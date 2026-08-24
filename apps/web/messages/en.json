@@ -1,0 +1,11 @@
+{
+  "common": {
+    "appName": "Customer Support CRM",
+    "loading": "Loading...",
+    "signedInAs": "Signed in as {email}",
+    "notSignedIn": "Not signed in.",
+    "login": "Log in",
+    "email": "Email",
+    "password": "Password"
+  }
+}

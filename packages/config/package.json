@@ -1,0 +1,23 @@
+{
+  "name": "@crm/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared TypeScript, ESLint, and Prettier configuration for the Customer Support CRM monorepo.",
+  "main": "./index.js",
+  "files": [
+    "tsconfig.*.json",
+    "eslint-preset.js",
+    "prettier-preset.js"
+  ],
+  "dependencies": {
+    "@eslint/js": "^9.39.5",
+    "typescript-eslint": "^8.67.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.11.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  # Dummy values so `prisma generate`/`validate` (which only need the env
+  # vars to be *present*, not a live database) succeed in CI. Never real
+  # secrets — see docs/architecture/05-auth-and-security.md ("Secrets").
+  DATABASE_URL: "postgresql://crm:crm@localhost:5432/crm?schema=public"
+  REDIS_URL: "redis://localhost:6379"
+  JWT_ACCESS_SECRET: "ci-only-access-secret-not-a-real-secret-32chars"
+  JWT_REFRESH_SECRET: "ci-only-refresh-secret-not-a-real-secret-32chars"
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @crm/api prisma:generate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+  docker-images:
+    name: Build Docker images
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [web, portal, api, worker]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.app }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: false
+          tags: crm-${{ matrix.app }}:ci
+          # No registry push / deploy step — production deployment is
+          # explicitly out of scope for this feature, see
+          # docs/architecture/12-risks-tradeoffs-and-scope.md.

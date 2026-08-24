@@ -1,0 +1,171 @@
+// Customer Support CRM — Prisma schema
+//
+// Source of truth: docs/architecture/04-data-and-multitenancy.md
+// This is the MINIMAL foundation schema for Story 02 (identity/auth/tenant
+// only). Feature-domain tables (customers, ticketing, SLA, KB, AI, channels,
+// notifications, reporting, integrations) are added by their own future
+// stories, each in its own logical Postgres schema per
+// docs/architecture/03-domain-boundaries.md.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector"), pg_trgm]
+  schemas    = ["identity", "admin"]
+}
+
+// ---------------------------------------------------------------------------
+// identity schema
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  branches  Branch[]
+
+  @@map("organizations")
+  @@schema("identity")
+}
+
+model Branch {
+  id             String           @id @default(uuid())
+  organizationId String           @map("organization_id")
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  name           String
+  timezone       String
+  departments    Department[]
+  userRoles      UserBranchRole[]
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  @@map("branches")
+  @@schema("identity")
+}
+
+model Department {
+  id        String           @id @default(uuid())
+  branchId  String           @map("branch_id")
+  branch    Branch           @relation(fields: [branchId], references: [id])
+  name      String
+  userRoles UserBranchRole[]
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@unique([branchId, name])
+  @@map("departments")
+  @@schema("identity")
+}
+
+model User {
+  id           String           @id @default(uuid())
+  email        String           @unique
+  passwordHash String           @map("password_hash")
+  fullName     String           @map("full_name")
+  isActive     Boolean          @default(true) @map("is_active")
+  branchRoles  UserBranchRole[]
+  refreshTokens RefreshToken[]
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@map("users")
+  @@schema("identity")
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  permissions RolePermission[]
+  userRoles   UserBranchRole[]
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@map("roles")
+  @@schema("identity")
+}
+
+model Permission {
+  id    String           @id @default(uuid())
+  key   String           @unique // e.g. "ticket:reassign"
+  roles RolePermission[]
+
+  @@map("permissions")
+  @@schema("identity")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id")
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String     @map("permission_id")
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+  @@schema("identity")
+}
+
+/// A user can hold a role scoped to a branch (and optionally a department
+/// within it). This is the enforcement point for the multi-branch /
+/// multi-department model — see docs/architecture/04-data-and-multitenancy.md.
+model UserBranchRole {
+  id           String      @id @default(uuid())
+  userId       String      @map("user_id")
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branchId     String      @map("branch_id")
+  branch       Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  departmentId String?     @map("department_id")
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  roleId       String      @map("role_id")
+  role         Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  @@unique([userId, branchId, departmentId, roleId])
+  @@map("user_branch_roles")
+  @@schema("identity")
+}
+
+/// Rotating refresh-token record — see docs/architecture/05-auth-and-security.md
+/// ("rotating refresh token"). Only the SHA-256 hash of the token is stored,
+/// never the raw token, so a leaked database dump cannot be replayed.
+/// A row is consumed (rotated) on every successful refresh: `revokedAt` is
+/// set on the old row and a new row is inserted for the next token.
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+  @@schema("identity")
+}
+
+// ---------------------------------------------------------------------------
+// admin schema
+// ---------------------------------------------------------------------------
+
+/// Append-only audit log. The application's runtime DB role must be granted
+/// INSERT/SELECT only on this table (no UPDATE/DELETE) — see
+/// docs/architecture/05-auth-and-security.md. Enforcing that grant is a
+/// deployment/DBA task tracked as a follow-up (see Story 02 plan's Done
+/// Criteria); Prisma itself cannot express column/row privileges.
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  branchId   String?  @map("branch_id")
+  diff       Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+  @@schema("admin")
+}

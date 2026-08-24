@@ -1,0 +1,40 @@
+import { z } from "zod";
+
+/**
+ * Every environment variable `apps/api` reads, validated once at boot.
+ * See docs/architecture/05-auth-and-security.md ("Secrets") and
+ * docs/architecture/11-quality-and-operations.md ("Environments").
+ *
+ * A missing/malformed value fails startup immediately instead of the app
+ * running with an undefined secret.
+ */
+export const envSchema = z.object({
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  PORT: z.coerce.number().int().positive().default(3001),
+
+  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  REDIS_URL: z.string().min(1, "REDIS_URL is required"),
+
+  JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
+  JWT_ACCESS_TTL: z.string().default("15m"),
+  JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
+  JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(7),
+
+  S3_ENDPOINT: z.string().optional(),
+  S3_ACCESS_KEY: z.string().optional(),
+  S3_SECRET_KEY: z.string().optional(),
+  S3_BUCKET: z.string().optional(),
+});
+
+export type EnvConfig = z.infer<typeof envSchema>;
+
+export function validateEnv(config: Record<string, unknown>): EnvConfig {
+  const result = envSchema.safeParse(config);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
+      .join("\n");
+    throw new Error(`Invalid environment configuration:\n${issues}`);
+  }
+  return result.data;
+}

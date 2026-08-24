@@ -1,0 +1,6 @@
+{
+  "common": {
+    "appName": "Customer Portal",
+    "placeholder": "The customer portal will let you submit tickets, track requests, view history, browse FAQs, and send feedback. This is a placeholder page for Story 02 — see docs/architecture/08-supporting-domains.md."
+  }
+}
