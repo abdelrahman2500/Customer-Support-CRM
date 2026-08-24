@@ -1,0 +1,12 @@
+version: 1
+project:
+  name: Customer Support CRM
+  primaryLanguage: typescript
+  projectRoots:
+    - .
+tracker:
+  type: github
+naming:
+  includeTrackerId: true
+  globalSequence: true
+agents: []
