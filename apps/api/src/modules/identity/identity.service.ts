@@ -1,20 +1,56 @@
 import { randomBytes, createHmac } from "node:crypto";
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
 import type { AuthenticatedUser, AuthTokenPair, JwtAccessTokenClaims } from "@crm/shared";
 import { PrismaService } from "../../prisma/prisma.service";
+import { TenantContext } from "../../common/tenant/tenant-context";
 import type { EnvConfig } from "../../common/config/env.validation";
+import type { CreateUserDto } from "./dto/create-user.dto";
+import type { UpdateUserDto } from "./dto/update-user.dto";
 
 const BCRYPT_ROUNDS = 12;
 
+export interface UserSummary {
+  id: string;
+  email: string;
+  fullName: string;
+  isActive: boolean;
+  roles: string[];
+}
+
+export interface RoleSummary {
+  id: string;
+  name: string;
+  permissions: string[];
+}
+
+export interface PermissionSummary {
+  id: string;
+  key: string;
+}
+
+/**
+ * Owns branches/departments/users/roles/permissions AND the auth session
+ * logic (login/refresh/logout/me) — see `identity.module.ts`. This class is
+ * request-scoped (transitively, via `TenantContext`) so `listUsers()` can
+ * resolve the caller's active branch without a branch id ever being
+ * accepted from the client — see docs/architecture/04-data-and-multitenancy.md
+ * ("Enforcement: TenantContext").
+ */
 @Injectable()
 export class IdentityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService<EnvConfig, true>,
+    private readonly tenantContext: TenantContext,
   ) {}
 
   /**
@@ -103,9 +139,103 @@ export class IdentityService {
       branchId: active?.branchId ?? null,
       departmentId: active?.departmentId ?? null,
       roles: user.branchRoles
-        .filter((br) => br.branchId === active?.branchId && br.departmentId === active?.departmentId)
+        .filter(
+          (br) => br.branchId === active?.branchId && br.departmentId === active?.departmentId,
+        )
         .map((br) => br.role.name),
     };
+  }
+
+  /**
+   * Creates a user scoped to a branch (and optionally a department) with a
+   * given role. The target branch is whatever the caller specifies in the
+   * DTO — an admin managing several branches is expected to pick one —
+   * this is deliberately not auto-scoped to the caller's own
+   * `TenantContext` branch (unlike `listUsers`, below).
+   */
+  async createUser(dto: CreateUserDto): Promise<{ id: string; email: string }> {
+    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (existing) {
+      throw new ConflictException("A user with this email already exists");
+    }
+
+    const passwordHash = await hashPassword(dto.password);
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: { email: dto.email, passwordHash, fullName: dto.fullName },
+      });
+      await tx.userBranchRole.create({
+        data: {
+          userId: created.id,
+          branchId: dto.branchId,
+          departmentId: dto.departmentId ?? null,
+          roleId: dto.roleId,
+        },
+      });
+      return created;
+    });
+
+    return { id: user.id, email: user.email };
+  }
+
+  /**
+   * Lists users in the caller's active branch — the first real consumer of
+   * `TenantContext.requireBranchScope()` (present since Story 02, unused
+   * until now). A user with roles in the branch under more than one
+   * department/role combination is still listed once.
+   */
+  async listUsers(): Promise<UserSummary[]> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+
+    const users = await this.prisma.user.findMany({
+      where: { branchRoles: { some: { branchId } } },
+      include: { branchRoles: { where: { branchId }, include: { role: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      isActive: user.isActive,
+      roles: [...new Set(user.branchRoles.map((br) => br.role.name))],
+    }));
+  }
+
+  async updateUser(id: string, dto: UpdateUserDto): Promise<{ id: string }> {
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("User not found");
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+    });
+
+    return { id };
+  }
+
+  async listRoles(): Promise<RoleSummary[]> {
+    const roles = await this.prisma.role.findMany({
+      include: { permissions: { include: { permission: true } } },
+      orderBy: { name: "asc" },
+    });
+
+    return roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      permissions: role.permissions.map((rp) => rp.permission.key),
+    }));
+  }
+
+  async listPermissions(): Promise<PermissionSummary[]> {
+    const permissions = await this.prisma.permission.findMany({ orderBy: { key: "asc" } });
+    return permissions.map((permission) => ({ id: permission.id, key: permission.key }));
   }
 
   // ---------------------------------------------------------------------
@@ -128,7 +258,9 @@ export class IdentityService {
       branchId: active?.branchId ?? null,
       departmentId: active?.departmentId ?? null,
       roles: branchRoles
-        .filter((br) => br.branchId === active?.branchId && br.departmentId === active?.departmentId)
+        .filter(
+          (br) => br.branchId === active?.branchId && br.departmentId === active?.departmentId,
+        )
         .map((br) => br.role.name),
     };
     return this.jwtService.signAsync(claims);
