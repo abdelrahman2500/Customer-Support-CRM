@@ -173,7 +173,7 @@ Add steps, after "Generate Prisma client" and before "Test":
 
 ```yaml
 - name: Run database migrations
-  run: pnpm --filter @crm/api prisma migrate deploy
+  run: pnpm --filter @crm/api exec prisma migrate deploy
 
 - name: Seed database
   run: pnpm --filter @crm/api prisma:seed
