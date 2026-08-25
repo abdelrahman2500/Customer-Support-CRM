@@ -6,17 +6,48 @@ on:
     branches: [main]
 
 env:
-  # Dummy values so `prisma generate`/`validate` (which only need the env
-  # vars to be *present*, not a live database) succeed in CI. Never real
-  # secrets — see docs/architecture/05-auth-and-security.md ("Secrets").
+  # Real, working credentials matching the `postgres`/`redis` service
+  # containers below (not the previous dummy placeholders) — see
+  # docs/architecture/05-auth-and-security.md ("Secrets"). Still not real
+  # production secrets: these only ever exist inside an ephemeral CI job.
   DATABASE_URL: "postgresql://crm:crm@localhost:5432/crm?schema=public"
   REDIS_URL: "redis://localhost:6379"
   JWT_ACCESS_SECRET: "ci-only-access-secret-not-a-real-secret-32chars"
   JWT_REFRESH_SECRET: "ci-only-refresh-secret-not-a-real-secret-32chars"
+  JWT_REFRESH_TTL_DAYS: "7"
+  SEED_ADMIN_EMAIL: "ci-admin@example.com"
+  SEED_ADMIN_PASSWORD: "ci-only-admin-password-not-a-real-secret-32ch"
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    # Same images as docker-compose.yml's local dev services (Story 02) —
+    # GitHub Actions runs these as plain containers alongside the job with
+    # the ports below mapped to localhost, independent of this repo's own
+    # Docker/WSL2 environment.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: crm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,8 +78,17 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Run database migrations
+        run: pnpm --filter @crm/api prisma migrate deploy
+
+      - name: Seed database
+        run: pnpm --filter @crm/api prisma:seed
+
       - name: Test
         run: pnpm test
+
+      - name: Integration tests
+        run: pnpm --filter @crm/api test:e2e
 
   docker-images:
     name: Build Docker images
