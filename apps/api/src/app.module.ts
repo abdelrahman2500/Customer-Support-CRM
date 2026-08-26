@@ -11,6 +11,7 @@ import { AuditInterceptor } from "./common/audit/audit.interceptor";
 import { TenantMiddleware } from "./common/tenant/tenant.middleware";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
+import { QueuesModule } from "./queues/queues.module";
 import { IdentityModule } from "./modules/identity/identity.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { TicketsModule } from "./modules/tickets/tickets.module";
@@ -29,6 +30,7 @@ import { SlaPoliciesModule } from "./modules/sla-policies/sla-policies.module";
     PrismaModule,
     AuthModule,
     HealthModule,
+    QueuesModule,
     IdentityModule,
     CustomersModule,
     TicketsModule,

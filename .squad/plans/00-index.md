@@ -8,3 +8,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | customer-management  | [customer-management/00-overview.md](./customer-management/00-overview.md)     | 06       |
 | ticketing            | [ticketing/00-overview.md](./ticketing/00-overview.md)                         | 07–09    |
 | sla-policy-foundation | [sla-policy-foundation/00-overview.md](./sla-policy-foundation/00-overview.md) | 10–      |
+| background-job-producer-foundation | [background-job-producer-foundation/00-overview.md](./background-job-producer-foundation/00-overview.md) | 14–      |
