@@ -351,15 +351,24 @@ model SlaPolicy {
 /// `TicketHistoryEntry` and `customers.Contact` already established.
 /// `onDelete: Cascade` on `ticket` mirrors `TicketHistoryEntry.ticket`'s own
 /// explicit choice exactly (schema.prisma, `TicketHistoryEntry` model).
+/// Story 15 adds the four `*NotifiedAt` columns below — the one deliberate
+/// exception to "never mutated": fire-once bookkeeping for the `sla-timers`
+/// job (apps/worker/src/queues/sla-timer.processor.ts), set at most once
+/// each via a conditional update. `responseTargetAt`/`resolutionTargetAt`/
+/// `slaPolicyId` remain untouched by that job.
 model SlaTicketTarget {
-  id                 String    @id @default(uuid())
-  ticketId           String    @unique @map("ticket_id")
-  ticket             Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  slaPolicyId        String    @map("sla_policy_id")
-  slaPolicy          SlaPolicy @relation(fields: [slaPolicyId], references: [id])
-  responseTargetAt   DateTime  @map("response_target_at")
-  resolutionTargetAt DateTime  @map("resolution_target_at")
-  createdAt          DateTime  @default(now()) @map("created_at")
+  id                           String    @id @default(uuid())
+  ticketId                     String    @unique @map("ticket_id")
+  ticket                       Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  slaPolicyId                  String    @map("sla_policy_id")
+  slaPolicy                    SlaPolicy @relation(fields: [slaPolicyId], references: [id])
+  responseTargetAt             DateTime  @map("response_target_at")
+  resolutionTargetAt           DateTime  @map("resolution_target_at")
+  responseAtRiskNotifiedAt     DateTime? @map("response_at_risk_notified_at")
+  responseBreachedNotifiedAt   DateTime? @map("response_breached_notified_at")
+  resolutionAtRiskNotifiedAt   DateTime? @map("resolution_at_risk_notified_at")
+  resolutionBreachedNotifiedAt DateTime? @map("resolution_breached_notified_at")
+  createdAt                    DateTime  @default(now()) @map("created_at")
 
   @@map("sla_ticket_targets")
   @@schema("sla")

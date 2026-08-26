@@ -3,6 +3,9 @@ import { BullModule } from "@nestjs/bullmq";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { validateEnv, type EnvConfig } from "./env.validation";
 import { HealthProcessor, HEALTH_CHECK_QUEUE } from "./queues/health.processor";
+import { SlaTimerProcessor, SLA_TIMERS_QUEUE } from "./queues/sla-timer.processor";
+import { SLA_TIMER_EVENTS_QUEUE } from "./queues/sla-timer-events.types";
+import { PrismaModule } from "./prisma/prisma.module";
 
 @Module({
   imports: [
@@ -15,7 +18,10 @@ import { HealthProcessor, HEALTH_CHECK_QUEUE } from "./queues/health.processor";
       }),
     }),
     BullModule.registerQueue({ name: HEALTH_CHECK_QUEUE }),
+    BullModule.registerQueue({ name: SLA_TIMERS_QUEUE }),
+    BullModule.registerQueue({ name: SLA_TIMER_EVENTS_QUEUE }),
+    PrismaModule,
   ],
-  providers: [HealthProcessor],
+  providers: [HealthProcessor, SlaTimerProcessor],
 })
 export class WorkerModule {}

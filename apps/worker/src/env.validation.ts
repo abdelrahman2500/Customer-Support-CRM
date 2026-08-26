@@ -1,13 +1,18 @@
 import { z } from "zod";
 
 /**
- * `apps/worker` only needs Redis (BullMQ) in this foundation story — it has
- * no domain queues yet (sla-timers, notifications, integration-sync,
- * ai-processing, reports-refresh are added by the feature stories that need
- * them; see docs/architecture/06-communication-and-realtime.md).
+ * `apps/worker` needed only Redis (BullMQ) through project-foundation
+ * Story 02; sla-policy-foundation Story 15 added `DATABASE_URL` — the
+ * minimum Prisma access needed for the `sla-timers` job to query
+ * `SlaTicketTarget`/`Ticket`/`SlaPolicy` (see
+ * apps/worker/src/prisma/prisma.service.ts). Remaining domain queues
+ * (notifications, integration-sync, ai-processing, reports-refresh) are
+ * still added by the feature stories that need them; see
+ * docs/architecture/06-communication-and-realtime.md.
  */
 export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   REDIS_URL: z.string().min(1, "REDIS_URL is required"),
 });
 
