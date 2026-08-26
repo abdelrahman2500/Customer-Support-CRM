@@ -11,6 +11,7 @@ import { TenantMiddleware } from "./common/tenant/tenant.middleware";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
 import { IdentityModule } from "./modules/identity/identity.module";
+import { CustomersModule } from "./modules/customers/customers.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { IdentityModule } from "./modules/identity/identity.module";
     AuthModule,
     HealthModule,
     IdentityModule,
+    CustomersModule,
   ],
   providers: [
     // Registration order matters: AuthGuard must resolve `request.user`

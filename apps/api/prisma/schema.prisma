@@ -16,7 +16,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   extensions = [pgvector(map: "vector"), pg_trgm]
-  schemas    = ["identity", "admin"]
+  schemas    = ["identity", "admin", "customers"]
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +41,7 @@ model Branch {
   timezone       String
   departments    Department[]
   userRoles      UserBranchRole[]
+  customers      Customer[]
   createdAt      DateTime         @default(now()) @map("created_at")
 
   @@map("branches")
@@ -168,4 +169,49 @@ model AuditLog {
 
   @@map("audit_logs")
   @@schema("admin")
+}
+
+// ---------------------------------------------------------------------------
+// customers schema
+// ---------------------------------------------------------------------------
+
+/// Aggregate root for the Customer Management domain — see
+/// docs/architecture/03-domain-boundaries.md ("Customer Management").
+/// Branch-scoped per docs/architecture/04-data-and-multitenancy.md; no
+/// departmentId — departments route tickets, not customer identity, and no
+/// story has justified department-scoping a customer yet.
+model Customer {
+  id          String    @id @default(uuid())
+  branchId    String    @map("branch_id")
+  branch      Branch    @relation(fields: [branchId], references: [id])
+  displayName String    @map("display_name")
+  isActive    Boolean   @default(true) @map("is_active")
+  contacts    Contact[]
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([branchId])
+  @@map("customers")
+  @@schema("customers")
+}
+
+/// A person belonging to exactly one Customer — no independent lifecycle or
+/// permission namespace (mutations reuse `customer:*`, see identity.service.ts
+/// precedent for a sub-entity of an aggregate root, e.g. UserBranchRole).
+/// Email is unique per Customer, never globally — the same real person's
+/// email may legitimately appear under a different Customer.
+model Contact {
+  id         String   @id @default(uuid())
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  fullName   String   @map("full_name")
+  email      String?
+  phone      String?
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([customerId, email])
+  @@index([customerId])
+  @@map("contacts")
+  @@schema("customers")
 }

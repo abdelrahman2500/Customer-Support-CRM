@@ -10,8 +10,8 @@ naming:
   includeTrackerId: true
   globalSequence: true
 agents: []
-planner:
-  budget:
-    maxFileReads:25
-    maxContextBytes: 50000
-    maxDurationSeconds: 180
+# planner:
+#   budget:
+#     maxFileReads:25
+#     maxContextBytes: 50000
+#     maxDurationSeconds: 180
