@@ -16,7 +16,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   extensions = [pgvector(map: "vector"), pg_trgm]
-  schemas    = ["identity", "admin", "customers"]
+  schemas    = ["identity", "admin", "customers", "ticketing"]
 }
 
 // ---------------------------------------------------------------------------
@@ -42,6 +42,7 @@ model Branch {
   departments    Department[]
   userRoles      UserBranchRole[]
   customers      Customer[]
+  tickets        Ticket[]
   createdAt      DateTime         @default(now()) @map("created_at")
 
   @@map("branches")
@@ -54,6 +55,7 @@ model Department {
   branch    Branch           @relation(fields: [branchId], references: [id])
   name      String
   userRoles UserBranchRole[]
+  tickets   Ticket[]
   createdAt DateTime         @default(now()) @map("created_at")
 
   @@unique([branchId, name])
@@ -62,15 +64,16 @@ model Department {
 }
 
 model User {
-  id           String           @id @default(uuid())
-  email        String           @unique
-  passwordHash String           @map("password_hash")
-  fullName     String           @map("full_name")
-  isActive     Boolean          @default(true) @map("is_active")
-  branchRoles  UserBranchRole[]
-  refreshTokens RefreshToken[]
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  id              String           @id @default(uuid())
+  email           String           @unique
+  passwordHash    String           @map("password_hash")
+  fullName        String           @map("full_name")
+  isActive        Boolean          @default(true) @map("is_active")
+  branchRoles     UserBranchRole[]
+  refreshTokens   RefreshToken[]
+  assignedTickets Ticket[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
 
   @@map("users")
   @@schema("identity")
@@ -187,6 +190,7 @@ model Customer {
   displayName String    @map("display_name")
   isActive    Boolean   @default(true) @map("is_active")
   contacts    Contact[]
+  tickets     Ticket[]
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
@@ -208,10 +212,65 @@ model Contact {
   email      String?
   phone      String?
   isPrimary  Boolean  @default(false) @map("is_primary")
+  tickets    Ticket[]
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@unique([customerId, email])
   @@index([customerId])
   @@map("contacts")
   @@schema("customers")
+}
+
+// ---------------------------------------------------------------------------
+// ticketing schema
+// ---------------------------------------------------------------------------
+
+/// See docs/architecture/03-domain-boundaries.md ("Ticketing"). Domain-event
+/// emission (ticket.created/ticket.updated/ticket.escalated) and CASL-based
+/// per-record visibility are named in the architecture but explicitly
+/// deferred by Story 07 — see that story's "Settled decisions" section.
+/// `category` is a plain nullable String, not a lookup table — no story has
+/// justified a `Category` model yet.
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@schema("ticketing")
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+
+  @@schema("ticketing")
+}
+
+model Ticket {
+  id               String         @id @default(uuid())
+  branchId         String         @map("branch_id")
+  branch           Branch         @relation(fields: [branchId], references: [id])
+  departmentId     String?        @map("department_id")
+  department       Department?    @relation(fields: [departmentId], references: [id])
+  customerId       String         @map("customer_id")
+  customer         Customer       @relation(fields: [customerId], references: [id])
+  contactId        String?        @map("contact_id")
+  contact          Contact?       @relation(fields: [contactId], references: [id])
+  assignedToUserId String?        @map("assigned_to_user_id")
+  assignedToUser   User?          @relation(fields: [assignedToUserId], references: [id])
+  subject          String
+  category         String?
+  priority         TicketPriority @default(MEDIUM)
+  status           TicketStatus   @default(OPEN)
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  @@index([branchId])
+  @@index([customerId])
+  @@index([assignedToUserId])
+  @@map("tickets")
+  @@schema("ticketing")
 }

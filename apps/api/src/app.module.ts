@@ -12,6 +12,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
 import { IdentityModule } from "./modules/identity/identity.module";
 import { CustomersModule } from "./modules/customers/customers.module";
+import { TicketsModule } from "./modules/tickets/tickets.module";
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { CustomersModule } from "./modules/customers/customers.module";
     HealthModule,
     IdentityModule,
     CustomersModule,
+    TicketsModule,
   ],
   providers: [
     // Registration order matters: AuthGuard must resolve `request.user`

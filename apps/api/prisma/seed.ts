@@ -25,6 +25,9 @@ const PERMISSION_CATALOG = [
   "customer:create",
   "customer:read",
   "customer:update",
+  "ticket:create",
+  "ticket:read",
+  "ticket:update",
 ] as const;
 
 // No ticketing/customer/etc. permissions yet — those land with the stories

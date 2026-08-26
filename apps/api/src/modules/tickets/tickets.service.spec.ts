@@ -1,0 +1,278 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NotFoundException } from "@nestjs/common";
+import { TicketsService } from "./tickets.service";
+import type { PrismaService } from "../../prisma/prisma.service";
+import type { TenantContext } from "../../common/tenant/tenant-context";
+
+function buildPrismaMock() {
+  return {
+    ticket: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    customer: {
+      findFirst: vi.fn(),
+    },
+    contact: {
+      findFirst: vi.fn(),
+    },
+    department: {
+      findFirst: vi.fn(),
+    },
+    userBranchRole: {
+      findFirst: vi.fn(),
+    },
+  };
+}
+
+function buildTenantContextMock(branchId: string | null = "branch-1") {
+  return {
+    requireBranchScope: vi.fn(() => {
+      if (!branchId) {
+        throw new Error("TenantContext: no active branch on this request");
+      }
+      return { branchId };
+    }),
+  };
+}
+
+function createService(
+  prismaMock: ReturnType<typeof buildPrismaMock>,
+  tenantMock: ReturnType<typeof buildTenantContextMock>,
+): TicketsService {
+  return new TicketsService(
+    prismaMock as unknown as PrismaService,
+    tenantMock as unknown as TenantContext,
+  );
+}
+
+describe("TicketsService", () => {
+  let prisma: ReturnType<typeof buildPrismaMock>;
+  let tenantContext: ReturnType<typeof buildTenantContextMock>;
+  let service: TicketsService;
+
+  const baseDto = { customerId: "customer-1", subject: "Cannot log in" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prisma = buildPrismaMock();
+    tenantContext = buildTenantContextMock();
+    service = createService(prisma, tenantContext);
+  });
+
+  describe("createTicket", () => {
+    it("throws NotFoundException when the customer isn't in the caller's branch", async () => {
+      prisma.customer.findFirst.mockResolvedValue(null);
+
+      await expect(service.createTicket(baseDto)).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.customer.findFirst).toHaveBeenCalledWith({
+        where: { id: "customer-1", branchId: "branch-1" },
+      });
+      expect(prisma.ticket.create).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException when the contact doesn't belong to the given customer", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createTicket({ ...baseDto, contactId: "contact-from-elsewhere" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.contact.findFirst).toHaveBeenCalledWith({
+        where: { id: "contact-from-elsewhere", customerId: "customer-1" },
+      });
+      expect(prisma.ticket.create).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException when the department isn't in the caller's branch", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.department.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createTicket({ ...baseDto, departmentId: "dept-from-elsewhere" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.department.findFirst).toHaveBeenCalledWith({
+        where: { id: "dept-from-elsewhere", branchId: "branch-1" },
+      });
+      expect(prisma.ticket.create).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException when assignedToUserId has no role in the caller's branch", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.userBranchRole.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createTicket({ ...baseDto, assignedToUserId: "user-from-elsewhere" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.userBranchRole.findFirst).toHaveBeenCalledWith({
+        where: { userId: "user-from-elsewhere", branchId: "branch-1" },
+      });
+      expect(prisma.ticket.create).not.toHaveBeenCalled();
+    });
+
+    it("creates the ticket with all cross-domain checks passing, defaulting nullable fields", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.findFirst.mockResolvedValue({ id: "contact-1" });
+      prisma.department.findFirst.mockResolvedValue({ id: "dept-1" });
+      prisma.userBranchRole.findFirst.mockResolvedValue({ id: "ubr-1" });
+      prisma.ticket.create.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: "contact-1",
+        departmentId: "dept-1",
+        assignedToUserId: "user-1",
+      });
+
+      const result = await service.createTicket({
+        ...baseDto,
+        contactId: "contact-1",
+        departmentId: "dept-1",
+        assignedToUserId: "user-1",
+      });
+
+      expect(prisma.ticket.create).toHaveBeenCalledWith({
+        data: {
+          branchId: "branch-1",
+          customerId: "customer-1",
+          contactId: "contact-1",
+          departmentId: "dept-1",
+          assignedToUserId: "user-1",
+          subject: "Cannot log in",
+          category: null,
+        },
+      });
+      expect(result.status).toBe("OPEN");
+      expect(result.priority).toBe("MEDIUM");
+    });
+
+    it("omits contactId/departmentId/assignedToUserId checks entirely when not provided", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.ticket.create.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+      });
+
+      await service.createTicket(baseDto);
+
+      expect(prisma.contact.findFirst).not.toHaveBeenCalled();
+      expect(prisma.department.findFirst).not.toHaveBeenCalled();
+      expect(prisma.userBranchRole.findFirst).not.toHaveBeenCalled();
+      expect(prisma.ticket.create).toHaveBeenCalledWith({
+        data: {
+          branchId: "branch-1",
+          customerId: "customer-1",
+          contactId: null,
+          departmentId: null,
+          assignedToUserId: null,
+          subject: "Cannot log in",
+          category: null,
+        },
+      });
+    });
+
+    it("passes an explicit priority through instead of relying on the schema default", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.ticket.create.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "URGENT",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+      });
+
+      await service.createTicket({ ...baseDto, priority: "URGENT" as never });
+
+      expect(prisma.ticket.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ priority: "URGENT" }) }),
+      );
+    });
+  });
+
+  describe("listTickets", () => {
+    it("scopes the query to the caller's active branch", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets();
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1" } }),
+      );
+    });
+  });
+
+  describe("getTicket", () => {
+    it("throws NotFoundException for an unknown/out-of-scope id", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(service.getTicket("missing-id")).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticket.findFirst).toHaveBeenCalledWith({
+        where: { id: "missing-id", branchId: "branch-1" },
+      });
+    });
+  });
+
+  describe("updateTicket", () => {
+    it("throws NotFoundException for an unknown/out-of-scope id", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateTicket("missing-id", { status: "CLOSED" as never }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticket.update).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException when reassigning to a user outside the caller's branch", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.userBranchRole.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateTicket("ticket-1", { assignedToUserId: "user-from-elsewhere" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.userBranchRole.findFirst).toHaveBeenCalledWith({
+        where: { userId: "user-from-elsewhere", branchId: "branch-1" },
+      });
+      expect(prisma.ticket.update).not.toHaveBeenCalled();
+    });
+
+    it("only includes fields present in the DTO", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+
+      await service.updateTicket("ticket-1", { status: "IN_PROGRESS" as never });
+
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: "ticket-1" },
+        data: { status: "IN_PROGRESS" },
+      });
+    });
+
+    it("reassigns successfully once the user is confirmed in scope", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.userBranchRole.findFirst.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateTicket("ticket-1", { assignedToUserId: "user-1" });
+
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: "ticket-1" },
+        data: { assignedToUserId: "user-1" },
+      });
+    });
+  });
+});
