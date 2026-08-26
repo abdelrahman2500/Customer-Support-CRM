@@ -5,8 +5,8 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateTicketDto } from "./dto/create-ticket.dto";
 import type { UpdateTicketDto } from "./dto/update-ticket.dto";
-import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT } from "./tickets.events";
-import type { TicketCreatedEvent, TicketUpdatedEvent } from "./tickets.events";
+import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT, TICKET_RECATEGORIZED_EVENT } from "./tickets.events";
+import type { TicketCreatedEvent, TicketUpdatedEvent, TicketRecategorizedEvent } from "./tickets.events";
 
 export interface TicketSummary {
   id: string;
@@ -117,11 +117,19 @@ export class TicketsService {
 
   async updateTicket(id: string, dto: UpdateTicketDto): Promise<{ id: string }> {
     const { branchId } = this.tenantContext.requireBranchScope();
-    await this.findTicketInScope(id);
+    const existing = await this.findTicketInScope(id);
 
+    if (dto.departmentId !== undefined) {
+      await this.requireDepartmentInScope(dto.departmentId, branchId);
+    }
     if (dto.assignedToUserId !== undefined) {
       await this.requireUserInScope(dto.assignedToUserId, branchId);
     }
+
+    const isRecategorized =
+      (dto.category !== undefined && dto.category !== existing.category) ||
+      (dto.priority !== undefined && dto.priority !== existing.priority) ||
+      (dto.departmentId !== undefined && dto.departmentId !== existing.departmentId);
 
     const updated = await this.prisma.ticket.update({
       where: { id },
@@ -130,15 +138,23 @@ export class TicketsService {
         ...(dto.category !== undefined ? { category: dto.category } : {}),
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
+        ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
         ...(dto.assignedToUserId !== undefined
           ? { assignedToUserId: dto.assignedToUserId }
           : {}),
       },
     });
+    const summary = toTicketSummary(updated);
     this.eventEmitter.emit(TICKET_UPDATED_EVENT, {
-      ticket: toTicketSummary(updated),
+      ticket: summary,
       actorUserId: this.tenantContext.userId,
     } satisfies TicketUpdatedEvent);
+    if (isRecategorized) {
+      this.eventEmitter.emit(TICKET_RECATEGORIZED_EVENT, {
+        ticket: summary,
+        actorUserId: this.tenantContext.userId,
+      } satisfies TicketRecategorizedEvent);
+    }
     return { id };
   }
 

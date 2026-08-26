@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotFoundException } from "@nestjs/common";
 import type { EventEmitter2 } from "@nestjs/event-emitter";
 import { TicketsService } from "./tickets.service";
-import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT } from "./tickets.events";
+import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT, TICKET_RECATEGORIZED_EVENT } from "./tickets.events";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 
@@ -277,6 +277,20 @@ describe("TicketsService", () => {
       expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
+    it("throws NotFoundException when moving to a department outside the caller's branch, before updating or emitting", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", category: null, priority: "MEDIUM", departmentId: null });
+      prisma.department.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateTicket("ticket-1", { departmentId: "dept-from-elsewhere" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.department.findFirst).toHaveBeenCalledWith({
+        where: { id: "dept-from-elsewhere", branchId: "branch-1" },
+      });
+      expect(prisma.ticket.update).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
     it("only includes fields present in the DTO", async () => {
       prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
       prisma.ticket.update.mockResolvedValue({
@@ -302,6 +316,186 @@ describe("TicketsService", () => {
         ticket: expect.objectContaining({ id: "ticket-1", status: "IN_PROGRESS" }),
         actorUserId: "user-1",
       });
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+        TICKET_RECATEGORIZED_EVENT,
+        expect.anything(),
+      );
+    });
+
+    it("does not emit ticket.recategorized when only subject changes", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        category: "billing",
+        priority: "MEDIUM",
+        departmentId: null,
+      });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "New subject",
+        category: "billing",
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+      });
+
+      await service.updateTicket("ticket-1", { subject: "New subject" });
+
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+        TICKET_RECATEGORIZED_EVENT,
+        expect.anything(),
+      );
+    });
+
+    it("does not emit ticket.recategorized when the DTO resends the ticket's current category", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        category: "billing",
+        priority: "MEDIUM",
+        departmentId: null,
+      });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: "billing",
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+      });
+
+      await service.updateTicket("ticket-1", { category: "billing" });
+
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+        TICKET_RECATEGORIZED_EVENT,
+        expect.anything(),
+      );
+    });
+
+    it("emits ticket.recategorized when category changes", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        category: "billing",
+        priority: "MEDIUM",
+        departmentId: null,
+      });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: "technical",
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+      });
+
+      await service.updateTicket("ticket-1", { category: "technical" });
+
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(2);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
+        ticket: expect.objectContaining({ id: "ticket-1", category: "technical" }),
+        actorUserId: "user-1",
+      });
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_RECATEGORIZED_EVENT, {
+        ticket: expect.objectContaining({ id: "ticket-1", category: "technical" }),
+        actorUserId: "user-1",
+      });
+    });
+
+    it("emits ticket.recategorized when priority changes", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        category: null,
+        priority: "MEDIUM",
+        departmentId: null,
+      });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "URGENT",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+      });
+
+      await service.updateTicket("ticket-1", { priority: "URGENT" as never });
+
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(2);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        TICKET_RECATEGORIZED_EVENT,
+        expect.objectContaining({ ticket: expect.objectContaining({ priority: "URGENT" }) }),
+      );
+    });
+
+    it("emits ticket.recategorized when departmentId changes", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        category: null,
+        priority: "MEDIUM",
+        departmentId: "dept-old",
+      });
+      prisma.department.findFirst.mockResolvedValue({ id: "dept-new" });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: "dept-new",
+        assignedToUserId: null,
+      });
+
+      await service.updateTicket("ticket-1", { departmentId: "dept-new" });
+
+      expect(prisma.department.findFirst).toHaveBeenCalledWith({
+        where: { id: "dept-new", branchId: "branch-1" },
+      });
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(2);
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        TICKET_RECATEGORIZED_EVENT,
+        expect.objectContaining({ ticket: expect.objectContaining({ departmentId: "dept-new" }) }),
+      );
+    });
+
+    it("emits ticket.recategorized exactly once when category and priority both change in the same update", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        category: "billing",
+        priority: "MEDIUM",
+        departmentId: null,
+      });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: "technical",
+        priority: "URGENT",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+      });
+
+      await service.updateTicket("ticket-1", { category: "technical", priority: "URGENT" as never });
+
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(2);
+      const recategorizedCalls = eventEmitter.emit.mock.calls.filter(
+        ([eventName]) => eventName === TICKET_RECATEGORIZED_EVENT,
+      );
+      expect(recategorizedCalls).toHaveLength(1);
     });
 
     it("reassigns successfully once the user is confirmed in scope", async () => {

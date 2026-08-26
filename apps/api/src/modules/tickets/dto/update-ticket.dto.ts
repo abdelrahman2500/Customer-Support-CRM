@@ -27,5 +27,10 @@ export class UpdateTicketDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsUUID()
+  departmentId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
   assignedToUserId?: string;
 }

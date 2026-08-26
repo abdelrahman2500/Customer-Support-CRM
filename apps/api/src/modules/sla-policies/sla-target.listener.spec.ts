@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SlaTargetListener } from "./sla-target.listener";
-import { TICKET_CREATED_EVENT } from "../tickets/tickets.events";
+import { TICKET_CREATED_EVENT, TICKET_RECATEGORIZED_EVENT } from "../tickets/tickets.events";
 import type { TicketSummary } from "../tickets/tickets.service";
 import type { PrismaService } from "../../prisma/prisma.service";
 
@@ -20,6 +20,8 @@ function buildPrismaMock() {
     },
     slaTicketTarget: {
       create: vi.fn(),
+      upsert: vi.fn(),
+      deleteMany: vi.fn(),
     },
   };
 }
@@ -232,6 +234,159 @@ describe("SlaTargetListener", () => {
     });
   });
 
+  describe("onTicketRecategorized", () => {
+    it("re-fetches the ticket by event.ticket.id", async () => {
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([]);
+
+      await listener.onTicketRecategorized({ ticket, actorUserId: "user-1" });
+
+      expect(prisma.ticket.findUnique).toHaveBeenCalledWith({
+        where: { id: "ticket-1" },
+        select: {
+          branchId: true,
+          departmentId: true,
+          category: true,
+          priority: true,
+          createdAt: true,
+        },
+      });
+    });
+
+    it("does nothing when the ticket cannot be re-fetched (defensive edge case)", async () => {
+      prisma.ticket.findUnique.mockResolvedValue(null);
+
+      await listener.onTicketRecategorized({ ticket, actorUserId: "user-1" });
+
+      expect(prisma.slaPolicy.findMany).not.toHaveBeenCalled();
+      expect(prisma.slaTicketTarget.upsert).not.toHaveBeenCalled();
+      expect(prisma.slaTicketTarget.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("recomputes and upserts the target using the newly-matched policy, resetting all four notified-at columns", async () => {
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([wildcardPolicy()]); // response 30, resolution 240
+
+      await listener.onTicketRecategorized({ ticket, actorUserId: "user-1" });
+
+      expect(prisma.slaTicketTarget.upsert).toHaveBeenCalledWith({
+        where: { ticketId: "ticket-1" },
+        create: {
+          ticketId: "ticket-1",
+          slaPolicyId: "policy-wildcard",
+          responseTargetAt: new Date("2026-01-01T00:30:00.000Z"),
+          resolutionTargetAt: new Date("2026-01-01T04:00:00.000Z"),
+        },
+        update: {
+          slaPolicyId: "policy-wildcard",
+          responseTargetAt: new Date("2026-01-01T00:30:00.000Z"),
+          resolutionTargetAt: new Date("2026-01-01T04:00:00.000Z"),
+          responseAtRiskNotifiedAt: null,
+          responseBreachedNotifiedAt: null,
+          resolutionAtRiskNotifiedAt: null,
+          resolutionBreachedNotifiedAt: null,
+        },
+      });
+    });
+
+    it("supplies a correctly-shaped `create` payload for a ticket that previously had no target", async () => {
+      // Whether Prisma's `upsert` actually takes the `create` or `update`
+      // branch depends on whether a row matching `where` already exists in
+      // the real database — not observable through this mock. This test
+      // only proves the `create` payload this listener supplies is correct
+      // for that case; the branch selection itself is covered by the e2e
+      // suite (real Postgres).
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([wildcardPolicy()]);
+
+      await listener.onTicketRecategorized({ ticket, actorUserId: "user-1" });
+
+      const call = prisma.slaTicketTarget.upsert.mock.calls[0]![0];
+      expect(call.create).toEqual({
+        ticketId: "ticket-1",
+        slaPolicyId: "policy-wildcard",
+        responseTargetAt: new Date("2026-01-01T00:30:00.000Z"),
+        resolutionTargetAt: new Date("2026-01-01T04:00:00.000Z"),
+      });
+    });
+
+    it("resets notified-at columns to null unconditionally, regardless of any previous at-risk/breached state", async () => {
+      // The listener never reads the existing row's notified-at values — the
+      // `update` payload's four `null`s are unconditional (Design item 6),
+      // so a previously at-risk/breached target is reset the same way a
+      // never-fired one is.
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([wildcardPolicy()]);
+
+      await listener.onTicketRecategorized({ ticket, actorUserId: "user-1" });
+
+      const call = prisma.slaTicketTarget.upsert.mock.calls[0]![0];
+      expect(call.update).toMatchObject({
+        responseAtRiskNotifiedAt: null,
+        responseBreachedNotifiedAt: null,
+        resolutionAtRiskNotifiedAt: null,
+        resolutionBreachedNotifiedAt: null,
+      });
+    });
+
+    it("deletes the existing target and does not upsert when no policy matches", async () => {
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([]);
+
+      await listener.onTicketRecategorized({ ticket, actorUserId: "user-1" });
+
+      expect(prisma.slaTicketTarget.deleteMany).toHaveBeenCalledWith({
+        where: { ticketId: "ticket-1" },
+      });
+      expect(prisma.slaTicketTarget.upsert).not.toHaveBeenCalled();
+    });
+
+    it("reuses the branch's BusinessHoursCalendar the same way onTicketCreated does (Story 13, shared helper)", async () => {
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([wildcardPolicy()]); // response 30, resolution 240
+      prisma.businessHoursCalendar.findFirst.mockResolvedValue({
+        branch: { timezone: "UTC" },
+        days: [{ weekday: 4, isOpen: true, startMinute: 540, endMinute: 1020 }],
+        exceptions: [],
+      });
+
+      await listener.onTicketRecategorized({ ticket, actorUserId: "user-1" });
+
+      expect(prisma.businessHoursCalendar.findFirst).toHaveBeenCalledWith({
+        where: { branchId: "branch-1" },
+        include: { branch: { select: { timezone: true } }, days: true, exceptions: true },
+      });
+      expect(prisma.slaTicketTarget.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            responseTargetAt: new Date("2026-01-01T09:30:00.000Z"),
+            resolutionTargetAt: new Date("2026-01-01T13:00:00.000Z"),
+          }),
+        }),
+      );
+    });
+
+    it("does not throw when persistence fails — it catches and logs instead", async () => {
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([wildcardPolicy()]);
+      prisma.slaTicketTarget.upsert.mockRejectedValue(new Error("db unavailable"));
+
+      await expect(
+        listener.onTicketRecategorized({ ticket, actorUserId: "user-1" }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("does not throw when the deleteMany persistence fails — it catches and logs instead", async () => {
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([]);
+      prisma.slaTicketTarget.deleteMany.mockRejectedValue(new Error("db unavailable"));
+
+      await expect(
+        listener.onTicketRecategorized({ ticket, actorUserId: "user-1" }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   it("does not subscribe to ticket.updated", () => {
     expect((listener as unknown as Record<string, unknown>).onTicketUpdated).toBeUndefined();
   });
@@ -240,5 +395,13 @@ describe("SlaTargetListener", () => {
     // Sanity check that the constant this listener is decorated with matches
     // the constant TicketsService actually emits.
     expect(TICKET_CREATED_EVENT).toBe("ticket.created");
+  });
+
+  it("subscribes to ticket.recategorized via a distinct handler from onTicketUpdated", () => {
+    // Sanity check that the constant this listener is decorated with matches
+    // the constant TicketsService actually emits (Story 16).
+    expect(TICKET_RECATEGORIZED_EVENT).toBe("ticket.recategorized");
+    expect(typeof listener.onTicketRecategorized).toBe("function");
+    expect((listener as unknown as Record<string, unknown>).onTicketUpdated).toBeUndefined();
   });
 });
