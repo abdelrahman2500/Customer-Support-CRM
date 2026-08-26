@@ -269,6 +269,7 @@ model Ticket {
   priority         TicketPriority @default(MEDIUM)
   status           TicketStatus   @default(OPEN)
   historyEntries   TicketHistoryEntry[]
+  slaTarget        SlaTicketTarget?
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
@@ -328,8 +329,37 @@ model SlaPolicy {
   isActive                Boolean     @default(true) @map("is_active")
   createdAt               DateTime    @default(now()) @map("created_at")
   updatedAt               DateTime    @updatedAt @map("updated_at")
+  targets                 SlaTicketTarget[]
 
   @@index([branchId])
   @@map("sla_policies")
+  @@schema("sla")
+}
+
+/// The first row of runtime SLA automation state (see
+/// docs/architecture/07-sla-automation-and-ai.md, "SLA targets are computed
+/// when a ticket is created... by `SlaModule` reacting to `ticket.created`")
+/// — computed once, when a ticket is created, and never mutated (this story
+/// does not react to `ticket.updated`, see Story 11's "Settled decisions").
+/// Strict 1:1 with `Ticket` (`ticketId` is `@unique`), not an append-only
+/// log, because no recomputation happens. `slaPolicyId` is kept only for
+/// traceability. Absolute timestamps (`responseTargetAt`/`resolutionTargetAt`),
+/// not raw minute counts, so a later edit to the matched `SlaPolicy` never
+/// retroactively changes an already-computed target. No `branchId` — scope
+/// is always derived through the parent `Ticket`, the same precedent
+/// `TicketHistoryEntry` and `customers.Contact` already established.
+/// `onDelete: Cascade` on `ticket` mirrors `TicketHistoryEntry.ticket`'s own
+/// explicit choice exactly (schema.prisma, `TicketHistoryEntry` model).
+model SlaTicketTarget {
+  id                 String    @id @default(uuid())
+  ticketId           String    @unique @map("ticket_id")
+  ticket             Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  slaPolicyId        String    @map("sla_policy_id")
+  slaPolicy          SlaPolicy @relation(fields: [slaPolicyId], references: [id])
+  responseTargetAt   DateTime  @map("response_target_at")
+  resolutionTargetAt DateTime  @map("resolution_target_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@map("sla_ticket_targets")
   @@schema("sla")
 }
