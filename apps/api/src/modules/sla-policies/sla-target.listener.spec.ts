@@ -12,6 +12,12 @@ function buildPrismaMock() {
     slaPolicy: {
       findMany: vi.fn(),
     },
+    // Defaults to `null` (no calendar for the branch) so every pre-existing
+    // test below — none of which configure this mock — continues to
+    // exercise exactly the wall-clock fallback path they always have.
+    businessHoursCalendar: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
     slaTicketTarget: {
       create: vi.fn(),
     },
@@ -177,6 +183,52 @@ describe("SlaTargetListener", () => {
       await expect(
         listener.onTicketCreated({ ticket, actorUserId: "user-1" }),
       ).resolves.toBeUndefined();
+    });
+
+    it("uses the branch's BusinessHoursCalendar to compute both targets when one exists (Story 13)", async () => {
+      // fullTicketRow.createdAt is 2026-01-01T00:00:00.000Z, a Thursday
+      // (weekday 4), at local midnight — before the calendar's 09:00 open.
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([wildcardPolicy()]); // response 30, resolution 240
+      prisma.businessHoursCalendar.findFirst.mockResolvedValue({
+        branch: { timezone: "UTC" },
+        days: [{ weekday: 4, isOpen: true, startMinute: 540, endMinute: 1020 }],
+        exceptions: [],
+      });
+
+      await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
+
+      expect(prisma.businessHoursCalendar.findFirst).toHaveBeenCalledWith({
+        where: { branchId: "branch-1" },
+        include: { branch: { select: { timezone: true } }, days: true, exceptions: true },
+      });
+      // Business-hours-aware: both targets start counting from 09:00
+      // (the window's open), not from midnight — clearly different from
+      // the plain wall-clock 00:30/04:00 the fallback path would produce,
+      // proving the calendar path was actually used.
+      expect(prisma.slaTicketTarget.create).toHaveBeenCalledWith({
+        data: {
+          ticketId: "ticket-1",
+          slaPolicyId: "policy-wildcard",
+          responseTargetAt: new Date("2026-01-01T09:30:00.000Z"),
+          resolutionTargetAt: new Date("2026-01-01T13:00:00.000Z"),
+        },
+      });
+    });
+
+    it("catches and logs when the calendar's business hours never permit a target (e.g. all closed)", async () => {
+      prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
+      prisma.slaPolicy.findMany.mockResolvedValue([wildcardPolicy()]);
+      prisma.businessHoursCalendar.findFirst.mockResolvedValue({
+        branch: { timezone: "UTC" },
+        days: [],
+        exceptions: [],
+      });
+
+      await expect(
+        listener.onTicketCreated({ ticket, actorUserId: "user-1" }),
+      ).resolves.toBeUndefined();
+      expect(prisma.slaTicketTarget.create).not.toHaveBeenCalled();
     });
   });
 

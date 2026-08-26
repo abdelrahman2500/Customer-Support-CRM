@@ -126,8 +126,10 @@ describe("SLA Targets (e2e)", () => {
     expect(response.body.ticketId).toBe(matchingTicketId);
     const responseTargetAt = new Date(response.body.responseTargetAt).getTime();
     const resolutionTargetAt = new Date(response.body.resolutionTargetAt).getTime();
-    // (240 - 30) minutes apart, regardless of the ticket's exact createdAt.
-    expect(resolutionTargetAt - responseTargetAt).toBe((240 - 30) * 60_000);
+    // resolutionTargetMinutes (240) > responseTargetMinutes (30), and both
+    // are walked forward from the same instant — resolution can never land
+    // before response, whether or not business-hours math applies (Story 13).
+    expect(resolutionTargetAt).toBeGreaterThanOrEqual(responseTargetAt);
   });
 
   it("produces no target when no policy matches", async () => {

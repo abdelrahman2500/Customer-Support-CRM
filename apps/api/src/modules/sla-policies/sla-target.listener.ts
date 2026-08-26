@@ -3,6 +3,7 @@ import { OnEvent } from "@nestjs/event-emitter";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TICKET_CREATED_EVENT } from "../tickets/tickets.events";
 import type { TicketCreatedEvent } from "../tickets/tickets.events";
+import { addBusinessMinutes } from "./business-hours-calculator";
 
 const MINUTE_MS = 60_000;
 
@@ -72,16 +73,39 @@ export class SlaTargetListener {
         return;
       }
 
+      const calendar = await this.prisma.businessHoursCalendar.findFirst({
+        where: { branchId: ticket.branchId },
+        include: { branch: { select: { timezone: true } }, days: true, exceptions: true },
+      });
+
+      const [responseTargetAt, resolutionTargetAt] = calendar
+        ? [
+            addBusinessMinutes(
+              ticket.createdAt,
+              bestPolicy.responseTargetMinutes,
+              calendar.branch.timezone,
+              calendar.days,
+              calendar.exceptions,
+            ),
+            addBusinessMinutes(
+              ticket.createdAt,
+              bestPolicy.resolutionTargetMinutes,
+              calendar.branch.timezone,
+              calendar.days,
+              calendar.exceptions,
+            ),
+          ]
+        : [
+            new Date(ticket.createdAt.getTime() + bestPolicy.responseTargetMinutes * MINUTE_MS),
+            new Date(ticket.createdAt.getTime() + bestPolicy.resolutionTargetMinutes * MINUTE_MS),
+          ];
+
       await this.prisma.slaTicketTarget.create({
         data: {
           ticketId: event.ticket.id,
           slaPolicyId: bestPolicy.id,
-          responseTargetAt: new Date(
-            ticket.createdAt.getTime() + bestPolicy.responseTargetMinutes * MINUTE_MS,
-          ),
-          resolutionTargetAt: new Date(
-            ticket.createdAt.getTime() + bestPolicy.resolutionTargetMinutes * MINUTE_MS,
-          ),
+          responseTargetAt,
+          resolutionTargetAt,
         },
       });
     } catch (error) {
