@@ -20,6 +20,14 @@ export interface TicketSummary {
   assignedToUserId: string | null;
 }
 
+export interface TicketHistoryEntrySummary {
+  id: string;
+  eventType: string;
+  actorUserId: string | null;
+  snapshot: unknown;
+  createdAt: Date;
+}
+
 /**
  * Owns the `ticketing` schema — see docs/architecture/03-domain-boundaries.md
  * ("Ticketing"). CASL-based per-record visibility is still explicitly
@@ -86,7 +94,10 @@ export class TicketsService {
       },
     });
     const summary = toTicketSummary(ticket);
-    this.eventEmitter.emit(TICKET_CREATED_EVENT, { ticket: summary } satisfies TicketCreatedEvent);
+    this.eventEmitter.emit(TICKET_CREATED_EVENT, {
+      ticket: summary,
+      actorUserId: this.tenantContext.userId,
+    } satisfies TicketCreatedEvent);
     return summary;
   }
 
@@ -126,8 +137,24 @@ export class TicketsService {
     });
     this.eventEmitter.emit(TICKET_UPDATED_EVENT, {
       ticket: toTicketSummary(updated),
+      actorUserId: this.tenantContext.userId,
     } satisfies TicketUpdatedEvent);
     return { id };
+  }
+
+  async getTicketHistory(id: string): Promise<TicketHistoryEntrySummary[]> {
+    await this.findTicketInScope(id);
+    const entries = await this.prisma.ticketHistoryEntry.findMany({
+      where: { ticketId: id },
+      orderBy: { createdAt: "asc" },
+    });
+    return entries.map((entry) => ({
+      id: entry.id,
+      eventType: entry.eventType,
+      actorUserId: entry.actorUserId,
+      snapshot: entry.snapshot,
+      createdAt: entry.createdAt,
+    }));
   }
 
   // ---------------------------------------------------------------------

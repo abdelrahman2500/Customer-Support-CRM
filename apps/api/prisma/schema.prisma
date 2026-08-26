@@ -69,10 +69,11 @@ model User {
   passwordHash    String           @map("password_hash")
   fullName        String           @map("full_name")
   isActive        Boolean          @default(true) @map("is_active")
-  branchRoles     UserBranchRole[]
-  refreshTokens   RefreshToken[]
-  assignedTickets Ticket[]
-  createdAt       DateTime         @default(now()) @map("created_at")
+  branchRoles          UserBranchRole[]
+  refreshTokens        RefreshToken[]
+  assignedTickets      Ticket[]
+  ticketHistoryEntries TicketHistoryEntry[]
+  createdAt            DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
   @@map("users")
@@ -265,6 +266,7 @@ model Ticket {
   category         String?
   priority         TicketPriority @default(MEDIUM)
   status           TicketStatus   @default(OPEN)
+  historyEntries   TicketHistoryEntry[]
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
 
@@ -272,5 +274,26 @@ model Ticket {
   @@index([customerId])
   @@index([assignedToUserId])
   @@map("tickets")
+  @@schema("ticketing")
+}
+
+/// Append-only history entry for a Ticket's `ticket.created`/`ticket.updated`
+/// domain events — see docs/architecture/03-domain-boundaries.md ("Ticketing",
+/// "history/timeline"). No `branchId` — scoping is always derived from the
+/// parent Ticket, the same way `customers.Contact` has no `branchId` of its
+/// own. `snapshot` is the exact `TicketSummary` the emitting event carried —
+/// no diff, no changed-fields computation.
+model TicketHistoryEntry {
+  id          String   @id @default(uuid())
+  ticketId    String   @map("ticket_id")
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actorUserId String?  @map("actor_user_id")
+  actorUser   User?    @relation(fields: [actorUserId], references: [id])
+  eventType   String   @map("event_type")
+  snapshot    Json
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@map("ticket_history_entries")
   @@schema("ticketing")
 }

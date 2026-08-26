@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
 import { CreateTicketDto } from "./dto/create-ticket.dto";
 import { UpdateTicketDto } from "./dto/update-ticket.dto";
-import type { TicketSummary } from "./tickets.service";
+import type { TicketHistoryEntrySummary, TicketSummary } from "./tickets.service";
 import { TicketsService } from "./tickets.service";
 
 @ApiTags("tickets")
@@ -34,5 +34,11 @@ export class TicketsController {
   @RequirePermissions("ticket:update")
   update(@Param("id") id: string, @Body() dto: UpdateTicketDto): Promise<{ id: string }> {
     return this.ticketsService.updateTicket(id, dto);
+  }
+
+  @Get(":id/history")
+  @RequirePermissions("ticket:read")
+  getHistory(@Param("id") id: string): Promise<TicketHistoryEntrySummary[]> {
+    return this.ticketsService.getTicketHistory(id);
   }
 }

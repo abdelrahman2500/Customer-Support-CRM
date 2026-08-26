@@ -168,6 +168,18 @@ describe("Ticketing (e2e)", () => {
     expect(createdEvents.some((event) => event.ticket.id === ticketId)).toBe(true);
   });
 
+  it("records exactly one history entry after ticket creation, with actor and snapshot", async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/tickets/${ticketId}/history`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].eventType).toBe("ticket.created");
+    expect(response.body[0].actorUserId).toBe(adminUserId);
+    expect(response.body[0].snapshot.id).toBe(ticketId);
+  });
+
   it("lists tickets in the caller's active branch, including the new one", async () => {
     const response = await request(app.getHttpServer())
       .get("/api/v1/tickets")
@@ -218,6 +230,31 @@ describe("Ticketing (e2e)", () => {
           event.ticket.priority === "HIGH",
       ),
     ).toBe(true);
+  });
+
+  it("records a second, ticket.updated history entry after the update, ordered after the first", async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/tickets/${ticketId}/history`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body).toHaveLength(2);
+    expect(response.body[0].eventType).toBe("ticket.created");
+    expect(response.body[1].eventType).toBe("ticket.updated");
+    expect(response.body[1].actorUserId).toBe(adminUserId);
+    expect(response.body[1].snapshot.status).toBe("IN_PROGRESS");
+    expect(response.body[1].snapshot.priority).toBe("HIGH");
+  });
+
+  it("returns 404 for history on an unknown ticket id", async () => {
+    await request(app.getHttpServer())
+      .get(`/api/v1/tickets/${randomUUID()}/history`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(404);
+  });
+
+  it("rejects an unauthenticated request for ticket history", async () => {
+    await request(app.getHttpServer()).get(`/api/v1/tickets/${ticketId}/history`).expect(401);
   });
 
   it("rejects reassignment to an unknown user id with 404", async () => {
@@ -316,6 +353,44 @@ describe("Ticketing (e2e)", () => {
 
     await request(app.getHttpServer())
       .get("/api/v1/tickets")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .expect(403);
+  });
+
+  it("rejects an Agent-role user attempting to read ticket history (403)", async () => {
+    const agentEmail = `agent-history-${randomUUID()}@example.com`;
+    const agentPassword = "agent-test-password-123";
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+    const me = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: agentEmail,
+        password: agentPassword,
+        fullName: "Test Agent History",
+        branchId: me.body.branchId,
+        departmentId: me.body.departmentId ?? undefined,
+        roleId: agentRole.id,
+      })
+      .expect(201);
+
+    const agentLogin = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: agentEmail, password: agentPassword })
+      .expect(200);
+    const agentAccessToken = agentLogin.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/tickets/${ticketId}/history`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(403);
   });

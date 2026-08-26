@@ -6,9 +6,11 @@ export const TICKET_UPDATED_EVENT = "ticket.updated";
 /** Emitted once, after `TicketsService.createTicket` successfully persists the row. */
 export interface TicketCreatedEvent {
   ticket: TicketSummary;
+  actorUserId: string | null;
 }
 
 /** Emitted once, after `TicketsService.updateTicket` successfully persists the row. */
 export interface TicketUpdatedEvent {
   ticket: TicketSummary;
+  actorUserId: string | null;
 }

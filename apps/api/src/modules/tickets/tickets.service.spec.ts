@@ -14,6 +14,9 @@ function buildPrismaMock() {
       findFirst: vi.fn(),
       update: vi.fn(),
     },
+    ticketHistoryEntry: {
+      findMany: vi.fn(),
+    },
     customer: {
       findFirst: vi.fn(),
     },
@@ -29,8 +32,9 @@ function buildPrismaMock() {
   };
 }
 
-function buildTenantContextMock(branchId: string | null = "branch-1") {
+function buildTenantContextMock(branchId: string | null = "branch-1", userId: string | null = "user-1") {
   return {
+    userId,
     requireBranchScope: vi.fn(() => {
       if (!branchId) {
         throw new Error("TenantContext: no active branch on this request");
@@ -164,7 +168,10 @@ describe("TicketsService", () => {
       expect(result.status).toBe("OPEN");
       expect(result.priority).toBe("MEDIUM");
       expect(eventEmitter.emit).toHaveBeenCalledOnce();
-      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_CREATED_EVENT, { ticket: result });
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_CREATED_EVENT, {
+        ticket: result,
+        actorUserId: "user-1",
+      });
     });
 
     it("omits contactId/departmentId/assignedToUserId checks entirely when not provided", async () => {
@@ -293,6 +300,7 @@ describe("TicketsService", () => {
       expect(eventEmitter.emit).toHaveBeenCalledOnce();
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
         ticket: expect.objectContaining({ id: "ticket-1", status: "IN_PROGRESS" }),
+        actorUserId: "user-1",
       });
     });
 
@@ -320,7 +328,48 @@ describe("TicketsService", () => {
       expect(eventEmitter.emit).toHaveBeenCalledOnce();
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
         ticket: expect.objectContaining({ id: "ticket-1", assignedToUserId: "user-1" }),
+        actorUserId: "user-1",
       });
+    });
+  });
+
+  describe("getTicketHistory", () => {
+    it("throws NotFoundException for an unknown/out-of-scope ticket id", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(service.getTicketHistory("missing-id")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.ticketHistoryEntry.findMany).not.toHaveBeenCalled();
+    });
+
+    it("scopes and orders history entries once the ticket is confirmed in scope", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketHistoryEntry.findMany.mockResolvedValue([
+        {
+          id: "history-1",
+          eventType: TICKET_CREATED_EVENT,
+          actorUserId: "user-1",
+          snapshot: { id: "ticket-1" },
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
+
+      const result = await service.getTicketHistory("ticket-1");
+
+      expect(prisma.ticketHistoryEntry.findMany).toHaveBeenCalledWith({
+        where: { ticketId: "ticket-1" },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(result).toEqual([
+        {
+          id: "history-1",
+          eventType: TICKET_CREATED_EVENT,
+          actorUserId: "user-1",
+          snapshot: { id: "ticket-1" },
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
     });
   });
 });
