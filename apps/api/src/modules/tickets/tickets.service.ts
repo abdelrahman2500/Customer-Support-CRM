@@ -1,9 +1,12 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import type { TicketPriority, TicketStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateTicketDto } from "./dto/create-ticket.dto";
 import type { UpdateTicketDto } from "./dto/update-ticket.dto";
+import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT } from "./tickets.events";
+import type { TicketCreatedEvent, TicketUpdatedEvent } from "./tickets.events";
 
 export interface TicketSummary {
   id: string;
@@ -19,10 +22,13 @@ export interface TicketSummary {
 
 /**
  * Owns the `ticketing` schema — see docs/architecture/03-domain-boundaries.md
- * ("Ticketing"). Domain-event emission and CASL-based per-record visibility
- * are explicitly deferred (see Story 07's "Settled decisions") — every
- * authorization/scoping decision here is branch-level only, via
- * `TenantContext`, exactly like `CustomersService`.
+ * ("Ticketing"). CASL-based per-record visibility is still explicitly
+ * deferred (see Story 07's "Settled decisions") — every authorization/
+ * scoping decision here is branch-level only, via `TenantContext`, exactly
+ * like `CustomersService`. Domain-event emission (`ticket.created`/
+ * `ticket.updated`) was deferred by Story 07 and is implemented by Story 08
+ * (see ./tickets.events.ts) — `ticket.escalated` and every subscriber
+ * remain deferred past Story 08 too.
  *
  * Unlike `CustomersService`, a `Ticket` cross-references three other
  * domains at once (`Customer`/`Contact` from Customer Management,
@@ -37,6 +43,7 @@ export class TicketsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContext,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async createTicket(dto: CreateTicketDto): Promise<TicketSummary> {
@@ -78,7 +85,9 @@ export class TicketsService {
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
       },
     });
-    return toTicketSummary(ticket);
+    const summary = toTicketSummary(ticket);
+    this.eventEmitter.emit(TICKET_CREATED_EVENT, { ticket: summary } satisfies TicketCreatedEvent);
+    return summary;
   }
 
   async listTickets(): Promise<TicketSummary[]> {
@@ -103,7 +112,7 @@ export class TicketsService {
       await this.requireUserInScope(dto.assignedToUserId, branchId);
     }
 
-    await this.prisma.ticket.update({
+    const updated = await this.prisma.ticket.update({
       where: { id },
       data: {
         ...(dto.subject !== undefined ? { subject: dto.subject } : {}),
@@ -115,6 +124,9 @@ export class TicketsService {
           : {}),
       },
     });
+    this.eventEmitter.emit(TICKET_UPDATED_EVENT, {
+      ticket: toTicketSummary(updated),
+    } satisfies TicketUpdatedEvent);
     return { id };
   }
 

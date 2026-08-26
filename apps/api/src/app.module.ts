@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { EventEmitterModule } from "@nestjs/event-emitter";
 import { validateEnv } from "./common/config/env.validation";
 import { AuthModule } from "./common/auth/auth.module";
 import { AuthGuard } from "./common/auth/auth.guard";
@@ -20,6 +21,7 @@ import { TicketsModule } from "./modules/tickets/tickets.module";
       isGlobal: true,
       validate: validateEnv,
     }),
+    EventEmitterModule.forRoot(),
     // Public-facing endpoints only (auth, portal, webhooks) sit behind this —
     // see docs/architecture/05-auth-and-security.md ("Rate limiting").
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),

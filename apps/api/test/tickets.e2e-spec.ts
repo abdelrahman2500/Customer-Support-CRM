@@ -2,9 +2,11 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
+import type { TicketCreatedEvent, TicketUpdatedEvent } from "../src/modules/tickets/tickets.events";
 
 /**
  * Integration suite for the `tickets/*` HTTP surface.
@@ -26,6 +28,15 @@ import { AppModule } from "../src/app.module";
  * department/user id) stand in for that and are the realistic failure
  * shapes this branch *can* produce; true cross-branch rejection is covered
  * by `tickets.service.spec.ts`'s mocked-TenantContext tests instead.
+ *
+ * Two assertions below (in the "creates a ticket..." and "updates status
+ * and priority" tests) additionally listen on the REAL `EventEmitter2`
+ * resolved from this compiled module's DI container — proving
+ * `EventEmitterModule.forRoot()` is actually registered and that
+ * `TicketsService` actually receives a working `EventEmitter2`, which the
+ * mocked-`EventEmitter2` unit tests in `tickets.service.spec.ts` cannot
+ * prove on their own (Story 08's plan, "E2E verification — is it
+ * justified?"). No other scenario in this file changed.
  */
 describe("Ticketing (e2e)", () => {
   let app: INestApplication;
@@ -35,6 +46,8 @@ describe("Ticketing (e2e)", () => {
   let otherCustomerId: string;
   let contactId: string;
   let ticketId: string;
+  const createdEvents: TicketCreatedEvent[] = [];
+  const updatedEvents: TicketUpdatedEvent[] = [];
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -47,6 +60,10 @@ describe("Ticketing (e2e)", () => {
     );
 
     await app.init();
+
+    const eventEmitter = moduleRef.get(EventEmitter2);
+    eventEmitter.on("ticket.created", (payload: TicketCreatedEvent) => createdEvents.push(payload));
+    eventEmitter.on("ticket.updated", (payload: TicketUpdatedEvent) => updatedEvents.push(payload));
 
     const email = process.env.SEED_ADMIN_EMAIL;
     const password = process.env.SEED_ADMIN_PASSWORD;
@@ -147,6 +164,8 @@ describe("Ticketing (e2e)", () => {
     expect(response.body.status).toBe("OPEN");
     expect(response.body.priority).toBe("MEDIUM");
     ticketId = response.body.id;
+
+    expect(createdEvents.some((event) => event.ticket.id === ticketId)).toBe(true);
   });
 
   it("lists tickets in the caller's active branch, including the new one", async () => {
@@ -190,6 +209,15 @@ describe("Ticketing (e2e)", () => {
       .expect(200);
     expect(after.body.status).toBe("IN_PROGRESS");
     expect(after.body.priority).toBe("HIGH");
+
+    expect(
+      updatedEvents.some(
+        (event) =>
+          event.ticket.id === ticketId &&
+          event.ticket.status === "IN_PROGRESS" &&
+          event.ticket.priority === "HIGH",
+      ),
+    ).toBe(true);
   });
 
   it("rejects reassignment to an unknown user id with 404", async () => {

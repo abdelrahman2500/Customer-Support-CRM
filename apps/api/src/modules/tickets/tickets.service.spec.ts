@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotFoundException } from "@nestjs/common";
+import type { EventEmitter2 } from "@nestjs/event-emitter";
 import { TicketsService } from "./tickets.service";
+import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT } from "./tickets.events";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 
@@ -38,19 +40,26 @@ function buildTenantContextMock(branchId: string | null = "branch-1") {
   };
 }
 
+function buildEventEmitterMock() {
+  return { emit: vi.fn() };
+}
+
 function createService(
   prismaMock: ReturnType<typeof buildPrismaMock>,
   tenantMock: ReturnType<typeof buildTenantContextMock>,
+  eventEmitterMock: ReturnType<typeof buildEventEmitterMock>,
 ): TicketsService {
   return new TicketsService(
     prismaMock as unknown as PrismaService,
     tenantMock as unknown as TenantContext,
+    eventEmitterMock as unknown as EventEmitter2,
   );
 }
 
 describe("TicketsService", () => {
   let prisma: ReturnType<typeof buildPrismaMock>;
   let tenantContext: ReturnType<typeof buildTenantContextMock>;
+  let eventEmitter: ReturnType<typeof buildEventEmitterMock>;
   let service: TicketsService;
 
   const baseDto = { customerId: "customer-1", subject: "Cannot log in" };
@@ -59,7 +68,8 @@ describe("TicketsService", () => {
     vi.clearAllMocks();
     prisma = buildPrismaMock();
     tenantContext = buildTenantContextMock();
-    service = createService(prisma, tenantContext);
+    eventEmitter = buildEventEmitterMock();
+    service = createService(prisma, tenantContext, eventEmitter);
   });
 
   describe("createTicket", () => {
@@ -71,6 +81,7 @@ describe("TicketsService", () => {
         where: { id: "customer-1", branchId: "branch-1" },
       });
       expect(prisma.ticket.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it("throws NotFoundException when the contact doesn't belong to the given customer", async () => {
@@ -84,6 +95,7 @@ describe("TicketsService", () => {
         where: { id: "contact-from-elsewhere", customerId: "customer-1" },
       });
       expect(prisma.ticket.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it("throws NotFoundException when the department isn't in the caller's branch", async () => {
@@ -97,6 +109,7 @@ describe("TicketsService", () => {
         where: { id: "dept-from-elsewhere", branchId: "branch-1" },
       });
       expect(prisma.ticket.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it("throws NotFoundException when assignedToUserId has no role in the caller's branch", async () => {
@@ -110,6 +123,7 @@ describe("TicketsService", () => {
         where: { userId: "user-from-elsewhere", branchId: "branch-1" },
       });
       expect(prisma.ticket.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it("creates the ticket with all cross-domain checks passing, defaulting nullable fields", async () => {
@@ -149,6 +163,8 @@ describe("TicketsService", () => {
       });
       expect(result.status).toBe("OPEN");
       expect(result.priority).toBe("MEDIUM");
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_CREATED_EVENT, { ticket: result });
     });
 
     it("omits contactId/departmentId/assignedToUserId checks entirely when not provided", async () => {
@@ -237,6 +253,7 @@ describe("TicketsService", () => {
         service.updateTicket("missing-id", { status: "CLOSED" as never }),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.ticket.update).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it("throws NotFoundException when reassigning to a user outside the caller's branch", async () => {
@@ -250,10 +267,22 @@ describe("TicketsService", () => {
         where: { userId: "user-from-elsewhere", branchId: "branch-1" },
       });
       expect(prisma.ticket.update).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it("only includes fields present in the DTO", async () => {
       prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "MEDIUM",
+        status: "IN_PROGRESS",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+      });
 
       await service.updateTicket("ticket-1", { status: "IN_PROGRESS" as never });
 
@@ -261,17 +290,36 @@ describe("TicketsService", () => {
         where: { id: "ticket-1" },
         data: { status: "IN_PROGRESS" },
       });
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
+        ticket: expect.objectContaining({ id: "ticket-1", status: "IN_PROGRESS" }),
+      });
     });
 
     it("reassigns successfully once the user is confirmed in scope", async () => {
       prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
       prisma.userBranchRole.findFirst.mockResolvedValue({ id: "ubr-1" });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: "user-1",
+      });
 
       await service.updateTicket("ticket-1", { assignedToUserId: "user-1" });
 
       expect(prisma.ticket.update).toHaveBeenCalledWith({
         where: { id: "ticket-1" },
         data: { assignedToUserId: "user-1" },
+      });
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
+        ticket: expect.objectContaining({ id: "ticket-1", assignedToUserId: "user-1" }),
       });
     });
   });
