@@ -34,17 +34,18 @@ model Organization {
 }
 
 model Branch {
-  id             String           @id @default(uuid())
-  organizationId String           @map("organization_id")
-  organization   Organization     @relation(fields: [organizationId], references: [id])
-  name           String
-  timezone       String
-  departments    Department[]
-  userRoles      UserBranchRole[]
-  customers      Customer[]
-  tickets        Ticket[]
-  slaPolicies    SlaPolicy[]
-  createdAt      DateTime         @default(now()) @map("created_at")
+  id                    String                 @id @default(uuid())
+  organizationId        String                 @map("organization_id")
+  organization          Organization           @relation(fields: [organizationId], references: [id])
+  name                  String
+  timezone              String
+  departments           Department[]
+  userRoles             UserBranchRole[]
+  customers             Customer[]
+  tickets               Ticket[]
+  slaPolicies           SlaPolicy[]
+  businessHoursCalendar BusinessHoursCalendar?
+  createdAt             DateTime               @default(now()) @map("created_at")
 
   @@map("branches")
   @@schema("identity")
@@ -66,17 +67,17 @@ model Department {
 }
 
 model User {
-  id              String           @id @default(uuid())
-  email           String           @unique
-  passwordHash    String           @map("password_hash")
-  fullName        String           @map("full_name")
-  isActive        Boolean          @default(true) @map("is_active")
+  id                   String               @id @default(uuid())
+  email                String               @unique
+  passwordHash         String               @map("password_hash")
+  fullName             String               @map("full_name")
+  isActive             Boolean              @default(true) @map("is_active")
   branchRoles          UserBranchRole[]
   refreshTokens        RefreshToken[]
   assignedTickets      Ticket[]
   ticketHistoryEntries TicketHistoryEntry[]
-  createdAt            DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
 
   @@map("users")
   @@schema("identity")
@@ -253,25 +254,25 @@ enum TicketStatus {
 }
 
 model Ticket {
-  id               String         @id @default(uuid())
-  branchId         String         @map("branch_id")
-  branch           Branch         @relation(fields: [branchId], references: [id])
-  departmentId     String?        @map("department_id")
-  department       Department?    @relation(fields: [departmentId], references: [id])
-  customerId       String         @map("customer_id")
-  customer         Customer       @relation(fields: [customerId], references: [id])
-  contactId        String?        @map("contact_id")
-  contact          Contact?       @relation(fields: [contactId], references: [id])
-  assignedToUserId String?        @map("assigned_to_user_id")
-  assignedToUser   User?          @relation(fields: [assignedToUserId], references: [id])
+  id               String               @id @default(uuid())
+  branchId         String               @map("branch_id")
+  branch           Branch               @relation(fields: [branchId], references: [id])
+  departmentId     String?              @map("department_id")
+  department       Department?          @relation(fields: [departmentId], references: [id])
+  customerId       String               @map("customer_id")
+  customer         Customer             @relation(fields: [customerId], references: [id])
+  contactId        String?              @map("contact_id")
+  contact          Contact?             @relation(fields: [contactId], references: [id])
+  assignedToUserId String?              @map("assigned_to_user_id")
+  assignedToUser   User?                @relation(fields: [assignedToUserId], references: [id])
   subject          String
   category         String?
-  priority         TicketPriority @default(MEDIUM)
-  status           TicketStatus   @default(OPEN)
+  priority         TicketPriority       @default(MEDIUM)
+  status           TicketStatus         @default(OPEN)
   historyEntries   TicketHistoryEntry[]
   slaTarget        SlaTicketTarget?
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
 
   @@index([branchId])
   @@index([customerId])
@@ -317,18 +318,18 @@ model TicketHistoryEntry {
 /// No uniqueness constraint across the scoping dimensions — policy
 /// resolution is a future story's concern, not this one's.
 model SlaPolicy {
-  id                      String      @id @default(uuid())
-  branchId                String      @map("branch_id")
-  branch                  Branch      @relation(fields: [branchId], references: [id])
-  departmentId            String?     @map("department_id")
-  department              Department? @relation(fields: [departmentId], references: [id])
+  id                      String            @id @default(uuid())
+  branchId                String            @map("branch_id")
+  branch                  Branch            @relation(fields: [branchId], references: [id])
+  departmentId            String?           @map("department_id")
+  department              Department?       @relation(fields: [departmentId], references: [id])
   category                String?
   priority                String?
-  responseTargetMinutes   Int         @map("response_target_minutes")
-  resolutionTargetMinutes Int         @map("resolution_target_minutes")
-  isActive                Boolean     @default(true) @map("is_active")
-  createdAt               DateTime    @default(now()) @map("created_at")
-  updatedAt               DateTime    @updatedAt @map("updated_at")
+  responseTargetMinutes   Int               @map("response_target_minutes")
+  resolutionTargetMinutes Int               @map("resolution_target_minutes")
+  isActive                Boolean           @default(true) @map("is_active")
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
   targets                 SlaTicketTarget[]
 
   @@index([branchId])
@@ -361,5 +362,81 @@ model SlaTicketTarget {
   createdAt          DateTime  @default(now()) @map("created_at")
 
   @@map("sla_ticket_targets")
+  @@schema("sla")
+}
+
+/// Story 12 — the persistence/CRUD foundation for the business-hours
+/// calendar named in docs/architecture/07-sla-automation-and-ai.md
+/// ("SlaPolicy... defines... a business-hours calendar") and
+/// docs/architecture/10-i18n-and-rtl.md ("Each branch stores an IANA
+/// timezone for SLA business-hours calculations"). One calendar per Branch
+/// (`branchId` is `@unique`) — `Branch.timezone` (identity schema) is the
+/// timezone basis for interpreting `BusinessHoursDay`/`BusinessHoursException`
+/// minute-of-day values; it is deliberately NOT duplicated onto this model.
+/// This story does not consume the calendar — `SlaTargetListener` (Story 11)
+/// is unchanged and keeps using plain wall-clock arithmetic.
+model BusinessHoursCalendar {
+  id         String                   @id @default(uuid())
+  branchId   String                   @unique @map("branch_id")
+  branch     Branch                   @relation(fields: [branchId], references: [id])
+  days       BusinessHoursDay[]
+  exceptions BusinessHoursException[]
+  createdAt  DateTime                 @default(now()) @map("created_at")
+  updatedAt  DateTime                 @updatedAt @map("updated_at")
+
+  @@map("business_hours_calendars")
+  @@schema("sla")
+}
+
+/// Exactly one row per weekday (0=Sunday..6=Saturday, matching JS
+/// `Date#getUTCDay()`/`Intl` conventions — see docs/architecture/10-i18n-and-rtl.md)
+/// per calendar — always all 7, replaced wholesale on create/update, never
+/// managed as an open-ended list (unlike `BusinessHoursException`). A single
+/// open interval per day (`startMinute`/`endMinute`, minutes since midnight,
+/// 0-1439) is all repository evidence supports — no multi-interval/split-shift
+/// requirement is named anywhere, so a list-of-intervals table is deliberately
+/// not introduced (see Story 12's "avoid speculative generic scheduling
+/// abstractions"). Both null when `isOpen` is false (closed day). Overnight
+/// intervals (`startMinute > endMinute`) are not supported in this
+/// foundation — deferred, no evidence requires them yet.
+model BusinessHoursDay {
+  id          String                @id @default(uuid())
+  calendarId  String                @map("calendar_id")
+  calendar    BusinessHoursCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  weekday     Int
+  isOpen      Boolean               @default(false) @map("is_open")
+  startMinute Int?                  @map("start_minute")
+  endMinute   Int?                  @map("end_minute")
+
+  @@unique([calendarId, weekday])
+  @@map("business_hours_days")
+  @@schema("sla")
+}
+
+/// A calendar-specific closure or overridden-hours exception for one date.
+/// Open-ended list (unlike `BusinessHoursDay`), so it is managed the same
+/// way `customers.Contact` is managed under `Customer` — created/listed/
+/// updated individually, never replaced wholesale. `date` uses `@db.Date`
+/// (no time component — this is a calendar date, not a timestamp; the
+/// first `@db.*` mapping in this schema, chosen because nothing else here
+/// is a pure date-only value). `isClosed: true` means fully closed that
+/// date (override fields null); `isClosed: false` means the normal
+/// `BusinessHoursDay` for that weekday is replaced by
+/// `overrideStartMinute`/`overrideEndMinute` for this date only. No
+/// `branchId` — scope is derived through the parent `BusinessHoursCalendar`
+/// (→ `Branch`), the same precedent `Contact`/`TicketHistoryEntry`/
+/// `SlaTicketTarget` already established.
+model BusinessHoursException {
+  id                  String                @id @default(uuid())
+  calendarId          String                @map("calendar_id")
+  calendar            BusinessHoursCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  date                DateTime              @db.Date
+  isClosed            Boolean               @default(true) @map("is_closed")
+  overrideStartMinute Int?                  @map("override_start_minute")
+  overrideEndMinute   Int?                  @map("override_end_minute")
+  createdAt           DateTime              @default(now()) @map("created_at")
+
+  @@unique([calendarId, date])
+  @@map("business_hours_exceptions")
   @@schema("sla")
 }

@@ -5,6 +5,8 @@ import { SlaPoliciesService } from "./sla-policies.service";
 import { SlaTargetListener } from "./sla-target.listener";
 import { SlaTargetsController } from "./sla-targets.controller";
 import { SlaTargetsService } from "./sla-targets.service";
+import { BusinessHoursCalendarsController } from "./business-hours-calendars.controller";
+import { BusinessHoursCalendarsService } from "./business-hours-calendars.service";
 
 /**
  * Owns the `sla` schema — see docs/architecture/03-domain-boundaries.md
@@ -12,11 +14,20 @@ import { SlaTargetsService } from "./sla-targets.service";
  * `CustomersModule`/`TicketsModule` provide it. `SlaTargetListener`'s
  * `@OnEvent` handler is discovered automatically by `EventEmitterModule`
  * once the class is instantiated as a provider here — the same pattern
- * `TicketsModule` uses for `TicketHistoryListener`.
+ * `TicketsModule` uses for `TicketHistoryListener`. `BusinessHoursCalendars*`
+ * (Story 12) is added here rather than a new module, continuing the same
+ * "grow this module per `sla`-schema concern" pattern Story 11 already used
+ * for `SlaTargets*`.
  */
 @Module({
-  controllers: [SlaPoliciesController, SlaTargetsController],
-  providers: [SlaPoliciesService, SlaTargetsService, TenantContext, SlaTargetListener],
-  exports: [SlaPoliciesService, SlaTargetsService],
+  controllers: [SlaPoliciesController, SlaTargetsController, BusinessHoursCalendarsController],
+  providers: [
+    SlaPoliciesService,
+    SlaTargetsService,
+    BusinessHoursCalendarsService,
+    TenantContext,
+    SlaTargetListener,
+  ],
+  exports: [SlaPoliciesService, SlaTargetsService, BusinessHoursCalendarsService],
 })
 export class SlaPoliciesModule {}
