@@ -41,6 +41,21 @@ export interface TicketHistoryEntry {
 export interface CustomerSummary {
   id: string;
   displayName: string;
+  isActive: boolean;
+}
+
+/** Mirrors `apps/api/src/modules/customers/customers.service.ts`'s `ContactSummary`. */
+export interface ContactSummary {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  isPrimary: boolean;
+}
+
+/** Mirrors `GET /customers/:id`'s response shape — contacts already embedded, no second request needed (plan Design item 1). */
+export interface CustomerDetail extends CustomerSummary {
+  contacts: ContactSummary[];
 }
 
 export interface UserSummary {
@@ -115,6 +130,10 @@ export function updateTicket(id: string, input: UpdateTicketInput): Promise<{ id
 
 export function listCustomers(): Promise<CustomerSummary[]> {
   return apiFetch<CustomerSummary[]>("/customers");
+}
+
+export function getCustomer(id: string): Promise<CustomerDetail> {
+  return apiFetch<CustomerDetail>(`/customers/${id}`);
 }
 
 export function listUsers(): Promise<UserSummary[]> {

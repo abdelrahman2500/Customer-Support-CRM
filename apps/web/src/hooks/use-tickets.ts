@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createCustomer,
   createTicket,
+  getCustomer,
   getTicket,
   getTicketHistory,
   getTicketSlaTarget,
@@ -53,6 +54,12 @@ export function useCustomersQuery() {
     queryFn: listCustomers,
     staleTime: 5 * 60_000,
   });
+}
+
+/** Story 26 — mirrors `useTicketQuery`. `getCustomer` already returns
+ * contacts embedded (Design item 1) — no second query needed for them. */
+export function useCustomerQuery(id: string) {
+  return useQuery({ queryKey: ["customer", id], queryFn: () => getCustomer(id) });
 }
 
 export function useUsersQuery() {

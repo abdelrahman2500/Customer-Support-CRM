@@ -85,6 +85,27 @@
     }
   },
   "customers": {
+    "list": {
+      "title": "العملاء",
+      "createButton": "عميل جديد",
+      "error": "تعذّر تحميل العملاء.",
+      "retry": "إعادة المحاولة",
+      "empty": "لا يوجد عملاء حتى الآن.",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "columns": {
+        "name": "الاسم",
+        "status": "الحالة"
+      }
+    },
+    "detail": {
+      "notFound": "تعذّر العثور على هذا العميل.",
+      "loadError": "تعذّر تحميل هذا العميل.",
+      "contactsHeading": "جهات الاتصال",
+      "contactsEmpty": "لا توجد جهات اتصال حتى الآن.",
+      "primaryContact": "أساسي",
+      "noContactInfo": "لا يوجد بريد إلكتروني أو هاتف مسجّل."
+    },
     "create": {
       "title": "عميل جديد",
       "displayName": "اسم العميل",

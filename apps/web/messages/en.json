@@ -85,6 +85,27 @@
     }
   },
   "customers": {
+    "list": {
+      "title": "Customers",
+      "createButton": "New customer",
+      "error": "Couldn't load customers.",
+      "retry": "Retry",
+      "empty": "No customers yet.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "columns": {
+        "name": "Name",
+        "status": "Status"
+      }
+    },
+    "detail": {
+      "notFound": "This customer could not be found.",
+      "loadError": "Couldn't load this customer.",
+      "contactsHeading": "Contacts",
+      "contactsEmpty": "No contacts yet.",
+      "primaryContact": "Primary",
+      "noContactInfo": "No email or phone on file."
+    },
     "create": {
       "title": "New customer",
       "displayName": "Customer name",

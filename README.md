@@ -12,7 +12,7 @@ cross-cutting concern is decided and documented there. Read it before
 proposing a design for any new feature. This README covers only what's
 needed to install, configure, and run the project as it exists today.
 
-## Current state (through Story 25)
+## Current state (through Story 26)
 
 Implemented so far:
 
@@ -50,12 +50,20 @@ Implemented so far:
   full customer list already fetched elsewhere in the workspace (no
   search/autocomplete endpoint exists yet); a successful ticket creation
   opens the new ticket's real detail page.
+- **Customer list & detail** (Agent Workspace): `customers` lists every
+  customer in the branch (name + active/inactive status, no search/
+  pagination — same accepted limitation as the ticket list); `customers/{id}`
+  shows a customer's contacts read-only, using `GET /customers/:id`'s
+  already-embedded contacts (no second request). A "View customer" link is
+  available wherever the ticket list/detail already shows a customer name.
+  No customer editing or contact create/edit/delete is implemented yet.
 
 Not implemented yet: Communication Channels (email/WhatsApp/SMS/live chat/
 web forms), Knowledge Base, AI services, Customer Portal (`apps/portal` is
 still a placeholder), Reporting & Analytics, Administration screens,
 Integrations, `AutomationRule`, agent presence, ticket/customer search,
-pagination, bulk import, attachments, and ticket comments.
+pagination, bulk import, attachments, ticket comments, customer editing,
+and contact create/edit/delete.
 
 ## Repository layout
 
@@ -204,15 +212,23 @@ chat, and no per-user notification targeting implemented.
 ## Verification status
 
 Backend routes, filters/sorting, SLA-target reads, ticket mutations,
-ticket/customer creation, CORS, and both realtime rooms (including live
+ticket/customer creation, `GET /customers`/`GET /customers/:id` (including
+its embedded contacts), CORS, and both realtime rooms (including live
 `sla.at_risk`/`sla.breached`/`ticket.escalated` delivery to a real
 Socket.IO client) have been verified against a real running API, Postgres,
-and Redis — including the exact payload shapes the `tickets/new`/
-`customers/new` forms send. Actual browser/DOM click-through verification
-(as opposed to the underlying API/socket calls it depends on) requires a
-browser automation capability not available in every environment this
-project has been developed in — where it hasn't been performed, it is not
-claimed as done.
+and Redis, and the new `customers`/`customers/{id}` routes are confirmed to
+return real HTTP responses and to redirect an unauthenticated visitor to
+login exactly like every other Agent Workspace route. The customer list's
+static chrome (title, "New customer" button) is confirmed present in real
+server-rendered HTML; a customer's actual name/status/contacts are fetched
+client-side after hydration (TanStack Query, no SSR data-fetch), so — like
+every other per-record value in this workspace — their on-screen rendering
+is proven by real API-shape-matching component tests, not by a raw HTTP
+fetch of the page. Actual browser/DOM click-through verification (as
+opposed to the underlying API/socket calls and component tests it depends
+on) requires a browser automation capability not available in every
+environment this project has been developed in — where it hasn't been
+performed, it is not claimed as done.
 
 ## Status by story
 
@@ -232,7 +248,19 @@ claimed as done.
 - ✅ 24 — Agent Workspace: In-App Notification Display (implemented directly
   from a supplied specification; no `.squad` plan/intake exists for it)
 - ✅ 25 — Agent Workspace: Ticket & Customer Creation
+- ✅ 26 — Agent Workspace: Customer List & Detail
 - ⏭ Everything else in the target architecture (Channels, Knowledge Base,
   AI, Customer Portal, Reporting, Administration, Integrations,
-  `AutomationRule`, agent presence, search, pagination) — see
-  `.squad/plans/` for planned work.
+  `AutomationRule`, agent presence, search, pagination, customer editing,
+  contact create/edit/delete) — see `.squad/plans/` for planned work.
+
+## Known pre-existing test limitation
+
+`apps/api`'s e2e suite has one long-standing, environment-specific failure —
+`sla-business-hours-target-computation.e2e-spec.ts`'s "computes same-day,
+business-hours-aware targets under a fully open calendar" — caused by
+`BusinessHoursException` rows accumulated across many repeated e2e runs
+against a long-lived local Postgres volume, not by any implemented story's
+code. A clean re-seed (`docker compose down -v` then re-migrate/re-seed)
+resolves it; not done automatically since it would also discard local
+fixture data.

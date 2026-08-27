@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock("next-intl", () => ({

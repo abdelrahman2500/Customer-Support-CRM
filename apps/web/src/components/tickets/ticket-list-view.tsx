@@ -191,7 +191,18 @@ export function TicketListView() {
                   {ticket.id.slice(0, 8)}
                 </TableCell>
                 <TableCell className="font-medium text-slate-900">{ticket.subject}</TableCell>
-                <TableCell>{customerNameById.get(ticket.customerId) ?? ticket.customerId}</TableCell>
+                <TableCell>
+                  <button
+                    type="button"
+                    className="hover:underline"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      router.push(`/${locale}/customers/${ticket.customerId}`);
+                    }}
+                  >
+                    {customerNameById.get(ticket.customerId) ?? ticket.customerId}
+                  </button>
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">{ticket.status}</Badge>
                 </TableCell>

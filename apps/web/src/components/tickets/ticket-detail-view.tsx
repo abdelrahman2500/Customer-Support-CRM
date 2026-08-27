@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useCustomersQuery,
@@ -43,6 +43,7 @@ const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
   const { locale } = useParams<{ locale: string }>();
+  const router = useRouter();
 
   useTicketRealtime(ticketId);
 
@@ -91,7 +92,13 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <h1 className="text-lg font-semibold text-slate-900">{ticket.subject}</h1>
         <p className="text-sm text-slate-500">
           {t("detail.customer")}:{" "}
-          {customerNameById.get(ticket.customerId) ?? ticket.customerId}
+          <button
+            type="button"
+            className="hover:underline"
+            onClick={() => router.push(`/${locale}/customers/${ticket.customerId}`)}
+          >
+            {customerNameById.get(ticket.customerId) ?? ticket.customerId}
+          </button>
         </p>
       </div>
 
