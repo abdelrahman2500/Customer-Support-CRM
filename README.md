@@ -12,7 +12,7 @@ cross-cutting concern is decided and documented there. Read it before
 proposing a design for any new feature. This README covers only what's
 needed to install, configure, and run the project as it exists today.
 
-## Current state (through Story 27)
+## Current state (through Story 28)
 
 Implemented so far:
 
@@ -66,6 +66,14 @@ Implemented so far:
   matching customer in the existing picker — the agent can still change the
   selection — with no change to behavior when the parameter is absent or
   doesn't match a loaded customer.
+- **Real Agent Dashboard** (Agent Workspace): `dashboard` (previously a
+  redirect to `tickets`) now shows the authenticated agent's own open
+  (`OPEN`/`IN_PROGRESS`) tickets, fetched via the existing `GET
+  /tickets?assignedToUserId=<their own id>` filter — never the branch-wide
+  list — and ordered breached-first, then soonest-remaining-SLA-target,
+  then no-target-last, using the existing `deriveSlaStatus` helper (no new
+  "at risk" threshold). No filter/sort/search UI; `RESOLVED`/`CLOSED`
+  tickets are excluded (this is a work queue, not a history).
 
 Not implemented yet: Communication Channels (email/WhatsApp/SMS/live chat/
 web forms), Knowledge Base, AI services, Customer Portal (`apps/portal` is
@@ -255,6 +263,21 @@ section — their on-screen rendering is proven by component tests, not by a
 raw HTTP fetch of the page; no browser/DOM click-through verification is
 claimed for this story either.
 
+Story 28's Real Agent Dashboard was verified against the same real running
+API/Postgres: a real login, a real `GET /auth/me` call, and a real `GET
+/tickets?assignedToUserId=<that id>` call confirmed the filter genuinely
+narrows the result (46 tickets scoped to the authenticated user out of 476
+branch-wide, every one of the 46 actually carrying that user's id) rather
+than merely succeeding. `/dashboard` was confirmed, via real HTTP requests,
+to return `200` for an authenticated request (with the real static page
+chrome — "Dashboard"/"My open tickets" — present in the raw server-rendered
+HTML) and to still redirect an unauthenticated request to `login`, same as
+every other workspace route. The populated ticket list itself is
+client-fetched, so — consistent with the rest of this section — its
+on-screen rendering is proven by component tests, not by a raw HTTP fetch
+of the page; no browser/DOM click-through verification is claimed for this
+story either.
+
 ## Status by story
 
 - ✅ 01–05 — Project foundation (stack, monorepo, identity/auth)
@@ -275,6 +298,7 @@ claimed for this story either.
 - ✅ 25 — Agent Workspace: Ticket & Customer Creation
 - ✅ 26 — Agent Workspace: Customer List & Detail
 - ✅ 27 — Agent Workspace: Customer-to-Ticket Navigation
+- ✅ 28 — Agent Workspace: Real Agent Dashboard
 - ⏭ Everything else in the target architecture (Channels, Knowledge Base,
   AI, Customer Portal, Reporting, Administration, Integrations,
   `AutomationRule`, agent presence, search, pagination, customer editing,

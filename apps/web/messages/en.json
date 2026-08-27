@@ -120,6 +120,13 @@
       "createFailed": "Couldn't create the customer. Please try again."
     }
   },
+  "dashboard": {
+    "title": "Dashboard",
+    "heading": "My open tickets",
+    "error": "Couldn't load your tickets.",
+    "retry": "Retry",
+    "empty": "You have no open tickets assigned to you."
+  },
   "notifications": {
     "regionLabel": "Notifications",
     "dismiss": "Dismiss",

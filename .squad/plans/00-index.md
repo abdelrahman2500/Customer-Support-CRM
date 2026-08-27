@@ -22,3 +22,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | agent-workspace-ticket-customer-creation | [agent-workspace-ticket-customer-creation/00-overview.md](./agent-workspace-ticket-customer-creation/00-overview.md) | 25–      |
 | agent-workspace-customer-management | [agent-workspace-customer-management/00-overview.md](./agent-workspace-customer-management/00-overview.md) | 26–      |
 | agent-workspace-customer-ticket-navigation | [agent-workspace-customer-ticket-navigation/00-overview.md](./agent-workspace-customer-ticket-navigation/00-overview.md) | 27–      |
+| agent-workspace-real-dashboard | [agent-workspace-real-dashboard/00-overview.md](./agent-workspace-real-dashboard/00-overview.md) | 28–      |
