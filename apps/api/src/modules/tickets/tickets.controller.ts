@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
 import { CreateTicketDto } from "./dto/create-ticket.dto";
 import { UpdateTicketDto } from "./dto/update-ticket.dto";
-import type { TicketHistoryEntrySummary, TicketSummary } from "./tickets.service";
+import { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
+import type { TicketHistoryEntrySummary, TicketListItem, TicketSummary } from "./tickets.service";
 import { TicketsService } from "./tickets.service";
 
 @ApiTags("tickets")
@@ -20,8 +21,8 @@ export class TicketsController {
 
   @Get()
   @RequirePermissions("ticket:read")
-  list(): Promise<TicketSummary[]> {
-    return this.ticketsService.listTickets();
+  list(@Query() query: ListTicketsQueryDto): Promise<TicketListItem[]> {
+    return this.ticketsService.listTickets(query);
   }
 
   @Get(":id")

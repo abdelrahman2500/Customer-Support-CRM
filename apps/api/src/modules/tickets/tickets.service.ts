@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
-import type { TicketPriority, TicketStatus } from "@prisma/client";
+import type { Prisma, TicketPriority, TicketStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateTicketDto } from "./dto/create-ticket.dto";
 import type { UpdateTicketDto } from "./dto/update-ticket.dto";
+import type { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
 import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT, TICKET_RECATEGORIZED_EVENT } from "./tickets.events";
 import type { TicketCreatedEvent, TicketUpdatedEvent, TicketRecategorizedEvent } from "./tickets.events";
 
@@ -18,6 +19,26 @@ export interface TicketSummary {
   contactId: string | null;
   departmentId: string | null;
   assignedToUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Story 23 — the same shape `SlaTargetsService.getSlaTargetForTicket`
+ * (`sla-targets.service.ts`) returns, minus `ticketId` (redundant once
+ * embedded under the ticket it belongs to). Declared here rather than
+ * imported from the `sla-policies` module so `TicketsService` gains no new
+ * cross-module runtime dependency — only a structurally-matching type.
+ */
+export interface TicketSlaTargetSummary {
+  id: string;
+  slaPolicyId: string;
+  responseTargetAt: Date;
+  resolutionTargetAt: Date;
+}
+
+export interface TicketListItem extends TicketSummary {
+  slaTarget: TicketSlaTargetSummary | null;
 }
 
 export interface TicketHistoryEntrySummary {
@@ -101,13 +122,44 @@ export class TicketsService {
     return summary;
   }
 
-  async listTickets(): Promise<TicketSummary[]> {
+  /**
+   * Story 23 — mechanical, same-response-shape extension: optional equality
+   * filters on already-existing scalar fields, an optional sort choice on
+   * the two timestamp columns this story also exposes on `TicketSummary`
+   * (Task 1), and the ticket's already-existing `slaTarget` relation
+   * eager-loaded (no new query, no new table — see the plan's Design item
+   * 3). No search, no pagination — neither has any existing precedent in
+   * this codebase to extend (see `ListTicketsQueryDto`'s own doc comment).
+   */
+  async listTickets(query: ListTicketsQueryDto = {}): Promise<TicketListItem[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
+    const sortBy = query.sortBy ?? "createdAt";
+    const sortDir = query.sortDir ?? "asc";
+    const where: Prisma.TicketWhereInput = {
+      branchId,
+      ...(query.status !== undefined ? { status: query.status } : {}),
+      ...(query.priority !== undefined ? { priority: query.priority } : {}),
+      ...(query.category !== undefined ? { category: query.category } : {}),
+      ...(query.assignedToUserId !== undefined
+        ? { assignedToUserId: query.assignedToUserId }
+        : {}),
+    };
     const tickets = await this.prisma.ticket.findMany({
-      where: { branchId },
-      orderBy: { createdAt: "asc" },
+      where,
+      orderBy: { [sortBy]: sortDir },
+      include: { slaTarget: true },
     });
-    return tickets.map(toTicketSummary);
+    return tickets.map((ticket) => ({
+      ...toTicketSummary(ticket),
+      slaTarget: ticket.slaTarget
+        ? {
+            id: ticket.slaTarget.id,
+            slaPolicyId: ticket.slaTarget.slaPolicyId,
+            responseTargetAt: ticket.slaTarget.responseTargetAt,
+            resolutionTargetAt: ticket.slaTarget.resolutionTargetAt,
+          }
+        : null,
+    }));
   }
 
   async getTicket(id: string): Promise<TicketSummary> {
@@ -187,6 +239,8 @@ export class TicketsService {
     contactId: string | null;
     departmentId: string | null;
     assignedToUserId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
   }> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const ticket = await this.prisma.ticket.findFirst({ where: { id, branchId } });
@@ -226,6 +280,8 @@ export function toTicketSummary(ticket: {
   contactId: string | null;
   departmentId: string | null;
   assignedToUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }): TicketSummary {
   return {
     id: ticket.id,
@@ -237,5 +293,7 @@ export function toTicketSummary(ticket: {
     contactId: ticket.contactId,
     departmentId: ticket.departmentId,
     assignedToUserId: ticket.assignedToUserId,
+    createdAt: ticket.createdAt,
+    updatedAt: ticket.updatedAt,
   };
 }

@@ -40,6 +40,8 @@ export class TicketEscalationListener {
           contactId: true,
           departmentId: true,
           assignedToUserId: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
       if (!ticket) {

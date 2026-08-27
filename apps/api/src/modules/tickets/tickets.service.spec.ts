@@ -229,15 +229,102 @@ describe("TicketsService", () => {
   });
 
   describe("listTickets", () => {
-    it("scopes the query to the caller's active branch", async () => {
+    const baseTicketRow = {
+      id: "ticket-1",
+      subject: "Cannot log in",
+      category: "billing",
+      priority: "MEDIUM" as const,
+      status: "OPEN" as const,
+      customerId: "customer-1",
+      contactId: null,
+      departmentId: null,
+      assignedToUserId: null,
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-02T00:00:00.000Z"),
+      slaTarget: null,
+    };
+
+    it("scopes the query to the caller's active branch and defaults to createdAt asc, with no filters", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
 
       await service.listTickets();
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1" },
+        orderBy: { createdAt: "asc" },
+        include: { slaTarget: true },
+      });
+    });
+
+    it("applies status/priority/category/assignedToUserId filters independently and in combination", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({
+        status: "OPEN",
+        priority: "URGENT" as never,
+        category: "billing",
+        assignedToUserId: "user-1",
+      });
+
       expect(prisma.ticket.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { branchId: "branch-1" } }),
+        expect.objectContaining({
+          where: {
+            branchId: "branch-1",
+            status: "OPEN",
+            priority: "URGENT",
+            category: "billing",
+            assignedToUserId: "user-1",
+          },
+        }),
       );
+    });
+
+    it("sorts by the requested field and direction", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ sortBy: "updatedAt", sortDir: "desc" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { updatedAt: "desc" } }),
+      );
+    });
+
+    it("maps createdAt/updatedAt and a null slaTarget through to the response", async () => {
+      prisma.ticket.findMany.mockResolvedValue([baseTicketRow]);
+
+      const result = await service.listTickets();
+
+      expect(result).toEqual([
+        {
+          id: "ticket-1",
+          subject: "Cannot log in",
+          category: "billing",
+          priority: "MEDIUM",
+          status: "OPEN",
+          customerId: "customer-1",
+          contactId: null,
+          departmentId: null,
+          assignedToUserId: null,
+          createdAt: baseTicketRow.createdAt,
+          updatedAt: baseTicketRow.updatedAt,
+          slaTarget: null,
+        },
+      ]);
+    });
+
+    it("maps a present slaTarget relation into the response's slaTarget field", async () => {
+      const slaTarget = {
+        id: "target-1",
+        slaPolicyId: "policy-1",
+        responseTargetAt: new Date("2024-01-03T00:00:00.000Z"),
+        resolutionTargetAt: new Date("2024-01-04T00:00:00.000Z"),
+      };
+      prisma.ticket.findMany.mockResolvedValue([{ ...baseTicketRow, slaTarget }]);
+
+      const result = await service.listTickets();
+
+      expect(result[0]?.slaTarget).toEqual(slaTarget);
     });
   });
 

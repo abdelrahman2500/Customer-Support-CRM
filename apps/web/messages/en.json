@@ -7,5 +7,67 @@
     "login": "Log in",
     "email": "Email",
     "password": "Password"
+  },
+  "auth": {
+    "title": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in...",
+    "loginFailed": "Sign-in failed. Check your email and password and try again."
+  },
+  "workspace": {
+    "appName": "Customer Support CRM",
+    "signedInAs": "Signed in as {name}",
+    "signOut": "Sign out"
+  },
+  "tickets": {
+    "list": {
+      "title": "Tickets",
+      "filterAll": "All",
+      "filterStatus": "Status",
+      "filterPriority": "Priority",
+      "filterCategory": "Category",
+      "filterCategoryPlaceholder": "Filter by category",
+      "filterAssignedAgent": "Assigned agent",
+      "error": "Couldn't load tickets.",
+      "retry": "Retry",
+      "empty": "No tickets match the current filters.",
+      "noCategory": "—",
+      "unassigned": "Unassigned",
+      "columns": {
+        "id": "ID",
+        "subject": "Subject",
+        "customer": "Customer",
+        "status": "Status",
+        "priority": "Priority",
+        "category": "Category",
+        "assignedAgent": "Assigned agent",
+        "sla": "SLA",
+        "createdAt": "Created",
+        "updatedAt": "Updated"
+      }
+    },
+    "detail": {
+      "customer": "Customer",
+      "status": "Status",
+      "priority": "Priority",
+      "category": "Category",
+      "assignedAgent": "Assigned agent",
+      "slaHeading": "SLA",
+      "historyHeading": "History",
+      "historyError": "Couldn't load this ticket's history.",
+      "historyEmpty": "No history entries yet.",
+      "notFound": "This ticket could not be found.",
+      "loadError": "Couldn't load this ticket.",
+      "actionForbidden": "You don't have permission to perform that action.",
+      "actionFailed": "That change couldn't be saved. Please try again."
+    },
+    "sla": {
+      "none": "No SLA target",
+      "breached": "Breached",
+      "breachedAt": "Breached at {time}",
+      "remaining": "{time} remaining"
+    }
   }
 }

@@ -6,11 +6,21 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 import type { EnvConfig } from "./common/config/env.validation";
+import { parseCorsOrigins } from "./common/config/cors-origins";
 import { RedisIoAdapter } from "./realtime/redis-io.adapter";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService<EnvConfig, true>);
+
+  // Story 23 — env-configured allowed origins for both the REST API (here)
+  // and the Socket.IO gateway (`RedisIoAdapter`, same parsed list). Fails
+  // closed: an unset `CORS_ORIGINS` allows nothing, unchanged from this
+  // API's behavior before this story. `credentials: true` matches the
+  // agent workspace's existing `credentials: "include"` login fetch, which
+  // needs the refresh-token cookie.
+  const corsOrigins = parseCorsOrigins(config.get("CORS_ORIGINS", { infer: true }));
+  app.enableCors({ origin: corsOrigins, credentials: true });
 
   const redisIoAdapter = new RedisIoAdapter(app);
   await redisIoAdapter.connectToRedis();

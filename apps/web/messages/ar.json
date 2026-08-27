@@ -7,5 +7,67 @@
     "login": "تسجيل الدخول",
     "email": "البريد الإلكتروني",
     "password": "كلمة المرور"
+  },
+  "auth": {
+    "title": "تسجيل الدخول",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "signIn": "تسجيل الدخول",
+    "signingIn": "جارٍ تسجيل الدخول...",
+    "loginFailed": "فشل تسجيل الدخول. تحقق من البريد الإلكتروني وكلمة المرور وحاول مرة أخرى."
+  },
+  "workspace": {
+    "appName": "نظام إدارة خدمة العملاء",
+    "signedInAs": "مسجّل الدخول باسم {name}",
+    "signOut": "تسجيل الخروج"
+  },
+  "tickets": {
+    "list": {
+      "title": "التذاكر",
+      "filterAll": "الكل",
+      "filterStatus": "الحالة",
+      "filterPriority": "الأولوية",
+      "filterCategory": "الفئة",
+      "filterCategoryPlaceholder": "تصفية حسب الفئة",
+      "filterAssignedAgent": "الوكيل المكلّف",
+      "error": "تعذّر تحميل التذاكر.",
+      "retry": "إعادة المحاولة",
+      "empty": "لا توجد تذاكر مطابقة للمرشحات الحالية.",
+      "noCategory": "—",
+      "unassigned": "غير مُعيَّن",
+      "columns": {
+        "id": "الرقم",
+        "subject": "الموضوع",
+        "customer": "العميل",
+        "status": "الحالة",
+        "priority": "الأولوية",
+        "category": "الفئة",
+        "assignedAgent": "الوكيل المكلّف",
+        "sla": "اتفاقية مستوى الخدمة",
+        "createdAt": "تاريخ الإنشاء",
+        "updatedAt": "تاريخ التحديث"
+      }
+    },
+    "detail": {
+      "customer": "العميل",
+      "status": "الحالة",
+      "priority": "الأولوية",
+      "category": "الفئة",
+      "assignedAgent": "الوكيل المكلّف",
+      "slaHeading": "اتفاقية مستوى الخدمة",
+      "historyHeading": "السجل",
+      "historyError": "تعذّر تحميل سجل هذه التذكرة.",
+      "historyEmpty": "لا توجد إدخالات في السجل حتى الآن.",
+      "notFound": "تعذّر العثور على هذه التذكرة.",
+      "loadError": "تعذّر تحميل هذه التذكرة.",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى."
+    },
+    "sla": {
+      "none": "لا يوجد هدف اتفاقية مستوى خدمة",
+      "breached": "تم الخرق",
+      "breachedAt": "تم الخرق في {time}",
+      "remaining": "الوقت المتبقي: {time}"
+    }
   }
 }

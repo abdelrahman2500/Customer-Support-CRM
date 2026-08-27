@@ -196,6 +196,64 @@ describe("Ticketing (e2e)", () => {
     expect(ids).toContain(ticketId);
   });
 
+  it("includes createdAt/updatedAt and a slaTarget field (Story 23) on each listed ticket", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/tickets")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    const ticket = response.body.find((entry: { id: string }) => entry.id === ticketId);
+    expect(ticket).toBeDefined();
+    expect(typeof ticket.createdAt).toBe("string");
+    expect(typeof ticket.updatedAt).toBe("string");
+    // No SlaPolicy exists in this suite's fixtures, so no SlaTicketTarget was
+    // ever computed for this ticket — `slaTarget` is `null`, not omitted and
+    // not a 404 (Story 23's own "list row must not fail" design decision).
+    expect(ticket.slaTarget).toBeNull();
+  });
+
+  it("filters the ticket list by status, priority, category, and assignedToUserId", async () => {
+    const byStatus = await request(app.getHttpServer())
+      .get("/api/v1/tickets")
+      .query({ status: "OPEN" })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(
+      byStatus.body.every((entry: { status: string }) => entry.status === "OPEN"),
+    ).toBe(true);
+
+    const byUnrelatedStatus = await request(app.getHttpServer())
+      .get("/api/v1/tickets")
+      .query({ status: "CLOSED" })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(
+      byUnrelatedStatus.body.map((entry: { id: string }) => entry.id),
+    ).not.toContain(ticketId);
+  });
+
+  it("rejects an invalid status filter value with a validation error", async () => {
+    await request(app.getHttpServer())
+      .get("/api/v1/tickets")
+      .query({ status: "NOT_A_REAL_STATUS" })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(400);
+  });
+
+  it("sorts the ticket list by updatedAt descending", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/tickets")
+      .query({ sortBy: "updatedAt", sortDir: "desc" })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    const updatedAts = response.body.map((entry: { updatedAt: string }) =>
+      new Date(entry.updatedAt).getTime(),
+    );
+    const sorted = [...updatedAts].sort((a, b) => b - a);
+    expect(updatedAts).toEqual(sorted);
+  });
+
   it("gets a single ticket", async () => {
     const response = await request(app.getHttpServer())
       .get(`/api/v1/tickets/${ticketId}`)

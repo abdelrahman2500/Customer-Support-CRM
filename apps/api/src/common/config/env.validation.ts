@@ -24,6 +24,16 @@ export const envSchema = z.object({
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_BUCKET: z.string().optional(),
+
+  /**
+   * Story 23 — comma-separated list of allowed browser origins for both the
+   * REST API (`app.enableCors()`, `main.ts`) and the Socket.IO gateway
+   * (`RedisIoAdapter`). Unset by default: no origin is allowed unless a
+   * deployment explicitly opts in (see `parseCorsOrigins`,
+   * `common/config/cors-origins.ts`). Local development value:
+   * `http://localhost:3000`. No production origin is hard-coded here.
+   */
+  CORS_ORIGINS: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

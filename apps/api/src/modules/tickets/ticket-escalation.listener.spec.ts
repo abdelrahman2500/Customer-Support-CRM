@@ -76,6 +76,8 @@ describe("TicketEscalationListener", () => {
           contactId: true,
           departmentId: true,
           assignedToUserId: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
     });

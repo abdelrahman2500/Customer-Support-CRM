@@ -5,6 +5,7 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import { Redis } from "ioredis";
 import type { ServerOptions } from "socket.io";
 import type { EnvConfig } from "../common/config/env.validation";
+import { parseCorsOrigins } from "../common/config/cors-origins";
 
 /**
  * Wires the Socket.IO Redis adapter for horizontal scaling, per
@@ -14,6 +15,12 @@ import type { EnvConfig } from "../common/config/env.validation";
  * Redis instance or config surface. `@socket.io/redis-adapter` requires two
  * distinct connections (a pub client and a duplicated sub client), per its
  * own documented contract.
+ *
+ * Story 23 — `createIOServer` also merges the same env-configured
+ * `CORS_ORIGINS` (`main.ts` uses it for the REST API) into the `cors`
+ * option forwarded to `super.createIOServer(...)`, the existing extension
+ * point this override already had — no new adapter, no gateway decorator
+ * change, no change to `RealtimeGateway.authorizeRoom`.
  */
 export class RedisIoAdapter extends IoAdapter {
   private readonly logger = new Logger(RedisIoAdapter.name);
@@ -46,7 +53,12 @@ export class RedisIoAdapter extends IoAdapter {
   }
 
   createIOServer(port: number, options?: ServerOptions): unknown {
-    const server = super.createIOServer(port, options);
+    const config = this.app.get(ConfigService<EnvConfig, true>);
+    const corsOrigins = parseCorsOrigins(config.get("CORS_ORIGINS", { infer: true }));
+    const server = super.createIOServer(port, {
+      ...options,
+      cors: { origin: corsOrigins, credentials: true },
+    });
     if (this.adapterConstructor) {
       server.adapter(this.adapterConstructor);
     }
