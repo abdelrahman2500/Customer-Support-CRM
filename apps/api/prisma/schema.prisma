@@ -501,17 +501,30 @@ model BusinessHoursException {
 /// one would require an extra lookup that can race against
 /// `SlaTargetListener.onTicketRecategorized` deleting that exact row.
 /// Append-only: never updated after creation.
+///
+/// Story 19 — `branchId`/`targetType`/`targetAt` widened to nullable and
+/// `dedupeKey` added to support `ticket.escalated`, whose payload
+/// (`TicketEscalatedEvent`) carries none of the three SLA-shaped fields.
+/// Reusing the existing `(eventType, ticketId, targetType, targetAt)`
+/// constraint for those rows would enforce nothing — Postgres never treats
+/// two `NULL`s as equal — so `dedupeKey` is a second, independent identity:
+/// left `null` on every SLA row (never written by
+/// `SlaAtRiskNotificationListener`, unmodified), set to the ticket id on
+/// every `ticket.escalated` row. The two `@@unique` constraints below are
+/// deliberately separate and never interact.
 model NotificationLog {
-  id         String   @id @default(uuid())
-  eventType  String   @map("event_type")
-  ticketId   String   @map("ticket_id")
-  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  branchId   String   @map("branch_id")
-  targetType String   @map("target_type")
-  targetAt   DateTime @map("target_at")
-  loggedAt   DateTime @default(now()) @map("logged_at")
+  id         String    @id @default(uuid())
+  eventType  String    @map("event_type")
+  ticketId   String    @map("ticket_id")
+  ticket     Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  branchId   String?   @map("branch_id")
+  targetType String?   @map("target_type")
+  targetAt   DateTime? @map("target_at")
+  dedupeKey  String?   @map("dedupe_key")
+  loggedAt   DateTime  @default(now()) @map("logged_at")
 
   @@unique([eventType, ticketId, targetType, targetAt])
+  @@unique([eventType, dedupeKey])
   @@map("notification_logs")
   @@schema("notifications")
 }

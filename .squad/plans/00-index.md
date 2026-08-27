@@ -13,3 +13,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | ticket-recategorization-sla-target-recomputation | [ticket-recategorization-sla-target-recomputation/00-overview.md](./ticket-recategorization-sla-target-recomputation/00-overview.md) | 16–      |
 | sla-breach-escalation | [sla-breach-escalation/00-overview.md](./sla-breach-escalation/00-overview.md) | 17–      |
 | sla-at-risk-notification-reaction | [sla-at-risk-notification-reaction/00-overview.md](./sla-at-risk-notification-reaction/00-overview.md) | 18–      |
+| ticket-escalation-notification-reaction | [ticket-escalation-notification-reaction/00-overview.md](./ticket-escalation-notification-reaction/00-overview.md) | 19–      |
