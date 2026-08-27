@@ -6,10 +6,15 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 import type { EnvConfig } from "./common/config/env.validation";
+import { RedisIoAdapter } from "./realtime/redis-io.adapter";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService<EnvConfig, true>);
+
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   app.use(cookieParser());
   app.setGlobalPrefix("api/v1", { exclude: ["health", "health/ready"] });
