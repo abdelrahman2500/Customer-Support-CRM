@@ -35,6 +35,7 @@
       "empty": "لا توجد تذاكر مطابقة للمرشحات الحالية.",
       "noCategory": "—",
       "unassigned": "غير مُعيَّن",
+      "createButton": "تذكرة جديدة",
       "columns": {
         "id": "الرقم",
         "subject": "الموضوع",
@@ -68,6 +69,30 @@
       "breached": "تم الخرق",
       "breachedAt": "تم الخرق في {time}",
       "remaining": "الوقت المتبقي: {time}"
+    },
+    "create": {
+      "title": "تذكرة جديدة",
+      "customer": "العميل",
+      "selectCustomer": "اختر عميلاً",
+      "createCustomerLink": "إنشاء عميل جديد بدلاً من ذلك",
+      "subject": "الموضوع",
+      "category": "الفئة",
+      "priority": "الأولوية",
+      "priorityDefault": "الافتراضي",
+      "submit": "إنشاء التذكرة",
+      "submitting": "جارٍ الإنشاء...",
+      "createFailed": "تعذّر إنشاء التذكرة. حاول مرة أخرى."
+    }
+  },
+  "customers": {
+    "create": {
+      "title": "عميل جديد",
+      "displayName": "اسم العميل",
+      "submit": "إنشاء العميل",
+      "submitting": "جارٍ الإنشاء...",
+      "success": "تم إنشاء العميل \"{name}\".",
+      "createTicketLink": "إنشاء تذكرة له",
+      "createFailed": "تعذّر إنشاء العميل. حاول مرة أخرى."
     }
   },
   "notifications": {

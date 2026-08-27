@@ -35,6 +35,7 @@
       "empty": "No tickets match the current filters.",
       "noCategory": "—",
       "unassigned": "Unassigned",
+      "createButton": "New ticket",
       "columns": {
         "id": "ID",
         "subject": "Subject",
@@ -68,6 +69,30 @@
       "breached": "Breached",
       "breachedAt": "Breached at {time}",
       "remaining": "{time} remaining"
+    },
+    "create": {
+      "title": "New ticket",
+      "customer": "Customer",
+      "selectCustomer": "Select a customer",
+      "createCustomerLink": "Create a new customer instead",
+      "subject": "Subject",
+      "category": "Category",
+      "priority": "Priority",
+      "priorityDefault": "Default",
+      "submit": "Create ticket",
+      "submitting": "Creating...",
+      "createFailed": "Couldn't create the ticket. Please try again."
+    }
+  },
+  "customers": {
+    "create": {
+      "title": "New customer",
+      "displayName": "Customer name",
+      "submit": "Create customer",
+      "submitting": "Creating...",
+      "success": "Customer \"{name}\" was created.",
+      "createTicketLink": "Create a ticket for them",
+      "createFailed": "Couldn't create the customer. Please try again."
     }
   },
   "notifications": {

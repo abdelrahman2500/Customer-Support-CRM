@@ -120,3 +120,36 @@ export function listCustomers(): Promise<CustomerSummary[]> {
 export function listUsers(): Promise<UserSummary[]> {
   return apiFetch<UserSummary[]>("/identity/users");
 }
+
+/** Story 25 — mirrors the existing `CreateCustomerDto` exactly (`apps/api/src/modules/customers/dto/create-customer.dto.ts`): `displayName` only. */
+export interface CreateCustomerInput {
+  displayName: string;
+}
+
+export function createCustomer(input: CreateCustomerInput): Promise<CustomerSummary> {
+  return apiFetch<CustomerSummary>("/customers", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * Story 25 — mirrors the existing `CreateTicketDto` exactly (`apps/api/src/modules/tickets/dto/create-ticket.dto.ts`).
+ * `contactId`/`departmentId`/`assignedToUserId` are deliberately not part of
+ * this input type — plan Design item 3: contact creation, department, and
+ * assignment-at-creation-time are all explicitly out of scope for this
+ * story's minimum form.
+ */
+export interface CreateTicketInput {
+  customerId: string;
+  subject: string;
+  category?: string;
+  priority?: TicketPriority;
+}
+
+export function createTicket(input: CreateTicketInput): Promise<TicketSummary> {
+  return apiFetch<TicketSummary>("/tickets", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}

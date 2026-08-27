@@ -99,7 +99,12 @@ export function TicketListView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+        <Button size="sm" onClick={() => router.push(`/${locale}/tickets/new`)}>
+          {t("list.createButton")}
+        </Button>
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <FilterSelect

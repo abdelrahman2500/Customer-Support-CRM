@@ -12,7 +12,7 @@ cross-cutting concern is decided and documented there. Read it before
 proposing a design for any new feature. This README covers only what's
 needed to install, configure, and run the project as it exists today.
 
-## Current state (through Story 24)
+## Current state (through Story 25)
 
 Implemented so far:
 
@@ -43,12 +43,19 @@ Implemented so far:
   notification center, history, persistence, read/unread state, or
   per-user recipient targeting — every agent connected to a branch sees the
   same branch-wide broadcasts.
+- **Ticket & customer creation** (Agent Workspace): `tickets/new` and
+  `customers/new` let an agent create a ticket (for an existing customer)
+  or a customer, using the existing `POST /tickets`/`POST /customers`
+  contracts — no new backend endpoint. Customer selection reuses the same
+  full customer list already fetched elsewhere in the workspace (no
+  search/autocomplete endpoint exists yet); a successful ticket creation
+  opens the new ticket's real detail page.
 
 Not implemented yet: Communication Channels (email/WhatsApp/SMS/live chat/
 web forms), Knowledge Base, AI services, Customer Portal (`apps/portal` is
 still a placeholder), Reporting & Analytics, Administration screens,
 Integrations, `AutomationRule`, agent presence, ticket/customer search,
-pagination, and ticket/customer creation UI (creation is API-only so far).
+pagination, bulk import, attachments, and ticket comments.
 
 ## Repository layout
 
@@ -89,12 +96,15 @@ docs/
   connection error, check `Get-Service com.docker.service` and start it (as
   an administrator) before continuing.
 - On Windows specifically: if a native PostgreSQL service is already
-  running on port 5432, Docker's own Postgres container will be unreachable
-  on that port even though it starts and reports healthy. There is no
-  permanent workaround in this repo for that — temporarily remap the
-  `postgres` service in `docker-compose.yml` to a free host port (e.g.
-  `5433:5432`) and point `DATABASE_URL` at it for that session only; revert
-  both afterward. Do not commit a changed port mapping.
+  running on port 5432, Docker's own Postgres container is unreachable on
+  that port even though it starts and reports healthy. `docker-compose.yml`
+  currently maps `postgres` to host port **5433** (`5433:5432`) for exactly
+  this reason. **`.env.example`'s `DATABASE_URL` still says `5432`** — this
+  is a known, currently-unreconciled mismatch between the two committed
+  files; when copying `.env.example`, change the port to match whatever
+  `docker compose ps` actually shows for `postgres` on your machine (5433
+  today, or 5432 if you've reverted the compose mapping back because you
+  don't have a conflicting native Postgres).
 
 ## Getting started
 
@@ -144,7 +154,7 @@ pnpm dev
 | `apps/portal` (customer portal, placeholder) | http://localhost:3002 |
 | `apps/api` (HTTP API + Socket.IO + Swagger docs) | http://localhost:3001 (docs at `/api/docs`) |
 | `apps/worker` | no HTTP port — logs to the console |
-| Postgres (Docker) | localhost:5432 |
+| Postgres (Docker) | localhost:5433 (see the port-conflict note above) |
 | Redis (Docker) | localhost:6379 |
 | MinIO / MailHog (Docker, optional) | 9000/9001, 8025 |
 
@@ -193,14 +203,16 @@ chat, and no per-user notification targeting implemented.
 
 ## Verification status
 
-Backend routes, filters/sorting, SLA-target reads, ticket mutations, CORS,
-and both realtime rooms (including live `sla.at_risk`/`sla.breached`/
-`ticket.escalated` delivery to a real Socket.IO client) have been verified
-against a real running API, Postgres, and Redis. Actual browser/DOM
-click-through verification (as opposed to the underlying API/socket calls
-it depends on) requires a browser automation capability not available in
-every environment this project has been developed in — where it hasn't been
-performed, it is not claimed as done.
+Backend routes, filters/sorting, SLA-target reads, ticket mutations,
+ticket/customer creation, CORS, and both realtime rooms (including live
+`sla.at_risk`/`sla.breached`/`ticket.escalated` delivery to a real
+Socket.IO client) have been verified against a real running API, Postgres,
+and Redis — including the exact payload shapes the `tickets/new`/
+`customers/new` forms send. Actual browser/DOM click-through verification
+(as opposed to the underlying API/socket calls it depends on) requires a
+browser automation capability not available in every environment this
+project has been developed in — where it hasn't been performed, it is not
+claimed as done.
 
 ## Status by story
 
@@ -217,7 +229,10 @@ performed, it is not claimed as done.
 - ✅ 21 — Ticket history/timeline completion
 - ✅ 22 — In-app notification delivery (backend publisher)
 - ✅ 23 — Agent Workspace: Ticket Operations MVP
-- ✅ 24 — Agent Workspace: In-App Notification Display
+- ✅ 24 — Agent Workspace: In-App Notification Display (implemented directly
+  from a supplied specification; no `.squad` plan/intake exists for it)
+- ✅ 25 — Agent Workspace: Ticket & Customer Creation
 - ⏭ Everything else in the target architecture (Channels, Knowledge Base,
   AI, Customer Portal, Reporting, Administration, Integrations,
-  `AutomationRule`, agent presence) — see `.squad/plans/` for planned work.
+  `AutomationRule`, agent presence, search, pagination) — see
+  `.squad/plans/` for planned work.

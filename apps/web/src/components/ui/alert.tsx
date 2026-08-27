@@ -8,6 +8,9 @@ const alertVariants = cva("w-full rounded-md border px-4 py-3 text-sm", {
     variant: {
       default: "border-slate-200 bg-slate-50 text-slate-800",
       destructive: "border-red-200 bg-red-50 text-red-800",
+      /** Story 25 — matches `Badge`'s existing `success` palette; used for
+       * a successful creation confirmation. */
+      success: "border-emerald-200 bg-emerald-50 text-emerald-800",
     },
   },
   defaultVariants: { variant: "default" },

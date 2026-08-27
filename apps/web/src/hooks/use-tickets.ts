@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  createCustomer,
+  createTicket,
   getTicket,
   getTicketHistory,
   getTicketSlaTarget,
@@ -8,7 +10,12 @@ import {
   listUsers,
   updateTicket,
 } from "@/lib/tickets-api";
-import type { ListTicketsFilters, UpdateTicketInput } from "@/lib/tickets-api";
+import type {
+  CreateCustomerInput,
+  CreateTicketInput,
+  ListTicketsFilters,
+  UpdateTicketInput,
+} from "@/lib/tickets-api";
 
 export const ticketsQueryKey = (filters: ListTicketsFilters) => ["tickets", filters] as const;
 export const ticketQueryKey = (id: string) => ["ticket", id] as const;
@@ -66,6 +73,35 @@ export function useUpdateTicketMutation(id: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ticketQueryKey(id) });
       void queryClient.invalidateQueries({ queryKey: ticketHistoryQueryKey(id) });
+      void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+  });
+}
+
+/**
+ * Story 25 — never applies optimistically, same as `useUpdateTicketMutation`:
+ * only a successful `POST /customers` invalidates `["customers"]`, forcing
+ * every consumer (this workspace's customer picker included) to re-fetch
+ * the real, authoritative list.
+ */
+export function useCreateCustomerMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateCustomerInput) => createCustomer(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["customers"] });
+    },
+  });
+}
+
+/** Story 25 — same convention: only a successful `POST /tickets` invalidates
+ * `["tickets"]`; the caller navigates to the real new ticket's detail page
+ * rather than constructing an optimistic ticket object. */
+export function useCreateTicketMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateTicketInput) => createTicket(input),
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tickets"] });
     },
   });
