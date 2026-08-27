@@ -69,5 +69,23 @@
       "breachedAt": "تم الخرق في {time}",
       "remaining": "الوقت المتبقي: {time}"
     }
+  },
+  "notifications": {
+    "regionLabel": "الإشعارات",
+    "dismiss": "إغلاق",
+    "viewTicket": "عرض التذكرة",
+    "eventLabel": {
+      "slaAtRisk": "اتفاقية الخدمة في خطر",
+      "slaBreached": "تم خرق اتفاقية الخدمة",
+      "ticketEscalated": "تم تصعيد التذكرة"
+    },
+    "targetType": {
+      "response": "الاستجابة",
+      "resolution": "الحل"
+    },
+    "slaAtRisk": "هدف {targetType} للتذكرة {ticketId} في خطر.",
+    "slaBreached": "تم خرق هدف {targetType} للتذكرة {ticketId}.",
+    "ticketEscalated": "تم تصعيد التذكرة: {subject}",
+    "generic": "إشعار جديد"
   }
 }

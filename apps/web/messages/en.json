@@ -69,5 +69,23 @@
       "breachedAt": "Breached at {time}",
       "remaining": "{time} remaining"
     }
+  },
+  "notifications": {
+    "regionLabel": "Notifications",
+    "dismiss": "Dismiss",
+    "viewTicket": "View ticket",
+    "eventLabel": {
+      "slaAtRisk": "SLA at risk",
+      "slaBreached": "SLA breached",
+      "ticketEscalated": "Ticket escalated"
+    },
+    "targetType": {
+      "response": "response",
+      "resolution": "resolution"
+    },
+    "slaAtRisk": "The {targetType} target for ticket {ticketId} is at risk.",
+    "slaBreached": "The {targetType} target for ticket {ticketId} has been breached.",
+    "ticketEscalated": "Ticket escalated: {subject}",
+    "generic": "New notification"
   }
 }

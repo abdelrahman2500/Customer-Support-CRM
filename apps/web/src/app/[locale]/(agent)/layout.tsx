@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { AuthenticatedUser } from "@crm/shared";
 import { ACCESS_TOKEN_COOKIE, getApiBaseUrl } from "@/lib/api";
 import { WorkspaceNav } from "@/components/workspace/workspace-nav";
+import { BranchNotifications } from "@/components/notifications/branch-notifications";
 
 /**
  * Story 23 — the real auth guard for the agent workspace, replacing the
@@ -50,6 +51,9 @@ export default async function AgentWorkspaceLayout({
     <div className="flex min-h-screen flex-col bg-slate-50">
       <WorkspaceNav user={user} />
       <main className="flex-1 p-6">{children}</main>
+      {/* Story 24 — one branch-wide notification consumer for the whole
+          authenticated session, not per-page (see BranchNotifications). */}
+      <BranchNotifications branchId={user.branchId} />
     </div>
   );
 }
