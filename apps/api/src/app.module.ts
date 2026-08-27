@@ -16,6 +16,7 @@ import { IdentityModule } from "./modules/identity/identity.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { TicketsModule } from "./modules/tickets/tickets.module";
 import { SlaPoliciesModule } from "./modules/sla-policies/sla-policies.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { SlaPoliciesModule } from "./modules/sla-policies/sla-policies.module";
     CustomersModule,
     TicketsModule,
     SlaPoliciesModule,
+    NotificationsModule,
   ],
   providers: [
     // Registration order matters: AuthGuard must resolve `request.user`

@@ -16,7 +16,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   extensions = [pgvector(map: "vector"), pg_trgm]
-  schemas    = ["identity", "admin", "customers", "ticketing", "sla"]
+  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications"]
 }
 
 // ---------------------------------------------------------------------------
@@ -272,6 +272,7 @@ model Ticket {
   historyEntries   TicketHistoryEntry[]
   slaTarget        SlaTicketTarget?
   slaEscalations   SlaEscalation[]
+  notificationLogs NotificationLog[]
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
@@ -474,4 +475,43 @@ model BusinessHoursException {
   @@unique([calendarId, date])
   @@map("business_hours_exceptions")
   @@schema("sla")
+}
+
+// ---------------------------------------------------------------------------
+// notifications schema
+// ---------------------------------------------------------------------------
+
+/// Story 18 — the Notifications domain's first table (see
+/// docs/architecture/03-domain-boundaries.md, "Notifications... Templates,
+/// delivery logs, per-user preferences... owns notification routing").
+/// Deliberately narrow: this story records only that an `sla.at_risk`
+/// transition occurred, not an actual delivered notification — recipient
+/// resolution, template rendering, and channel delivery (the full
+/// `NotificationService` design in
+/// docs/architecture/06-communication-and-realtime.md) are a future story's
+/// concern. `eventType` is a plain String (not an enum) so a later event
+/// type can populate this same table without a migration, mirroring
+/// `TicketHistoryEntry.eventType`'s own precedent — only `"sla.at_risk"` is
+/// ever written by this story. Identity for idempotency is
+/// (eventType, ticketId, targetType, targetAt), not `slaTicketTargetId`:
+/// `SlaTicketTarget.id` stays constant across a Story 16 recategorization
+/// recompute, so `targetAt` is what actually distinguishes one at-risk
+/// transition from the next (the same reasoning `SlaEscalation`, Story 17,
+/// already established). No FK to `SlaTicketTarget`/`SlaPolicy` — resolving
+/// one would require an extra lookup that can race against
+/// `SlaTargetListener.onTicketRecategorized` deleting that exact row.
+/// Append-only: never updated after creation.
+model NotificationLog {
+  id         String   @id @default(uuid())
+  eventType  String   @map("event_type")
+  ticketId   String   @map("ticket_id")
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  branchId   String   @map("branch_id")
+  targetType String   @map("target_type")
+  targetAt   DateTime @map("target_at")
+  loggedAt   DateTime @default(now()) @map("logged_at")
+
+  @@unique([eventType, ticketId, targetType, targetAt])
+  @@map("notification_logs")
+  @@schema("notifications")
 }
