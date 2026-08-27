@@ -8,10 +8,12 @@ import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
 
 const push = vi.fn();
+let mockSearchParams = new URLSearchParams();
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
   useRouter: () => ({ push }),
+  useSearchParams: () => mockSearchParams,
 }));
 
 vi.mock("@/hooks/use-tickets", () => ({
@@ -34,6 +36,7 @@ function renderWithLocale(locale: "en" | "ar" = "en") {
 describe("CreateTicketView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
     mockedUseCustomersQuery.mockReturnValue({
       data: [{ id: "customer-1", displayName: "Acme Inc." }],
     } as never);
@@ -99,5 +102,73 @@ describe("CreateTicketView", () => {
 
     expect(await screen.findByText("Customer not found")).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  // Story 27 — customerId query-parameter prefill.
+  describe("customerId query-parameter prefill (Story 27)", () => {
+    it("pre-selects the customer when the query parameter matches a loaded customer", () => {
+      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockSearchParams = new URLSearchParams({ customerId: "customer-1" });
+
+      renderWithLocale("en");
+
+      // The submit button is disabled purely on `!customerId` (independent
+      // of subject) — an enabled button here proves the picker was seeded
+      // from the query parameter, without depending on Radix's internal
+      // trigger-label rendering.
+      expect(screen.getByRole("button", { name: "Create ticket" })).not.toBeDisabled();
+    });
+
+    it("leaves the picker unselected when the query parameter does not match any loaded customer", () => {
+      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockSearchParams = new URLSearchParams({ customerId: "unknown-customer" });
+
+      renderWithLocale("en");
+
+      expect(screen.getByRole("button", { name: "Create ticket" })).toBeDisabled();
+      expect(screen.getByText("Select a customer")).toBeInTheDocument();
+    });
+
+    it("leaves the picker unselected (unchanged existing behavior) when no query parameter is present", () => {
+      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockSearchParams = new URLSearchParams();
+
+      renderWithLocale("en");
+
+      expect(screen.getByRole("button", { name: "Create ticket" })).toBeDisabled();
+      expect(screen.getByText("Select a customer")).toBeInTheDocument();
+    });
+
+    it("still lets the agent change the pre-selected customer before submitting", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "ticket-42" });
+      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
+      mockedUseCustomersQuery.mockReturnValue({
+        data: [
+          { id: "customer-1", displayName: "Acme Inc." },
+          { id: "customer-2", displayName: "Widgets Co." },
+        ],
+      } as never);
+      mockSearchParams = new URLSearchParams({ customerId: "customer-1" });
+
+      renderWithLocale("en");
+
+      // Pre-selected — submit is already enabled from the query param alone.
+      expect(screen.getByRole("button", { name: "Create ticket" })).not.toBeDisabled();
+
+      // Open the picker via its combobox role (robust to whatever label the
+      // trigger currently shows) and pick the other customer instead.
+      const customerCombobox = screen.getAllByRole("combobox")[0] as HTMLElement;
+      fireEvent.click(customerCombobox);
+      fireEvent.click(await screen.findByRole("option", { name: "Widgets Co." }));
+      fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Billing question" } });
+      fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
+
+      await waitFor(() =>
+        expect(mutateAsync).toHaveBeenCalledWith({
+          customerId: "customer-2",
+          subject: "Billing question",
+        }),
+      );
+    });
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateTicketMutation, useCustomersQuery } from "@/hooks/use-tickets";
 import type { TicketPriority } from "@/lib/tickets-api";
@@ -28,11 +28,21 @@ const UNSET_PRIORITY = "__unset__";
  * every other workspace screen already uses (Design item 1) — no new
  * backend search/autocomplete. Never optimistic: on success, navigates to
  * the real new ticket's detail page, which fetches its own real state.
+ *
+ * Story 27 — reads an optional `customerId` query parameter (plan Design
+ * item 3) and, once it matches a customer in the already-fetched customer
+ * list, seeds the existing `customerId` state with it. This only seeds the
+ * initial selection — `onValueChange={setCustomerId}` below is completely
+ * unchanged, so the agent can still pick a different customer afterward.
+ * Absent, unknown, or not-yet-loaded, the state simply stays `""`, matching
+ * this screen's existing default behavior exactly.
  */
 export function CreateTicketView() {
   const t = useTranslations("tickets");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
+  const searchParams = useSearchParams();
+  const prefilledCustomerId = searchParams.get("customerId");
 
   const [customerId, setCustomerId] = useState("");
   const [subject, setSubject] = useState("");
@@ -42,6 +52,15 @@ export function CreateTicketView() {
 
   const customersQuery = useCustomersQuery();
   const mutation = useCreateTicketMutation();
+
+  useEffect(() => {
+    if (
+      prefilledCustomerId &&
+      (customersQuery.data ?? []).some((customer) => customer.id === prefilledCustomerId)
+    ) {
+      setCustomerId(prefilledCustomerId);
+    }
+  }, [prefilledCustomerId, customersQuery.data]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();

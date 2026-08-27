@@ -12,7 +12,7 @@ cross-cutting concern is decided and documented there. Read it before
 proposing a design for any new feature. This README covers only what's
 needed to install, configure, and run the project as it exists today.
 
-## Current state (through Story 26)
+## Current state (through Story 27)
 
 Implemented so far:
 
@@ -57,6 +57,15 @@ Implemented so far:
   already-embedded contacts (no second request). A "View customer" link is
   available wherever the ticket list/detail already shows a customer name.
   No customer editing or contact create/edit/delete is implemented yet.
+- **Customer-to-ticket navigation** (Agent Workspace): a customer's detail
+  page now has a "Related tickets" section, derived by filtering the
+  existing, already-fetched, unpaginated `GET /tickets` result client-side
+  by `customerId` (no backend `customerId` filter parameter exists), plus a
+  "New ticket" action that opens `tickets/new?customerId=<id>`. The Create
+  Ticket screen reads that optional query parameter and pre-selects the
+  matching customer in the existing picker — the agent can still change the
+  selection — with no change to behavior when the parameter is absent or
+  doesn't match a loaded customer.
 
 Not implemented yet: Communication Channels (email/WhatsApp/SMS/live chat/
 web forms), Knowledge Base, AI services, Customer Portal (`apps/portal` is
@@ -230,6 +239,22 @@ on) requires a browser automation capability not available in every
 environment this project has been developed in — where it hasn't been
 performed, it is not claimed as done.
 
+Story 27's customer-to-ticket navigation was verified against the same real
+running API/Postgres: a real `GET /tickets` call against the seeded local
+data confirmed multiple tickets sharing one real `customerId` (the exact
+condition the "Related tickets" client-side filter depends on), a real
+`GET /customers/:id` call for that same customer succeeded, and a real
+`POST /tickets` call with that `customerId` — the same payload shape the
+prefilled Create Ticket form would submit — succeeded and returned a new
+ticket carrying the same `customerId`. Both modified routes
+(`customers/{id}`, `tickets/new?customerId=...`) were confirmed to redirect
+an unauthenticated request to login, same as every other workspace route.
+The Related Tickets list itself and the picker's pre-selected option are
+client-fetched/client-state, so — consistent with the rest of this
+section — their on-screen rendering is proven by component tests, not by a
+raw HTTP fetch of the page; no browser/DOM click-through verification is
+claimed for this story either.
+
 ## Status by story
 
 - ✅ 01–05 — Project foundation (stack, monorepo, identity/auth)
@@ -249,6 +274,7 @@ performed, it is not claimed as done.
   from a supplied specification; no `.squad` plan/intake exists for it)
 - ✅ 25 — Agent Workspace: Ticket & Customer Creation
 - ✅ 26 — Agent Workspace: Customer List & Detail
+- ✅ 27 — Agent Workspace: Customer-to-Ticket Navigation
 - ⏭ Everything else in the target architecture (Channels, Knowledge Base,
   AI, Customer Portal, Reporting, Administration, Integrations,
   `AutomationRule`, agent presence, search, pagination, customer editing,

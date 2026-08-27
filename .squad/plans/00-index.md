@@ -21,3 +21,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | _(unplanned)_ agent-workspace-notification-display | Story 24 — implemented directly from a user-supplied specification; no `.squad` representation exists for it | 24        |
 | agent-workspace-ticket-customer-creation | [agent-workspace-ticket-customer-creation/00-overview.md](./agent-workspace-ticket-customer-creation/00-overview.md) | 25–      |
 | agent-workspace-customer-management | [agent-workspace-customer-management/00-overview.md](./agent-workspace-customer-management/00-overview.md) | 26–      |
+| agent-workspace-customer-ticket-navigation | [agent-workspace-customer-ticket-navigation/00-overview.md](./agent-workspace-customer-ticket-navigation/00-overview.md) | 27–      |

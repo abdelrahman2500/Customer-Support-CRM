@@ -104,7 +104,11 @@
       "contactsHeading": "Contacts",
       "contactsEmpty": "No contacts yet.",
       "primaryContact": "Primary",
-      "noContactInfo": "No email or phone on file."
+      "noContactInfo": "No email or phone on file.",
+      "ticketsHeading": "Related tickets",
+      "ticketsEmpty": "No tickets for this customer yet.",
+      "ticketsError": "Couldn't load this customer's tickets.",
+      "newTicketButton": "New ticket"
     },
     "create": {
       "title": "New customer",

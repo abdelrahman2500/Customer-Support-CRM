@@ -104,7 +104,11 @@
       "contactsHeading": "جهات الاتصال",
       "contactsEmpty": "لا توجد جهات اتصال حتى الآن.",
       "primaryContact": "أساسي",
-      "noContactInfo": "لا يوجد بريد إلكتروني أو هاتف مسجّل."
+      "noContactInfo": "لا يوجد بريد إلكتروني أو هاتف مسجّل.",
+      "ticketsHeading": "التذاكر المرتبطة",
+      "ticketsEmpty": "لا توجد تذاكر لهذا العميل حتى الآن.",
+      "ticketsError": "تعذّر تحميل تذاكر هذا العميل.",
+      "newTicketButton": "تذكرة جديدة"
     },
     "create": {
       "title": "عميل جديد",
