@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "../common/auth/auth.module";
 import { RealtimeGateway } from "./realtime.gateway";
 import { TicketRealtimeListener } from "./ticket-realtime.listener";
+import { BranchNotificationRealtimeListener } from "./branch-notification-realtime.listener";
 
 /**
  * Cross-cutting real-time transport infrastructure — see
@@ -17,6 +18,6 @@ import { TicketRealtimeListener } from "./ticket-realtime.listener";
  */
 @Module({
   imports: [AuthModule],
-  providers: [RealtimeGateway, TicketRealtimeListener],
+  providers: [RealtimeGateway, TicketRealtimeListener, BranchNotificationRealtimeListener],
 })
 export class RealtimeModule {}

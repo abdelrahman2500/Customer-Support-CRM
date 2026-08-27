@@ -16,3 +16,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | ticket-escalation-notification-reaction | [ticket-escalation-notification-reaction/00-overview.md](./ticket-escalation-notification-reaction/00-overview.md) | 19–      |
 | realtime-socketio-foundation | [realtime-socketio-foundation/00-overview.md](./realtime-socketio-foundation/00-overview.md) | 20–      |
 | ticket-history-timeline-completion | [ticket-history-timeline-completion/00-overview.md](./ticket-history-timeline-completion/00-overview.md) | 21–      |
+| in-app-notification-delivery | [in-app-notification-delivery/00-overview.md](./in-app-notification-delivery/00-overview.md) | 22–      |
