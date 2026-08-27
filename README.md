@@ -12,7 +12,7 @@ cross-cutting concern is decided and documented there. Read it before
 proposing a design for any new feature. This README covers only what's
 needed to install, configure, and run the project as it exists today.
 
-## Current state (through Story 28)
+## Current state (through Story 29)
 
 Implemented so far:
 
@@ -74,6 +74,18 @@ Implemented so far:
   then no-target-last, using the existing `deriveSlaStatus` helper (no new
   "at risk" threshold). No filter/sort/search UI; `RESOLVED`/`CLOSED`
   tickets are excluded (this is a work queue, not a history).
+- **Unassigned tickets & self-assign** (Agent Workspace): the Dashboard has
+  a second "Unclaimed tickets" section — the same unfiltered `GET /tickets`
+  call other screens already make, narrowed client-side to
+  `assignedToUserId === null` and an open status, ordered by the same SLA
+  urgency as "My open tickets". Each row has a "Claim" action that sends
+  the existing `PATCH /tickets/:id` with `{ assignedToUserId: <the current
+  agent's own id> }` — the same endpoint, DTO field, and `ticket:update`
+  permission `TicketDetailView`'s assignee picker already uses; no new
+  backend contract. The existing Ticket List is unchanged — it still has
+  no "Unassigned" filter option, since the backend has no way to filter
+  for "no assignee" and this story didn't add one. Already-assigned
+  tickets are never claimable through this section.
 
 Not implemented yet: Communication Channels (email/WhatsApp/SMS/live chat/
 web forms), Knowledge Base, AI services, Customer Portal (`apps/portal` is
@@ -278,6 +290,25 @@ on-screen rendering is proven by component tests, not by a raw HTTP fetch
 of the page; no browser/DOM click-through verification is claimed for this
 story either.
 
+Story 29's unassigned-tickets queue was verified against the same real
+running API/Postgres: a real `GET /tickets` call confirmed a large,
+concrete population of real unassigned open tickets (452–453 at
+verification time, out of just over 500 total — the exact count drifts as
+prior stories' own live-verification calls have each created one real
+ticket), then a real `PATCH /tickets/:id` claim was performed against one
+of them, setting `assignedToUserId` to the authenticated user's real id.
+A re-fetch of that same ticket confirmed the assignment genuinely changed
+(`null` → the real user id), a re-fetch of the branch-wide list confirmed
+the unassigned count dropped by exactly one, and the ticket's own history
+endpoint showed the existing `TicketHistoryListener` recorded a normal
+`ticket.updated` entry for it — the identical mechanism `TicketDetailView`'s
+assignee picker already relies on. **This claim is a real, permanent side
+effect on the local development database**, reported honestly rather than
+undone. The Unclaimed Tickets list itself is client-fetched, so —
+consistent with the rest of this section — its on-screen rendering is
+proven by component tests, not by a raw HTTP fetch of the page; no
+browser/DOM click-through verification is claimed for this story either.
+
 ## Status by story
 
 - ✅ 01–05 — Project foundation (stack, monorepo, identity/auth)
@@ -299,6 +330,7 @@ story either.
 - ✅ 26 — Agent Workspace: Customer List & Detail
 - ✅ 27 — Agent Workspace: Customer-to-Ticket Navigation
 - ✅ 28 — Agent Workspace: Real Agent Dashboard
+- ✅ 29 — Agent Workspace: Unassigned Tickets & Self-Assign
 - ⏭ Everything else in the target architecture (Channels, Knowledge Base,
   AI, Customer Portal, Reporting, Administration, Integrations,
   `AutomationRule`, agent presence, search, pagination, customer editing,

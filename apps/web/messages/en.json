@@ -125,7 +125,14 @@
     "heading": "My open tickets",
     "error": "Couldn't load your tickets.",
     "retry": "Retry",
-    "empty": "You have no open tickets assigned to you."
+    "empty": "You have no open tickets assigned to you.",
+    "unassignedHeading": "Unclaimed tickets",
+    "unassignedEmpty": "No unclaimed tickets right now.",
+    "unassignedError": "Couldn't load unclaimed tickets.",
+    "claimButton": "Claim",
+    "claiming": "Claiming...",
+    "claimForbidden": "You don't have permission to claim this ticket.",
+    "claimFailed": "Couldn't claim this ticket. Please try again."
   },
   "notifications": {
     "regionLabel": "Notifications",
