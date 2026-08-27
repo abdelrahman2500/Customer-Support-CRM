@@ -108,7 +108,18 @@
       "ticketsHeading": "Related tickets",
       "ticketsEmpty": "No tickets for this customer yet.",
       "ticketsError": "Couldn't load this customer's tickets.",
-      "newTicketButton": "New ticket"
+      "newTicketButton": "New ticket",
+      "displayNameLabel": "Customer name",
+      "actionForbidden": "You don't have permission to perform that action.",
+      "actionFailed": "That change couldn't be saved. Please try again.",
+      "contactFullNameLabel": "Name",
+      "contactEmailLabel": "Email",
+      "contactPhoneLabel": "Phone",
+      "setPrimary": "Set as primary",
+      "unsetPrimary": "Unset primary",
+      "addContactSubmit": "Add contact",
+      "addContactSubmitting": "Adding...",
+      "addContactFailed": "Couldn't add the contact. Please try again."
     },
     "create": {
       "title": "New customer",
@@ -118,6 +129,67 @@
       "success": "Customer \"{name}\" was created.",
       "createTicketLink": "Create a ticket for them",
       "createFailed": "Couldn't create the customer. Please try again."
+    }
+  },
+  "users": {
+    "list": {
+      "title": "Users",
+      "error": "Couldn't load users.",
+      "retry": "Retry",
+      "empty": "No users found.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "noRoles": "—",
+      "actionForbidden": "You don't have permission to perform that action.",
+      "actionFailed": "That change couldn't be saved. Please try again.",
+      "columns": {
+        "email": "Email",
+        "fullName": "Name",
+        "roles": "Roles",
+        "status": "Status"
+      }
+    }
+  },
+  "slaPolicies": {
+    "list": {
+      "title": "SLA Policies",
+      "createButton": "New policy",
+      "error": "Couldn't load SLA policies.",
+      "retry": "Retry",
+      "empty": "No SLA policies yet.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "noDepartment": "Any department",
+      "noCategory": "Any category",
+      "noPriority": "Any priority",
+      "actionForbidden": "You don't have permission to perform that action.",
+      "actionFailed": "That change couldn't be saved. Please try again.",
+      "columns": {
+        "department": "Department",
+        "category": "Category",
+        "priority": "Priority",
+        "responseTarget": "Response target (min)",
+        "resolutionTarget": "Resolution target (min)",
+        "status": "Status"
+      }
+    },
+    "create": {
+      "title": "New SLA policy",
+      "department": "Department ID",
+      "departmentPlaceholder": "Leave blank to apply to every department",
+      "category": "Category",
+      "priority": "Priority",
+      "priorityDefault": "Any priority",
+      "responseTarget": "Response target (minutes)",
+      "resolutionTarget": "Resolution target (minutes)",
+      "invalidTargets": "Response and resolution targets must be whole numbers of at least 1 minute.",
+      "submit": "Create policy",
+      "submitting": "Creating...",
+      "createFailed": "Couldn't create the SLA policy. Please try again."
     }
   },
   "dashboard": {

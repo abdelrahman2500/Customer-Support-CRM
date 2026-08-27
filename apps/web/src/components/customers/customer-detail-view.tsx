@@ -1,13 +1,29 @@
 "use client";
 
+import { useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useCustomerQuery, useTicketsQuery } from "@/hooks/use-tickets";
+import {
+  useCreateContactMutation,
+  useCustomerQuery,
+  useTicketsQuery,
+  useUpdateContactMutation,
+  useUpdateCustomerMutation,
+} from "@/hooks/use-tickets";
 import { ApiError } from "@/lib/api";
+import type { ContactSummary } from "@/lib/tickets-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function priorityBadgeVariant(priority: string) {
   if (priority === "URGENT") return "destructive" as const;
@@ -16,18 +32,175 @@ function priorityBadgeVariant(priority: string) {
 }
 
 /**
+ * Story 30 — one existing contact's inline-editable fields. A dedicated
+ * component (not inline in a `.map()`) because `useUpdateContactMutation`
+ * is a hook and must be called once per component instance, not once per
+ * loop iteration (React's rules of hooks) — the same constraint/precedent
+ * `UnclaimedTicketRow` (Story 29, `dashboard-view.tsx`) already established.
+ * Mirrors `TicketDetailView`'s blur-commit field convention: a field is only
+ * sent to the real `PATCH /customers/:id/contacts/:contactId` when its
+ * value actually changed on blur, and only ever a non-empty value for
+ * `fullName`/`email` (an emptied `email` is not sent — `UpdateContactDto`'s
+ * `@IsEmail()` would reject an empty string; no "clear this field" behavior
+ * exists anywhere in this codebase, so none is invented here). `phone` has
+ * no format constraint and may be cleared to blank.
+ */
+function ContactRow({ customerId, contact }: { customerId: string; contact: ContactSummary }) {
+  const t = useTranslations("customers");
+  const [fullNameDraft, setFullNameDraft] = useState<string | null>(null);
+  const [emailDraft, setEmailDraft] = useState<string | null>(null);
+  const [phoneDraft, setPhoneDraft] = useState<string | null>(null);
+  const mutation = useUpdateContactMutation(customerId, contact.id);
+
+  return (
+    <li className="flex flex-col gap-1 border-b border-slate-100 pb-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      <div className="flex flex-1 flex-wrap items-center gap-2">
+        <Input
+          className="w-36"
+          defaultValue={contact.fullName}
+          aria-label={t("detail.contactFullNameLabel")}
+          onChange={(event) => setFullNameDraft(event.target.value)}
+          onBlur={() => {
+            const value = fullNameDraft?.trim();
+            if (value && fullNameDraft !== contact.fullName) {
+              mutation.mutate({ fullName: value });
+            }
+          }}
+        />
+        <Input
+          className="w-40"
+          defaultValue={contact.email ?? ""}
+          placeholder={t("detail.contactEmailLabel")}
+          aria-label={t("detail.contactEmailLabel")}
+          onChange={(event) => setEmailDraft(event.target.value)}
+          onBlur={() => {
+            const value = emailDraft?.trim();
+            if (value && emailDraft !== (contact.email ?? "")) {
+              mutation.mutate({ email: value });
+            }
+          }}
+        />
+        <Input
+          className="w-32"
+          defaultValue={contact.phone ?? ""}
+          placeholder={t("detail.contactPhoneLabel")}
+          aria-label={t("detail.contactPhoneLabel")}
+          onChange={(event) => setPhoneDraft(event.target.value)}
+          onBlur={() => {
+            if (phoneDraft !== null && phoneDraft !== (contact.phone ?? "")) {
+              mutation.mutate({ phone: phoneDraft });
+            }
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={mutation.isPending}
+          onClick={() => mutation.mutate({ isPrimary: !contact.isPrimary })}
+        >
+          {contact.isPrimary ? t("detail.unsetPrimary") : t("detail.setPrimary")}
+        </Button>
+        {contact.isPrimary && <Badge variant="outline">{t("detail.primaryContact")}</Badge>}
+      </div>
+      {mutation.isError && (
+        <span className="text-xs text-red-600">
+          {mutation.error instanceof ApiError && mutation.error.status === 403
+            ? t("detail.actionForbidden")
+            : t("detail.actionFailed")}
+        </span>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Story 30 — the add-contact form, mirroring `CreateCustomerView`'s plain
+ * `useState` shape (no form/validation library). Never optimistic: on
+ * success, the existing `useCreateContactMutation` invalidation refreshes
+ * the customer detail query, and the new contact appears via the real
+ * re-fetched `contacts` array above — no optimistic row is ever inserted.
+ */
+function AddContactForm({ customerId }: { customerId: string }) {
+  const t = useTranslations("customers");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [isPrimary, setIsPrimary] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useCreateContactMutation(customerId);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setError(null);
+    try {
+      await mutation.mutateAsync({
+        fullName,
+        ...(email.trim() ? { email: email.trim() } : {}),
+        ...(phone.trim() ? { phone: phone.trim() } : {}),
+        ...(isPrimary ? { isPrimary: true } : {}),
+      });
+      setFullName("");
+      setEmail("");
+      setPhone("");
+      setIsPrimary(false);
+    } catch (submitError) {
+      setError(submitError instanceof ApiError ? submitError.message : t("detail.addContactFailed"));
+    }
+  }
+
+  return (
+    <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={handleSubmit}>
+      <label className="flex flex-col gap-1 text-xs text-slate-600">
+        {t("detail.contactFullNameLabel")}
+        <Input
+          className="w-36"
+          value={fullName}
+          onChange={(event) => setFullName(event.target.value)}
+          required
+          minLength={1}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-slate-600">
+        {t("detail.contactEmailLabel")}
+        <Input className="w-40" value={email} onChange={(event) => setEmail(event.target.value)} />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-slate-600">
+        {t("detail.contactPhoneLabel")}
+        <Input className="w-32" value={phone} onChange={(event) => setPhone(event.target.value)} />
+      </label>
+      <label className="flex items-center gap-1 text-xs text-slate-600">
+        <input
+          type="checkbox"
+          checked={isPrimary}
+          onChange={(event) => setIsPrimary(event.target.checked)}
+        />
+        {t("detail.primaryContact")}
+      </label>
+      <Button type="submit" size="sm" disabled={mutation.isPending}>
+        {mutation.isPending ? t("detail.addContactSubmitting") : t("detail.addContactSubmit")}
+      </Button>
+      {error && <Alert variant="destructive" className="w-full">{error}</Alert>}
+    </form>
+  );
+}
+
+/**
  * Story 26 — Customer Detail. Mirrors `TicketDetailView`'s structure: a
  * loading/error/content shape, the same 404-vs-generic error distinction,
- * and a bordered card per section. Read-only (plan Design item 7 — no
- * `PATCH /customers/:id` usage, no contact CRUD). Contacts render straight
- * from the customer-detail response's already-embedded `contacts` array
- * (Design item 1) — no second request.
+ * and a bordered card per section.
  *
  * Story 27 — adds a "Related tickets" card, derived by filtering the
  * existing, already-fetched, unpaginated `GET /tickets` result client-side
  * by `customerId` (plan Design item 1 — no backend `customerId` filter
  * parameter is introduced), plus a "New ticket" action that deep-links to
  * `tickets/new?customerId=<id>` (plan Design item 5).
+ *
+ * Story 30 — replaces the previously read-only header/contacts with real
+ * edit capability over the existing `PATCH /customers/:id` and
+ * `POST/PATCH /customers/:id/contacts` contracts (no new backend). Never
+ * optimistic: every field commits only on blur/submit and only ever
+ * reflects the real, re-fetched server state afterward.
  */
 export function CustomerDetailView({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");
@@ -38,6 +211,8 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
   const relatedTickets = (ticketsQuery.data ?? []).filter(
     (ticket) => ticket.customerId === customerId,
   );
+  const updateCustomerMutation = useUpdateCustomerMutation(customerId);
+  const [displayNameDraft, setDisplayNameDraft] = useState<string | null>(null);
 
   if (customerQuery.isLoading) {
     return (
@@ -64,10 +239,30 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
     <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-slate-900">{customer.displayName}</h1>
-          <Badge variant={customer.isActive ? "success" : "secondary"}>
-            {customer.isActive ? t("list.active") : t("list.inactive")}
-          </Badge>
+          <Input
+            className="w-56 text-lg font-semibold"
+            defaultValue={customer.displayName}
+            aria-label={t("detail.displayNameLabel")}
+            onChange={(event) => setDisplayNameDraft(event.target.value)}
+            onBlur={() => {
+              const value = displayNameDraft?.trim();
+              if (value && displayNameDraft !== customer.displayName) {
+                updateCustomerMutation.mutate({ displayName: value });
+              }
+            }}
+          />
+          <Select
+            value={customer.isActive ? "active" : "inactive"}
+            onValueChange={(value) => updateCustomerMutation.mutate({ isActive: value === "active" })}
+          >
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">{t("list.active")}</SelectItem>
+              <SelectItem value="inactive">{t("list.inactive")}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <Button
           size="sm"
@@ -77,6 +272,14 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         </Button>
       </div>
 
+      {updateCustomerMutation.isError && (
+        <Alert variant="destructive">
+          {updateCustomerMutation.error instanceof ApiError && updateCustomerMutation.error.status === 403
+            ? t("detail.actionForbidden")
+            : t("detail.actionFailed")}
+        </Alert>
+      )}
+
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.contactsHeading")}</h2>
         {customer.contacts.length === 0 && (
@@ -85,25 +288,11 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         {customer.contacts.length > 0 && (
           <ul className="mt-2 flex flex-col gap-2 text-sm">
             {customer.contacts.map((contact) => (
-              <li
-                key={contact.id}
-                className="flex items-center justify-between border-b border-slate-100 pb-2"
-              >
-                <span className="font-medium text-slate-800">
-                  {contact.fullName}
-                  {contact.isPrimary && (
-                    <Badge variant="outline" className="ms-2">
-                      {t("detail.primaryContact")}
-                    </Badge>
-                  )}
-                </span>
-                <span className="text-slate-500">
-                  {[contact.email, contact.phone].filter(Boolean).join(" · ") || t("detail.noContactInfo")}
-                </span>
-              </li>
+              <ContactRow key={contact.id} customerId={customerId} contact={contact} />
             ))}
           </ul>
         )}
+        <AddContactForm customerId={customerId} />
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white p-4">

@@ -12,7 +12,7 @@ cross-cutting concern is decided and documented there. Read it before
 proposing a design for any new feature. This README covers only what's
 needed to install, configure, and run the project as it exists today.
 
-## Current state (through Story 29)
+## Current state (through Story 32, with one gap — see "Known gap" below)
 
 Implemented so far:
 
@@ -56,7 +56,6 @@ Implemented so far:
   shows a customer's contacts read-only, using `GET /customers/:id`'s
   already-embedded contacts (no second request). A "View customer" link is
   available wherever the ticket list/detail already shows a customer name.
-  No customer editing or contact create/edit/delete is implemented yet.
 - **Customer-to-ticket navigation** (Agent Workspace): a customer's detail
   page now has a "Related tickets" section, derived by filtering the
   existing, already-fetched, unpaginated `GET /tickets` result client-side
@@ -86,13 +85,34 @@ Implemented so far:
   no "Unassigned" filter option, since the backend has no way to filter
   for "no assignee" and this story didn't add one. Already-assigned
   tickets are never claimable through this section.
+- **Customer & contact editing** (Agent Workspace): a customer's detail page
+  now has an editable display name and active/inactive select, both
+  committing on blur/change via the existing `PATCH /customers/:id` — no
+  new backend endpoint/DTO. Each contact is inline-editable (fullName/
+  email/phone, blur-commit) and has a "set/unset primary" toggle, all via
+  the existing `PATCH /customers/:id/contacts/:contactId`; a new contact
+  can be added via the existing `POST /customers/:id/contacts`. Every
+  mutation is never-optimistic (re-fetches the real state on success only)
+  and distinguishes a 403 from a generic failure inline, the same
+  convention as `TicketDetailView`.
+- **User management** (Agent Workspace): a new `/users` route lists every
+  user in the branch via the existing `GET /identity/users` (its
+  `UserSummary` now additionally returns `isActive`/`roles`, already
+  present server-side). `fullName` is inline-editable (blur-commit) and
+  active/inactive is toggleable, both via the existing
+  `PATCH /identity/users/:id` — no new backend endpoint/DTO. Roles render
+  as read-only badges (no role-assignment endpoint exists). User creation
+  is explicitly out of scope: `CreateUserDto` requires a real
+  `branchId`/`roleId` and no endpoint exists anywhere to list valid
+  branches/departments for a form to populate.
 
 Not implemented yet: Communication Channels (email/WhatsApp/SMS/live chat/
 web forms), Knowledge Base, AI services, Customer Portal (`apps/portal` is
-still a placeholder), Reporting & Analytics, Administration screens,
-Integrations, `AutomationRule`, agent presence, ticket/customer search,
-pagination, bulk import, attachments, ticket comments, customer editing,
-and contact create/edit/delete.
+still a placeholder), Reporting & Analytics, Administration screens (role/
+permission management, user creation, audit log viewing), Integrations,
+`AutomationRule`, agent presence, ticket/customer search, pagination, bulk
+import, attachments, ticket comments, and SLA policy management (planned
+as Story 31 — see "Known gap" below).
 
 ## Repository layout
 
@@ -331,10 +351,34 @@ browser/DOM click-through verification is claimed for this story either.
 - ✅ 27 — Agent Workspace: Customer-to-Ticket Navigation
 - ✅ 28 — Agent Workspace: Real Agent Dashboard
 - ✅ 29 — Agent Workspace: Unassigned Tickets & Self-Assign
+- ✅ 30 — Agent Workspace: Customer & Contact Editing
+- ❌ 31 — Agent Workspace: SLA Policy Management — **reported complete but not
+  present in this repository**; treat as not implemented — see "Known gap"
+  below.
+- ✅ 32 — Agent Workspace: User Management (list, deactivate, rename)
 - ⏭ Everything else in the target architecture (Channels, Knowledge Base,
   AI, Customer Portal, Reporting, Administration, Integrations,
-  `AutomationRule`, agent presence, search, pagination, customer editing,
-  contact create/edit/delete) — see `.squad/plans/` for planned work.
+  `AutomationRule`, agent presence, search, pagination) — see
+  `.squad/plans/` for planned work.
+
+## Known gap: Story 31 (SLA Policy Management) is not in this repository
+
+Stories 30–32 (`agent-workspace-customer-editing`,
+`agent-workspace-sla-policy-admin`, `agent-workspace-user-admin`) were
+developed as one parallel batch and each independently reported complete.
+A reconciliation pass across the combined repository state found Story
+30's and Story 32's implementations both present and coherent, but **Story
+31's implementation was never committed to this repository** — only its
+plan/story-intake documents exist
+(`.squad/plans/agent-workspace-sla-policy-admin/`,
+`.squad/stories/agent-workspace-sla-policy-admin/`). There is no
+`apps/web/src/lib/sla-policies-api.ts`, no `use-sla-policies.ts` hook, no
+`/sla-policies` route/component, and no commit referencing it. Its planned
+scope — SLA policy list/create/edit-target-minutes/active-toggle over the
+existing `sla-policies` backend endpoints (Story 10), no business-hours UI,
+no backend changes — remains unbuilt. This is a documentation-only
+finding from the reconciliation pass; no attempt was made to implement
+Story 31 here, since doing so is out of scope for a reconciliation pass.
 
 ## Known pre-existing test limitation
 

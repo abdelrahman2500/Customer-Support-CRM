@@ -108,7 +108,18 @@
       "ticketsHeading": "التذاكر المرتبطة",
       "ticketsEmpty": "لا توجد تذاكر لهذا العميل حتى الآن.",
       "ticketsError": "تعذّر تحميل تذاكر هذا العميل.",
-      "newTicketButton": "تذكرة جديدة"
+      "newTicketButton": "تذكرة جديدة",
+      "displayNameLabel": "اسم العميل",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+      "contactFullNameLabel": "الاسم",
+      "contactEmailLabel": "البريد الإلكتروني",
+      "contactPhoneLabel": "الهاتف",
+      "setPrimary": "تعيين كجهة اتصال أساسية",
+      "unsetPrimary": "إلغاء التعيين كأساسي",
+      "addContactSubmit": "إضافة جهة اتصال",
+      "addContactSubmitting": "جارٍ الإضافة...",
+      "addContactFailed": "تعذّر إضافة جهة الاتصال. حاول مرة أخرى."
     },
     "create": {
       "title": "عميل جديد",
@@ -118,6 +129,67 @@
       "success": "تم إنشاء العميل \"{name}\".",
       "createTicketLink": "إنشاء تذكرة له",
       "createFailed": "تعذّر إنشاء العميل. حاول مرة أخرى."
+    }
+  },
+  "users": {
+    "list": {
+      "title": "المستخدمون",
+      "error": "تعذّر تحميل المستخدمين.",
+      "retry": "إعادة المحاولة",
+      "empty": "لا يوجد مستخدمون.",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "activate": "تفعيل",
+      "deactivate": "إلغاء التفعيل",
+      "noRoles": "—",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+      "columns": {
+        "email": "البريد الإلكتروني",
+        "fullName": "الاسم",
+        "roles": "الأدوار",
+        "status": "الحالة"
+      }
+    }
+  },
+  "slaPolicies": {
+    "list": {
+      "title": "سياسات اتفاقية مستوى الخدمة",
+      "createButton": "سياسة جديدة",
+      "error": "تعذّر تحميل سياسات اتفاقية مستوى الخدمة.",
+      "retry": "إعادة المحاولة",
+      "empty": "لا توجد سياسات اتفاقية مستوى خدمة حتى الآن.",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "activate": "تفعيل",
+      "deactivate": "إلغاء التفعيل",
+      "noDepartment": "أي قسم",
+      "noCategory": "أي فئة",
+      "noPriority": "أي أولوية",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+      "columns": {
+        "department": "القسم",
+        "category": "الفئة",
+        "priority": "الأولوية",
+        "responseTarget": "هدف الاستجابة (دقيقة)",
+        "resolutionTarget": "هدف الحل (دقيقة)",
+        "status": "الحالة"
+      }
+    },
+    "create": {
+      "title": "سياسة اتفاقية خدمة جديدة",
+      "department": "معرّف القسم",
+      "departmentPlaceholder": "اترك الحقل فارغًا لتطبيقها على جميع الأقسام",
+      "category": "الفئة",
+      "priority": "الأولوية",
+      "priorityDefault": "أي أولوية",
+      "responseTarget": "هدف الاستجابة (بالدقائق)",
+      "resolutionTarget": "هدف الحل (بالدقائق)",
+      "invalidTargets": "يجب أن تكون أهداف الاستجابة والحل أرقامًا صحيحة لا تقل عن دقيقة واحدة.",
+      "submit": "إنشاء السياسة",
+      "submitting": "جارٍ الإنشاء...",
+      "createFailed": "تعذّر إنشاء سياسة اتفاقية الخدمة. حاول مرة أخرى."
     }
   },
   "dashboard": {

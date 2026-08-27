@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  createContact,
   createCustomer,
   createTicket,
   getCustomer,
@@ -9,13 +10,20 @@ import {
   listCustomers,
   listTickets,
   listUsers,
+  updateContact,
+  updateCustomer,
   updateTicket,
+  updateUser,
 } from "@/lib/tickets-api";
 import type {
+  CreateContactInput,
   CreateCustomerInput,
   CreateTicketInput,
   ListTicketsFilters,
+  UpdateContactInput,
+  UpdateCustomerInput,
   UpdateTicketInput,
+  UpdateUserInput,
 } from "@/lib/tickets-api";
 
 export const ticketsQueryKey = (filters: ListTicketsFilters) => ["tickets", filters] as const;
@@ -110,6 +118,65 @@ export function useCreateTicketMutation() {
     mutationFn: (input: CreateTicketInput) => createTicket(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+  });
+}
+
+/**
+ * Story 30 — never applies optimistically, same as `useUpdateTicketMutation`:
+ * a successful `PATCH /customers/:id` invalidates both this one customer's
+ * detail query and the branch-wide `["customers"]` list (which also shows
+ * `displayName`/`isActive`), forcing both to re-fetch the real, authoritative
+ * state.
+ */
+export function useUpdateCustomerMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateCustomerInput) => updateCustomer(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["customer", id] });
+      void queryClient.invalidateQueries({ queryKey: ["customers"] });
+    },
+  });
+}
+
+/** Story 30 — same never-optimistic convention: only a successful
+ * `POST /customers/:id/contacts` invalidates that customer's detail query
+ * (whose already-embedded `contacts` array is the only place a contact is
+ * ever rendered). */
+export function useCreateContactMutation(customerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateContactInput) => createContact(customerId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
+    },
+  });
+}
+
+/** Story 30 — same never-optimistic convention as `useCreateContactMutation`. */
+export function useUpdateContactMutation(customerId: string, contactId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateContactInput) => updateContact(customerId, contactId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
+    },
+  });
+}
+
+/**
+ * Story 32 — never applies optimistically, same convention as every other
+ * mutation here: only a successful `PATCH /identity/users/:id` invalidates
+ * `["users"]`, forcing the list (the only place a user is rendered) to
+ * re-fetch the real, authoritative state.
+ */
+export function useUpdateUserMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateUserInput) => updateUser(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
     },
   });
 }

@@ -58,10 +58,15 @@ export interface CustomerDetail extends CustomerSummary {
   contacts: ContactSummary[];
 }
 
+/** Story 32 — widened additively with `isActive`/`roles` (already returned
+ * by `GET /identity/users`; every existing consumer only destructures
+ * `id`/`fullName` and is unaffected). */
 export interface UserSummary {
   id: string;
   email: string;
   fullName: string;
+  isActive: boolean;
+  roles: string[];
 }
 
 export interface ListTicketsFilters {
@@ -136,8 +141,68 @@ export function getCustomer(id: string): Promise<CustomerDetail> {
   return apiFetch<CustomerDetail>(`/customers/${id}`);
 }
 
+/** Story 30 — mirrors the existing `UpdateCustomerDto` exactly (`apps/api/src/modules/customers/dto/update-customer.dto.ts`). */
+export interface UpdateCustomerInput {
+  displayName?: string;
+  isActive?: boolean;
+}
+
+export function updateCustomer(id: string, input: UpdateCustomerInput): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/customers/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Story 30 — mirrors the existing `CreateContactDto` exactly (`apps/api/src/modules/customers/dto/create-contact.dto.ts`). */
+export interface CreateContactInput {
+  fullName: string;
+  email?: string;
+  phone?: string;
+  isPrimary?: boolean;
+}
+
+export function createContact(customerId: string, input: CreateContactInput): Promise<ContactSummary> {
+  return apiFetch<ContactSummary>(`/customers/${customerId}/contacts`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Story 30 — mirrors the existing `UpdateContactDto` exactly (`apps/api/src/modules/customers/dto/update-contact.dto.ts`). */
+export interface UpdateContactInput {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  isPrimary?: boolean;
+}
+
+export function updateContact(
+  customerId: string,
+  contactId: string,
+  input: UpdateContactInput,
+): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/customers/${customerId}/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
 export function listUsers(): Promise<UserSummary[]> {
   return apiFetch<UserSummary[]>("/identity/users");
+}
+
+/** Story 32 — mirrors the existing `UpdateUserDto` exactly (`apps/api/src/modules/identity/dto/update-user.dto.ts`). No role/branch change possible through this endpoint. */
+export interface UpdateUserInput {
+  fullName?: string;
+  isActive?: boolean;
+}
+
+export function updateUser(id: string, input: UpdateUserInput): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/identity/users/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 /** Story 25 — mirrors the existing `CreateCustomerDto` exactly (`apps/api/src/modules/customers/dto/create-customer.dto.ts`): `displayName` only. */

@@ -1,7 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { CustomerDetailView } from "./customer-detail-view";
-import { useCustomerQuery, useTicketsQuery } from "@/hooks/use-tickets";
+import {
+  useCreateContactMutation,
+  useCustomerQuery,
+  useTicketsQuery,
+  useUpdateContactMutation,
+  useUpdateCustomerMutation,
+} from "@/hooks/use-tickets";
 import { ApiError } from "@/lib/api";
 
 const push = vi.fn();
@@ -19,10 +25,16 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/hooks/use-tickets", () => ({
   useCustomerQuery: vi.fn(),
   useTicketsQuery: vi.fn(),
+  useUpdateCustomerMutation: vi.fn(),
+  useCreateContactMutation: vi.fn(),
+  useUpdateContactMutation: vi.fn(),
 }));
 
 const mockedUseCustomerQuery = vi.mocked(useCustomerQuery);
 const mockedUseTicketsQuery = vi.mocked(useTicketsQuery);
+const mockedUseUpdateCustomerMutation = vi.mocked(useUpdateCustomerMutation);
+const mockedUseCreateContactMutation = vi.mocked(useCreateContactMutation);
+const mockedUseUpdateContactMutation = vi.mocked(useUpdateContactMutation);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -30,6 +42,17 @@ function queryResult(overrides: Record<string, unknown>) {
     isLoading: false,
     isError: false,
     isSuccess: false,
+    error: null,
+    ...overrides,
+  };
+}
+
+function idleMutation(overrides: Record<string, unknown> = {}) {
+  return {
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
     error: null,
     ...overrides,
   };
@@ -44,6 +67,9 @@ describe("CustomerDetailView", () => {
     mockedUseTicketsQuery.mockReturnValue(
       queryResult({ isSuccess: true, data: [] }) as never,
     );
+    mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation() as never);
+    mockedUseCreateContactMutation.mockReturnValue(idleMutation() as never);
+    mockedUseUpdateContactMutation.mockReturnValue(idleMutation() as never);
   });
 
   it("shows a loading state while the customer query is pending", () => {
@@ -91,11 +117,12 @@ describe("CustomerDetailView", () => {
 
     render(<CustomerDetailView customerId="customer-1" />);
 
-    expect(screen.getByText("Acme Inc.")).toBeInTheDocument();
-    expect(screen.getByText("list.active")).toBeInTheDocument();
-    expect(screen.getByText("Jane Doe")).toBeInTheDocument();
-    expect(screen.getByText("jane@acme.test")).toBeInTheDocument();
-    expect(screen.getByText("detail.primaryContact")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Acme Inc.")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Jane Doe")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("jane@acme.test")).toBeInTheDocument();
+    // "detail.primaryContact" also labels the add-contact form's checkbox —
+    // scope to the contacts list to assert the row's own primary badge.
+    expect(within(screen.getByRole("list")).getByText("detail.primaryContact")).toBeInTheDocument();
   });
 
   it("renders an empty-contacts message when the customer has no contacts", () => {
@@ -109,7 +136,6 @@ describe("CustomerDetailView", () => {
     render(<CustomerDetailView customerId="customer-1" />);
 
     expect(screen.getByText("detail.contactsEmpty")).toBeInTheDocument();
-    expect(screen.getByText("list.inactive")).toBeInTheDocument();
   });
 
   // Story 27 — Related tickets section + "New ticket" action.
@@ -210,6 +236,162 @@ describe("CustomerDetailView", () => {
       fireEvent.click(screen.getByText("detail.newTicketButton"));
 
       expect(push).toHaveBeenCalledWith("/en/tickets/new?customerId=customer-1");
+    });
+  });
+
+  // Story 30 — customer field editing + contact CRUD.
+  describe("customer editing (Story 30)", () => {
+    beforeEach(() => {
+      mockedUseCustomerQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: { id: "customer-1", displayName: "Acme Inc.", isActive: true, contacts: [] },
+        }) as never,
+      );
+    });
+
+    it("commits a changed display name on blur via the real PATCH /customers/:id mutation", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      const input = screen.getByDisplayValue("Acme Inc.");
+      fireEvent.change(input, { target: { value: "Acme Corp." } });
+      fireEvent.blur(input);
+
+      expect(mutate).toHaveBeenCalledWith({ displayName: "Acme Corp." });
+    });
+
+    it("does not commit when the display name is blurred unchanged", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      const input = screen.getByDisplayValue("Acme Inc.");
+      fireEvent.blur(input);
+
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it("toggles isActive via the real PATCH /customers/:id mutation", async () => {
+      const mutate = vi.fn();
+      mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByText("list.active"));
+      fireEvent.click(await screen.findByRole("option", { name: "list.inactive" }));
+
+      expect(mutate).toHaveBeenCalledWith({ isActive: false });
+    });
+
+    it("shows a forbidden-specific message when a customer edit is rejected with 403", () => {
+      mockedUseUpdateCustomerMutation.mockReturnValue(
+        idleMutation({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.actionForbidden")).toBeInTheDocument();
+    });
+
+    it("shows a generic failure message when a customer edit is rejected with a non-403 error", () => {
+      mockedUseUpdateCustomerMutation.mockReturnValue(
+        idleMutation({ isError: true, error: new ApiError("Server error", 500) }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.actionFailed")).toBeInTheDocument();
+    });
+  });
+
+  describe("contact editing (Story 30)", () => {
+    beforeEach(() => {
+      mockedUseCustomerQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: {
+            id: "customer-1",
+            displayName: "Acme Inc.",
+            isActive: true,
+            contacts: [
+              { id: "contact-1", fullName: "Jane Doe", email: "jane@acme.test", phone: null, isPrimary: false },
+            ],
+          },
+        }) as never,
+      );
+    });
+
+    it("commits a changed contact full name on blur via the real PATCH contact mutation", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateContactMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      const input = screen.getByDisplayValue("Jane Doe");
+      fireEvent.change(input, { target: { value: "Jane Smith" } });
+      fireEvent.blur(input);
+
+      expect(mockedUseUpdateContactMutation).toHaveBeenCalledWith("customer-1", "contact-1");
+      expect(mutate).toHaveBeenCalledWith({ fullName: "Jane Smith" });
+    });
+
+    it("toggles a contact's primary flag via the real PATCH contact mutation", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateContactMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByText("detail.setPrimary"));
+
+      expect(mutate).toHaveBeenCalledWith({ isPrimary: true });
+    });
+
+    it("shows a forbidden-specific message when a contact edit is rejected with 403", () => {
+      mockedUseUpdateContactMutation.mockReturnValue(
+        idleMutation({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.actionForbidden")).toBeInTheDocument();
+    });
+
+    it("submits a new contact via the real POST /customers/:id/contacts mutation and clears the form on success", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "contact-2" });
+      mockedUseCreateContactMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      // "detail.contactFullNameLabel"/"detail.contactEmailLabel" also label
+      // each existing contact row's inline-edit fields — scope to the
+      // add-contact form itself (found via its own submit button).
+      const form = screen.getByText("detail.addContactSubmit").closest("form") as HTMLFormElement;
+      fireEvent.change(within(form).getByLabelText("detail.contactFullNameLabel"), {
+        target: { value: "New Contact" },
+      });
+      fireEvent.change(within(form).getByLabelText("detail.contactEmailLabel"), {
+        target: { value: "new@acme.test" },
+      });
+      fireEvent.click(within(form).getByText("detail.addContactSubmit"));
+
+      await waitFor(() =>
+        expect(mutateAsync).toHaveBeenCalledWith({ fullName: "New Contact", email: "new@acme.test" }),
+      );
+      await waitFor(() =>
+        expect(within(form).getByLabelText("detail.contactFullNameLabel")).toHaveValue(""),
+      );
+    });
+
+    it("renders the backend's own message inline when adding a contact fails", async () => {
+      const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Email already in use", 409));
+      mockedUseCreateContactMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      const form = screen.getByText("detail.addContactSubmit").closest("form") as HTMLFormElement;
+      fireEvent.change(within(form).getByLabelText("detail.contactFullNameLabel"), {
+        target: { value: "New Contact" },
+      });
+      fireEvent.click(within(form).getByText("detail.addContactSubmit"));
+
+      expect(await screen.findByText("Email already in use")).toBeInTheDocument();
     });
   });
 });
