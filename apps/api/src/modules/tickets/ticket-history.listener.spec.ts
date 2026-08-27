@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TicketHistoryListener } from "./ticket-history.listener";
-import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT } from "./tickets.events";
+import {
+  TICKET_CREATED_EVENT,
+  TICKET_UPDATED_EVENT,
+  TICKET_RECATEGORIZED_EVENT,
+  TICKET_ESCALATED_EVENT,
+} from "./tickets.events";
 import type { TicketSummary } from "./tickets.service";
 import type { PrismaService } from "../../prisma/prisma.service";
 
@@ -77,6 +82,52 @@ describe("TicketHistoryListener", () => {
       prisma.ticketHistoryEntry.create.mockRejectedValue(new Error("db unavailable"));
 
       await expect(listener.onTicketUpdated({ ticket, actorUserId: "user-1" })).resolves.toBeUndefined();
+    });
+  });
+
+  describe("onTicketRecategorized", () => {
+    it("persists a history row with eventType ticket.recategorized", async () => {
+      await listener.onTicketRecategorized({ ticket, actorUserId: null });
+
+      expect(prisma.ticketHistoryEntry.create).toHaveBeenCalledWith({
+        data: {
+          ticketId: "ticket-1",
+          actorUserId: null,
+          eventType: TICKET_RECATEGORIZED_EVENT,
+          snapshot: ticket,
+        },
+      });
+    });
+
+    it("does not throw when persistence fails — it catches and logs instead", async () => {
+      prisma.ticketHistoryEntry.create.mockRejectedValue(new Error("db unavailable"));
+
+      await expect(
+        listener.onTicketRecategorized({ ticket, actorUserId: "user-1" }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("onTicketEscalated", () => {
+    it("persists a history row with eventType ticket.escalated", async () => {
+      await listener.onTicketEscalated({ ticket, actorUserId: null });
+
+      expect(prisma.ticketHistoryEntry.create).toHaveBeenCalledWith({
+        data: {
+          ticketId: "ticket-1",
+          actorUserId: null,
+          eventType: TICKET_ESCALATED_EVENT,
+          snapshot: ticket,
+        },
+      });
+    });
+
+    it("does not throw when persistence fails — it catches and logs instead", async () => {
+      prisma.ticketHistoryEntry.create.mockRejectedValue(new Error("db unavailable"));
+
+      await expect(
+        listener.onTicketEscalated({ ticket, actorUserId: "user-1" }),
+      ).resolves.toBeUndefined();
     });
   });
 });

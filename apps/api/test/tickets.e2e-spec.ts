@@ -6,7 +6,12 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
-import type { TicketCreatedEvent, TicketUpdatedEvent } from "../src/modules/tickets/tickets.events";
+import { TICKET_ESCALATED_EVENT } from "../src/modules/tickets/tickets.events";
+import type {
+  TicketCreatedEvent,
+  TicketUpdatedEvent,
+  TicketEscalatedEvent,
+} from "../src/modules/tickets/tickets.events";
 
 /**
  * Integration suite for the `tickets/*` HTTP surface.
@@ -46,6 +51,7 @@ describe("Ticketing (e2e)", () => {
   let otherCustomerId: string;
   let contactId: string;
   let ticketId: string;
+  let eventEmitter: EventEmitter2;
   const createdEvents: TicketCreatedEvent[] = [];
   const updatedEvents: TicketUpdatedEvent[] = [];
 
@@ -61,7 +67,7 @@ describe("Ticketing (e2e)", () => {
 
     await app.init();
 
-    const eventEmitter = moduleRef.get(EventEmitter2);
+    eventEmitter = moduleRef.get(EventEmitter2);
     eventEmitter.on("ticket.created", (payload: TicketCreatedEvent) => createdEvents.push(payload));
     eventEmitter.on("ticket.updated", (payload: TicketUpdatedEvent) => updatedEvents.push(payload));
 
@@ -232,18 +238,66 @@ describe("Ticketing (e2e)", () => {
     ).toBe(true);
   });
 
-  it("records a second, ticket.updated history entry after the update, ordered after the first", async () => {
+  it("records a second and third history entry — ticket.updated and ticket.recategorized — after a priority-changing update", async () => {
     const response = await request(app.getHttpServer())
       .get(`/api/v1/tickets/${ticketId}/history`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    expect(response.body).toHaveLength(2);
+    // `TicketsService.updateTicket` emits `ticket.updated` and (since this
+    // update changes `priority`) `ticket.recategorized` via two independent,
+    // unawaited `EventEmitter2.emit(...)` calls — nothing in the codebase
+    // synchronizes the order in which their two separate async
+    // `TicketHistoryListener` writes actually commit, so their relative
+    // `createdAt` order is not a guarantee this test can assert on (verified
+    // empirically: reproducibly `ticket.recategorized` before
+    // `ticket.updated` under the current listener set, not the emission
+    // order). Only `ticket.created` (the sole entry from a prior,
+    // already-completed request) has a guaranteed position.
+    expect(response.body).toHaveLength(3);
     expect(response.body[0].eventType).toBe("ticket.created");
-    expect(response.body[1].eventType).toBe("ticket.updated");
-    expect(response.body[1].actorUserId).toBe(adminUserId);
-    expect(response.body[1].snapshot.status).toBe("IN_PROGRESS");
-    expect(response.body[1].snapshot.priority).toBe("HIGH");
+
+    const updatedEntry = response.body.find(
+      (entry: { eventType: string }) => entry.eventType === "ticket.updated",
+    );
+    expect(updatedEntry).toBeDefined();
+    expect(updatedEntry.actorUserId).toBe(adminUserId);
+    expect(updatedEntry.snapshot.status).toBe("IN_PROGRESS");
+    expect(updatedEntry.snapshot.priority).toBe("HIGH");
+
+    const recategorizedEntry = response.body.find(
+      (entry: { eventType: string }) => entry.eventType === "ticket.recategorized",
+    );
+    expect(recategorizedEntry).toBeDefined();
+    expect(recategorizedEntry.actorUserId).toBe(adminUserId);
+    expect(recategorizedEntry.snapshot.priority).toBe("HIGH");
+  });
+
+  it("records a ticket.escalated history entry for a real, directly-emitted event", async () => {
+    const ticket = await request(app.getHttpServer())
+      .get(`/api/v1/tickets/${ticketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    const escalatedEvent: TicketEscalatedEvent = { ticket: ticket.body, actorUserId: null };
+    eventEmitter.emit(TICKET_ESCALATED_EVENT, escalatedEvent);
+
+    const deadline = Date.now() + 5000;
+    let history: Array<{ eventType: string }> = [];
+    do {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/history`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      history = response.body;
+      if (history.some((entry) => entry.eventType === TICKET_ESCALATED_EVENT)) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } while (Date.now() < deadline);
+
+    const escalatedEntry = history.find((entry) => entry.eventType === TICKET_ESCALATED_EVENT);
+    expect(escalatedEntry).toBeDefined();
   });
 
   it("returns 404 for history on an unknown ticket id", async () => {
