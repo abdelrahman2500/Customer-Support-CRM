@@ -35,7 +35,6 @@ import { AppModule } from "../src/app.module";
 describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
   let app: INestApplication;
   let adminAccessToken: string;
-  let todayDate: string;
   let tomorrowDate: string;
   let dayAfterTomorrowDate: string;
 
@@ -195,7 +194,6 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
     adminAccessToken = loginResponse.body.accessToken;
 
     const now = new Date();
-    todayDate = isoDate(now);
     tomorrowDate = isoDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
     dayAfterTomorrowDate = isoDate(new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000));
 
@@ -208,6 +206,26 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
   });
 
   it("computes same-day, business-hours-aware targets under a fully open calendar", async () => {
+    // Under this suite's fully open (continuous, 00:00-23:59) calendar, a
+    // target only stays on the same UTC calendar day as ticket creation if
+    // at least `durationMinutes` remain before UTC midnight (the window's
+    // end minute is 1439, matching `continuousWeek()` above); otherwise the
+    // walk correctly rolls over to the next day. `todayDate` is captured
+    // once in `beforeAll` and can be stale by the time this test actually
+    // runs, so — mirroring `business-hours-calculator.ts`'s own arithmetic —
+    // compute the expected date from the instant just before ticket
+    // creation instead of assuming same-day, keeping this assertion correct
+    // no matter what time of day the suite runs, including near UTC
+    // midnight.
+    const beforeCreate = new Date();
+    function expectedTargetDate(durationMinutes: number): string {
+      const minuteOfDay = beforeCreate.getUTCHours() * 60 + beforeCreate.getUTCMinutes();
+      const availableToday = 1439 - minuteOfDay;
+      return availableToday >= durationMinutes
+        ? isoDate(beforeCreate)
+        : isoDate(new Date(beforeCreate.getTime() + 24 * 60 * 60 * 1000));
+    }
+
     const ticketId = await createTicketWithPolicy(30, 240);
     const response = await waitForSlaTarget(ticketId);
     expect(response.status).toBe(200);
@@ -215,10 +233,8 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
     const responseTargetAt = new Date(response.body.responseTargetAt);
     const resolutionTargetAt = new Date(response.body.resolutionTargetAt);
     expect(resolutionTargetAt.getTime()).toBeGreaterThanOrEqual(responseTargetAt.getTime());
-    // A fully open calendar and a short (240-minute) duration should never
-    // cross a calendar-day boundary.
-    expect(isoDate(responseTargetAt)).toBe(todayDate);
-    expect(isoDate(resolutionTargetAt)).toBe(todayDate);
+    expect(isoDate(responseTargetAt)).toBe(expectedTargetDate(30));
+    expect(isoDate(resolutionTargetAt)).toBe(expectedTargetDate(240));
   });
 
   it("skips a closed exception date entirely", async () => {

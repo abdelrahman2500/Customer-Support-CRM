@@ -29,3 +29,18 @@ export interface TicketRecategorizedEvent {
   ticket: TicketSummary;
   actorUserId: string | null;
 }
+
+export const TICKET_ESCALATED_EVENT = "ticket.escalated";
+
+/**
+ * Emitted once, after the SLA & Automation domain's `sla.escalated`
+ * reaction (Story 17) is translated into a Ticketing-owned event by
+ * `TicketEscalationListener`. `actorUserId` is always `null` — no human
+ * actor is involved in a system-triggered escalation. Does not imply any
+ * `Ticket` field changed: priority, assignment, and department are
+ * untouched by this event.
+ */
+export interface TicketEscalatedEvent {
+  ticket: TicketSummary;
+  actorUserId: string | null;
+}

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { SlaPoliciesController } from "./sla-policies.controller";
 import { SlaPoliciesService } from "./sla-policies.service";
+import { SlaEscalationListener } from "./sla-escalation.listener";
 import { SlaTargetListener } from "./sla-target.listener";
 import { SlaTargetsController } from "./sla-targets.controller";
 import { SlaTargetsService } from "./sla-targets.service";
@@ -27,6 +28,7 @@ import { BusinessHoursCalendarsService } from "./business-hours-calendars.servic
     BusinessHoursCalendarsService,
     TenantContext,
     SlaTargetListener,
+    SlaEscalationListener,
   ],
   exports: [SlaPoliciesService, SlaTargetsService, BusinessHoursCalendarsService],
 })

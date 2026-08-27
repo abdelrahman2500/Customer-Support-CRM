@@ -15,3 +15,8 @@ export interface SlaAtRiskEvent extends SlaDetectionEventBase {}
 
 /** Emitted once `now >= targetAt`. */
 export interface SlaBreachedEvent extends SlaDetectionEventBase {}
+
+/** Emitted once an `sla.breached` transition has been durably persisted as an `SlaEscalation`. */
+export const SLA_ESCALATED_EVENT = "sla.escalated";
+
+export interface SlaEscalatedEvent extends SlaDetectionEventBase {}

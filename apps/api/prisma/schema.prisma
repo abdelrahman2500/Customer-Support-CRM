@@ -271,6 +271,7 @@ model Ticket {
   status           TicketStatus         @default(OPEN)
   historyEntries   TicketHistoryEntry[]
   slaTarget        SlaTicketTarget?
+  slaEscalations   SlaEscalation[]
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
@@ -371,6 +372,31 @@ model SlaTicketTarget {
   createdAt                    DateTime  @default(now()) @map("created_at")
 
   @@map("sla_ticket_targets")
+  @@schema("sla")
+}
+
+/// Story 17 — the persisted record of one escalated SLA breach transition.
+/// Identity is (ticketId, targetType, targetAt), not slaTicketTargetId:
+/// SlaTicketTarget.id stays constant across a Story 16 recategorization
+/// recompute (only its target timestamps/slaPolicyId change), so targetAt is
+/// what actually distinguishes "breach under the old target" from "breach
+/// under the recomputed one" — the two must produce two separate rows here,
+/// not one. Append-only: never updated after creation, mirroring
+/// TicketHistoryEntry's own convention. Deliberately has no FK to
+/// SlaTicketTarget/SlaPolicy — resolving one would require an extra lookup
+/// that can race against SlaTargetListener.onTicketRecategorized deleting
+/// that exact row when a recategorization no longer matches any policy.
+model SlaEscalation {
+  id          String   @id @default(uuid())
+  ticketId    String   @map("ticket_id")
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  branchId    String   @map("branch_id")
+  targetType  String   @map("target_type")
+  targetAt    DateTime @map("target_at")
+  escalatedAt DateTime @default(now()) @map("escalated_at")
+
+  @@unique([ticketId, targetType, targetAt])
+  @@map("sla_escalations")
   @@schema("sla")
 }
 

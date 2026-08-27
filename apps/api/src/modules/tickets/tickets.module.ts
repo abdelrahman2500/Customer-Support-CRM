@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
+import { TicketEscalationListener } from "./ticket-escalation.listener";
 import { TicketHistoryListener } from "./ticket-history.listener";
 import { TicketsController } from "./tickets.controller";
 import { TicketsService } from "./tickets.service";
@@ -14,7 +15,7 @@ import { TicketsService } from "./tickets.service";
  */
 @Module({
   controllers: [TicketsController],
-  providers: [TicketsService, TenantContext, TicketHistoryListener],
+  providers: [TicketsService, TenantContext, TicketHistoryListener, TicketEscalationListener],
   exports: [TicketsService],
 })
 export class TicketsModule {}

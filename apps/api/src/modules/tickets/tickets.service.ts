@@ -216,7 +216,7 @@ export class TicketsService {
   }
 }
 
-function toTicketSummary(ticket: {
+export function toTicketSummary(ticket: {
   id: string;
   subject: string;
   category: string | null;
