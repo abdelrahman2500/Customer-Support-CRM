@@ -27,3 +27,5 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | agent-workspace-customer-editing | [agent-workspace-customer-editing/00-overview.md](./agent-workspace-customer-editing/00-overview.md) | 30–      |
 | agent-workspace-sla-policy-admin | [agent-workspace-sla-policy-admin/00-overview.md](./agent-workspace-sla-policy-admin/00-overview.md) | 31–      |
 | agent-workspace-user-admin | [agent-workspace-user-admin/00-overview.md](./agent-workspace-user-admin/00-overview.md) | 32–      |
+| agent-workspace-business-hours-admin | [agent-workspace-business-hours-admin/00-overview.md](./agent-workspace-business-hours-admin/00-overview.md) | 33–      |
+| agent-workspace-roles-permissions-viewer | [agent-workspace-roles-permissions-viewer/00-overview.md](./agent-workspace-roles-permissions-viewer/00-overview.md) | 34–      |

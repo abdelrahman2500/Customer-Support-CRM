@@ -192,6 +192,64 @@
       "createFailed": "تعذّر إنشاء سياسة اتفاقية الخدمة. حاول مرة أخرى."
     }
   },
+  "roles": {
+    "title": "الأدوار والصلاحيات",
+    "list": {
+      "rolesHeading": "الأدوار",
+      "error": "تعذّر تحميل الأدوار.",
+      "retry": "إعادة المحاولة",
+      "empty": "لا توجد أدوار.",
+      "expand": "عرض الصلاحيات",
+      "collapse": "إخفاء الصلاحيات",
+      "noPermissions": "لا توجد صلاحيات لهذا الدور.",
+      "permissionsHeading": "جميع الصلاحيات",
+      "permissionsError": "تعذّر تحميل الصلاحيات.",
+      "permissionsEmpty": "لا توجد صلاحيات.",
+      "columns": {
+        "name": "الدور",
+        "permissionCount": "عدد الصلاحيات",
+        "actions": "الإجراءات"
+      }
+    }
+  },
+  "businessHours": {
+    "title": "ساعات العمل",
+    "loadError": "تعذّر تحميل تقويم ساعات العمل.",
+    "createHeading": "إعداد ساعات العمل",
+    "createPrompt": "لا يوجد تقويم ساعات عمل لهذا الفرع حتى الآن. راجع الجدول أدناه وعدّله ثم أنشئه.",
+    "createButton": "إنشاء التقويم",
+    "createSubmitting": "جارٍ الإنشاء...",
+    "createFailed": "تعذّر إنشاء تقويم ساعات العمل. حاول مرة أخرى.",
+    "scheduleHeading": "الجدول الأسبوعي",
+    "saveButton": "حفظ الجدول",
+    "saving": "جارٍ الحفظ...",
+    "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+    "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+    "openLabel": "مفتوح",
+    "startLabel": "وقت البدء",
+    "endLabel": "وقت الانتهاء",
+    "weekday": {
+      "sunday": "الأحد",
+      "monday": "الاثنين",
+      "tuesday": "الثلاثاء",
+      "wednesday": "الأربعاء",
+      "thursday": "الخميس",
+      "friday": "الجمعة",
+      "saturday": "السبت"
+    },
+    "exceptionsHeading": "الاستثناءات",
+    "exceptionsEmpty": "لا توجد استثناءات حتى الآن.",
+    "closedLabel": "مغلق",
+    "overriddenLabel": "ساعات مخصّصة",
+    "overrideStartLabel": "بداية الساعات المخصّصة",
+    "overrideEndLabel": "نهاية الساعات المخصّصة",
+    "markClosedButton": "تعيين كمغلق",
+    "markOverriddenButton": "تعيين ساعات مخصّصة",
+    "dateLabel": "التاريخ",
+    "exceptionAddSubmit": "إضافة استثناء",
+    "exceptionAddSubmitting": "جارٍ الإضافة...",
+    "exceptionAddFailed": "تعذّر إضافة الاستثناء. حاول مرة أخرى."
+  },
   "dashboard": {
     "title": "لوحة التحكم",
     "heading": "تذاكري المفتوحة",

@@ -192,6 +192,64 @@
       "createFailed": "Couldn't create the SLA policy. Please try again."
     }
   },
+  "roles": {
+    "title": "Roles & Permissions",
+    "list": {
+      "rolesHeading": "Roles",
+      "error": "Couldn't load roles.",
+      "retry": "Retry",
+      "empty": "No roles found.",
+      "expand": "Show permissions",
+      "collapse": "Hide permissions",
+      "noPermissions": "This role has no permissions.",
+      "permissionsHeading": "All permissions",
+      "permissionsError": "Couldn't load permissions.",
+      "permissionsEmpty": "No permissions found.",
+      "columns": {
+        "name": "Role",
+        "permissionCount": "Permissions",
+        "actions": "Actions"
+      }
+    }
+  },
+  "businessHours": {
+    "title": "Business Hours",
+    "loadError": "Couldn't load the business-hours calendar.",
+    "createHeading": "Set up business hours",
+    "createPrompt": "No business-hours calendar exists yet for this branch. Review and adjust the schedule below, then create it.",
+    "createButton": "Create calendar",
+    "createSubmitting": "Creating...",
+    "createFailed": "Couldn't create the business-hours calendar. Please try again.",
+    "scheduleHeading": "Weekly schedule",
+    "saveButton": "Save schedule",
+    "saving": "Saving...",
+    "actionForbidden": "You don't have permission to perform that action.",
+    "actionFailed": "That change couldn't be saved. Please try again.",
+    "openLabel": "Open",
+    "startLabel": "Start time",
+    "endLabel": "End time",
+    "weekday": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    },
+    "exceptionsHeading": "Exceptions",
+    "exceptionsEmpty": "No date exceptions yet.",
+    "closedLabel": "Closed",
+    "overriddenLabel": "Overridden hours",
+    "overrideStartLabel": "Override start",
+    "overrideEndLabel": "Override end",
+    "markClosedButton": "Mark closed",
+    "markOverriddenButton": "Set override hours",
+    "dateLabel": "Date",
+    "exceptionAddSubmit": "Add exception",
+    "exceptionAddSubmitting": "Adding...",
+    "exceptionAddFailed": "Couldn't add the exception. Please try again."
+  },
   "dashboard": {
     "title": "Dashboard",
     "heading": "My open tickets",
