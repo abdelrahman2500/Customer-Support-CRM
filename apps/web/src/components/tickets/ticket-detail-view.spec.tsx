@@ -1,8 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { TicketDetailView } from "./ticket-detail-view";
 import {
   useCustomersQuery,
+  useDepartmentsQuery,
   useTicketHistoryQuery,
   useTicketQuery,
   useTicketSlaTargetQuery,
@@ -29,6 +30,7 @@ vi.mock("@/hooks/use-tickets", () => ({
   useTicketSlaTargetQuery: vi.fn(),
   useCustomersQuery: vi.fn(),
   useUsersQuery: vi.fn(),
+  useDepartmentsQuery: vi.fn(),
   useUpdateTicketMutation: vi.fn(),
 }));
 
@@ -64,6 +66,7 @@ describe("TicketDetailView", () => {
       queryResult({ data: [{ id: "customer-1", displayName: "Acme Inc." }], isSuccess: true }) as never,
     );
     vi.mocked(useUsersQuery).mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    vi.mocked(useDepartmentsQuery).mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     vi.mocked(useTicketHistoryQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -84,7 +87,8 @@ describe("TicketDetailView", () => {
 
     render(<TicketDetailView ticketId="ticket-1" />);
 
-    expect(screen.getByText("Cannot log in")).toBeInTheDocument();
+    // Story 42 — subject is now an editable input, not static text.
+    expect(screen.getByDisplayValue("Cannot log in")).toBeInTheDocument();
     expect(screen.getByText(/Acme Inc\./)).toBeInTheDocument();
   });
 
@@ -136,5 +140,133 @@ describe("TicketDetailView", () => {
     render(<TicketDetailView ticketId="ticket-1" />);
 
     expect(screen.getByText("detail.actionFailed")).toBeInTheDocument();
+  });
+
+  // Story 42 — subject reassignment.
+  describe("subject editing (Story 42)", () => {
+    it("commits a subject edit on blur when the value changed", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      const mutate = vi.fn();
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const input = screen.getByDisplayValue("Cannot log in");
+      fireEvent.change(input, { target: { value: "Cannot log in anymore" } });
+      fireEvent.blur(input);
+
+      expect(mutate).toHaveBeenCalledWith({ subject: "Cannot log in anymore" });
+    });
+
+    it("does not commit the subject when blurred unchanged", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      const mutate = vi.fn();
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      fireEvent.blur(screen.getByDisplayValue("Cannot log in"));
+
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it("does not commit an emptied (or whitespace-only) subject", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      const mutate = vi.fn();
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const input = screen.getByDisplayValue("Cannot log in");
+      fireEvent.change(input, { target: { value: "   " } });
+      fireEvent.blur(input);
+
+      expect(mutate).not.toHaveBeenCalled();
+    });
+  });
+
+  // Story 42 — department reassignment.
+  describe("department reassignment (Story 42)", () => {
+    it("shows the no-department placeholder when the ticket has no department", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.noDepartment")).toBeInTheDocument();
+    });
+
+    it("renders the department select showing the ticket's current department name", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({
+          data: { ...baseTicket, departmentId: "dept-1" },
+          isSuccess: true,
+        }) as never,
+      );
+      vi.mocked(useDepartmentsQuery).mockReturnValue(
+        queryResult({
+          data: [{ id: "dept-1", branchId: "branch-1", name: "Billing" }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("Billing")).toBeInTheDocument();
+    });
+
+    it("commits a department reassignment when a different department is selected", async () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useDepartmentsQuery).mockReturnValue(
+        queryResult({
+          data: [{ id: "dept-1", branchId: "branch-1", name: "Billing" }],
+          isSuccess: true,
+        }) as never,
+      );
+      const mutate = vi.fn();
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByText("detail.noDepartment"));
+      fireEvent.click(await screen.findByRole("option", { name: "Billing" }));
+
+      expect(mutate).toHaveBeenCalledWith({ departmentId: "dept-1" });
+    });
+
+    it("renders an inline error when departments fail to load", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useDepartmentsQuery).mockReturnValue(queryResult({ isError: true }) as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.departmentLoadError")).toBeInTheDocument();
+    });
   });
 });

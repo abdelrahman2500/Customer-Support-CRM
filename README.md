@@ -35,7 +35,8 @@ Implemented so far:
   shell, a ticket list (filter by status/priority/category/assigned agent,
   sort by created/updated time — no search or pagination yet), ticket
   detail (customer info, SLA target, history, and status/priority/category/
-  assignment actions), and live updates to an open ticket via `ticket:{id}`.
+  subject/department/assignment actions), and live updates to an open
+  ticket via `ticket:{id}`.
 - **In-app notifications** (Agent Workspace): the workspace joins
   `branch:{id}:notifications` once per session and shows `sla.at_risk`,
   `sla.breached`, and `ticket.escalated` events as transient, dismissible

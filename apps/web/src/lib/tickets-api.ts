@@ -119,11 +119,16 @@ export async function getTicketSlaTarget(id: string): Promise<TicketSlaTarget | 
   }
 }
 
+/** Story 42 — `subject`/`departmentId` added, mirroring the existing
+ * `UpdateTicketDto` field-for-field (both already accepted by the real
+ * `PATCH /tickets/:id`, previously unconsumed by any frontend). */
 export interface UpdateTicketInput {
   status?: TicketStatus;
   priority?: TicketPriority;
   category?: string;
   assignedToUserId?: string;
+  subject?: string;
+  departmentId?: string;
 }
 
 export function updateTicket(id: string, input: UpdateTicketInput): Promise<{ id: string }> {

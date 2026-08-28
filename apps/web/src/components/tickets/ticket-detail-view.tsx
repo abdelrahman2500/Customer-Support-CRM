@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useCustomersQuery,
+  useDepartmentsQuery,
   useTicketHistoryQuery,
   useTicketQuery,
   useTicketSlaTargetQuery,
@@ -39,6 +40,13 @@ const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
  * `PATCH /tickets/:id` — a rejected mutation renders inline (Design item 5:
  * never assumed to succeed) and never optimistically applies. Joins
  * `ticket:{id}` (Story 20) via `useTicketRealtime` — no other room.
+ *
+ * Story 42 — subject (now an editable heading, mirroring
+ * `CustomerDetailView`'s displayName field) and department (a `Select`
+ * sourced from the existing `useDepartmentsQuery()`, Story 38) both flow
+ * through the same `PATCH /tickets/:id` and the same never-optimistic,
+ * 403-vs-generic error convention as every other field here — no new
+ * mutation hook, no new error-handling branch.
  */
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -52,9 +60,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const slaTargetQuery = useTicketSlaTargetQuery(ticketId);
   const customersQuery = useCustomersQuery();
   const usersQuery = useUsersQuery();
+  const departmentsQuery = useDepartmentsQuery();
   const mutation = useUpdateTicketMutation(ticketId);
 
   const [categoryDraft, setCategoryDraft] = useState<string | null>(null);
+  const [subjectDraft, setSubjectDraft] = useState<string | null>(null);
 
   const customerNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -89,7 +99,18 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   return (
     <section className="flex flex-col gap-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900">{ticket.subject}</h1>
+        <Input
+          className="w-full max-w-md text-lg font-semibold"
+          defaultValue={ticket.subject}
+          aria-label={t("detail.subjectLabel")}
+          onChange={(event) => setSubjectDraft(event.target.value)}
+          onBlur={() => {
+            const value = subjectDraft?.trim();
+            if (value && subjectDraft !== ticket.subject) {
+              mutation.mutate({ subject: value });
+            }
+          }}
+        />
         <p className="text-sm text-slate-500">
           {t("detail.customer")}:{" "}
           <button
@@ -175,6 +196,27 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               ))}
             </SelectContent>
           </Select>
+        </Field>
+
+        <Field label={t("detail.department")}>
+          <Select
+            value={ticket.departmentId ?? undefined}
+            onValueChange={(value) => mutation.mutate({ departmentId: value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={t("detail.noDepartment")} />
+            </SelectTrigger>
+            <SelectContent>
+              {(departmentsQuery.data ?? []).map((department) => (
+                <SelectItem key={department.id} value={department.id}>
+                  {department.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {departmentsQuery.isError && (
+            <span className="text-xs text-red-600">{t("detail.departmentLoadError")}</span>
+          )}
         </Field>
       </div>
 

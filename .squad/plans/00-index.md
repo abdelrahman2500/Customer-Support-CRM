@@ -34,3 +34,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | audit-log-read-endpoint | [audit-log-read-endpoint/00-overview.md](./audit-log-read-endpoint/00-overview.md) | 37–      |
 | _(unplanned)_ agent-workspace-user-admin / notification-history / audit-log-viewer follow-ups | Stories 38 (Create User), 39 (Notification History), 40 (Audit Log Viewer) — implemented directly from user-supplied specifications; no `.squad` plan/story representation exists for them (same convention as Story 24) | 38–40    |
 | agent-workspace-session-refresh | [agent-workspace-session-refresh/00-overview.md](./agent-workspace-session-refresh/00-overview.md) | 41–      |
+| agent-workspace-ticket-detail-reassignment | [agent-workspace-ticket-detail-reassignment/00-overview.md](./agent-workspace-ticket-detail-reassignment/00-overview.md) | 42–      |
