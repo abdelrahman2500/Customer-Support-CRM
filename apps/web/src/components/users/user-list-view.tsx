@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useUpdateUserMutation, useUsersQuery } from "@/hooks/use-tickets";
 import type { UserSummary } from "@/lib/tickets-api";
@@ -15,20 +16,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 /**
  * Story 32 — User Management: list, inline rename, inline
  * activate/deactivate, over the already-existing `GET`/`PATCH
- * /identity/users` (Story 03/23). No creation UI (plan Design item 4 — no
- * endpoint exists to list valid branches/departments for a form to
- * populate). Roles are read-only badges — no mutation endpoint exists for
- * role assignment. Mirrors `TicketListView`'s loading/error/empty
- * conventions and `TicketDetailView`'s never-optimistic, blur-commit
- * inline-field / actionForbidden-vs-actionFailed pattern.
+ * /identity/users` (Story 03/23). Roles are read-only badges — no
+ * mutation endpoint exists for role assignment. Mirrors `TicketListView`'s
+ * loading/error/empty conventions and `TicketDetailView`'s never-optimistic,
+ * blur-commit inline-field / actionForbidden-vs-actionFailed pattern.
+ *
+ * Story 38 — adds a "New user" entry point to `/users/new` (creation was
+ * explicitly deferred in Story 32 pending `GET /identity/branches`/`GET
+ * /identity/departments`, added by Story 35). This list itself is
+ * otherwise unchanged.
  */
 export function UserListView() {
   const t = useTranslations("users");
+  const router = useRouter();
+  const { locale } = useParams<{ locale: string }>();
   const usersQuery = useUsersQuery();
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+        <Button size="sm" onClick={() => router.push(`/${locale}/users/new`)}>
+          {t("list.createButton")}
+        </Button>
+      </div>
 
       {usersQuery.isLoading && (
         <div className="flex flex-col gap-2">

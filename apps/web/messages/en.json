@@ -134,6 +134,7 @@
   "users": {
     "list": {
       "title": "Users",
+      "createButton": "New user",
       "error": "Couldn't load users.",
       "retry": "Retry",
       "empty": "No users found.",
@@ -150,6 +151,24 @@
         "roles": "Roles",
         "status": "Status"
       }
+    },
+    "create": {
+      "title": "New user",
+      "email": "Email",
+      "password": "Password",
+      "fullName": "Full name",
+      "branch": "Branch",
+      "selectBranch": "Select a branch",
+      "branchLoadError": "Couldn't load branches.",
+      "department": "Department",
+      "departmentDefault": "No department",
+      "departmentLoadError": "Couldn't load departments.",
+      "role": "Role",
+      "selectRole": "Select a role",
+      "roleLoadError": "Couldn't load roles.",
+      "submit": "Create user",
+      "submitting": "Creating...",
+      "createFailed": "Couldn't create the user. Please try again."
     }
   },
   "slaPolicies": {
@@ -250,6 +269,28 @@
     "exceptionAddSubmitting": "Adding...",
     "exceptionAddFailed": "Couldn't add the exception. Please try again."
   },
+  "auditLogs": {
+    "title": "Audit Log",
+    "error": "Couldn't load the audit log.",
+    "retry": "Retry",
+    "empty": "No audit log entries yet.",
+    "forbidden": "You don't have permission to view the audit log.",
+    "noDiff": "No diff recorded.",
+    "systemActor": "System",
+    "noEntityId": "—",
+    "noBranch": "—",
+    "noIpAddress": "—",
+    "columns": {
+      "createdAt": "Timestamp",
+      "actor": "Actor",
+      "action": "Action",
+      "entityType": "Entity type",
+      "entityId": "Entity ID",
+      "branch": "Branch",
+      "ipAddress": "IP address",
+      "diff": "Diff"
+    }
+  },
   "dashboard": {
     "title": "Dashboard",
     "heading": "My open tickets",
@@ -281,5 +322,30 @@
     "slaBreached": "The {targetType} target for ticket {ticketId} has been breached.",
     "ticketEscalated": "Ticket escalated: {subject}",
     "generic": "New notification"
+  },
+  "notificationHistory": {
+    "title": "Notification History",
+    "error": "Couldn't load notification history.",
+    "retry": "Retry",
+    "empty": "No notifications yet.",
+    "forbidden": "You don't have permission to view notification history.",
+    "unknownCustomer": "—",
+    "noTarget": "—",
+    "eventLabel": {
+      "slaAtRisk": "SLA at risk",
+      "slaBreached": "SLA breached",
+      "ticketEscalated": "Ticket escalated"
+    },
+    "targetType": {
+      "response": "Response",
+      "resolution": "Resolution"
+    },
+    "columns": {
+      "event": "Event",
+      "ticket": "Ticket",
+      "customer": "Customer",
+      "target": "Target",
+      "loggedAt": "Logged at"
+    }
   }
 }

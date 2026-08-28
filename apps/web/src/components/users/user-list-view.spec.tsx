@@ -4,9 +4,16 @@ import { UserListView } from "./user-list-view";
 import { useUpdateUserMutation, useUsersQuery } from "@/hooks/use-tickets";
 import { ApiError } from "@/lib/api";
 
+const push = vi.fn();
+
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
     vars ? `${key}:${JSON.stringify(vars)}` : key,
+}));
+
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ locale: "en" }),
+  useRouter: () => ({ push }),
 }));
 
 vi.mock("@/hooks/use-tickets", () => ({
@@ -51,6 +58,15 @@ describe("UserListView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedUseUpdateUserMutation.mockReturnValue(mutationResult() as never);
+  });
+
+  it("navigates to /users/new when 'New user' is clicked", () => {
+    mockedUseUsersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+    render(<UserListView />);
+    fireEvent.click(screen.getByText("list.createButton"));
+
+    expect(push).toHaveBeenCalledWith("/en/users/new");
   });
 
   it("shows a loading state while the users query is pending", () => {

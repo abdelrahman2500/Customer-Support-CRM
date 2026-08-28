@@ -192,6 +192,47 @@ export function listUsers(): Promise<UserSummary[]> {
   return apiFetch<UserSummary[]>("/identity/users");
 }
 
+/** Story 38 — mirrors `apps/api/src/modules/identity/identity.service.ts`'s
+ * `BranchSummary` exactly (the caller's own branch only — see that
+ * interface's own doc comment). */
+export interface BranchSummary {
+  id: string;
+  name: string;
+}
+
+/** Story 38 — mirrors the backend's own `DepartmentSummary` exactly. */
+export interface DepartmentSummary {
+  id: string;
+  branchId: string;
+  name: string;
+}
+
+export function listBranches(): Promise<BranchSummary[]> {
+  return apiFetch<BranchSummary[]>("/identity/branches");
+}
+
+export function listDepartments(): Promise<DepartmentSummary[]> {
+  return apiFetch<DepartmentSummary[]>("/identity/departments");
+}
+
+/** Story 38 — mirrors the existing `CreateUserDto` exactly
+ * (`apps/api/src/modules/identity/dto/create-user.dto.ts`). */
+export interface CreateUserInput {
+  email: string;
+  password: string;
+  fullName: string;
+  branchId: string;
+  departmentId?: string;
+  roleId: string;
+}
+
+export function createUser(input: CreateUserInput): Promise<{ id: string; email: string }> {
+  return apiFetch<{ id: string; email: string }>("/identity/users", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 /** Story 32 — mirrors the existing `UpdateUserDto` exactly (`apps/api/src/modules/identity/dto/update-user.dto.ts`). No role/branch change possible through this endpoint. */
 export interface UpdateUserInput {
   fullName?: string;

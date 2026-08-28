@@ -134,6 +134,7 @@
   "users": {
     "list": {
       "title": "المستخدمون",
+      "createButton": "مستخدم جديد",
       "error": "تعذّر تحميل المستخدمين.",
       "retry": "إعادة المحاولة",
       "empty": "لا يوجد مستخدمون.",
@@ -150,6 +151,24 @@
         "roles": "الأدوار",
         "status": "الحالة"
       }
+    },
+    "create": {
+      "title": "مستخدم جديد",
+      "email": "البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "fullName": "الاسم الكامل",
+      "branch": "الفرع",
+      "selectBranch": "اختر فرعًا",
+      "branchLoadError": "تعذّر تحميل الفروع.",
+      "department": "القسم",
+      "departmentDefault": "بدون قسم",
+      "departmentLoadError": "تعذّر تحميل الأقسام.",
+      "role": "الدور",
+      "selectRole": "اختر دورًا",
+      "roleLoadError": "تعذّر تحميل الأدوار.",
+      "submit": "إنشاء المستخدم",
+      "submitting": "جارٍ الإنشاء...",
+      "createFailed": "تعذّر إنشاء المستخدم. حاول مرة أخرى."
     }
   },
   "slaPolicies": {
@@ -250,6 +269,28 @@
     "exceptionAddSubmitting": "جارٍ الإضافة...",
     "exceptionAddFailed": "تعذّر إضافة الاستثناء. حاول مرة أخرى."
   },
+  "auditLogs": {
+    "title": "سجل التدقيق",
+    "error": "تعذّر تحميل سجل التدقيق.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد إدخالات في سجل التدقيق حتى الآن.",
+    "forbidden": "لا تملك صلاحية عرض سجل التدقيق.",
+    "noDiff": "لا يوجد فرق مسجّل.",
+    "systemActor": "النظام",
+    "noEntityId": "—",
+    "noBranch": "—",
+    "noIpAddress": "—",
+    "columns": {
+      "createdAt": "الوقت",
+      "actor": "الفاعل",
+      "action": "الإجراء",
+      "entityType": "نوع الكيان",
+      "entityId": "معرّف الكيان",
+      "branch": "الفرع",
+      "ipAddress": "عنوان IP",
+      "diff": "الفرق"
+    }
+  },
   "dashboard": {
     "title": "لوحة التحكم",
     "heading": "تذاكري المفتوحة",
@@ -281,5 +322,30 @@
     "slaBreached": "تم خرق هدف {targetType} للتذكرة {ticketId}.",
     "ticketEscalated": "تم تصعيد التذكرة: {subject}",
     "generic": "إشعار جديد"
+  },
+  "notificationHistory": {
+    "title": "سجل الإشعارات",
+    "error": "تعذّر تحميل سجل الإشعارات.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد إشعارات حتى الآن.",
+    "forbidden": "لا تملك صلاحية عرض سجل الإشعارات.",
+    "unknownCustomer": "—",
+    "noTarget": "—",
+    "eventLabel": {
+      "slaAtRisk": "اتفاقية الخدمة في خطر",
+      "slaBreached": "تم خرق اتفاقية الخدمة",
+      "ticketEscalated": "تم تصعيد التذكرة"
+    },
+    "targetType": {
+      "response": "الاستجابة",
+      "resolution": "الحل"
+    },
+    "columns": {
+      "event": "الحدث",
+      "ticket": "التذكرة",
+      "customer": "العميل",
+      "target": "الهدف",
+      "loggedAt": "وقت التسجيل"
+    }
   }
 }

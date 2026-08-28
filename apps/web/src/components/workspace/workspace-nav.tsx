@@ -4,14 +4,27 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedUser } from "@crm/shared";
 import { Button } from "@/components/ui/button";
-import { clearAccessToken } from "@/lib/api";
+import { clearAccessToken, logout } from "@/lib/api";
 
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
   const t = useTranslations("workspace");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
-  function handleSignOut() {
+  /**
+   * Story 41 — calls the real `POST /auth/logout` (revoking the refresh
+   * token server-side) before the existing local cleanup. `logout()` is
+   * itself best-effort (it never throws), but the `catch` here is a second,
+   * defense-in-depth guarantee at this call site: local cleanup — cookie
+   * cleared, redirected — always runs, even if `logout()` were to reject,
+   * so the user's intent to leave is never blocked on a round-trip.
+   */
+  async function handleSignOut() {
+    try {
+      await logout();
+    } catch {
+      // Best-effort — local sign-out below always proceeds regardless.
+    }
     clearAccessToken();
     router.push(`/${locale}/login`);
   }

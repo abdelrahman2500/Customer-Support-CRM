@@ -3,11 +3,14 @@ import {
   createContact,
   createCustomer,
   createTicket,
+  createUser,
   getCustomer,
   getTicket,
   getTicketHistory,
   getTicketSlaTarget,
+  listBranches,
   listCustomers,
+  listDepartments,
   listTickets,
   listUsers,
   updateContact,
@@ -19,6 +22,7 @@ import type {
   CreateContactInput,
   CreateCustomerInput,
   CreateTicketInput,
+  CreateUserInput,
   ListTicketsFilters,
   UpdateContactInput,
   UpdateCustomerInput,
@@ -175,6 +179,33 @@ export function useUpdateUserMutation(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateUserInput) => updateUser(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+/** Story 38 — read-only, mirrors `useUsersQuery`'s `staleTime` convention
+ * for infrequently-changing reference data. Populates the create-user
+ * form's branch/department pickers. */
+export function useBranchesQuery() {
+  return useQuery({ queryKey: ["branches"], queryFn: listBranches, staleTime: 5 * 60_000 });
+}
+
+export function useDepartmentsQuery() {
+  return useQuery({ queryKey: ["departments"], queryFn: listDepartments, staleTime: 5 * 60_000 });
+}
+
+/**
+ * Story 38 — never applies optimistically, same convention as every other
+ * mutation here: only a successful `POST /identity/users` invalidates
+ * `["users"]`, forcing the list (the only place a user is rendered) to
+ * re-fetch the real, authoritative state.
+ */
+export function useCreateUserMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateUserInput) => createUser(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["users"] });
     },

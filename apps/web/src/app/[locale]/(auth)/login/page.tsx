@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
-import { ACCESS_TOKEN_COOKIE, getApiBaseUrl } from "@/lib/api";
+import { getApiBaseUrl, setAccessToken } from "@/lib/api";
 
 /**
  * Story 23 — the real agent sign-in screen, replacing the Story 02
@@ -16,6 +16,12 @@ import { ACCESS_TOKEN_COOKIE, getApiBaseUrl } from "@/lib/api";
  * refresh token stays httpOnly, set directly by `apps/api`), same
  * `credentials: "include"` so that Set-Cookie lands. No new auth
  * mechanism, customer-portal login, or second JWT/session system.
+ *
+ * Story 41 — writes the cookie via `setAccessToken` (factored out of this
+ * page's own former inline `document.cookie = ...`) rather than duplicating
+ * that cookie-string construction a second time now that the silent-refresh
+ * success path also needs to write it. Same cookie, same shape, no behavior
+ * change.
  */
 export default function LoginPage() {
   const t = useTranslations("auth");
@@ -45,7 +51,7 @@ export default function LoginPage() {
       }
 
       const { accessToken } = (await response.json()) as { accessToken: string };
-      document.cookie = `${ACCESS_TOKEN_COOKIE}=${accessToken}; path=/; max-age=900; samesite=lax`;
+      setAccessToken(accessToken);
       router.push(`/${locale}/tickets`);
     } catch {
       setError(t("loginFailed"));
