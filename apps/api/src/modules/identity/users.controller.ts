@@ -9,6 +9,7 @@ import { UpdateDepartmentDto } from "./dto/update-department.dto";
 import { CreateRoleDto } from "./dto/create-role.dto";
 import { UpdateRoleDto } from "./dto/update-role.dto";
 import { SetRolePermissionsDto } from "./dto/set-role-permissions.dto";
+import { UpdateUserAssignmentDto } from "./dto/update-user-assignment.dto";
 import type {
   BranchSummary,
   DepartmentSummary,
@@ -43,6 +44,13 @@ import { IdentityService } from "./identity.service";
  * renamed or deactivated (`PATCH roles/:id` rejects it with `400`), but
  * permission assignment on them via `PATCH roles/:id/permissions` is fully
  * allowed — granting `Agent` its first real permissions is the point.
+ *
+ * Story 47 adds `PATCH users/:id/assignment`, gated by its own
+ * `user:reassign` permission: `user:update` (above) remains profile-only
+ * (`fullName`/`isActive`), while `user:reassign` lets an admin change an
+ * *existing* user's Role and/or Department, both scoped to the caller's
+ * own branch — never a different branch, which this route does not accept
+ * or expose in any form.
  */
 @ApiTags("identity")
 @ApiBearerAuth()
@@ -66,6 +74,15 @@ export class UsersController {
   @RequirePermissions("user:update")
   updateUser(@Param("id") id: string, @Body() dto: UpdateUserDto): Promise<{ id: string }> {
     return this.identityService.updateUser(id, dto);
+  }
+
+  @Patch("users/:id/assignment")
+  @RequirePermissions("user:reassign")
+  updateUserAssignment(
+    @Param("id") id: string,
+    @Body() dto: UpdateUserAssignmentDto,
+  ): Promise<{ id: string }> {
+    return this.identityService.updateUserAssignment(id, dto);
   }
 
   @Get("roles")

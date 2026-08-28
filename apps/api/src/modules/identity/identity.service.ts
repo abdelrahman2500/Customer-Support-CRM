@@ -22,6 +22,7 @@ import type { UpdateDepartmentDto } from "./dto/update-department.dto";
 import type { CreateRoleDto } from "./dto/create-role.dto";
 import type { UpdateRoleDto } from "./dto/update-role.dto";
 import type { SetRolePermissionsDto } from "./dto/set-role-permissions.dto";
+import type { UpdateUserAssignmentDto } from "./dto/update-user-assignment.dto";
 
 const BCRYPT_ROUNDS = 12;
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
@@ -41,6 +42,8 @@ export interface UserSummary {
   fullName: string;
   isActive: boolean;
   roles: string[];
+  roleId: string;
+  departmentId: string | null;
 }
 
 /**
@@ -236,17 +239,36 @@ export class IdentityService {
 
     const users = await this.prisma.user.findMany({
       where: { branchRoles: { some: { branchId } } },
-      include: { branchRoles: { where: { branchId }, include: { role: true } } },
+      include: {
+        branchRoles: { where: { branchId }, include: { role: true }, orderBy: { createdAt: "asc" } },
+      },
       orderBy: { createdAt: "asc" },
     });
 
-    return users.map((user) => ({
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      isActive: user.isActive,
-      roles: [...new Set(user.branchRoles.map((br) => br.role.name))],
-    }));
+    // Story 47 — `roleId`/`departmentId` are derived from `branchRoles[0]`,
+    // the same "first/oldest membership wins" rule `login`/`refresh`/
+    // `getAuthenticatedUser` already use to pick a user's active context.
+    // The `where` clause above guarantees every returned user has at least
+    // one `branchRoles` row in this branch, so `active` is never actually
+    // undefined here — the `flatMap`/guard is defensive only, matching this
+    // file's `noUncheckedIndexedAccess`-safe style elsewhere.
+    return users.flatMap((user) => {
+      const active = user.branchRoles[0];
+      if (!active) {
+        return [];
+      }
+      return [
+        {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          isActive: user.isActive,
+          roles: [...new Set(user.branchRoles.map((br) => br.role.name))],
+          roleId: active.roleId,
+          departmentId: active.departmentId,
+        },
+      ];
+    });
   }
 
   async updateUser(id: string, dto: UpdateUserDto): Promise<{ id: string }> {
@@ -264,6 +286,93 @@ export class IdentityService {
     });
 
     return { id };
+  }
+
+  /**
+   * Story 47 — reassigns an existing user's Role and/or Department, both
+   * scoped to the caller's own branch. `user:update` (above) stays
+   * profile-only (`fullName`/`isActive`); this is a deliberately separate,
+   * more privilege-affecting permission (`user:reassign`) — see Story 46's
+   * `role:assign-permissions` vs. `role:update` split for the precedent.
+   *
+   * Edits the target user's existing first/active `UserBranchRole` row
+   * in place (`branchRoles[0]`, the same "first/oldest membership wins"
+   * row `login`/`refresh`/`getAuthenticatedUser` already treat as active) —
+   * never adds a second row, never deletes-then-recreates. No `branchId`
+   * is accepted anywhere in this method: reassigning a user to a different
+   * branch is explicitly out of scope (see Story 47 plan, Design item 2).
+   */
+  async updateUserAssignment(id: string, dto: UpdateUserAssignmentDto): Promise<{ id: string }> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+
+    const membership = await this.prisma.userBranchRole.findFirst({
+      where: { userId: id, branchId },
+      include: { role: true },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!membership) {
+      throw new NotFoundException("User not found in this branch");
+    }
+
+    if (dto.roleId !== undefined) {
+      const role = await this.prisma.role.findUnique({ where: { id: dto.roleId } });
+      if (!role) {
+        throw new NotFoundException("Role not found");
+      }
+      if (!role.isActive) {
+        throw new BadRequestException("Cannot assign an inactive role");
+      }
+    }
+
+    if (dto.departmentId !== undefined && dto.departmentId !== null) {
+      const department = await this.prisma.department.findFirst({
+        where: { id: dto.departmentId, branchId },
+      });
+      if (!department) {
+        throw new NotFoundException("Department not found");
+      }
+      if (!department.isActive) {
+        throw new BadRequestException("Cannot assign an inactive department");
+      }
+    }
+
+    // Last-SuperAdmin lockout guard — only relevant when the membership's
+    // *current* role is SuperAdmin and this call would actually move it to
+    // a different role. Mirrors Story 46's "protect against unrecoverable
+    // lockout" philosophy, applied here to the last living holder of the
+    // role rather than the role record itself.
+    if (
+      dto.roleId !== undefined &&
+      membership.role.name === "SuperAdmin" &&
+      dto.roleId !== membership.roleId
+    ) {
+      const superAdminRole = await this.prisma.role.findUnique({
+        where: { name: "SuperAdmin" },
+      });
+      const otherSuperAdmins = await this.prisma.userBranchRole.count({
+        where: {
+          roleId: superAdminRole?.id,
+          userId: { not: id },
+          user: { isActive: true },
+        },
+      });
+      if (otherSuperAdmins === 0) {
+        throw new BadRequestException("Cannot reassign the last SuperAdmin user");
+      }
+    }
+
+    try {
+      await this.prisma.userBranchRole.update({
+        where: { id: membership.id },
+        data: {
+          ...(dto.roleId !== undefined ? { roleId: dto.roleId } : {}),
+          ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
+        },
+      });
+      return { id };
+    } catch (error) {
+      throw translateDuplicateUserAssignment(error);
+    }
   }
 
   /**
@@ -566,6 +675,24 @@ function translateDuplicateRoleName(error: unknown): Error {
     error.code === UNIQUE_CONSTRAINT_VIOLATION
   ) {
     return new ConflictException("A role with this name already exists");
+  }
+  return error as Error;
+}
+
+/**
+ * A genuine duplicate exact assignment is caught here by Prisma's `P2002`
+ * unique-constraint-violation code (backstopping `UserBranchRole`'s
+ * `@@unique([userId, branchId, departmentId, roleId])` constraint) and
+ * turned into a `ConflictException` — never a raw 500. Unlikely in
+ * practice since `updateUserAssignment` only ever edits a user's single
+ * existing row in place; kept defensively.
+ */
+function translateDuplicateUserAssignment(error: unknown): Error {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === UNIQUE_CONSTRAINT_VIOLATION
+  ) {
+    return new ConflictException("This user already has this exact assignment");
   }
   return error as Error;
 }

@@ -39,3 +39,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | agent-workspace-navigation-menu | [agent-workspace-navigation-menu/00-overview.md](./agent-workspace-navigation-menu/00-overview.md) | 44–      |
 | agent-workspace-branch-department-admin | [agent-workspace-branch-department-admin/00-overview.md](./agent-workspace-branch-department-admin/00-overview.md) | 45–      |
 | agent-workspace-role-permission-management | [agent-workspace-role-permission-management/00-overview.md](./agent-workspace-role-permission-management/00-overview.md) | 46–      |
+| agent-workspace-user-role-assignment | [agent-workspace-user-role-assignment/00-overview.md](./agent-workspace-user-role-assignment/00-overview.md) | 47–      |

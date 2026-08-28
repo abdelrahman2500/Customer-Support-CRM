@@ -176,7 +176,12 @@
         "fullName": "الاسم",
         "roles": "الأدوار",
         "status": "الحالة"
-      }
+      },
+      "roleLabel": "الدور",
+      "departmentLabel": "القسم",
+      "noDepartment": "بدون قسم",
+      "roleLoadError": "تعذّر تحميل الأدوار.",
+      "departmentLoadError": "تعذّر تحميل الأقسام."
     },
     "create": {
       "title": "مستخدم جديد",

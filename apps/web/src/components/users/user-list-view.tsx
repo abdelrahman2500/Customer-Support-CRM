@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useUpdateUserMutation, useUsersQuery } from "@/hooks/use-tickets";
+import {
+  useDepartmentsQuery,
+  useUpdateUserAssignmentMutation,
+  useUpdateUserMutation,
+  useUsersQuery,
+} from "@/hooks/use-tickets";
+import { useRolesQuery } from "@/hooks/use-roles";
 import type { UserSummary } from "@/lib/tickets-api";
 import { ApiError } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +18,23 @@ import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+/** Same sentinel string `CreateUserView` uses for its own optional
+ * department picker — kept as an equivalent local constant since
+ * `CreateUserView` doesn't export one. */
+const UNSET_DEPARTMENT = "__unset__";
 
 /**
  * Story 32 — User Management: list, inline rename, inline
  * activate/deactivate, over the already-existing `GET`/`PATCH
- * /identity/users` (Story 03/23). Roles are read-only badges — no
- * mutation endpoint exists for role assignment. Mirrors `TicketListView`'s
+ * /identity/users` (Story 03/23). Mirrors `TicketListView`'s
  * loading/error/empty conventions and `TicketDetailView`'s never-optimistic,
  * blur-commit inline-field / actionForbidden-vs-actionFailed pattern.
  *
@@ -25,6 +42,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
  * explicitly deferred in Story 32 pending `GET /identity/branches`/`GET
  * /identity/departments`, added by Story 35). This list itself is
  * otherwise unchanged.
+ *
+ * Story 47 — the previously read-only `roles: string[]` badge list is
+ * replaced by two inline `Select`s (role, department) that commit
+ * immediately on change via the new, separate
+ * `useUpdateUserAssignmentMutation(user.id)` — mirroring the existing
+ * activate/deactivate button's immediate-commit-on-click convention (a
+ * `Select` has no natural "blur to confirm" moment) rather than the
+ * blur-commit text-input pattern. Error rendering extends the existing
+ * 403-vs-generic split into `RoleListView`'s 3-way
+ * 403/other-`ApiError`-verbatim/generic pattern. No branch picker — Branch
+ * reassignment is out of scope (plan Design item 2).
  */
 export function UserListView() {
   const t = useTranslations("users");
@@ -88,6 +116,9 @@ export function UserListView() {
 function UserRow({ user }: { user: UserSummary }) {
   const t = useTranslations("users");
   const mutation = useUpdateUserMutation(user.id);
+  const assignmentMutation = useUpdateUserAssignmentMutation(user.id);
+  const rolesQuery = useRolesQuery();
+  const departmentsQuery = useDepartmentsQuery();
   const [fullNameDraft, setFullNameDraft] = useState(user.fullName);
 
   function commitFullName() {
@@ -125,13 +156,67 @@ function UserRow({ user }: { user: UserSummary }) {
         )}
       </TableCell>
       <TableCell>
-        <div className="flex flex-wrap gap-1">
-          {user.roles.length === 0 && <span className="text-slate-400">{t("list.noRoles")}</span>}
-          {user.roles.map((role) => (
-            <Badge key={role} variant="outline">
-              {role}
-            </Badge>
-          ))}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-slate-500">{t("list.roleLabel")}</span>
+            <Select
+              value={user.roleId}
+              disabled={assignmentMutation.isPending}
+              onValueChange={(value) => assignmentMutation.mutate({ roleId: value })}
+            >
+              <SelectTrigger className="min-w-[10rem]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(rolesQuery.data ?? []).map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    {role.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {rolesQuery.isError && (
+              <span className="text-xs text-red-600">{t("list.roleLoadError")}</span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-slate-500">{t("list.departmentLabel")}</span>
+            <Select
+              value={user.departmentId ?? UNSET_DEPARTMENT}
+              disabled={assignmentMutation.isPending}
+              onValueChange={(value) =>
+                assignmentMutation.mutate({
+                  departmentId: value === UNSET_DEPARTMENT ? null : value,
+                })
+              }
+            >
+              <SelectTrigger className="min-w-[10rem]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNSET_DEPARTMENT}>{t("list.noDepartment")}</SelectItem>
+                {(departmentsQuery.data ?? []).map((department) => (
+                  <SelectItem key={department.id} value={department.id}>
+                    {department.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {departmentsQuery.isError && (
+              <span className="text-xs text-red-600">{t("list.departmentLoadError")}</span>
+            )}
+          </div>
+
+          {assignmentMutation.isError && (
+            <p className="text-xs text-red-600">
+              {assignmentMutation.error instanceof ApiError && assignmentMutation.error.status === 403
+                ? t("list.actionForbidden")
+                : assignmentMutation.error instanceof ApiError
+                  ? assignmentMutation.error.message
+                  : t("list.actionFailed")}
+            </p>
+          )}
         </div>
       </TableCell>
       <TableCell>

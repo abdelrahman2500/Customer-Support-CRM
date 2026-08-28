@@ -58,6 +58,9 @@ function buildPrismaMock() {
     },
     userBranchRole: {
       create: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
+      count: vi.fn(),
     },
     role: {
       findMany: vi.fn(),
@@ -337,6 +340,50 @@ describe("IdentityService", () => {
 
       await expect(service.listUsers()).rejects.toThrow(/no active branch/);
     });
+
+    it("derives roleId/departmentId from the first (oldest-createdAt) branchRoles entry, not just whichever is present", async () => {
+      // Deliberately constructed with 2+ entries, the "active" one first —
+      // the same "first/oldest membership wins" rule `login`/`refresh`/
+      // `getAuthenticatedUser` already use. If `listUsers` ever picked a
+      // different entry (e.g. the last one, or merged fields across all of
+      // them), this test would catch it.
+      prisma.user.findMany.mockResolvedValue([
+        {
+          id: "user-1",
+          email: "multi@example.com",
+          fullName: "Multi Role",
+          isActive: true,
+          branchRoles: [
+            {
+              id: "ubr-old",
+              branchId: "branch-1",
+              departmentId: "dept-old",
+              roleId: "role-old",
+              createdAt: new Date("2024-01-01"),
+              role: { name: "Agent" },
+            },
+            {
+              id: "ubr-new",
+              branchId: "branch-1",
+              departmentId: "dept-new",
+              roleId: "role-new",
+              createdAt: new Date("2024-02-01"),
+              role: { name: "Custom Role" },
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.listUsers();
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          id: "user-1",
+          roleId: "role-old",
+          departmentId: "dept-old",
+        }),
+      ]);
+    });
   });
 
   describe("updateUser", () => {
@@ -357,6 +404,267 @@ describe("IdentityService", () => {
         where: { id: "user-1" },
         data: { isActive: false },
       });
+    });
+  });
+
+  describe("updateUserAssignment", () => {
+    const membership = {
+      id: "ubr-1",
+      userId: "user-1",
+      branchId: "branch-1",
+      departmentId: "dept-old",
+      roleId: "role-old",
+      role: { name: "Agent" },
+    };
+    const superAdminMembership = {
+      id: "ubr-1",
+      userId: "user-1",
+      branchId: "branch-1",
+      departmentId: "dept-old",
+      roleId: "role-super-admin",
+      role: { name: "SuperAdmin" },
+    };
+
+    it("updates only the role when only roleId is given", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-new",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      const result = await service.updateUserAssignment("user-1", { roleId: "role-new" });
+
+      expect(prisma.userBranchRole.update).toHaveBeenCalledWith({
+        where: { id: membership.id },
+        data: { roleId: "role-new" },
+      });
+      expect(result).toEqual({ id: "user-1" });
+    });
+
+    it("updates only the department when only departmentId is given", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.department.findFirst.mockResolvedValue({
+        id: "dept-new",
+        branchId: "branch-1",
+        isActive: true,
+      });
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateUserAssignment("user-1", { departmentId: "dept-new" });
+
+      expect(prisma.userBranchRole.update).toHaveBeenCalledWith({
+        where: { id: membership.id },
+        data: { departmentId: "dept-new" },
+      });
+      expect(prisma.role.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("updates both role and department when both are given", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-new",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.department.findFirst.mockResolvedValue({
+        id: "dept-new",
+        branchId: "branch-1",
+        isActive: true,
+      });
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateUserAssignment("user-1", {
+        roleId: "role-new",
+        departmentId: "dept-new",
+      });
+
+      expect(prisma.userBranchRole.update).toHaveBeenCalledWith({
+        where: { id: membership.id },
+        data: { roleId: "role-new", departmentId: "dept-new" },
+      });
+    });
+
+    it("clears the department when departmentId: null is given", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateUserAssignment("user-1", { departmentId: null });
+
+      expect(prisma.department.findFirst).not.toHaveBeenCalled();
+      expect(prisma.userBranchRole.update).toHaveBeenCalledWith({
+        where: { id: membership.id },
+        data: { departmentId: null },
+      });
+    });
+
+    it("does nothing to either field when neither is given in the DTO", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateUserAssignment("user-1", {});
+
+      expect(prisma.userBranchRole.update).toHaveBeenCalledWith({
+        where: { id: membership.id },
+        data: {},
+      });
+    });
+
+    it("throws NotFoundException when the target user has no membership in the caller's branch", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateUserAssignment("user-1", { roleId: "role-new" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.userBranchRole.update).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException when roleId doesn't exist", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.role.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateUserAssignment("user-1", { roleId: "missing-role" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.userBranchRole.update).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException when the target role is inactive", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-inactive",
+        name: "Inactive Role",
+        isActive: false,
+      });
+
+      await expect(
+        service.updateUserAssignment("user-1", { roleId: "role-inactive" }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.userBranchRole.update).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException when departmentId doesn't exist or isn't in the caller's branch", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.department.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateUserAssignment("user-1", { departmentId: "not-in-branch" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.department.findFirst).toHaveBeenCalledWith({
+        where: { id: "not-in-branch", branchId: "branch-1" },
+      });
+      expect(prisma.userBranchRole.update).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException when the target department is inactive", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.department.findFirst.mockResolvedValue({
+        id: "dept-inactive",
+        branchId: "branch-1",
+        isActive: false,
+      });
+
+      await expect(
+        service.updateUserAssignment("user-1", { departmentId: "dept-inactive" }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.userBranchRole.update).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException (last-SuperAdmin guard) when reassigning the sole active SuperAdmin away", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(superAdminMembership);
+      prisma.role.findUnique.mockImplementation(
+        async ({ where }: { where: { id?: string; name?: string } }) => {
+          if (where.id === "role-agent") {
+            return { id: "role-agent", name: "Agent", isActive: true };
+          }
+          if (where.name === "SuperAdmin") {
+            return { id: "role-super-admin", name: "SuperAdmin", isActive: true };
+          }
+          return null;
+        },
+      );
+      prisma.userBranchRole.count.mockResolvedValue(0);
+
+      const promise = service.updateUserAssignment("user-1", { roleId: "role-agent" });
+
+      await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+      await expect(promise).rejects.toThrow(/Cannot reassign the last SuperAdmin user/);
+      expect(prisma.userBranchRole.update).not.toHaveBeenCalled();
+    });
+
+    it("does NOT throw the last-SuperAdmin guard when another active SuperAdmin exists", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(superAdminMembership);
+      prisma.role.findUnique.mockImplementation(
+        async ({ where }: { where: { id?: string; name?: string } }) => {
+          if (where.id === "role-agent") {
+            return { id: "role-agent", name: "Agent", isActive: true };
+          }
+          if (where.name === "SuperAdmin") {
+            return { id: "role-super-admin", name: "SuperAdmin", isActive: true };
+          }
+          return null;
+        },
+      );
+      prisma.userBranchRole.count.mockResolvedValue(1);
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await expect(
+        service.updateUserAssignment("user-1", { roleId: "role-agent" }),
+      ).resolves.toEqual({ id: "user-1" });
+      expect(prisma.userBranchRole.update).toHaveBeenCalledWith({
+        where: { id: superAdminMembership.id },
+        data: { roleId: "role-agent" },
+      });
+    });
+
+    it("does NOT run the last-SuperAdmin check at all when dto.roleId is undefined", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(superAdminMembership);
+      prisma.department.findFirst.mockResolvedValue({
+        id: "dept-new",
+        branchId: "branch-1",
+        isActive: true,
+      });
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateUserAssignment("user-1", { departmentId: "dept-new" });
+
+      expect(prisma.role.findUnique).not.toHaveBeenCalled();
+      expect(prisma.userBranchRole.count).not.toHaveBeenCalled();
+    });
+
+    it("does NOT run the last-SuperAdmin check when the current role is NOT SuperAdmin", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-new",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateUserAssignment("user-1", { roleId: "role-new" });
+
+      expect(prisma.role.findUnique).toHaveBeenCalledTimes(1);
+      expect(prisma.role.findUnique).toHaveBeenCalledWith({ where: { id: "role-new" } });
+      expect(prisma.userBranchRole.count).not.toHaveBeenCalled();
+    });
+
+    it("translates a P2002 unique-constraint violation into ConflictException", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.userBranchRole.update.mockRejectedValue(buildUniqueConstraintError());
+
+      await expect(service.updateUserAssignment("user-1", {})).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, jwtService, configService, tenantContext);
+
+      await expect(service.updateUserAssignment("user-1", {})).rejects.toThrow(
+        /no active branch/,
+      );
     });
   });
 

@@ -783,4 +783,220 @@ describe("Identity & Access (e2e)", () => {
       .set("Authorization", `Bearer ${dynamicAgentAccessToken}`)
       .expect(200);
   });
+
+  // ---------------------------------------------------------------------
+  // Story 47 — User Role/Department Reassignment
+  //
+  // Known scope limit: a true cross-branch reassignment attempt (moving a
+  // user's UserBranchRole to a *different* Branch) cannot be exercised
+  // end-to-end in this suite — `prisma/seed.ts` creates exactly one Branch
+  // per organization and there is deliberately no branch-create endpoint
+  // (see this file's own top-of-file doc comment, and Story 46's identical
+  // disclosed limitation for duplicate BRANCH names), so there is no
+  // second-branch fixture to reassign a user *into*. `UpdateUserAssignmentDto`
+  // itself accepts no `branchId` field at all — Branch reassignment isn't
+  // merely untested here, it isn't exposed as an option at all (Story 47
+  // plan, Design item 2) — so this path is covered only at the unit level,
+  // via `identity.service.spec.ts`'s mocked-Prisma `updateUserAssignment`
+  // tests.
+  // ---------------------------------------------------------------------
+
+  it("rejects PATCH /identity/users/:id/assignment with no token", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/assignment`)
+      .send({ departmentId: createdDepartmentId })
+      .expect(401);
+  });
+
+  it("rejects the Agent user (no user:reassign permission) from reassigning a user (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: secondAgentEmail, password: secondAgentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/assignment`)
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ departmentId: createdDepartmentId })
+      .expect(403);
+  });
+
+  it("reassigns the previously-created agent user's department, then role, as the admin", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ departmentId: createdDepartmentId })
+      .expect(200);
+
+    let users = await request(app.getHttpServer())
+      .get("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    let updatedUser = users.body.find(
+      (user: { id: string }) => user.id === createdAgentUserId,
+    );
+    expect(updatedUser).toMatchObject({ departmentId: createdDepartmentId });
+
+    // Reassign to the custom role created/reactivated earlier in this suite
+    // (Story 46 section) — it's guaranteed active at this point.
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ roleId: customRoleId })
+      .expect(200);
+
+    users = await request(app.getHttpServer())
+      .get("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    updatedUser = users.body.find((user: { id: string }) => user.id === createdAgentUserId);
+    expect(updatedUser).toMatchObject({
+      roleId: customRoleId,
+      departmentId: createdDepartmentId,
+    });
+  });
+
+  it("clears the agent user's department via departmentId: null", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ departmentId: null })
+      .expect(200);
+
+    const users = await request(app.getHttpServer())
+      .get("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const updatedUser = users.body.find(
+      (user: { id: string }) => user.id === createdAgentUserId,
+    );
+    expect(updatedUser).toMatchObject({ departmentId: null });
+  });
+
+  it("rejects an unknown roleId with 404", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ roleId: randomUUID() })
+      .expect(404);
+  });
+
+  it("rejects an unknown departmentId with 404", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ departmentId: randomUUID() })
+      .expect(404);
+  });
+
+  it("rejects assigning an inactive role with 400", async () => {
+    const inactiveRoleName = `Inactive Role ${randomUUID()}`;
+    const createRoleResponse = await request(app.getHttpServer())
+      .post("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: inactiveRoleName })
+      .expect(201);
+    const inactiveRoleId = createRoleResponse.body.id as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${inactiveRoleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: false })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ roleId: inactiveRoleId })
+      .expect(400);
+  });
+
+  it("rejects assigning an inactive department with 400", async () => {
+    const inactiveDeptName = `Inactive Dept ${randomUUID()}`;
+    const createDeptResponse = await request(app.getHttpServer())
+      .post("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: inactiveDeptName })
+      .expect(201);
+    const inactiveDepartmentId = createDeptResponse.body.id as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/departments/${inactiveDepartmentId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: false })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ departmentId: inactiveDepartmentId })
+      .expect(400);
+  });
+
+  it("rejects reassigning the sole SuperAdmin away from SuperAdmin with 400, then allows it once a second SuperAdmin exists", async () => {
+    const usersBefore = await request(app.getHttpServer())
+      .get("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const seededAdmin = usersBefore.body.find(
+      (user: { email: string }) => user.email === process.env.SEED_ADMIN_EMAIL,
+    );
+    expect(seededAdmin).toBeTruthy();
+    const seededAdminId = seededAdmin.id as string;
+
+    // Exactly one SuperAdmin exists at this point in the suite (the seeded
+    // bootstrap admin — `prisma/seed.ts` creates only one, and nothing
+    // earlier in this file creates another) — reassigning them away from
+    // SuperAdmin is rejected to prevent an unrecoverable lockout.
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${seededAdminId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ roleId: agentRoleId })
+      .expect(400);
+
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const superAdminRole = roles.body.find(
+      (role: { name: string }) => role.name === "SuperAdmin",
+    );
+    expect(superAdminRole).toBeTruthy();
+
+    const secondSuperAdminEmail = `super-admin-2-${randomUUID()}@example.com`;
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: secondSuperAdminEmail,
+        password: "second-super-admin-password-123",
+        fullName: "Second Super Admin",
+        branchId: adminBranchId,
+        departmentId: adminDepartmentId ?? undefined,
+        roleId: superAdminRole.id,
+      })
+      .expect(201);
+
+    // Now that a second active SuperAdmin exists, reassigning the FIRST
+    // admin away from SuperAdmin succeeds.
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${seededAdminId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ roleId: agentRoleId })
+      .expect(200);
+
+    // Restore the seeded bootstrap admin back to SuperAdmin — other e2e
+    // spec files (and any later test run) log in as `SEED_ADMIN_EMAIL` and
+    // expect it to remain SuperAdmin; this call's own JWT claims are
+    // unaffected either way (Design item 7: a reassignment only takes
+    // effect for a user's *next* token refresh/login, not their currently-
+    // live token), so it still succeeds with the same already-issued
+    // `adminAccessToken`.
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${seededAdminId}/assignment`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ roleId: superAdminRole.id })
+      .expect(200);
+  });
 });

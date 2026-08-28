@@ -17,6 +17,7 @@ import {
   updateCustomer,
   updateTicket,
   updateUser,
+  updateUserAssignment,
 } from "@/lib/tickets-api";
 import type {
   CreateContactInput,
@@ -27,6 +28,7 @@ import type {
   UpdateContactInput,
   UpdateCustomerInput,
   UpdateTicketInput,
+  UpdateUserAssignmentInput,
   UpdateUserInput,
 } from "@/lib/tickets-api";
 
@@ -190,6 +192,22 @@ export function useUpdateUserMutation(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateUserInput) => updateUser(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+/**
+ * Story 47 — never applies optimistically, same convention as every other
+ * mutation here: only a successful `PATCH /identity/users/:id/assignment`
+ * invalidates `["users"]`, forcing the list (the only place a user's
+ * role/department is rendered) to re-fetch the real, authoritative state.
+ */
+export function useUpdateUserAssignmentMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateUserAssignmentInput) => updateUserAssignment(id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["users"] });
     },

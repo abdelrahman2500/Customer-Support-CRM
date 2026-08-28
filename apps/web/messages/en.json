@@ -176,7 +176,12 @@
         "fullName": "Name",
         "roles": "Roles",
         "status": "Status"
-      }
+      },
+      "roleLabel": "Role",
+      "departmentLabel": "Department",
+      "noDepartment": "No department",
+      "roleLoadError": "Couldn't load roles.",
+      "departmentLoadError": "Couldn't load departments."
     },
     "create": {
       "title": "New user",

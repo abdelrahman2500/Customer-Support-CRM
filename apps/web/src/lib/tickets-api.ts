@@ -60,13 +60,20 @@ export interface CustomerDetail extends CustomerSummary {
 
 /** Story 32 — widened additively with `isActive`/`roles` (already returned
  * by `GET /identity/users`; every existing consumer only destructures
- * `id`/`fullName` and is unaffected). */
+ * `id`/`fullName` and is unaffected).
+ *
+ * Story 47 — further widened additively with `roleId`/`departmentId`,
+ * both derived server-side from the user's `branchRoles[0]` (the same
+ * "active" membership `login`/`refresh`/`getAuthenticatedUser` already key
+ * off of) — needed so an edit control can know what to pre-select. */
 export interface UserSummary {
   id: string;
   email: string;
   fullName: string;
   isActive: boolean;
   roles: string[];
+  roleId: string;
+  departmentId: string | null;
 }
 
 export interface ListTicketsFilters {
@@ -246,6 +253,26 @@ export interface UpdateUserInput {
 
 export function updateUser(id: string, input: UpdateUserInput): Promise<{ id: string }> {
   return apiFetch<{ id: string }>(`/identity/users/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Story 47 — mirrors the existing `UpdateUserAssignmentDto` exactly
+ * (`apps/api/src/modules/identity/dto/update-user-assignment.dto.ts`).
+ * `departmentId: null` explicitly clears a department (branch-wide role);
+ * omitting a field leaves it unchanged. No branch field — reassigning a
+ * user to a different Branch is out of scope (plan Design item 2). */
+export interface UpdateUserAssignmentInput {
+  roleId?: string;
+  departmentId?: string | null;
+}
+
+export function updateUserAssignment(
+  id: string,
+  input: UpdateUserAssignmentInput,
+): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/identity/users/${id}/assignment`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });
