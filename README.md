@@ -49,8 +49,11 @@ Implemented so far:
   or a customer, using the existing `POST /tickets`/`POST /customers`
   contracts — no new backend endpoint. Customer selection reuses the same
   full customer list already fetched elsewhere in the workspace (no
-  search/autocomplete endpoint exists yet); a successful ticket creation
-  opens the new ticket's real detail page.
+  search/autocomplete endpoint exists yet); an agent can also optionally
+  pick a specific contact of the selected customer, a department, and an
+  assignee at creation time (contact options reset if the customer
+  selection changes); a successful ticket creation opens the new ticket's
+  real detail page.
 - **Customer list & detail** (Agent Workspace): `customers` lists every
   customer in the branch (name + active/inactive status, no search/
   pagination — same accepted limitation as the ticket list); `customers/{id}`

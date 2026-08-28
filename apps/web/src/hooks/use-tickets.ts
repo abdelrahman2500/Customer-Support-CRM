@@ -69,9 +69,20 @@ export function useCustomersQuery() {
 }
 
 /** Story 26 — mirrors `useTicketQuery`. `getCustomer` already returns
- * contacts embedded (Design item 1) — no second query needed for them. */
+ * contacts embedded (Design item 1) — no second query needed for them.
+ *
+ * Story 43 — `enabled: Boolean(id)` added so this hook is safe to call with
+ * an empty id (e.g. `CreateTicketView`'s `customerId` state before any
+ * customer is chosen) without firing a real, invalid `GET /customers/`
+ * request. `CustomerDetailView` (the only other consumer) always passes a
+ * truthy route-param id, so this is a no-op there — zero behavior change.
+ */
 export function useCustomerQuery(id: string) {
-  return useQuery({ queryKey: ["customer", id], queryFn: () => getCustomer(id) });
+  return useQuery({
+    queryKey: ["customer", id],
+    queryFn: () => getCustomer(id),
+    enabled: Boolean(id),
+  });
 }
 
 export function useUsersQuery() {

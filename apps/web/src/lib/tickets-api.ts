@@ -265,16 +265,19 @@ export function createCustomer(input: CreateCustomerInput): Promise<CustomerSumm
 
 /**
  * Story 25 — mirrors the existing `CreateTicketDto` exactly (`apps/api/src/modules/tickets/dto/create-ticket.dto.ts`).
- * `contactId`/`departmentId`/`assignedToUserId` are deliberately not part of
- * this input type — plan Design item 3: contact creation, department, and
- * assignment-at-creation-time are all explicitly out of scope for this
- * story's minimum form.
+ *
+ * Story 43 — `contactId`/`departmentId`/`assignedToUserId` added, closing
+ * the last three fields `CreateTicketDto` already accepted but this input
+ * type never carried (Story 25's own deferral, now picked up).
  */
 export interface CreateTicketInput {
   customerId: string;
   subject: string;
   category?: string;
   priority?: TicketPriority;
+  contactId?: string;
+  departmentId?: string;
+  assignedToUserId?: string;
 }
 
 export function createTicket(input: CreateTicketInput): Promise<TicketSummary> {
