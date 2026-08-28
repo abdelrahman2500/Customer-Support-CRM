@@ -19,7 +19,19 @@
   "workspace": {
     "appName": "نظام إدارة خدمة العملاء",
     "signedInAs": "مسجّل الدخول باسم {name}",
-    "signOut": "تسجيل الخروج"
+    "signOut": "تسجيل الخروج",
+    "nav": {
+      "label": "التنقل في مساحة العمل",
+      "dashboard": "لوحة التحكم",
+      "tickets": "التذاكر",
+      "customers": "العملاء",
+      "slaPolicies": "سياسات اتفاقية مستوى الخدمة",
+      "businessHours": "ساعات العمل",
+      "users": "المستخدمون",
+      "roles": "الأدوار والصلاحيات",
+      "auditLogs": "سجل التدقيق",
+      "notifications": "سجل الإشعارات"
+    }
   },
   "tickets": {
     "list": {

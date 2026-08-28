@@ -89,4 +89,41 @@ describe("WorkspaceNav", () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith("/en/login"));
     expect(mockedClearAccessToken).toHaveBeenCalledOnce();
   });
+
+  // Story 44 — persistent navigation menu.
+  describe("navigation links (Story 44)", () => {
+    const EXPECTED_LINKS: Array<[name: string, href: string]> = [
+      ["nav.dashboard", "/en/dashboard"],
+      ["nav.tickets", "/en/tickets"],
+      ["nav.customers", "/en/customers"],
+      ["nav.slaPolicies", "/en/sla-policies"],
+      ["nav.businessHours", "/en/business-hours"],
+      ["nav.users", "/en/users"],
+      ["nav.roles", "/en/roles"],
+      ["nav.auditLogs", "/en/audit-logs"],
+      ["nav.notifications", "/en/notifications"],
+    ];
+
+    it("renders a link to every one of the nine top-level Agent Workspace screens", () => {
+      render(<WorkspaceNav user={user} />);
+
+      for (const [name, href] of EXPECTED_LINKS) {
+        expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
+      }
+    });
+
+    it("labels the nav landmark with an accessible name", () => {
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.getByRole("navigation", { name: "nav.label" })).toBeInTheDocument();
+    });
+
+    it("still renders the existing app-name link and sign-out button unchanged, alongside the new nav row", () => {
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.getByRole("link", { name: "appName" })).toHaveAttribute("href", "/en/tickets");
+      expect(screen.getByRole("button", { name: "signOut" })).toBeInTheDocument();
+      expect(screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`)).toBeInTheDocument();
+    });
+  });
 });
