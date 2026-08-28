@@ -27,6 +27,7 @@
       "customers": "Customers",
       "slaPolicies": "SLA Policies",
       "businessHours": "Business Hours",
+      "branches": "My Branch",
       "users": "Users",
       "roles": "Roles & Permissions",
       "auditLogs": "Audit Log",
@@ -293,6 +294,41 @@
     "exceptionAddSubmit": "Add exception",
     "exceptionAddSubmitting": "Adding...",
     "exceptionAddFailed": "Couldn't add the exception. Please try again."
+  },
+  "branches": {
+    "myBranch": {
+      "heading": "My Branch",
+      "nameLabel": "Branch name",
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "actionForbidden": "You don't have permission to perform that action.",
+      "actionFailed": "That change couldn't be saved. Please try again.",
+      "loadError": "Couldn't load your branch.",
+      "retry": "Retry"
+    },
+    "departments": {
+      "heading": "Departments",
+      "error": "Couldn't load departments.",
+      "retry": "Retry",
+      "empty": "No departments yet.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "nameLabel": "Name",
+      "createPlaceholder": "Department name",
+      "createSubmit": "Add department",
+      "createSubmitting": "Adding...",
+      "createFailed": "Couldn't create the department. Please try again.",
+      "actionForbidden": "You don't have permission to perform that action.",
+      "actionFailed": "That change couldn't be saved. Please try again.",
+      "columns": {
+        "name": "Name",
+        "status": "Status"
+      }
+    }
   },
   "auditLogs": {
     "title": "Audit Log",

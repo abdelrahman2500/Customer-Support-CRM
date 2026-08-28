@@ -8,14 +8,19 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import type { AuthenticatedUser, AuthTokenPair, JwtAccessTokenClaims } from "@crm/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { EnvConfig } from "../../common/config/env.validation";
 import type { CreateUserDto } from "./dto/create-user.dto";
 import type { UpdateUserDto } from "./dto/update-user.dto";
+import type { UpdateBranchDto } from "./dto/update-branch.dto";
+import type { CreateDepartmentDto } from "./dto/create-department.dto";
+import type { UpdateDepartmentDto } from "./dto/update-department.dto";
 
 const BCRYPT_ROUNDS = 12;
+const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
 
 export interface UserSummary {
   id: string;
@@ -40,6 +45,7 @@ export interface UserSummary {
 export interface BranchSummary {
   id: string;
   name: string;
+  isActive: boolean;
 }
 
 /** Story 35 — every department within the caller's own branch (same
@@ -48,6 +54,7 @@ export interface DepartmentSummary {
   id: string;
   branchId: string;
   name: string;
+  isActive: boolean;
 }
 
 export interface RoleSummary {
@@ -251,27 +258,90 @@ export class IdentityService {
    * doc comment) — mirrors `listUsers`'s `requireBranchScope()` pattern
    * exactly.
    */
-  async listBranches(): Promise<BranchSummary[]> {
+  async listBranches(includeInactive = false): Promise<BranchSummary[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
-    const branch = await this.prisma.branch.findUnique({
-      where: { id: branchId },
-      select: { id: true, name: true },
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: branchId, ...(includeInactive ? {} : { isActive: true }) },
+      select: { id: true, name: true, isActive: true },
     });
     return branch ? [branch] : [];
   }
 
   /** Story 35 — every department within the caller's own branch. */
-  async listDepartments(): Promise<DepartmentSummary[]> {
+  async listDepartments(includeInactive = false): Promise<DepartmentSummary[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const departments = await this.prisma.department.findMany({
-      where: { branchId },
+      where: { branchId, ...(includeInactive ? {} : { isActive: true }) },
       orderBy: { name: "asc" },
     });
     return departments.map((department) => ({
       id: department.id,
       branchId: department.branchId,
       name: department.name,
+      isActive: department.isActive,
     }));
+  }
+
+  /**
+   * Renames/(de)activates the caller's own branch — never another branch,
+   * and never creates one (there is deliberately no `createBranch`; branch
+   * creation stays out of scope for this story). The scope check is a plain
+   * identity comparison against `TenantContext`, not a DB lookup: the
+   * caller's own branch id is already known and trusted.
+   */
+  async updateBranch(id: string, dto: UpdateBranchDto): Promise<{ id: string }> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    if (id !== branchId) {
+      throw new NotFoundException("Branch not found");
+    }
+
+    try {
+      await this.prisma.branch.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.timezone !== undefined ? { timezone: dto.timezone } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+      });
+      return { id };
+    } catch (error) {
+      throw translateDuplicateBranchName(error);
+    }
+  }
+
+  /**
+   * Creates a department in the caller's own branch — `branchId` always
+   * comes from `TenantContext`, never from the DTO, mirroring
+   * `CustomersService.createCustomer`.
+   */
+  async createDepartment(dto: CreateDepartmentDto): Promise<{ id: string }> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    try {
+      const department = await this.prisma.department.create({
+        data: { branchId, name: dto.name },
+      });
+      return { id: department.id };
+    } catch (error) {
+      throw translateDuplicateDepartmentName(error);
+    }
+  }
+
+  async updateDepartment(id: string, dto: UpdateDepartmentDto): Promise<{ id: string }> {
+    await this.requireDepartmentInScope(id);
+
+    try {
+      await this.prisma.department.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+      });
+      return { id };
+    } catch (error) {
+      throw translateDuplicateDepartmentName(error);
+    }
   }
 
   async listRoles(): Promise<RoleSummary[]> {
@@ -295,6 +365,14 @@ export class IdentityService {
   // ---------------------------------------------------------------------
   // internals
   // ---------------------------------------------------------------------
+
+  private async requireDepartmentInScope(id: string): Promise<void> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const department = await this.prisma.department.findFirst({ where: { id, branchId } });
+    if (!department) {
+      throw new NotFoundException("Department not found");
+    }
+  }
 
   private async issueAccessToken(
     userId: string,
@@ -342,4 +420,36 @@ export class IdentityService {
 
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, BCRYPT_ROUNDS);
+}
+
+/**
+ * A duplicate branch name within the same organization is caught here by
+ * Prisma's `P2002` unique-constraint-violation code (backstopping the
+ * `@@unique([organizationId, name])` constraint) and turned into a
+ * `ConflictException` — never a raw 500.
+ */
+function translateDuplicateBranchName(error: unknown): Error {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === UNIQUE_CONSTRAINT_VIOLATION
+  ) {
+    return new ConflictException("A branch with this name already exists");
+  }
+  return error as Error;
+}
+
+/**
+ * A duplicate department name within the same branch is caught here by
+ * Prisma's `P2002` unique-constraint-violation code (backstopping the
+ * `@@unique([branchId, name])` constraint) and turned into a
+ * `ConflictException` — never a raw 500.
+ */
+function translateDuplicateDepartmentName(error: unknown): Error {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === UNIQUE_CONSTRAINT_VIOLATION
+  ) {
+    return new ConflictException("A department with this name already exists");
+  }
+  return error as Error;
 }

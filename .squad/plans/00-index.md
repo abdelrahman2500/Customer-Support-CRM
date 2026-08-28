@@ -37,3 +37,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | agent-workspace-ticket-detail-reassignment | [agent-workspace-ticket-detail-reassignment/00-overview.md](./agent-workspace-ticket-detail-reassignment/00-overview.md) | 42–      |
 | agent-workspace-ticket-creation-fields | [agent-workspace-ticket-creation-fields/00-overview.md](./agent-workspace-ticket-creation-fields/00-overview.md) | 43–      |
 | agent-workspace-navigation-menu | [agent-workspace-navigation-menu/00-overview.md](./agent-workspace-navigation-menu/00-overview.md) | 44–      |
+| agent-workspace-branch-department-admin | [agent-workspace-branch-department-admin/00-overview.md](./agent-workspace-branch-department-admin/00-overview.md) | 45–      |

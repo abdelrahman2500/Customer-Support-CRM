@@ -98,13 +98,14 @@ describe("WorkspaceNav", () => {
       ["nav.customers", "/en/customers"],
       ["nav.slaPolicies", "/en/sla-policies"],
       ["nav.businessHours", "/en/business-hours"],
+      ["nav.branches", "/en/branches"],
       ["nav.users", "/en/users"],
       ["nav.roles", "/en/roles"],
       ["nav.auditLogs", "/en/audit-logs"],
       ["nav.notifications", "/en/notifications"],
     ];
 
-    it("renders a link to every one of the nine top-level Agent Workspace screens", () => {
+    it("renders a link to every one of the ten top-level Agent Workspace screens", () => {
       render(<WorkspaceNav user={user} />);
 
       for (const [name, href] of EXPECTED_LINKS) {

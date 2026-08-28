@@ -23,6 +23,9 @@ const PERMISSION_CATALOG = [
   "role:read",
   "permission:read",
   "branch:read",
+  "branch:update",
+  "department:create",
+  "department:update",
   "customer:create",
   "customer:read",
   "customer:update",
@@ -67,7 +70,9 @@ async function main(): Promise<void> {
     (await prisma.organization.findFirst()) ??
     (await prisma.organization.create({ data: { name: DEFAULT_ORGANIZATION_NAME } }));
 
-  // 2. Branch — same reasoning: no unique constraint on (organizationId, name).
+  // 2. Branch — a `@@unique([organizationId, name])` constraint exists, but we
+  //    still findFirst-then-create here rather than upsert, to avoid asserting
+  //    an `isActive`/`timezone` update on every re-run.
   const branch =
     (await prisma.branch.findFirst({
       where: { organizationId: organization.id, name: DEFAULT_BRANCH_NAME },

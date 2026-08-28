@@ -21,6 +21,14 @@ import { AppModule } from "../src/app.module";
  * Redis service containers configured in `.github/workflows/ci.yml`. It
  * logs in as the seed's bootstrap admin (`SEED_ADMIN_EMAIL`/
  * `SEED_ADMIN_PASSWORD`) rather than creating its own bootstrap user.
+ *
+ * Known scope limit: `prisma/seed.ts` creates exactly one Branch per
+ * organization, and there is deliberately no branch-create endpoint (Story
+ * 45's plan keeps branch creation out of scope), so this suite cannot
+ * produce a second, colliding branch to exercise a duplicate BRANCH name
+ * 409 end-to-end. That path is covered by
+ * `identity.service.spec.ts`'s mocked-Prisma `updateBranch` P2002 test
+ * (unit-only).
  */
 describe("Identity & Access (e2e)", () => {
   let app: INestApplication;
@@ -31,6 +39,10 @@ describe("Identity & Access (e2e)", () => {
   let createdAgentUserId: string;
   const agentEmail = `agent-${randomUUID()}@example.com`;
   const agentPassword = "agent-test-password-123";
+  const secondAgentEmail = `agent2-${randomUUID()}@example.com`;
+  const secondAgentPassword = "agent2-test-password-123";
+  let createdDepartmentId: string;
+  let currentDepartmentName: string;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -132,7 +144,9 @@ describe("Identity & Access (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    expect(response.body).toEqual([{ id: adminBranchId, name: expect.any(String) }]);
+    expect(response.body).toEqual([
+      { id: adminBranchId, name: expect.any(String), isActive: true },
+    ]);
   });
 
   it("lists the admin's own branch's departments via GET /identity/departments", async () => {
@@ -223,5 +237,305 @@ describe("Identity & Access (e2e)", () => {
       .post("/api/v1/auth/login")
       .send({ email: agentEmail, password: agentPassword })
       .expect(401);
+  });
+
+  it("rejects PATCH /identity/branches/:id, POST /identity/departments, and PATCH /identity/departments/:id with no token", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/branches/${adminBranchId}`)
+      .send({ name: "Should Not Apply" })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/departments")
+      .send({ name: "Should Not Be Created" })
+      .expect(401);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/departments/${randomUUID()}`)
+      .send({ name: "Should Not Apply" })
+      .expect(401);
+  });
+
+  it("creates a second Agent-role user for the new branch/department permission checks", async () => {
+    const response = await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: secondAgentEmail,
+        password: secondAgentPassword,
+        fullName: "Second Test Agent",
+        branchId: adminBranchId,
+        departmentId: adminDepartmentId ?? undefined,
+        roleId: agentRoleId,
+      })
+      .expect(201);
+
+    expect(response.body.email).toBe(secondAgentEmail);
+  });
+
+  it("rejects the Agent user (no branch:update permission) from updating the branch (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: secondAgentEmail, password: secondAgentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/branches/${adminBranchId}`)
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ name: "Should Not Apply" })
+      .expect(403);
+  });
+
+  it("rejects the Agent user (no department:create permission) from creating a department (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: secondAgentEmail, password: secondAgentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ name: "Should Not Be Created" })
+      .expect(403);
+  });
+
+  it("rejects the Agent user (no department:update permission) from updating a department (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: secondAgentEmail, password: secondAgentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/departments/${adminDepartmentId}`)
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ name: "Should Not Apply" })
+      .expect(403);
+  });
+
+  it("renames the branch as the admin", async () => {
+    const response = await request(app.getHttpServer())
+      .patch(`/api/v1/identity/branches/${adminBranchId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: "Renamed Main Branch" })
+      .expect(200);
+
+    expect(response.body).toEqual({ id: adminBranchId });
+
+    const branches = await request(app.getHttpServer())
+      .get("/api/v1/identity/branches")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(branches.body).toEqual([
+      { id: adminBranchId, name: "Renamed Main Branch", isActive: true },
+    ]);
+  });
+
+  it("deactivates the branch, hiding it from the default listing but not from includeInactive=true", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/branches/${adminBranchId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: false })
+      .expect(200);
+
+    const defaultListing = await request(app.getHttpServer())
+      .get("/api/v1/identity/branches")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(defaultListing.body).toEqual([]);
+
+    const withInactive = await request(app.getHttpServer())
+      .get("/api/v1/identity/branches?includeInactive=true")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(withInactive.body).toEqual([
+      { id: adminBranchId, name: "Renamed Main Branch", isActive: false },
+    ]);
+  });
+
+  it("reactivates the branch, restoring it to the default listing", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/branches/${adminBranchId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: true })
+      .expect(200);
+
+    const defaultListing = await request(app.getHttpServer())
+      .get("/api/v1/identity/branches")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(defaultListing.body).toEqual([
+      { id: adminBranchId, name: "Renamed Main Branch", isActive: true },
+    ]);
+  });
+
+  it("creates a department as the admin, ignoring any client-sent branchId", async () => {
+    currentDepartmentName = `Dept ${randomUUID()}`;
+    const response = await request(app.getHttpServer())
+      .post("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: currentDepartmentName })
+      .expect(201);
+
+    createdDepartmentId = response.body.id;
+    expect(createdDepartmentId).toBeTypeOf("string");
+
+    // `CreateDepartmentDto` has no `branchId` field at all (and the global
+    // `ValidationPipe` runs with `forbidNonWhitelisted: true`), so there is no
+    // way to even send one — this listing lookup is what proves the created
+    // department's `branchId` is the admin's own branch, assigned purely from
+    // `TenantContext`, never from client input.
+    const departments = await request(app.getHttpServer())
+      .get("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const created = departments.body.find(
+      (department: { id: string }) => department.id === createdDepartmentId,
+    );
+    expect(created).toMatchObject({
+      id: createdDepartmentId,
+      branchId: adminBranchId,
+      name: currentDepartmentName,
+      isActive: true,
+    });
+  });
+
+  it("renames the department", async () => {
+    currentDepartmentName = `${currentDepartmentName} Renamed`;
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/departments/${createdDepartmentId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: currentDepartmentName })
+      .expect(200);
+
+    const departments = await request(app.getHttpServer())
+      .get("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const updated = departments.body.find(
+      (department: { id: string }) => department.id === createdDepartmentId,
+    );
+    expect(updated).toMatchObject({ name: currentDepartmentName });
+  });
+
+  it("deactivates the department, hiding it from the default listing but not from includeInactive=true", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/departments/${createdDepartmentId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: false })
+      .expect(200);
+
+    const defaultListing = await request(app.getHttpServer())
+      .get("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(
+      defaultListing.body.some((department: { id: string }) => department.id === createdDepartmentId),
+    ).toBe(false);
+
+    const withInactive = await request(app.getHttpServer())
+      .get("/api/v1/identity/departments?includeInactive=true")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const found = withInactive.body.find(
+      (department: { id: string }) => department.id === createdDepartmentId,
+    );
+    expect(found).toMatchObject({ isActive: false });
+  });
+
+  it("reactivates the department, restoring it to the default listing", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/departments/${createdDepartmentId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: true })
+      .expect(200);
+
+    const defaultListing = await request(app.getHttpServer())
+      .get("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const found = defaultListing.body.find(
+      (department: { id: string }) => department.id === createdDepartmentId,
+    );
+    expect(found).toMatchObject({ isActive: true });
+  });
+
+  it("rejects a duplicate department name within the branch with 409", async () => {
+    const duplicateName = `Dup Dept ${randomUUID()}`;
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: duplicateName })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: duplicateName })
+      .expect(409);
+  });
+
+  it("does not strip a user's department assignment when the department is deactivated", async () => {
+    const regressionDeptName = `Regression Dept ${randomUUID()}`;
+    const createDeptResponse = await request(app.getHttpServer())
+      .post("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: regressionDeptName })
+      .expect(201);
+    const regressionDepartmentId = createDeptResponse.body.id as string;
+
+    const regressionAgentEmail = `regression-agent-${randomUUID()}@example.com`;
+    const regressionAgentPassword = "regression-agent-password-123";
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: regressionAgentEmail,
+        password: regressionAgentPassword,
+        fullName: "Regression Agent",
+        branchId: adminBranchId,
+        departmentId: regressionDepartmentId,
+        roleId: agentRoleId,
+      })
+      .expect(201);
+
+    const loginBefore = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: regressionAgentEmail, password: regressionAgentPassword })
+      .expect(200);
+    const meBefore = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${loginBefore.body.accessToken}`)
+      .expect(200);
+    expect(meBefore.body.departmentId).toBe(regressionDepartmentId);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/departments/${regressionDepartmentId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: false })
+      .expect(200);
+
+    // Deactivation must not cascade to the user: they stay listed and active...
+    const usersAfter = await request(app.getHttpServer())
+      .get("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const regressionUser = usersAfter.body.find(
+      (user: { email: string }) => user.email === regressionAgentEmail,
+    );
+    expect(regressionUser).toMatchObject({ isActive: true });
+
+    // ...and, more to the point, their `UserBranchRole.departmentId` is left
+    // completely untouched — surfaced here via the `departmentId` claim
+    // `GET /auth/me` reports after a fresh login.
+    const loginAfter = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: regressionAgentEmail, password: regressionAgentPassword })
+      .expect(200);
+    const meAfter = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${loginAfter.body.accessToken}`)
+      .expect(200);
+    expect(meAfter.body.departmentId).toBe(regressionDepartmentId);
   });
 });

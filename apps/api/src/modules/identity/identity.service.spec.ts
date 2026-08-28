@@ -2,10 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConflictException, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import type { ConfigService } from "@nestjs/config";
 import type { JwtService } from "@nestjs/jwt";
+import { Prisma } from "@prisma/client";
 import { IdentityService, hashPassword } from "./identity.service";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 import type { EnvConfig } from "../../common/config/env.validation";
+
+/** Mimics the shape `PrismaClientKnownRequestError` exposes at `.code`. */
+function buildUniqueConstraintError(): Prisma.PrismaClientKnownRequestError {
+  return Object.assign(Object.create(Prisma.PrismaClientKnownRequestError.prototype), {
+    code: "P2002",
+    message: "Unique constraint failed",
+  }) as Prisma.PrismaClientKnownRequestError;
+}
 
 vi.mock("bcryptjs", () => ({
   compare: vi.fn(),
@@ -27,10 +36,14 @@ function buildPrismaMock() {
       })),
     },
     branch: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
     },
     department: {
       findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
     },
     refreshToken: {
       findUnique: vi.fn(),
@@ -331,20 +344,24 @@ describe("IdentityService", () => {
 
   describe("listBranches", () => {
     it("scopes to the caller's own branch and returns exactly that branch", async () => {
-      prisma.branch.findUnique.mockResolvedValue({ id: "branch-1", name: "Main Branch" });
+      prisma.branch.findFirst.mockResolvedValue({
+        id: "branch-1",
+        name: "Main Branch",
+        isActive: true,
+      });
 
       const result = await service.listBranches();
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
-      expect(prisma.branch.findUnique).toHaveBeenCalledWith({
-        where: { id: "branch-1" },
-        select: { id: true, name: true },
+      expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+        where: { id: "branch-1", isActive: true },
+        select: { id: true, name: true, isActive: true },
       });
-      expect(result).toEqual([{ id: "branch-1", name: "Main Branch" }]);
+      expect(result).toEqual([{ id: "branch-1", name: "Main Branch", isActive: true }]);
     });
 
     it("returns an empty array if the branch row is somehow gone", async () => {
-      prisma.branch.findUnique.mockResolvedValue(null);
+      prisma.branch.findFirst.mockResolvedValue(null);
 
       const result = await service.listBranches();
 
@@ -357,21 +374,49 @@ describe("IdentityService", () => {
 
       await expect(service.listBranches()).rejects.toThrow(/no active branch/);
     });
+
+    it("by default excludes inactive branches from the where clause", async () => {
+      prisma.branch.findFirst.mockResolvedValue(null);
+
+      await service.listBranches();
+
+      expect(prisma.branch.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "branch-1", isActive: true } }),
+      );
+    });
+
+    it("includeInactive: true drops the isActive filter so inactive branches are included", async () => {
+      prisma.branch.findFirst.mockResolvedValue({
+        id: "branch-1",
+        name: "Main Branch",
+        isActive: false,
+      });
+
+      const result = await service.listBranches(true);
+
+      expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+        where: { id: "branch-1" },
+        select: { id: true, name: true, isActive: true },
+      });
+      expect(result).toEqual([{ id: "branch-1", name: "Main Branch", isActive: false }]);
+    });
   });
 
   describe("listDepartments", () => {
     it("scopes the query to the caller's active branch", async () => {
       prisma.department.findMany.mockResolvedValue([
-        { id: "dept-1", branchId: "branch-1", name: "Support" },
+        { id: "dept-1", branchId: "branch-1", name: "Support", isActive: true },
       ]);
 
       const result = await service.listDepartments();
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
       expect(prisma.department.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { branchId: "branch-1" } }),
+        expect.objectContaining({ where: { branchId: "branch-1", isActive: true } }),
       );
-      expect(result).toEqual([{ id: "dept-1", branchId: "branch-1", name: "Support" }]);
+      expect(result).toEqual([
+        { id: "dept-1", branchId: "branch-1", name: "Support", isActive: true },
+      ]);
     });
 
     it("returns an empty array when the branch has no departments", async () => {
@@ -387,6 +432,162 @@ describe("IdentityService", () => {
       service = createService(prisma, jwtService, configService, tenantContext);
 
       await expect(service.listDepartments()).rejects.toThrow(/no active branch/);
+    });
+
+    it("by default excludes inactive departments from the where clause", async () => {
+      prisma.department.findMany.mockResolvedValue([]);
+
+      await service.listDepartments();
+
+      expect(prisma.department.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1", isActive: true } }),
+      );
+    });
+
+    it("includeInactive: true drops the isActive filter so inactive departments are included", async () => {
+      prisma.department.findMany.mockResolvedValue([
+        { id: "dept-1", branchId: "branch-1", name: "Support", isActive: false },
+      ]);
+
+      const result = await service.listDepartments(true);
+
+      expect(prisma.department.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1" } }),
+      );
+      expect(result).toEqual([
+        { id: "dept-1", branchId: "branch-1", name: "Support", isActive: false },
+      ]);
+    });
+  });
+
+  describe("updateBranch", () => {
+    it("updates only the fields present in the DTO", async () => {
+      prisma.branch.update.mockResolvedValue({ id: "branch-1" });
+
+      await service.updateBranch("branch-1", { name: "Renamed Branch" });
+
+      expect(prisma.branch.update).toHaveBeenCalledWith({
+        where: { id: "branch-1" },
+        data: { name: "Renamed Branch" },
+      });
+    });
+
+    it("throws NotFoundException when id !== tenantContext's branchId", async () => {
+      await expect(
+        service.updateBranch("some-other-branch", { name: "Renamed Branch" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.branch.update).not.toHaveBeenCalled();
+    });
+
+    it("translates a P2002 unique-constraint violation into ConflictException", async () => {
+      prisma.branch.update.mockRejectedValue(buildUniqueConstraintError());
+
+      await expect(
+        service.updateBranch("branch-1", { name: "Duplicate Name" }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("toggles isActive alone without touching name/timezone", async () => {
+      prisma.branch.update.mockResolvedValue({ id: "branch-1" });
+
+      await service.updateBranch("branch-1", { isActive: false });
+
+      expect(prisma.branch.update).toHaveBeenCalledWith({
+        where: { id: "branch-1" },
+        data: { isActive: false },
+      });
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, jwtService, configService, tenantContext);
+
+      await expect(service.updateBranch("branch-1", { name: "X" })).rejects.toThrow(
+        /no active branch/,
+      );
+    });
+  });
+
+  describe("createDepartment", () => {
+    it("assigns branchId from TenantContext, not from the DTO", async () => {
+      prisma.department.create.mockResolvedValue({
+        id: "dept-1",
+        branchId: "branch-1",
+        name: "Billing",
+        isActive: true,
+      });
+
+      const result = await service.createDepartment({ name: "Billing" });
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.department.create).toHaveBeenCalledWith({
+        data: { branchId: "branch-1", name: "Billing" },
+      });
+      expect(result).toEqual({ id: "dept-1" });
+    });
+
+    it("translates a P2002 unique-constraint violation into ConflictException", async () => {
+      prisma.department.create.mockRejectedValue(buildUniqueConstraintError());
+
+      await expect(service.createDepartment({ name: "Billing" })).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, jwtService, configService, tenantContext);
+
+      await expect(service.createDepartment({ name: "Billing" })).rejects.toThrow(
+        /no active branch/,
+      );
+    });
+  });
+
+  describe("updateDepartment", () => {
+    it("updates only the fields present in the DTO", async () => {
+      prisma.department.findFirst.mockResolvedValue({ id: "dept-1", branchId: "branch-1" });
+      prisma.department.update.mockResolvedValue({ id: "dept-1" });
+
+      await service.updateDepartment("dept-1", { name: "Renamed Department" });
+
+      expect(prisma.department.update).toHaveBeenCalledWith({
+        where: { id: "dept-1" },
+        data: { name: "Renamed Department" },
+      });
+    });
+
+    it("throws NotFoundException when the department isn't found in the caller's branch scope", async () => {
+      prisma.department.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateDepartment("missing-dept", { name: "X" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.department.findFirst).toHaveBeenCalledWith({
+        where: { id: "missing-dept", branchId: "branch-1" },
+      });
+      expect(prisma.department.update).not.toHaveBeenCalled();
+    });
+
+    it("translates a P2002 unique-constraint violation into ConflictException", async () => {
+      prisma.department.findFirst.mockResolvedValue({ id: "dept-1", branchId: "branch-1" });
+      prisma.department.update.mockRejectedValue(buildUniqueConstraintError());
+
+      await expect(
+        service.updateDepartment("dept-1", { name: "Duplicate Name" }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("toggles isActive alone", async () => {
+      prisma.department.findFirst.mockResolvedValue({ id: "dept-1", branchId: "branch-1" });
+      prisma.department.update.mockResolvedValue({ id: "dept-1" });
+
+      await service.updateDepartment("dept-1", { isActive: false });
+
+      expect(prisma.department.update).toHaveBeenCalledWith({
+        where: { id: "dept-1" },
+        data: { isActive: false },
+      });
     });
   });
 

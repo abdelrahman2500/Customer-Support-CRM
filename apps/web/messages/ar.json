@@ -27,6 +27,7 @@
       "customers": "العملاء",
       "slaPolicies": "سياسات اتفاقية مستوى الخدمة",
       "businessHours": "ساعات العمل",
+      "branches": "فرعي",
       "users": "المستخدمون",
       "roles": "الأدوار والصلاحيات",
       "auditLogs": "سجل التدقيق",
@@ -293,6 +294,41 @@
     "exceptionAddSubmit": "إضافة استثناء",
     "exceptionAddSubmitting": "جارٍ الإضافة...",
     "exceptionAddFailed": "تعذّر إضافة الاستثناء. حاول مرة أخرى."
+  },
+  "branches": {
+    "myBranch": {
+      "heading": "فرعي",
+      "nameLabel": "اسم الفرع",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "activate": "تفعيل",
+      "deactivate": "إلغاء التفعيل",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+      "loadError": "تعذّر تحميل فرعك.",
+      "retry": "إعادة المحاولة"
+    },
+    "departments": {
+      "heading": "الأقسام",
+      "error": "تعذّر تحميل الأقسام.",
+      "retry": "إعادة المحاولة",
+      "empty": "لا توجد أقسام حتى الآن.",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "activate": "تفعيل",
+      "deactivate": "إلغاء التفعيل",
+      "nameLabel": "الاسم",
+      "createPlaceholder": "اسم القسم",
+      "createSubmit": "إضافة قسم",
+      "createSubmitting": "جارٍ الإضافة...",
+      "createFailed": "تعذّر إنشاء القسم. حاول مرة أخرى.",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+      "columns": {
+        "name": "الاسم",
+        "status": "الحالة"
+      }
+    }
   },
   "auditLogs": {
     "title": "سجل التدقيق",

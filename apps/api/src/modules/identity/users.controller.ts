@@ -1,8 +1,11 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { UpdateBranchDto } from "./dto/update-branch.dto";
+import { CreateDepartmentDto } from "./dto/create-department.dto";
+import { UpdateDepartmentDto } from "./dto/update-department.dto";
 import type {
   BranchSummary,
   DepartmentSummary,
@@ -20,10 +23,13 @@ import { IdentityService } from "./identity.service";
  * (checked by the globally-registered `PermissionsGuard` — see
  * `app.module.ts`), on top of the equally global `AuthGuard`.
  *
- * Branch/department/role/permission **mutation** endpoints are explicitly
- * out of scope — see the Story 03 plan. Story 35 adds **read-only**
- * branch/department listing (`listBranches`/`listDepartments` below);
- * mutation remains out of scope.
+ * Role/Permission mutation, and Branch **creation**, remain explicitly out
+ * of scope — see the Story 03 plan. Story 35 added read-only branch/department
+ * listing (`listBranches`/`listDepartments` below); Story 45 adds renaming
+ * and activating/deactivating the caller's own branch (`PATCH branches/:id`)
+ * and creating/renaming/activating/deactivating departments within the
+ * caller's own branch (`POST departments`, `PATCH departments/:id`) — both
+ * still scoped to the caller's own branch only, never another branch.
  */
 @ApiTags("identity")
 @ApiBearerAuth()
@@ -70,13 +76,36 @@ export class UsersController {
    */
   @Get("branches")
   @RequirePermissions("branch:read")
-  listBranches(): Promise<BranchSummary[]> {
-    return this.identityService.listBranches();
+  listBranches(@Query("includeInactive") includeInactive?: string): Promise<BranchSummary[]> {
+    return this.identityService.listBranches(includeInactive === "true");
+  }
+
+  @Patch("branches/:id")
+  @RequirePermissions("branch:update")
+  updateBranch(@Param("id") id: string, @Body() dto: UpdateBranchDto): Promise<{ id: string }> {
+    return this.identityService.updateBranch(id, dto);
   }
 
   @Get("departments")
   @RequirePermissions("branch:read")
-  listDepartments(): Promise<DepartmentSummary[]> {
-    return this.identityService.listDepartments();
+  listDepartments(
+    @Query("includeInactive") includeInactive?: string,
+  ): Promise<DepartmentSummary[]> {
+    return this.identityService.listDepartments(includeInactive === "true");
+  }
+
+  @Post("departments")
+  @RequirePermissions("department:create")
+  createDepartment(@Body() dto: CreateDepartmentDto): Promise<{ id: string }> {
+    return this.identityService.createDepartment(dto);
+  }
+
+  @Patch("departments/:id")
+  @RequirePermissions("department:update")
+  updateDepartment(
+    @Param("id") id: string,
+    @Body() dto: UpdateDepartmentDto,
+  ): Promise<{ id: string }> {
+    return this.identityService.updateDepartment(id, dto);
   }
 }

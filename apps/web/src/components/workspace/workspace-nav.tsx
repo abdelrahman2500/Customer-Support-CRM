@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { href: "customers", labelKey: "nav.customers" },
   { href: "sla-policies", labelKey: "nav.slaPolicies" },
   { href: "business-hours", labelKey: "nav.businessHours" },
+  { href: "branches", labelKey: "nav.branches" },
   { href: "users", labelKey: "nav.users" },
   { href: "roles", labelKey: "nav.roles" },
   { href: "audit-logs", labelKey: "nav.auditLogs" },
