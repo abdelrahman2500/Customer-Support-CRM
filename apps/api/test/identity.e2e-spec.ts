@@ -121,6 +121,32 @@ describe("Identity & Access (e2e)", () => {
     );
   });
 
+  it("rejects a branches/departments request with no token", async () => {
+    await request(app.getHttpServer()).get("/api/v1/identity/branches").expect(401);
+    await request(app.getHttpServer()).get("/api/v1/identity/departments").expect(401);
+  });
+
+  it("lists exactly the admin's own branch via GET /identity/branches", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/identity/branches")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body).toEqual([{ id: adminBranchId, name: expect.any(String) }]);
+  });
+
+  it("lists the admin's own branch's departments via GET /identity/departments", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(Array.isArray(response.body)).toBe(true);
+    for (const department of response.body) {
+      expect(department).toMatchObject({ branchId: adminBranchId });
+    }
+  });
+
   it("creates a new Agent-role user as the admin", async () => {
     const response = await request(app.getHttpServer())
       .post("/api/v1/identity/users")
@@ -166,6 +192,23 @@ describe("Identity & Access (e2e)", () => {
         branchId: adminBranchId,
         roleId: agentRoleId,
       })
+      .expect(403);
+  });
+
+  it("rejects the Agent user (no branch:read permission) from listing branches/departments (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: agentEmail, password: agentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .get("/api/v1/identity/branches")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(403);
   });
 

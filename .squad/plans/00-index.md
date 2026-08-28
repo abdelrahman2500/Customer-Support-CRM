@@ -29,3 +29,6 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | agent-workspace-user-admin | [agent-workspace-user-admin/00-overview.md](./agent-workspace-user-admin/00-overview.md) | 32–      |
 | agent-workspace-business-hours-admin | [agent-workspace-business-hours-admin/00-overview.md](./agent-workspace-business-hours-admin/00-overview.md) | 33–      |
 | agent-workspace-roles-permissions-viewer | [agent-workspace-roles-permissions-viewer/00-overview.md](./agent-workspace-roles-permissions-viewer/00-overview.md) | 34–      |
+| identity-branch-department-listing | [identity-branch-department-listing/00-overview.md](./identity-branch-department-listing/00-overview.md) | 35–      |
+| notifications-read-endpoint | [notifications-read-endpoint/00-overview.md](./notifications-read-endpoint/00-overview.md) | 36–      |
+| audit-log-read-endpoint | [audit-log-read-endpoint/00-overview.md](./audit-log-read-endpoint/00-overview.md) | 37–      |

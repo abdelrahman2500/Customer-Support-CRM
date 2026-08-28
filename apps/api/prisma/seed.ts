@@ -22,6 +22,7 @@ const PERMISSION_CATALOG = [
   "user:update",
   "role:read",
   "permission:read",
+  "branch:read",
   "customer:create",
   "customer:read",
   "customer:update",
@@ -31,6 +32,8 @@ const PERMISSION_CATALOG = [
   "sla:create",
   "sla:read",
   "sla:update",
+  "notification:read",
+  "audit:read",
 ] as const;
 
 // No ticketing/customer/etc. permissions yet — those land with the stories

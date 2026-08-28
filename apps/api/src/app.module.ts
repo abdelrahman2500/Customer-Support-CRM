@@ -13,6 +13,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
 import { QueuesModule } from "./queues/queues.module";
 import { IdentityModule } from "./modules/identity/identity.module";
+import { AdminModule } from "./modules/admin/admin.module";
 import { CustomersModule } from "./modules/customers/customers.module";
 import { TicketsModule } from "./modules/tickets/tickets.module";
 import { SlaPoliciesModule } from "./modules/sla-policies/sla-policies.module";
@@ -34,6 +35,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
     HealthModule,
     QueuesModule,
     IdentityModule,
+    AdminModule,
     CustomersModule,
     TicketsModule,
     SlaPoliciesModule,

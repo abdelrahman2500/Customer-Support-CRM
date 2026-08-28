@@ -3,7 +3,13 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
-import type { PermissionSummary, RoleSummary, UserSummary } from "./identity.service";
+import type {
+  BranchSummary,
+  DepartmentSummary,
+  PermissionSummary,
+  RoleSummary,
+  UserSummary,
+} from "./identity.service";
 import { IdentityService } from "./identity.service";
 
 /**
@@ -15,7 +21,9 @@ import { IdentityService } from "./identity.service";
  * `app.module.ts`), on top of the equally global `AuthGuard`.
  *
  * Branch/department/role/permission **mutation** endpoints are explicitly
- * out of scope for this story — see the Story 03 plan.
+ * out of scope — see the Story 03 plan. Story 35 adds **read-only**
+ * branch/department listing (`listBranches`/`listDepartments` below);
+ * mutation remains out of scope.
  */
 @ApiTags("identity")
 @ApiBearerAuth()
@@ -51,5 +59,24 @@ export class UsersController {
   @RequirePermissions("permission:read")
   listPermissions(): Promise<PermissionSummary[]> {
     return this.identityService.listPermissions();
+  }
+
+  /**
+   * Story 35 — read-only; scoped to the caller's own branch (see
+   * `BranchSummary`'s doc comment in `identity.service.ts`). Shares
+   * `branch:read` with `listDepartments` below, mirroring how `sla:read`
+   * already covers both `SlaPolicy` and `BusinessHoursCalendar` — one
+   * permission per small, closely-related resource area, not one per model.
+   */
+  @Get("branches")
+  @RequirePermissions("branch:read")
+  listBranches(): Promise<BranchSummary[]> {
+    return this.identityService.listBranches();
+  }
+
+  @Get("departments")
+  @RequirePermissions("branch:read")
+  listDepartments(): Promise<DepartmentSummary[]> {
+    return this.identityService.listDepartments();
   }
 }

@@ -25,6 +25,31 @@ export interface UserSummary {
   roles: string[];
 }
 
+/**
+ * Story 35 — the caller's own branch only (via `TenantContext.requireBranchScope()`,
+ * the same enforcement every other scoped query in this codebase uses),
+ * not every branch in the organization: nothing in this codebase's auth
+ * model lets a token's active branch see another branch's data ("Cross-branch
+ * access is an explicit, audited permission, never a default" —
+ * docs/architecture/04-data-and-multitenancy.md), and no story has decided
+ * a cross-branch listing/branch-switching UI yet. Returns exactly one
+ * element today; the shape is a list because a future branch-switching
+ * story could legitimately expand this without a breaking response-shape
+ * change.
+ */
+export interface BranchSummary {
+  id: string;
+  name: string;
+}
+
+/** Story 35 — every department within the caller's own branch (same
+ * branch-scoping rule as `BranchSummary`). */
+export interface DepartmentSummary {
+  id: string;
+  branchId: string;
+  name: string;
+}
+
 export interface RoleSummary {
   id: string;
   name: string;
@@ -218,6 +243,35 @@ export class IdentityService {
     });
 
     return { id };
+  }
+
+  /**
+   * Story 35 — first real consumer of `Branch` beyond the auth/tenant
+   * plumbing itself. Scoped to the caller's own branch (see `BranchSummary`'s
+   * doc comment) — mirrors `listUsers`'s `requireBranchScope()` pattern
+   * exactly.
+   */
+  async listBranches(): Promise<BranchSummary[]> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { id: true, name: true },
+    });
+    return branch ? [branch] : [];
+  }
+
+  /** Story 35 — every department within the caller's own branch. */
+  async listDepartments(): Promise<DepartmentSummary[]> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const departments = await this.prisma.department.findMany({
+      where: { branchId },
+      orderBy: { name: "asc" },
+    });
+    return departments.map((department) => ({
+      id: department.id,
+      branchId: department.branchId,
+      name: department.name,
+    }));
   }
 
   async listRoles(): Promise<RoleSummary[]> {

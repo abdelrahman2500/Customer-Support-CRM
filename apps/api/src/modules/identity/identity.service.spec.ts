@@ -26,6 +26,12 @@ function buildPrismaMock() {
         email: args.data.email,
       })),
     },
+    branch: {
+      findUnique: vi.fn(),
+    },
+    department: {
+      findMany: vi.fn(),
+    },
     refreshToken: {
       findUnique: vi.fn(),
       create: vi.fn(),
@@ -320,6 +326,67 @@ describe("IdentityService", () => {
         where: { id: "user-1" },
         data: { isActive: false },
       });
+    });
+  });
+
+  describe("listBranches", () => {
+    it("scopes to the caller's own branch and returns exactly that branch", async () => {
+      prisma.branch.findUnique.mockResolvedValue({ id: "branch-1", name: "Main Branch" });
+
+      const result = await service.listBranches();
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.branch.findUnique).toHaveBeenCalledWith({
+        where: { id: "branch-1" },
+        select: { id: true, name: true },
+      });
+      expect(result).toEqual([{ id: "branch-1", name: "Main Branch" }]);
+    });
+
+    it("returns an empty array if the branch row is somehow gone", async () => {
+      prisma.branch.findUnique.mockResolvedValue(null);
+
+      const result = await service.listBranches();
+
+      expect(result).toEqual([]);
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, jwtService, configService, tenantContext);
+
+      await expect(service.listBranches()).rejects.toThrow(/no active branch/);
+    });
+  });
+
+  describe("listDepartments", () => {
+    it("scopes the query to the caller's active branch", async () => {
+      prisma.department.findMany.mockResolvedValue([
+        { id: "dept-1", branchId: "branch-1", name: "Support" },
+      ]);
+
+      const result = await service.listDepartments();
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.department.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1" } }),
+      );
+      expect(result).toEqual([{ id: "dept-1", branchId: "branch-1", name: "Support" }]);
+    });
+
+    it("returns an empty array when the branch has no departments", async () => {
+      prisma.department.findMany.mockResolvedValue([]);
+
+      const result = await service.listDepartments();
+
+      expect(result).toEqual([]);
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, jwtService, configService, tenantContext);
+
+      await expect(service.listDepartments()).rejects.toThrow(/no active branch/);
     });
   });
 
