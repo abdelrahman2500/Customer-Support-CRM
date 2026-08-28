@@ -1,47 +1,137 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { usePermissionsQuery, useRolesQuery } from "@/hooks/use-roles";
-import type { RoleSummary } from "@/lib/roles-api";
+import {
+  useCreateRoleMutation,
+  useManagedRolesQuery,
+  usePermissionsQuery,
+  useSetRolePermissionsMutation,
+  useUpdateRoleMutation,
+} from "@/hooks/use-roles";
+import type { PermissionSummary, RoleSummary } from "@/lib/roles-api";
+import { ApiError } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+/** The two seeded roles `seed.ts` reconciles by literal name — the backend
+ * rejects a rename/deactivate on either (Design item 5); this is a
+ * client-side courtesy only, the backend remains the actual source of truth. */
+const PROTECTED_ROLE_NAMES = new Set(["SuperAdmin", "Agent"]);
 
 function RoleRow({
   role,
   expanded,
   onToggle,
+  allPermissions,
 }: {
   role: RoleSummary;
   expanded: boolean;
   onToggle: () => void;
+  allPermissions: PermissionSummary[];
 }) {
   const t = useTranslations("roles");
+  const updateMutation = useUpdateRoleMutation(role.id);
+  const permissionsMutation = useSetRolePermissionsMutation(role.id);
+  const [nameDraft, setNameDraft] = useState(role.name);
+  const isProtected = PROTECTED_ROLE_NAMES.has(role.name);
+
+  function commitName() {
+    const trimmed = nameDraft.trim();
+    if (!trimmed || trimmed === role.name) {
+      setNameDraft(role.name);
+      return;
+    }
+    updateMutation.mutate({ name: trimmed }, { onError: () => setNameDraft(role.name) });
+  }
+
+  function toggleActive() {
+    updateMutation.mutate({ isActive: !role.isActive });
+  }
+
+  function togglePermission(permissionKey: string) {
+    const next = role.permissions.includes(permissionKey)
+      ? role.permissions.filter((key) => key !== permissionKey)
+      : [...role.permissions, permissionKey];
+    permissionsMutation.mutate({ permissionKeys: next });
+  }
+
+  const activeError = updateMutation.isError ? updateMutation.error : permissionsMutation.error;
+  const hasError = updateMutation.isError || permissionsMutation.isError;
+
   return (
     <>
-      <TableRow className="cursor-pointer" onClick={onToggle}>
-        <TableCell className="font-medium text-slate-900">{role.name}</TableCell>
+      <TableRow>
+        <TableCell className="font-medium text-slate-900">
+          {isProtected ? (
+            <div className="flex items-center gap-2">
+              <span>{role.name}</span>
+              <Badge variant="outline">{t("list.systemRole")}</Badge>
+            </div>
+          ) : (
+            <Input
+              className="min-w-[10rem]"
+              value={nameDraft}
+              onChange={(event) => setNameDraft(event.target.value)}
+              onBlur={commitName}
+            />
+          )}
+        </TableCell>
         <TableCell className="text-slate-500">{role.permissions.length}</TableCell>
         <TableCell>
-          <Button type="button" variant="outline" size="sm">
-            {expanded ? t("list.collapse") : t("list.expand")}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {!isProtected && (
+              <>
+                <Badge variant={role.isActive ? "success" : "secondary"}>
+                  {role.isActive ? t("list.active") : t("list.inactive")}
+                </Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={updateMutation.isPending}
+                  onClick={toggleActive}
+                >
+                  {role.isActive ? t("list.deactivate") : t("list.activate")}
+                </Button>
+              </>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={onToggle}>
+              {expanded ? t("list.collapse") : t("list.expand")}
+            </Button>
+          </div>
+          {hasError && (
+            <p className="mt-1 text-xs text-red-600">
+              {activeError instanceof ApiError && activeError.status === 403
+                ? t("list.actionForbidden")
+                : activeError instanceof ApiError
+                  ? activeError.message
+                  : t("list.actionFailed")}
+            </p>
+          )}
         </TableCell>
       </TableRow>
       {expanded && (
         <TableRow>
           <TableCell colSpan={3}>
-            {role.permissions.length === 0 ? (
-              <p className="text-sm text-slate-500">{t("list.noPermissions")}</p>
+            <h3 className="text-xs font-semibold text-slate-700">{t("list.permissionsAssignHeading")}</h3>
+            {allPermissions.length === 0 ? (
+              <p className="mt-1 text-sm text-slate-500">{t("list.noPermissions")}</p>
             ) : (
-              <div className="flex flex-wrap gap-1">
-                {role.permissions.map((permission) => (
-                  <Badge key={permission} variant="outline">
-                    {permission}
-                  </Badge>
+              <div className="mt-2 flex flex-wrap gap-3">
+                {allPermissions.map((permission) => (
+                  <label key={permission.id} className="flex items-center gap-1.5 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={role.permissions.includes(permission.key)}
+                      onChange={() => togglePermission(permission.key)}
+                    />
+                    {permission.key}
+                  </label>
                 ))}
               </div>
             )}
@@ -53,22 +143,68 @@ function RoleRow({
 }
 
 /**
- * Story 34 — Roles & Permissions Viewer, over the already-existing `GET
- * /identity/roles`/`GET /identity/permissions` (Story 03, never before
- * consumed by any frontend). Entirely read-only — no mutation exists on
- * this screen, so expand/collapse state is tracked once here as a plain
- * `Set<string>` of expanded role ids, rather than via a per-row
- * subcomponent — there is no hook being called per row that rules-of-hooks
- * would otherwise require isolating (unlike `ContactRow`/`SlaPolicyRow`/
- * `UnclaimedTicketRow`, which each bind a real mutation to one row's id).
- * The two sections (roles, permissions reference) fetch and fail
- * independently of each other, mirroring the established multi-card
- * independent-failure convention (e.g. `CustomerDetailView`'s Contacts vs.
- * Related Tickets cards).
+ * The smallest UI surface for a one-field create — an inline form below the
+ * table, not a separate route/page, mirroring `AddDepartmentForm`'s exact
+ * shape (Design item 13).
+ */
+function AddRoleForm() {
+  const t = useTranslations("roles");
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useCreateRoleMutation();
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setError(null);
+    try {
+      await mutation.mutateAsync({ name: name.trim() });
+      setName("");
+    } catch (submitError) {
+      setError(submitError instanceof ApiError ? submitError.message : t("list.createFailed"));
+    }
+  }
+
+  return (
+    <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={handleSubmit}>
+      <label className="flex flex-col gap-1 text-xs text-slate-600">
+        {t("list.createHeading")}
+        <Input
+          value={name}
+          placeholder={t("list.createPlaceholder")}
+          onChange={(event) => setName(event.target.value)}
+          required
+          minLength={1}
+          className="w-56"
+        />
+      </label>
+      <Button type="submit" size="sm" disabled={mutation.isPending || !name.trim()}>
+        {mutation.isPending ? t("list.createSubmitting") : t("list.createSubmit")}
+      </Button>
+      {error && (
+        <Alert variant="destructive" className="w-full">
+          {error}
+        </Alert>
+      )}
+    </form>
+  );
+}
+
+/**
+ * Story 34 — Roles & Permissions Viewer, extended in place by Story 46 into a
+ * full management screen: rename/activate-deactivate (skipped for the two
+ * protected roles, `SuperAdmin`/`Agent`), permission-checkbox assignment
+ * against the full catalog, and a "create role" inline form. The two
+ * sections (roles, permissions reference) still fetch and fail independently
+ * of each other, mirroring the established multi-card independent-failure
+ * convention (e.g. `CustomerDetailView`'s Contacts vs. Related Tickets
+ * cards). `usePermissionsQuery()` is lifted once here and passed down to
+ * every `RoleRow` as `allPermissions`, so the full catalog is fetched exactly
+ * once and reused both for the per-role checkbox list and for the
+ * independent "all permissions" reference section below.
  */
 export function RoleListView() {
   const t = useTranslations("roles");
-  const rolesQuery = useRolesQuery();
+  const rolesQuery = useManagedRolesQuery();
   const permissionsQuery = usePermissionsQuery();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
@@ -83,6 +219,8 @@ export function RoleListView() {
       return next;
     });
   }
+
+  const allPermissions = permissionsQuery.data ?? [];
 
   return (
     <section className="flex flex-col gap-6">
@@ -127,11 +265,14 @@ export function RoleListView() {
                   role={role}
                   expanded={expandedIds.has(role.id)}
                   onToggle={() => toggle(role.id)}
+                  allPermissions={allPermissions}
                 />
               ))}
             </TableBody>
           </Table>
         )}
+
+        <AddRoleForm />
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white p-4">

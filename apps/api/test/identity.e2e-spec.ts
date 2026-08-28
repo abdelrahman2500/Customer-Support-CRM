@@ -37,6 +37,8 @@ describe("Identity & Access (e2e)", () => {
   let adminDepartmentId: string | null;
   let agentRoleId: string;
   let createdAgentUserId: string;
+  let customRoleId: string;
+  let customRoleName: string;
   const agentEmail = `agent-${randomUUID()}@example.com`;
   const agentPassword = "agent-test-password-123";
   const secondAgentEmail = `agent2-${randomUUID()}@example.com`;
@@ -537,5 +539,248 @@ describe("Identity & Access (e2e)", () => {
       .set("Authorization", `Bearer ${loginAfter.body.accessToken}`)
       .expect(200);
     expect(meAfter.body.departmentId).toBe(regressionDepartmentId);
+  });
+
+  // ---------------------------------------------------------------------
+  // Story 46 — Role & Permission Management
+  // ---------------------------------------------------------------------
+
+  it("rejects POST /identity/roles, PATCH /identity/roles/:id, and PATCH /identity/roles/:id/permissions with no token", async () => {
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/roles")
+      .send({ name: "Should Not Be Created" })
+      .expect(401);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${agentRoleId}`)
+      .send({ name: "Should Not Apply" })
+      .expect(401);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${agentRoleId}/permissions`)
+      .send({ permissionKeys: [] })
+      .expect(401);
+  });
+
+  it("rejects the Agent user (no role:create permission) from creating a role (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: secondAgentEmail, password: secondAgentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ name: `Should Not Be Created ${randomUUID()}` })
+      .expect(403);
+  });
+
+  it("rejects the Agent user (no role:update permission) from updating a role (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: secondAgentEmail, password: secondAgentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${agentRoleId}`)
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ name: "Should Not Apply" })
+      .expect(403);
+  });
+
+  it("rejects the Agent user (no role:assign-permissions permission) from assigning permissions (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: secondAgentEmail, password: secondAgentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${agentRoleId}/permissions`)
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ permissionKeys: ["notification:read"] })
+      .expect(403);
+  });
+
+  it("creates a custom role as the admin", async () => {
+    customRoleName = `Custom Role ${randomUUID()}`;
+    const response = await request(app.getHttpServer())
+      .post("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: customRoleName })
+      .expect(201);
+
+    customRoleId = response.body.id;
+    expect(customRoleId).toBeTypeOf("string");
+
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const created = roles.body.find((role: { id: string }) => role.id === customRoleId);
+    expect(created).toMatchObject({ name: customRoleName, isActive: true, permissions: [] });
+  });
+
+  it("renames the custom role", async () => {
+    customRoleName = `${customRoleName} Renamed`;
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${customRoleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: customRoleName })
+      .expect(200);
+
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const updated = roles.body.find((role: { id: string }) => role.id === customRoleId);
+    expect(updated).toMatchObject({ name: customRoleName, isActive: true });
+  });
+
+  it("assigns a subset of permissions to the custom role", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${customRoleId}/permissions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ permissionKeys: ["ticket:read", "customer:read"] })
+      .expect(200);
+
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const updated = roles.body.find((role: { id: string }) => role.id === customRoleId);
+    expect([...updated.permissions].sort()).toEqual(["customer:read", "ticket:read"]);
+  });
+
+  it("deactivates the custom role, hiding it from the default listing but not from includeInactive=true", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${customRoleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: false })
+      .expect(200);
+
+    const defaultListing = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(
+      defaultListing.body.some((role: { id: string }) => role.id === customRoleId),
+    ).toBe(false);
+
+    const withInactive = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles?includeInactive=true")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const found = withInactive.body.find((role: { id: string }) => role.id === customRoleId);
+    expect(found).toMatchObject({ isActive: false });
+  });
+
+  it("reactivates the custom role, restoring it to the default listing", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${customRoleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: true })
+      .expect(200);
+
+    const defaultListing = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const found = defaultListing.body.find((role: { id: string }) => role.id === customRoleId);
+    expect(found).toMatchObject({ isActive: true });
+  });
+
+  it("rejects a duplicate role name with 409", async () => {
+    const duplicateName = `Dup Role ${randomUUID()}`;
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: duplicateName })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: duplicateName })
+      .expect(409);
+  });
+
+  it("rejects an unknown permission key in PATCH roles/:id/permissions with 400", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${customRoleId}/permissions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ permissionKeys: ["not-a-real-permission:whatever"] })
+      .expect(400);
+  });
+
+  it("rejects renaming SuperAdmin with 400", async () => {
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const superAdminRole = roles.body.find(
+      (role: { name: string }) => role.name === "SuperAdmin",
+    );
+    expect(superAdminRole).toBeTruthy();
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${superAdminRole.id}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: "Renamed Super Admin" })
+      .expect(400);
+  });
+
+  it("rejects deactivating Agent with 400", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${agentRoleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ isActive: false })
+      .expect(400);
+  });
+
+  it("proves permission grants on Agent are dynamic: the very next request with an already-issued token reflects the change, with no re-login in between", async () => {
+    const dynamicAgentEmail = `agent-dynamic-${randomUUID()}@example.com`;
+    const dynamicAgentPassword = "dynamic-agent-password-123";
+
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: dynamicAgentEmail,
+        password: dynamicAgentPassword,
+        fullName: "Dynamic Agent",
+        branchId: adminBranchId,
+        departmentId: adminDepartmentId ?? undefined,
+        roleId: agentRoleId,
+      })
+      .expect(201);
+
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: dynamicAgentEmail, password: dynamicAgentPassword })
+      .expect(200);
+    const dynamicAgentAccessToken = loginResponse.body.accessToken as string;
+
+    // The Agent role does not (yet) grant notification:read.
+    await request(app.getHttpServer())
+      .get("/api/v1/notifications")
+      .set("Authorization", `Bearer ${dynamicAgentAccessToken}`)
+      .expect(403);
+
+    // As the admin, grant Agent the notification:read permission.
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${agentRoleId}/permissions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ permissionKeys: ["notification:read"] })
+      .expect(200);
+
+    // With NO token refresh/re-login step, the very next request using the
+    // SAME already-issued access token now succeeds — proving permission
+    // resolution is fully dynamic (re-checked fresh from the DB on every
+    // guarded request), never cached and never dependent on token reissue.
+    await request(app.getHttpServer())
+      .get("/api/v1/notifications")
+      .set("Authorization", `Bearer ${dynamicAgentAccessToken}`)
+      .expect(200);
   });
 });

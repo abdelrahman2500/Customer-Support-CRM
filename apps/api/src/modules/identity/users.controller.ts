@@ -6,6 +6,9 @@ import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateBranchDto } from "./dto/update-branch.dto";
 import { CreateDepartmentDto } from "./dto/create-department.dto";
 import { UpdateDepartmentDto } from "./dto/update-department.dto";
+import { CreateRoleDto } from "./dto/create-role.dto";
+import { UpdateRoleDto } from "./dto/update-role.dto";
+import { SetRolePermissionsDto } from "./dto/set-role-permissions.dto";
 import type {
   BranchSummary,
   DepartmentSummary,
@@ -23,13 +26,23 @@ import { IdentityService } from "./identity.service";
  * (checked by the globally-registered `PermissionsGuard` — see
  * `app.module.ts`), on top of the equally global `AuthGuard`.
  *
- * Role/Permission mutation, and Branch **creation**, remain explicitly out
- * of scope — see the Story 03 plan. Story 35 added read-only branch/department
- * listing (`listBranches`/`listDepartments` below); Story 45 adds renaming
- * and activating/deactivating the caller's own branch (`PATCH branches/:id`)
+ * Branch **creation** remains explicitly out of scope — see the Story 03
+ * plan. Story 35 added read-only branch/department listing
+ * (`listBranches`/`listDepartments` below); Story 45 adds renaming and
+ * activating/deactivating the caller's own branch (`PATCH branches/:id`)
  * and creating/renaming/activating/deactivating departments within the
  * caller's own branch (`POST departments`, `PATCH departments/:id`) — both
  * still scoped to the caller's own branch only, never another branch.
+ *
+ * Story 46 adds Role mutation: `POST roles` creates a custom Role,
+ * `PATCH roles/:id` renames/activates/deactivates one, and
+ * `PATCH roles/:id/permissions` full-replaces a Role's permission grants.
+ * `Permission` rows themselves remain immutable/read-only — the catalog
+ * stays code-defined (`prisma/seed.ts`), no client-defined permission key
+ * is ever accepted. The two seeded roles, `SuperAdmin`/`Agent`, cannot be
+ * renamed or deactivated (`PATCH roles/:id` rejects it with `400`), but
+ * permission assignment on them via `PATCH roles/:id/permissions` is fully
+ * allowed — granting `Agent` its first real permissions is the point.
  */
 @ApiTags("identity")
 @ApiBearerAuth()
@@ -57,8 +70,29 @@ export class UsersController {
 
   @Get("roles")
   @RequirePermissions("role:read")
-  listRoles(): Promise<RoleSummary[]> {
-    return this.identityService.listRoles();
+  listRoles(@Query("includeInactive") includeInactive?: string): Promise<RoleSummary[]> {
+    return this.identityService.listRoles(includeInactive === "true");
+  }
+
+  @Post("roles")
+  @RequirePermissions("role:create")
+  createRole(@Body() dto: CreateRoleDto): Promise<{ id: string }> {
+    return this.identityService.createRole(dto);
+  }
+
+  @Patch("roles/:id")
+  @RequirePermissions("role:update")
+  updateRole(@Param("id") id: string, @Body() dto: UpdateRoleDto): Promise<{ id: string }> {
+    return this.identityService.updateRole(id, dto);
+  }
+
+  @Patch("roles/:id/permissions")
+  @RequirePermissions("role:assign-permissions")
+  setRolePermissions(
+    @Param("id") id: string,
+    @Body() dto: SetRolePermissionsDto,
+  ): Promise<{ id: string }> {
+    return this.identityService.setRolePermissions(id, dto);
   }
 
   @Get("permissions")

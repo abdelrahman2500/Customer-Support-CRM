@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ConflictException, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import type { ConfigService } from "@nestjs/config";
 import type { JwtService } from "@nestjs/jwt";
 import { Prisma } from "@prisma/client";
@@ -56,15 +61,28 @@ function buildPrismaMock() {
     },
     role: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
     },
     permission: {
       findMany: vi.fn(),
     },
-    // The real PrismaService's $transaction runs the callback with a
-    // transactional client — for these unit tests, the mock's model
-    // methods above double as that client, matching how `createUser`
-    // uses `tx.user.create` / `tx.userBranchRole.create`.
-    $transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(prismaSelfRef)),
+    rolePermission: {
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
+    },
+    // The real PrismaService's `$transaction` is used two ways in this
+    // codebase: the interactive-callback form (`createUser`, via
+    // `tx.user.create`/`tx.userBranchRole.create`) and the batch-array form
+    // (`setRolePermissions`, via `[deleteMany(...), createMany(...)]`). This
+    // mock supports both shapes.
+    $transaction: vi.fn((arg: unknown) => {
+      if (Array.isArray(arg)) {
+        return Promise.all(arg);
+      }
+      return (arg as (tx: unknown) => unknown)(prismaSelfRef);
+    }),
   };
 }
 
@@ -591,6 +609,216 @@ describe("IdentityService", () => {
     });
   });
 
+  describe("createRole", () => {
+    it("creates a role with just the given name, returning { id }", async () => {
+      prisma.role.create.mockResolvedValue({ id: "role-1" });
+
+      const result = await service.createRole({ name: "Custom Role" });
+
+      expect(prisma.role.create).toHaveBeenCalledWith({ data: { name: "Custom Role" } });
+      expect(result).toEqual({ id: "role-1" });
+    });
+
+    it("translates a P2002 unique-constraint violation into ConflictException", async () => {
+      prisma.role.create.mockRejectedValue(buildUniqueConstraintError());
+
+      await expect(service.createRole({ name: "Duplicate Role" })).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+  });
+
+  describe("updateRole", () => {
+    it("updates only the fields present in the DTO for a non-protected (custom) role", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.role.update.mockResolvedValue({ id: "role-1" });
+
+      const result = await service.updateRole("role-1", { name: "Renamed Custom Role" });
+
+      expect(prisma.role.update).toHaveBeenCalledWith({
+        where: { id: "role-1" },
+        data: { name: "Renamed Custom Role" },
+      });
+      expect(result).toEqual({ id: "role-1" });
+    });
+
+    it("throws NotFoundException for an unknown role id", async () => {
+      prisma.role.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateRole("missing-role", { name: "Whatever" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.role.update).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException when attempting to rename SuperAdmin", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-super-admin",
+        name: "SuperAdmin",
+        isActive: true,
+      });
+
+      await expect(
+        service.updateRole("role-super-admin", { name: "Renamed Super Admin" }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.role.update).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException when attempting to deactivate Agent", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-agent",
+        name: "Agent",
+        isActive: true,
+      });
+
+      await expect(
+        service.updateRole("role-agent", { isActive: false }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.role.update).not.toHaveBeenCalled();
+    });
+
+    it("does not throw for a no-op update (empty DTO) sent for a protected role", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-super-admin",
+        name: "SuperAdmin",
+        isActive: true,
+      });
+      prisma.role.update.mockResolvedValue({ id: "role-super-admin" });
+
+      // Neither `name` nor `isActive` is present, so `updateRole`'s
+      // protection guard (which only fires when one of those two fields is
+      // present) does not trip — the real implementation falls through to
+      // an actual (no-op-data) `prisma.role.update` call rather than a 400.
+      await expect(service.updateRole("role-super-admin", {})).resolves.toEqual({
+        id: "role-super-admin",
+      });
+      expect(prisma.role.update).toHaveBeenCalledWith({
+        where: { id: "role-super-admin" },
+        data: {},
+      });
+    });
+
+    it("translates a P2002 unique-constraint violation into ConflictException", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.role.update.mockRejectedValue(buildUniqueConstraintError());
+
+      await expect(
+        service.updateRole("role-1", { name: "Duplicate Name" }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe("setRolePermissions", () => {
+    it("replaces a role's permissions with the exact given set", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.permission.findMany.mockResolvedValue([
+        { id: "perm-1", key: "ticket:read" },
+        { id: "perm-2", key: "ticket:create" },
+      ]);
+
+      const result = await service.setRolePermissions("role-1", {
+        permissionKeys: ["ticket:read", "ticket:create"],
+      });
+
+      expect(prisma.rolePermission.deleteMany).toHaveBeenCalledWith({
+        where: { roleId: "role-1" },
+      });
+      expect(prisma.rolePermission.createMany).toHaveBeenCalledWith({
+        data: [
+          { roleId: "role-1", permissionId: "perm-1" },
+          { roleId: "role-1", permissionId: "perm-2" },
+        ],
+      });
+      expect(result).toEqual({ id: "role-1" });
+    });
+
+    it("revokes all permissions when permissionKeys is an empty array", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.permission.findMany.mockResolvedValue([]);
+
+      await service.setRolePermissions("role-1", { permissionKeys: [] });
+
+      expect(prisma.rolePermission.deleteMany).toHaveBeenCalledWith({
+        where: { roleId: "role-1" },
+      });
+      expect(prisma.rolePermission.createMany).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException for an unknown role id", async () => {
+      prisma.role.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.setRolePermissions("missing-role", { permissionKeys: [] }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.rolePermission.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException listing the exact unknown key(s)", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.permission.findMany.mockResolvedValue([{ id: "perm-1", key: "ticket:read" }]);
+
+      const promise = service.setRolePermissions("role-1", {
+        permissionKeys: ["ticket:read", "bogus:key"],
+      });
+
+      await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+      await expect(promise).rejects.toThrow(/bogus:key/);
+      expect(prisma.rolePermission.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("succeeds against SuperAdmin, unlike updateRole's protection check", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-super-admin",
+        name: "SuperAdmin",
+        isActive: true,
+      });
+      prisma.permission.findMany.mockResolvedValue([{ id: "perm-1", key: "ticket:read" }]);
+
+      await expect(
+        service.setRolePermissions("role-super-admin", { permissionKeys: ["ticket:read"] }),
+      ).resolves.toEqual({ id: "role-super-admin" });
+      expect(prisma.rolePermission.deleteMany).toHaveBeenCalledWith({
+        where: { roleId: "role-super-admin" },
+      });
+    });
+
+    it("succeeds against Agent, unlike updateRole's protection check", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-agent",
+        name: "Agent",
+        isActive: true,
+      });
+      prisma.permission.findMany.mockResolvedValue([{ id: "perm-1", key: "ticket:read" }]);
+
+      await expect(
+        service.setRolePermissions("role-agent", { permissionKeys: ["ticket:read"] }),
+      ).resolves.toEqual({ id: "role-agent" });
+      expect(prisma.rolePermission.deleteMany).toHaveBeenCalledWith({
+        where: { roleId: "role-agent" },
+      });
+    });
+  });
+
   describe("listRoles", () => {
     it("maps roles to their granted permission keys", async () => {
       prisma.role.findMany.mockResolvedValue([
@@ -609,6 +837,26 @@ describe("IdentityService", () => {
       expect(result).toEqual([
         { id: "role-1", name: "SuperAdmin", permissions: ["user:create", "user:read"] },
       ]);
+    });
+
+    it("by default excludes inactive roles from the where clause", async () => {
+      prisma.role.findMany.mockResolvedValue([]);
+
+      await service.listRoles();
+
+      expect(prisma.role.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { isActive: true } }),
+      );
+    });
+
+    it("includeInactive: true drops the isActive filter so inactive roles are included", async () => {
+      prisma.role.findMany.mockResolvedValue([]);
+
+      await service.listRoles(true);
+
+      expect(prisma.role.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} }),
+      );
     });
   });
 

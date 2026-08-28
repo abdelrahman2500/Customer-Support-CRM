@@ -1,5 +1,6 @@
 import { randomBytes, createHmac } from "node:crypto";
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -18,9 +19,21 @@ import type { UpdateUserDto } from "./dto/update-user.dto";
 import type { UpdateBranchDto } from "./dto/update-branch.dto";
 import type { CreateDepartmentDto } from "./dto/create-department.dto";
 import type { UpdateDepartmentDto } from "./dto/update-department.dto";
+import type { CreateRoleDto } from "./dto/create-role.dto";
+import type { UpdateRoleDto } from "./dto/update-role.dto";
+import type { SetRolePermissionsDto } from "./dto/set-role-permissions.dto";
 
 const BCRYPT_ROUNDS = 12;
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
+
+/**
+ * Story 46 — the two seeded roles `seed.ts` keys its reconciliation logic
+ * on by literal name. Renaming either would cause the next `prisma:seed`
+ * run to create a duplicate role under the original name; deactivating
+ * `SuperAdmin` risks an unrecoverable lockout. Permission *assignment* on
+ * both remains fully allowed — only rename/(de)activate is blocked.
+ */
+const PROTECTED_ROLE_NAMES = new Set(["SuperAdmin", "Agent"]);
 
 export interface UserSummary {
   id: string;
@@ -60,6 +73,7 @@ export interface DepartmentSummary {
 export interface RoleSummary {
   id: string;
   name: string;
+  isActive: boolean;
   permissions: string[];
 }
 
@@ -344,8 +358,9 @@ export class IdentityService {
     }
   }
 
-  async listRoles(): Promise<RoleSummary[]> {
+  async listRoles(includeInactive = false): Promise<RoleSummary[]> {
     const roles = await this.prisma.role.findMany({
+      where: { ...(includeInactive ? {} : { isActive: true }) },
       include: { permissions: { include: { permission: true } } },
       orderBy: { name: "asc" },
     });
@@ -353,6 +368,7 @@ export class IdentityService {
     return roles.map((role) => ({
       id: role.id,
       name: role.name,
+      isActive: role.isActive,
       permissions: role.permissions.map((rp) => rp.permission.key),
     }));
   }
@@ -360,6 +376,90 @@ export class IdentityService {
   async listPermissions(): Promise<PermissionSummary[]> {
     const permissions = await this.prisma.permission.findMany({ orderBy: { key: "asc" } });
     return permissions.map((permission) => ({ id: permission.id, key: permission.key }));
+  }
+
+  /**
+   * Creates a custom Role with no permissions — assignment is a deliberate
+   * separate call (`setRolePermissions`); see Story 46 plan §6.
+   */
+  async createRole(dto: CreateRoleDto): Promise<{ id: string }> {
+    try {
+      const role = await this.prisma.role.create({ data: { name: dto.name } });
+      return { id: role.id };
+    } catch (error) {
+      throw translateDuplicateRoleName(error);
+    }
+  }
+
+  /**
+   * Renames/(de)activates a Role. `SuperAdmin`/`Agent` are protected —
+   * `seed.ts` reconciles by literal name, and deactivating `SuperAdmin`
+   * risks an unrecoverable lockout — so a rename/(de)activate attempt on
+   * either is rejected with `400`, never a raw 500 or a silent no-op.
+   */
+  async updateRole(id: string, dto: UpdateRoleDto): Promise<{ id: string }> {
+    const role = await this.prisma.role.findUnique({ where: { id } });
+    if (!role) {
+      throw new NotFoundException("Role not found");
+    }
+
+    if (
+      PROTECTED_ROLE_NAMES.has(role.name) &&
+      (dto.name !== undefined || dto.isActive !== undefined)
+    ) {
+      throw new BadRequestException("Built-in roles cannot be renamed or deactivated");
+    }
+
+    try {
+      await this.prisma.role.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+      });
+      return { id };
+    } catch (error) {
+      throw translateDuplicateRoleName(error);
+    }
+  }
+
+  /**
+   * Full-replace permission assignment for a Role — mirrors `seed.ts`'s own
+   * delete-then-recreate reconciliation transaction exactly. Deliberately
+   * allowed on every role including the two protected ones (`SuperAdmin`/
+   * `Agent`): granting `Agent` its first real permissions is the entire
+   * point of this story, so no protection check runs here.
+   */
+  async setRolePermissions(id: string, dto: SetRolePermissionsDto): Promise<{ id: string }> {
+    const role = await this.prisma.role.findUnique({ where: { id } });
+    if (!role) {
+      throw new NotFoundException("Role not found");
+    }
+
+    const uniqueKeys = [...new Set(dto.permissionKeys)];
+    const permissions = await this.prisma.permission.findMany({
+      where: { key: { in: uniqueKeys } },
+    });
+
+    if (permissions.length !== uniqueKeys.length) {
+      const foundKeys = new Set(permissions.map((p) => p.key));
+      const missing = uniqueKeys.filter((key) => !foundKeys.has(key));
+      throw new BadRequestException(`Unknown permission key(s): ${missing.join(", ")}`);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.rolePermission.deleteMany({ where: { roleId: id } }),
+      ...(permissions.length > 0
+        ? [
+            this.prisma.rolePermission.createMany({
+              data: permissions.map((p) => ({ roleId: id, permissionId: p.id })),
+            }),
+          ]
+        : []),
+    ]);
+
+    return { id };
   }
 
   // ---------------------------------------------------------------------
@@ -450,6 +550,22 @@ function translateDuplicateDepartmentName(error: unknown): Error {
     error.code === UNIQUE_CONSTRAINT_VIOLATION
   ) {
     return new ConflictException("A department with this name already exists");
+  }
+  return error as Error;
+}
+
+/**
+ * A duplicate role name is caught here by Prisma's `P2002`
+ * unique-constraint-violation code (backstopping `Role.name`'s pre-existing
+ * `@unique` constraint) and turned into a `ConflictException` — never a raw
+ * 500.
+ */
+function translateDuplicateRoleName(error: unknown): Error {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === UNIQUE_CONSTRAINT_VIOLATION
+  ) {
+    return new ConflictException("A role with this name already exists");
   }
   return error as Error;
 }
