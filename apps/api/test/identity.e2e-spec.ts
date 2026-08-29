@@ -999,4 +999,148 @@ describe("Identity & Access (e2e)", () => {
       .send({ roleId: superAdminRole.id })
       .expect(200);
   });
+
+  // ---------------------------------------------------------------------
+  // Story 48 — User Profile Correction: Email Change & Admin-Driven
+  // Password Reset
+  //
+  // `secondAgentEmail`/`secondAgentPassword` (created in the Story 45
+  // section, above) is reused for every 403 check below: the Story 46
+  // section's "dynamic Agent" test replaced the Agent role's permission set
+  // with exactly `["notification:read"]` (a full-replace, not additive —
+  // see `setRolePermissions`), so by this point in the suite Agent holds
+  // neither `user:update` nor `user:reset-password`, matching `ROLE_GRANTS`'s
+  // `Agent: []` default with no manual edit needed for this story.
+  // ---------------------------------------------------------------------
+
+  it("rejects PATCH /identity/users/:id/password with no token", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/password`)
+      .send({ newPassword: "should-not-apply-123" })
+      .expect(401);
+  });
+
+  it("rejects the Agent user (no user:reset-password permission) from resetting another user's password (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: secondAgentEmail, password: secondAgentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}/password`)
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ newPassword: "should-not-apply-123" })
+      .expect(403);
+  });
+
+  it("rejects the Agent user (no user:update permission) from changing another user's email (403)", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: secondAgentEmail, password: secondAgentPassword })
+      .expect(200);
+    const agentAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}`)
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ email: `should-not-apply-${randomUUID()}@example.com` })
+      .expect(403);
+  });
+
+  it("changes an existing user's email as the admin, confirmed via GET /identity/users", async () => {
+    const newEmail = `changed-${randomUUID()}@example.com`;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ email: newEmail })
+      .expect(200);
+
+    const users = await request(app.getHttpServer())
+      .get("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const updatedUser = users.body.find((user: { id: string }) => user.id === createdAgentUserId);
+    expect(updatedUser).toMatchObject({ email: newEmail });
+  });
+
+  it("rejects changing a user's email to one already in use by another user (409)", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${createdAgentUserId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ email: secondAgentEmail })
+      .expect(409);
+  });
+
+  it("returns 404 when resetting the password of an unknown user id", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${randomUUID()}/password`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ newPassword: "whatever-password-123" })
+      .expect(404);
+  });
+
+  it("resets a user's password as the admin: revokes their pre-reset refresh token, invalidates the old password, and allows login with the new one", async () => {
+    // A dedicated, freshly created, still-ACTIVE user — `createdAgentUserId`
+    // was deactivated earlier in this suite (Story 45 section) and can no
+    // longer log in regardless of its password, which would make the
+    // login-success/failure half of this proof meaningless.
+    const resetAgentEmail = `agent-pwreset-${randomUUID()}@example.com`;
+    const oldPassword = "old-password-123";
+    const newPassword = "new-password-456";
+
+    const createResponse = await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: resetAgentEmail,
+        password: oldPassword,
+        fullName: "Password Reset Agent",
+        branchId: adminBranchId,
+        departmentId: adminDepartmentId ?? undefined,
+        roleId: agentRoleId,
+      })
+      .expect(201);
+    const resetAgentUserId = createResponse.body.id as string;
+
+    // Log in with the OLD password to obtain a refresh token BEFORE the
+    // reset — this is the token whose survival (or revocation) the rest of
+    // this test proves.
+    const preResetLogin = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: resetAgentEmail, password: oldPassword })
+      .expect(200);
+    const setCookieHeader = preResetLogin.headers["set-cookie"] as unknown as string[];
+    const rawRefreshCookie = setCookieHeader?.find((cookie) => cookie.startsWith("refreshToken="));
+    expect(rawRefreshCookie).toBeTruthy();
+    const preResetRefreshCookie = rawRefreshCookie!.split(";")[0]!;
+
+    // As the admin, reset this user's password via the new dedicated route.
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${resetAgentUserId}/password`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ newPassword })
+      .expect(200);
+
+    // Core proof of Design item 1: the refresh token obtained BEFORE the
+    // reset is now rejected — `resetPassword`'s `revokeAllRefreshTokens`
+    // revoked it, even though `refresh()` itself never reads `passwordHash`.
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/refresh")
+      .set("Cookie", preResetRefreshCookie)
+      .expect(401);
+
+    // The OLD password no longer works...
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: resetAgentEmail, password: oldPassword })
+      .expect(401);
+
+    // ...and the NEW password does.
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: resetAgentEmail, password: newPassword })
+      .expect(200);
+  });
 });

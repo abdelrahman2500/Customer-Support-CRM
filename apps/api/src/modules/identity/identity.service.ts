@@ -16,6 +16,7 @@ import { TenantContext } from "../../common/tenant/tenant-context";
 import type { EnvConfig } from "../../common/config/env.validation";
 import type { CreateUserDto } from "./dto/create-user.dto";
 import type { UpdateUserDto } from "./dto/update-user.dto";
+import type { ResetPasswordDto } from "./dto/reset-password.dto";
 import type { UpdateBranchDto } from "./dto/update-branch.dto";
 import type { CreateDepartmentDto } from "./dto/create-department.dto";
 import type { UpdateDepartmentDto } from "./dto/update-department.dto";
@@ -171,6 +172,19 @@ export class IdentityService {
     });
   }
 
+  /**
+   * Story 48 — revokes every currently-unrevoked refresh token for a user,
+   * used by `resetPassword` (unlike `revoke` above, which only ever revokes
+   * the single token being logged out with). Simply matches zero rows,
+   * with no error, for a user with no currently-active refresh tokens.
+   */
+  private async revokeAllRefreshTokens(userId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   async getAuthenticatedUser(userId: string): Promise<AuthenticatedUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -277,13 +291,42 @@ export class IdentityService {
       throw new NotFoundException("User not found");
     }
 
-    await this.prisma.user.update({
-      where: { id },
-      data: {
-        ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-      },
-    });
+    try {
+      await this.prisma.user.update({
+        where: { id },
+        data: {
+          ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          ...(dto.email !== undefined ? { email: dto.email } : {}),
+        },
+      });
+    } catch (error) {
+      throw translateDuplicateEmail(error);
+    }
+
+    return { id };
+  }
+
+  /**
+   * Story 48 — sets a new password for an existing user directly (no
+   * "forgot password" email flow). Because `refresh()` never reads
+   * `passwordHash` and no field links a `RefreshToken` to a password
+   * version, a stolen-but-still-valid refresh token would otherwise survive
+   * a password reset undetected — so every currently-unrevoked refresh
+   * token for this user is revoked as part of the reset (see
+   * `revokeAllRefreshTokens` below). An already-issued access token (JWT)
+   * cannot be revoked before its own natural expiry — a pre-existing,
+   * disclosed limitation, not addressed here.
+   */
+  async resetPassword(id: string, dto: ResetPasswordDto): Promise<{ id: string }> {
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("User not found");
+    }
+
+    const passwordHash = await hashPassword(dto.newPassword);
+    await this.prisma.user.update({ where: { id }, data: { passwordHash } });
+    await this.revokeAllRefreshTokens(id);
 
     return { id };
   }
@@ -675,6 +718,24 @@ function translateDuplicateRoleName(error: unknown): Error {
     error.code === UNIQUE_CONSTRAINT_VIOLATION
   ) {
     return new ConflictException("A role with this name already exists");
+  }
+  return error as Error;
+}
+
+/**
+ * A duplicate email on a user **update** (as opposed to `createUser`'s
+ * pre-check, the sole exception to this file's P2002-catch convention) is
+ * caught here by Prisma's `P2002` unique-constraint-violation code
+ * (backstopping `User.email`'s pre-existing `@unique` constraint) and
+ * turned into a `ConflictException` — never a raw 500. Race-free: no
+ * separate check-then-write gap.
+ */
+function translateDuplicateEmail(error: unknown): Error {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === UNIQUE_CONSTRAINT_VIOLATION
+  ) {
+    return new ConflictException("A user with this email already exists");
   }
   return error as Error;
 }

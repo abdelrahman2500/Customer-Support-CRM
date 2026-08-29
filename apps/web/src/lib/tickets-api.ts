@@ -245,14 +245,35 @@ export function createUser(input: CreateUserInput): Promise<{ id: string; email:
   });
 }
 
-/** Story 32 — mirrors the existing `UpdateUserDto` exactly (`apps/api/src/modules/identity/dto/update-user.dto.ts`). No role/branch change possible through this endpoint. */
+/** Story 32 — mirrors the existing `UpdateUserDto` exactly (`apps/api/src/modules/identity/dto/update-user.dto.ts`). No role/branch change possible through this endpoint.
+ *
+ * Story 48 — widened additively with `email` (the same `user:update`
+ * permission now also covers correcting a user's email address; the
+ * endpoint/call shape below is otherwise unchanged). */
 export interface UpdateUserInput {
   fullName?: string;
   isActive?: boolean;
+  email?: string;
 }
 
 export function updateUser(id: string, input: UpdateUserInput): Promise<{ id: string }> {
   return apiFetch<{ id: string }>(`/identity/users/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Story 48 — mirrors the existing `ResetPasswordDto` exactly
+ * (`apps/api/src/modules/identity/dto/reset-password.dto.ts`). Gated by the
+ * new, separately-permissioned `user:reset-password` (distinct from
+ * `user:update` above) — revokes every one of the target user's existing
+ * refresh tokens server-side on success. */
+export interface ResetPasswordInput {
+  newPassword: string;
+}
+
+export function resetPassword(id: string, input: ResetPasswordInput): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/identity/users/${id}/password`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });

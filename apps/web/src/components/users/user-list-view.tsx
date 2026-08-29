@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useDepartmentsQuery,
+  useResetPasswordMutation,
   useUpdateUserAssignmentMutation,
   useUpdateUserMutation,
   useUsersQuery,
@@ -53,6 +54,18 @@ const UNSET_DEPARTMENT = "__unset__";
  * 403-vs-generic split into `RoleListView`'s 3-way
  * 403/other-`ApiError`-verbatim/generic pattern. No branch picker — Branch
  * reassignment is out of scope (plan Design item 2).
+ *
+ * Story 48 — the previously plain-text email `TableCell` becomes a
+ * blur-commit `Input`, identical in shape to the existing `fullName` field,
+ * reusing the same, now-widened `mutation` (`useUpdateUserMutation`) —
+ * its own error block extends the fullName field's 2-way split into the
+ * 3-way 403/other-`ApiError`-verbatim/generic pattern Story 47 established,
+ * since a duplicate-email conflict (409) needs its backend message shown
+ * verbatim. Below it, a password-reset `Input` + "Reset password" `Button`
+ * (disabled until 8+ characters), wired to a new, separate
+ * `useResetPasswordMutation(user.id)` — commits on click (not blur), clears
+ * on success, and shows a brief inline confirmation. No dialog — this
+ * codebase has no modal primitive (plan Design item 6).
  */
 export function UserListView() {
   const t = useTranslations("users");
@@ -117,9 +130,13 @@ function UserRow({ user }: { user: UserSummary }) {
   const t = useTranslations("users");
   const mutation = useUpdateUserMutation(user.id);
   const assignmentMutation = useUpdateUserAssignmentMutation(user.id);
+  const resetPasswordMutation = useResetPasswordMutation(user.id);
   const rolesQuery = useRolesQuery();
   const departmentsQuery = useDepartmentsQuery();
   const [fullNameDraft, setFullNameDraft] = useState(user.fullName);
+  const [emailDraft, setEmailDraft] = useState(user.email);
+  const [newPasswordDraft, setNewPasswordDraft] = useState("");
+  const [passwordResetSuccess, setPasswordResetSuccess] = useState(false);
 
   function commitFullName() {
     const trimmed = fullNameDraft.trim();
@@ -133,13 +150,93 @@ function UserRow({ user }: { user: UserSummary }) {
     );
   }
 
+  function commitEmail() {
+    const trimmed = emailDraft.trim();
+    if (!trimmed || trimmed === user.email) {
+      setEmailDraft(user.email);
+      return;
+    }
+    mutation.mutate(
+      { email: trimmed },
+      { onError: () => setEmailDraft(user.email) },
+    );
+  }
+
   function toggleActive() {
     mutation.mutate({ isActive: !user.isActive });
   }
 
+  function handleResetPassword() {
+    resetPasswordMutation.mutate(
+      { newPassword: newPasswordDraft },
+      {
+        onSuccess: () => {
+          setNewPasswordDraft("");
+          setPasswordResetSuccess(true);
+        },
+      },
+    );
+  }
+
   return (
     <TableRow>
-      <TableCell className="text-slate-500">{user.email}</TableCell>
+      <TableCell>
+        <div className="flex flex-col gap-2">
+          <Input
+            className="min-w-[10rem]"
+            type="email"
+            value={emailDraft}
+            onChange={(event) => setEmailDraft(event.target.value)}
+            onBlur={commitEmail}
+          />
+          {mutation.isError && (
+            <p className="text-xs text-red-600">
+              {mutation.error instanceof ApiError && mutation.error.status === 403
+                ? t("list.actionForbidden")
+                : mutation.error instanceof ApiError
+                  ? mutation.error.message
+                  : t("list.actionFailed")}
+            </p>
+          )}
+
+          <div className="flex flex-col gap-1 border-t border-slate-200 pt-2">
+            <span className="text-xs text-slate-500">{t("list.passwordResetLabel")}</span>
+            <Input
+              className="min-w-[10rem]"
+              type="password"
+              placeholder={t("list.passwordResetPlaceholder")}
+              value={newPasswordDraft}
+              onChange={(event) => {
+                setNewPasswordDraft(event.target.value);
+                setPasswordResetSuccess(false);
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={newPasswordDraft.length < 8 || resetPasswordMutation.isPending}
+              onClick={handleResetPassword}
+            >
+              {resetPasswordMutation.isPending
+                ? t("list.passwordResetSubmitting")
+                : t("list.passwordResetSubmit")}
+            </Button>
+            {passwordResetSuccess && (
+              <p className="text-xs text-emerald-600">{t("list.passwordResetSuccess")}</p>
+            )}
+            {resetPasswordMutation.isError && (
+              <p className="text-xs text-red-600">
+                {resetPasswordMutation.error instanceof ApiError &&
+                resetPasswordMutation.error.status === 403
+                  ? t("list.actionForbidden")
+                  : resetPasswordMutation.error instanceof ApiError
+                    ? resetPasswordMutation.error.message
+                    : t("list.actionFailed")}
+              </p>
+            )}
+          </div>
+        </div>
+      </TableCell>
       <TableCell>
         <Input
           className="min-w-[10rem]"

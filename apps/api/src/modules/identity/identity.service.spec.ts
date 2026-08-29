@@ -405,6 +405,90 @@ describe("IdentityService", () => {
         data: { isActive: false },
       });
     });
+
+    it("does NOT include email in the update data when it is omitted from the DTO", async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+
+      await service.updateUser("user-1", { fullName: "Renamed User" });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { fullName: "Renamed User" },
+      });
+    });
+
+    it("updates the email when only email is given in the DTO", async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+
+      await service.updateUser("user-1", { email: "new@example.com" });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { email: "new@example.com" },
+      });
+    });
+
+    it("updates email and fullName together when both are given", async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+
+      await service.updateUser("user-1", {
+        email: "both@example.com",
+        fullName: "Both Fields",
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { fullName: "Both Fields", email: "both@example.com" },
+      });
+    });
+
+    it("translates a P2002 unique-constraint violation into ConflictException when updating email", async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+      prisma.user.update.mockRejectedValue(buildUniqueConstraintError());
+
+      await expect(
+        service.updateUser("user-1", { email: "taken@example.com" }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe("resetPassword", () => {
+    it("hashes the new password and updates the user's passwordHash", async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+      prisma.user.update.mockResolvedValue({ id: "user-1" });
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.resetPassword("user-1", { newPassword: "brand-new-password" });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { passwordHash: "hashed:brand-new-password" },
+      });
+      expect(result).toEqual({ id: "user-1" });
+    });
+
+    it("revokes all of the user's currently-unrevoked refresh tokens as part of the flow", async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+      prisma.user.update.mockResolvedValue({ id: "user-1" });
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+
+      await service.resetPassword("user-1", { newPassword: "brand-new-password" });
+
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: "user-1", revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+
+    it("throws NotFoundException for an unknown user id", async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword("missing-id", { newPassword: "brand-new-password" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    });
   });
 
   describe("updateUserAssignment", () => {

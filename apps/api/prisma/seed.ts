@@ -21,6 +21,7 @@ const PERMISSION_CATALOG = [
   "user:read",
   "user:update",
   "user:reassign",
+  "user:reset-password",
   "role:read",
   "role:create",
   "role:update",

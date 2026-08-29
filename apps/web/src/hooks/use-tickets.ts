@@ -13,6 +13,7 @@ import {
   listDepartments,
   listTickets,
   listUsers,
+  resetPassword,
   updateContact,
   updateCustomer,
   updateTicket,
@@ -25,6 +26,7 @@ import type {
   CreateTicketInput,
   CreateUserInput,
   ListTicketsFilters,
+  ResetPasswordInput,
   UpdateContactInput,
   UpdateCustomerInput,
   UpdateTicketInput,
@@ -208,6 +210,22 @@ export function useUpdateUserAssignmentMutation(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateUserAssignmentInput) => updateUserAssignment(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+/**
+ * Story 48 — never applies optimistically, same convention as every other
+ * mutation here: only a successful `PATCH /identity/users/:id/password`
+ * invalidates `["users"]`, consistent with every other mutation hook, even
+ * though no field in `UserSummary` reflects the password.
+ */
+export function useResetPasswordMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ResetPasswordInput) => resetPassword(id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["users"] });
     },

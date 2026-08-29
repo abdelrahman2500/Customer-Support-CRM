@@ -181,7 +181,12 @@
       "departmentLabel": "Department",
       "noDepartment": "No department",
       "roleLoadError": "Couldn't load roles.",
-      "departmentLoadError": "Couldn't load departments."
+      "departmentLoadError": "Couldn't load departments.",
+      "passwordResetLabel": "New password",
+      "passwordResetPlaceholder": "New password (min. 8 characters)",
+      "passwordResetSubmit": "Reset password",
+      "passwordResetSubmitting": "Resetting...",
+      "passwordResetSuccess": "Password reset."
     },
     "create": {
       "title": "New user",

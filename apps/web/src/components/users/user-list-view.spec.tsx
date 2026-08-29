@@ -1,9 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, act } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { UserListView } from "./user-list-view";
 import {
   useDepartmentsQuery,
+  useResetPasswordMutation,
   useUpdateUserAssignmentMutation,
   useUpdateUserMutation,
   useUsersQuery,
@@ -33,6 +34,30 @@ import enMessages from "../../../messages/en.json";
  * as well, so asserting a *currently-selected* value's label must be scoped
  * with `within(combobox).getByText(...)` rather than an unscoped
  * `screen.getByText(...)`, which would be ambiguous.
+ *
+ * Story 48 — the previously plain-text email `TableCell` is now a
+ * blur-commit `Input`, so every assertion that used to target
+ * `screen.getByText(user.email)` now uses `getByDisplayValue(user.email)`
+ * instead (the established convention for a "text became an input"
+ * transition in this codebase, e.g. `branch-departments-view.spec.tsx`'s own
+ * rename-input assertions). The email field reuses the *same* `mutation`
+ * (`useUpdateUserMutation`) as `fullName`, but its own error block is a
+ * 3-way 403/other-`ApiError`-verbatim/generic split — a strictly richer
+ * split than `fullName`'s existing 2-way (403/generic) block, which is left
+ * unchanged. Because both blocks render off the *same* shared `mutation`
+ * object, a 403 rejection now renders the forbidden copy in *both* the email
+ * and fullName cells simultaneously — the pre-existing
+ * "3-way error handling on the rename/activate mutation" 403 test is scoped
+ * to the fullName cell (via `getAllByRole("cell")`) to keep asserting its
+ * original, narrower intent instead of tripping over the new duplicate
+ * text node. A new "3-way error handling on the email field" block asserts
+ * the email cell's own, richer behavior (including the verbatim
+ * duplicate-email 409 case) scoped to the email cell the same way. A new
+ * password-reset `Input` + `Button`, wired to the new
+ * `useResetPasswordMutation(user.id)`, is covered by its own describe
+ * blocks below, plus a small cross-independence check confirming the three
+ * per-row mutations (rename/activate, assignment, password-reset) never
+ * affect one another's mock call assertions.
  */
 
 const push = vi.fn();
@@ -47,6 +72,7 @@ vi.mock("@/hooks/use-tickets", () => ({
   useUpdateUserMutation: vi.fn(),
   useDepartmentsQuery: vi.fn(),
   useUpdateUserAssignmentMutation: vi.fn(),
+  useResetPasswordMutation: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-roles", () => ({
@@ -57,6 +83,7 @@ const mockedUseUsersQuery = vi.mocked(useUsersQuery);
 const mockedUseUpdateUserMutation = vi.mocked(useUpdateUserMutation);
 const mockedUseDepartmentsQuery = vi.mocked(useDepartmentsQuery);
 const mockedUseUpdateUserAssignmentMutation = vi.mocked(useUpdateUserAssignmentMutation);
+const mockedUseResetPasswordMutation = vi.mocked(useResetPasswordMutation);
 const mockedUseRolesQuery = vi.mocked(useRolesQuery);
 
 function queryResult(overrides: Record<string, unknown> = {}) {
@@ -114,6 +141,7 @@ describe("UserListView", () => {
     vi.clearAllMocks();
     mockedUseUpdateUserMutation.mockReturnValue(mutationResult() as never);
     mockedUseUpdateUserAssignmentMutation.mockReturnValue(mutationResult() as never);
+    mockedUseResetPasswordMutation.mockReturnValue(mutationResult() as never);
     mockedUseRolesQuery.mockReturnValue(queryResult({ data: oneRole, isSuccess: true }) as never);
     mockedUseDepartmentsQuery.mockReturnValue(
       queryResult({ data: oneDepartment, isSuccess: true }) as never,
@@ -156,14 +184,14 @@ describe("UserListView", () => {
     expect(refetch).toHaveBeenCalledOnce();
   });
 
-  it("renders a row per user once the query succeeds, with email, an editable full name, and a status badge", () => {
+  it("renders a row per user once the query succeeds, with an editable email, an editable full name, and a status badge", () => {
     mockedUseUsersQuery.mockReturnValue(
       queryResult({ isSuccess: true, data: [baseUser] }) as never,
     );
 
     renderView();
 
-    expect(screen.getByText("agent@example.com")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("agent@example.com")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Ada Lovelace")).toBeInTheDocument();
     expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.getByText("Deactivate")).toBeInTheDocument();
@@ -228,6 +256,42 @@ describe("UserListView", () => {
         expect.objectContaining({ onError: expect.any(Function) }),
       );
       expect(assignmentMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("email blur-commit", () => {
+    it("commits an email change on blur when the email changed", () => {
+      const mutate = vi.fn();
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+      renderView();
+
+      const input = screen.getByDisplayValue("agent@example.com");
+      fireEvent.change(input, { target: { value: "new@example.com" } });
+      fireEvent.blur(input);
+
+      expect(mutate).toHaveBeenCalledWith(
+        { email: "new@example.com" },
+        expect.objectContaining({ onError: expect.any(Function) }),
+      );
+    });
+
+    it("does not fire the update mutation on blur when the email is unchanged", () => {
+      const mutate = vi.fn();
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+      renderView();
+
+      const input = screen.getByDisplayValue("agent@example.com");
+      fireEvent.blur(input);
+
+      expect(mutate).not.toHaveBeenCalled();
     });
   });
 
@@ -333,8 +397,15 @@ describe("UserListView", () => {
 
       renderView();
 
+      // The email cell shares this same `mutation` and now also renders on
+      // 403 (its own, richer 3-way block — see "3-way error handling on the
+      // email field" below), so this assertion is scoped to the fullName
+      // cell to keep testing this describe block's original, narrower
+      // intent (the fullName field's own 2-way block) rather than tripping
+      // over the duplicate text node the email cell also renders.
+      const fullNameCell = screen.getAllByRole("cell")[1]!;
       expect(
-        screen.getByText("You don't have permission to perform that action."),
+        within(fullNameCell).getByText("You don't have permission to perform that action."),
       ).toBeInTheDocument();
     });
 
@@ -348,8 +419,62 @@ describe("UserListView", () => {
 
       renderView();
 
+      const fullNameCell = screen.getAllByRole("cell")[1]!;
       expect(
-        screen.getByText("That change couldn't be saved. Please try again."),
+        within(fullNameCell).getByText("That change couldn't be saved. Please try again."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("3-way error handling on the email field", () => {
+    it("renders the forbidden message when the update mutation is rejected with 403", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseUpdateUserMutation.mockReturnValue(
+        mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
+      );
+
+      renderView();
+
+      const emailCell = screen.getAllByRole("cell")[0]!;
+      expect(
+        within(emailCell).getByText("You don't have permission to perform that action."),
+      ).toBeInTheDocument();
+    });
+
+    it("renders the backend's own message verbatim when rejected with 409 (duplicate email)", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseUpdateUserMutation.mockReturnValue(
+        mutationResult({
+          isError: true,
+          error: new ApiError("A user with this email already exists", 409),
+        }) as never,
+      );
+
+      renderView();
+
+      const emailCell = screen.getAllByRole("cell")[0]!;
+      expect(
+        within(emailCell).getByText("A user with this email already exists"),
+      ).toBeInTheDocument();
+    });
+
+    it("renders a generic action-failed message when the rejection is not an ApiError", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseUpdateUserMutation.mockReturnValue(
+        mutationResult({ isError: true, error: new Error("network down") }) as never,
+      );
+
+      renderView();
+
+      const emailCell = screen.getAllByRole("cell")[0]!;
+      expect(
+        within(emailCell).getByText("That change couldn't be saved. Please try again."),
       ).toBeInTheDocument();
     });
   });
@@ -417,6 +542,203 @@ describe("UserListView", () => {
       expect(
         screen.getByText("That change couldn't be saved. Please try again."),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("password reset", () => {
+    it("keeps the reset-password button disabled until the draft is at least 8 characters", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+
+      renderView();
+
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      const submitButton = screen.getByRole("button", { name: "Reset password" });
+      expect(submitButton).toBeDisabled();
+
+      fireEvent.change(passwordInput, { target: { value: "short1" } });
+      expect(submitButton).toBeDisabled();
+
+      fireEvent.change(passwordInput, { target: { value: "longenough1" } });
+      expect(submitButton).toBeEnabled();
+    });
+
+    it("does not commit on blur — only an explicit click on the button commits, with the exact { newPassword } payload", () => {
+      const mutate = vi.fn();
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+      renderView();
+
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
+      fireEvent.blur(passwordInput);
+      expect(mutate).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+
+      expect(mutate).toHaveBeenCalledWith(
+        { newPassword: "newpassword1" },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+
+    it("preserves the entered password when the reset mutation does not succeed", () => {
+      // A bare `vi.fn()` mock never invokes the `onSuccess` callback passed
+      // to `mutate` — exactly mirroring a real, still-pending/rejected
+      // mutation, under which the component's local draft state is left
+      // untouched (there is no `onError` handler on this control at all).
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(mutationResult() as never);
+
+      renderView();
+
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+
+      expect(screen.getByDisplayValue("newpassword1")).toBeInTheDocument();
+    });
+
+    it("clears the password field and shows a success message when the reset mutation succeeds", () => {
+      let capturedOnSuccess: (() => void) | undefined;
+      const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
+        capturedOnSuccess = options?.onSuccess;
+      });
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+      renderView();
+
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+
+      // Simulate the real mutation resolving successfully by invoking the
+      // callback the component actually passed to `mutate`.
+      act(() => {
+        capturedOnSuccess?.();
+      });
+
+      expect(passwordInput).toHaveValue("");
+      expect(screen.getByText("Password reset.")).toBeInTheDocument();
+    });
+  });
+
+  describe("3-way error handling on the reset-password mutation", () => {
+    it("renders the forbidden message when rejected with 403", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(
+        mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
+      );
+
+      renderView();
+
+      expect(
+        screen.getByText("You don't have permission to perform that action."),
+      ).toBeInTheDocument();
+    });
+
+    it("renders the backend's own message verbatim for a non-403 ApiError", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(
+        mutationResult({
+          isError: true,
+          error: new ApiError("Password must be at least 8 characters", 400),
+        }) as never,
+      );
+
+      renderView();
+
+      expect(
+        screen.getByText("Password must be at least 8 characters"),
+      ).toBeInTheDocument();
+    });
+
+    it("renders a generic action-failed message when the rejection is not an ApiError", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(
+        mutationResult({ isError: true, error: new Error("network down") }) as never,
+      );
+
+      renderView();
+
+      expect(
+        screen.getByText("That change couldn't be saved. Please try again."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("mutation independence", () => {
+    it("committing an email change only calls the update mutation, not the assignment or reset-password mutations", () => {
+      const renameMutate = vi.fn();
+      const assignmentMutate = vi.fn();
+      const resetPasswordMutate = vi.fn();
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+      mockedUseUpdateUserAssignmentMutation.mockReturnValue(
+        mutationResult({ mutate: assignmentMutate }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(
+        mutationResult({ mutate: resetPasswordMutate }) as never,
+      );
+
+      renderView();
+
+      const input = screen.getByDisplayValue("agent@example.com");
+      fireEvent.change(input, { target: { value: "new@example.com" } });
+      fireEvent.blur(input);
+
+      expect(renameMutate).toHaveBeenCalledWith(
+        { email: "new@example.com" },
+        expect.objectContaining({ onError: expect.any(Function) }),
+      );
+      expect(assignmentMutate).not.toHaveBeenCalled();
+      expect(resetPasswordMutate).not.toHaveBeenCalled();
+    });
+
+    it("clicking 'Reset password' only calls the reset-password mutation, not the rename/activate or assignment mutations", () => {
+      const renameMutate = vi.fn();
+      const assignmentMutate = vi.fn();
+      const resetPasswordMutate = vi.fn();
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+      mockedUseUpdateUserAssignmentMutation.mockReturnValue(
+        mutationResult({ mutate: assignmentMutate }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(
+        mutationResult({ mutate: resetPasswordMutate }) as never,
+      );
+
+      renderView();
+
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+
+      expect(resetPasswordMutate).toHaveBeenCalledWith(
+        { newPassword: "newpassword1" },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+      expect(renameMutate).not.toHaveBeenCalled();
+      expect(assignmentMutate).not.toHaveBeenCalled();
     });
   });
 });

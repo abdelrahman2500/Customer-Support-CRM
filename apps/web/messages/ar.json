@@ -181,7 +181,12 @@
       "departmentLabel": "القسم",
       "noDepartment": "بدون قسم",
       "roleLoadError": "تعذّر تحميل الأدوار.",
-      "departmentLoadError": "تعذّر تحميل الأقسام."
+      "departmentLoadError": "تعذّر تحميل الأقسام.",
+      "passwordResetLabel": "كلمة مرور جديدة",
+      "passwordResetPlaceholder": "كلمة مرور جديدة (8 أحرف على الأقل)",
+      "passwordResetSubmit": "إعادة تعيين كلمة المرور",
+      "passwordResetSubmitting": "جارٍ إعادة التعيين...",
+      "passwordResetSuccess": "تمت إعادة تعيين كلمة المرور."
     },
     "create": {
       "title": "مستخدم جديد",

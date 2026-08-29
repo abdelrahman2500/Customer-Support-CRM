@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { UpdateBranchDto } from "./dto/update-branch.dto";
 import { CreateDepartmentDto } from "./dto/create-department.dto";
 import { UpdateDepartmentDto } from "./dto/update-department.dto";
@@ -51,6 +52,13 @@ import { IdentityService } from "./identity.service";
  * *existing* user's Role and/or Department, both scoped to the caller's
  * own branch — never a different branch, which this route does not accept
  * or expose in any form.
+ *
+ * Story 48 widens `user:update` to also cover correcting a user's `email`
+ * (a plain profile-field edit, the same risk class as `fullName`/
+ * `isActive`), and adds `PATCH users/:id/password`, gated by its own,
+ * separately-permissioned `user:reset-password`: a materially more
+ * sensitive action that lets an admin set a new password for a user
+ * directly, revoking every one of that user's existing refresh tokens.
  */
 @ApiTags("identity")
 @ApiBearerAuth()
@@ -83,6 +91,15 @@ export class UsersController {
     @Body() dto: UpdateUserAssignmentDto,
   ): Promise<{ id: string }> {
     return this.identityService.updateUserAssignment(id, dto);
+  }
+
+  @Patch("users/:id/password")
+  @RequirePermissions("user:reset-password")
+  resetPassword(
+    @Param("id") id: string,
+    @Body() dto: ResetPasswordDto,
+  ): Promise<{ id: string }> {
+    return this.identityService.resetPassword(id, dto);
   }
 
   @Get("roles")
