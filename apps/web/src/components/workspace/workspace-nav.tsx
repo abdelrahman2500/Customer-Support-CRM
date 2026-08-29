@@ -18,6 +18,8 @@ import { clearAccessToken, logout } from "@/lib/api";
  *
  * Story 51 — `knowledge-base` appended as the new last entry, the same
  * append convention every prior addition to this list has used.
+ *
+ * Story 56 — `reports` appended as the new last entry, same convention.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -31,6 +33,7 @@ const NAV_ITEMS = [
   { href: "audit-logs", labelKey: "nav.auditLogs" },
   { href: "notifications", labelKey: "nav.notifications" },
   { href: "knowledge-base", labelKey: "nav.knowledgeBase" },
+  { href: "reports", labelKey: "nav.reports" },
 ] as const;
 
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {

@@ -48,3 +48,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | customer-portal-ticket-submission-tracking | [customer-portal-ticket-submission-tracking/00-overview.md](./customer-portal-ticket-submission-tracking/00-overview.md) | 53–      |
 | customer-portal-knowledge-base-browsing | [customer-portal-knowledge-base-browsing/00-overview.md](./customer-portal-knowledge-base-browsing/00-overview.md) | 54–      |
 | customer-portal-ticket-csat-feedback | [customer-portal-ticket-csat-feedback/00-overview.md](./customer-portal-ticket-csat-feedback/00-overview.md) | 55–      |
+| reporting-analytics-foundation | [reporting-analytics-foundation/00-overview.md](./reporting-analytics-foundation/00-overview.md) | 56–      |

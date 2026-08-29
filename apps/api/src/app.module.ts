@@ -21,6 +21,7 @@ import { SlaPoliciesModule } from "./modules/sla-policies/sla-policies.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { KnowledgeBaseModule } from "./modules/knowledge-base/knowledge-base.module";
 import { PortalModule } from "./modules/portal/portal.module";
+import { ReportingModule } from "./modules/reporting/reporting.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 
 @Module({
@@ -45,6 +46,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
     NotificationsModule,
     KnowledgeBaseModule,
     PortalModule,
+    ReportingModule,
     RealtimeModule,
   ],
   providers: [

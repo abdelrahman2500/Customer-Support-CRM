@@ -45,6 +45,7 @@ const PERMISSION_CATALOG = [
   "kb:create",
   "kb:read",
   "kb:update",
+  "report:read",
 ] as const;
 
 // No ticketing/customer/etc. permissions yet — those land with the stories

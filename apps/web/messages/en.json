@@ -32,7 +32,8 @@
       "roles": "Roles & Permissions",
       "auditLogs": "Audit Log",
       "notifications": "Notification History",
-      "knowledgeBase": "Knowledge Base"
+      "knowledgeBase": "Knowledge Base",
+      "reports": "Reports"
     }
   },
   "tickets": {
@@ -495,6 +496,26 @@
       "customer": "Customer",
       "target": "Target",
       "loggedAt": "Logged at"
+    }
+  },
+  "reporting": {
+    "title": "Reports",
+    "forbidden": "You don't have permission to view reports.",
+    "error": "Couldn't load this report.",
+    "retry": "Retry",
+    "ticketVolume": {
+      "heading": "Ticket Volume by Status",
+      "empty": "No tickets yet."
+    },
+    "slaCompliance": {
+      "heading": "SLA Compliance",
+      "empty": "No SLA-targeted tickets yet.",
+      "detail": "{compliant} of {total} tickets met their resolution target"
+    },
+    "csat": {
+      "heading": "Customer Satisfaction",
+      "empty": "No feedback submitted yet.",
+      "detail": "based on {count} responses"
     }
   }
 }
