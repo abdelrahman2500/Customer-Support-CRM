@@ -37,6 +37,26 @@ export interface CreatePortalTicketInput {
   category?: string;
 }
 
+/**
+ * Story 55 — mirrors the backend's `TicketCsatSummary` exactly
+ * (`apps/api/src/modules/tickets/tickets.service.ts`).
+ */
+export interface PortalTicketCsat {
+  id: string;
+  ticketId: string;
+  submittedByContactId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
+/** Mirrors `SubmitCsatDto` exactly
+ * (`apps/api/src/modules/portal/dto/submit-csat.dto.ts`). */
+export interface SubmitCsatInput {
+  rating: number;
+  comment?: string;
+}
+
 export function listMyTickets(): Promise<PortalTicketSummary[]> {
   return apiFetch<PortalTicketSummary[]>("/portal/tickets");
 }
@@ -53,6 +73,26 @@ export function createMyTicket(
   input: CreatePortalTicketInput,
 ): Promise<PortalTicketSummary> {
   return apiFetch<PortalTicketSummary>("/portal/tickets", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * `undefined` (not `null`) means no feedback has been submitted yet — the
+ * backend replies `204 No Content` for that case (never a literal JSON
+ * `null` body, which every fetch client's `response.json()` would throw on)
+ * and `apiFetch`'s shared `attempt()` already maps `204` to `undefined`.
+ */
+export function getMyTicketCsat(id: string): Promise<PortalTicketCsat | undefined> {
+  return apiFetch<PortalTicketCsat | undefined>(`/portal/tickets/${id}/csat`);
+}
+
+export function submitMyTicketCsat(
+  id: string,
+  input: SubmitCsatInput,
+): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/portal/tickets/${id}/csat`, {
     method: "POST",
     body: JSON.stringify(input),
   });

@@ -1,8 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { TicketsService } from "../tickets/tickets.service";
-import type { TicketHistoryEntrySummary, TicketSummary } from "../tickets/tickets.service";
+import type {
+  TicketCsatSummary,
+  TicketHistoryEntrySummary,
+  TicketSummary,
+} from "../tickets/tickets.service";
 import { PortalService } from "./portal.service";
 import type { PortalCreateTicketDto } from "./dto/portal-create-ticket.dto";
+import type { SubmitCsatDto } from "./dto/submit-csat.dto";
 
 /**
  * Story 53 — composes `PortalService.getAuthenticatedContact` (resolves the
@@ -41,5 +46,20 @@ export class PortalTicketsService {
   ): Promise<TicketHistoryEntrySummary[]> {
     const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
     return this.ticketsService.getTicketHistoryForCustomer(ticketId, customerId);
+  }
+
+  /** Story 55 — feedback/CSAT for a resolved/closed ticket. */
+  async submitCsat(
+    contactId: string,
+    ticketId: string,
+    dto: SubmitCsatDto,
+  ): Promise<{ id: string }> {
+    const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
+    return this.ticketsService.submitCsatForCustomer(ticketId, customerId, contactId, dto);
+  }
+
+  async getCsat(contactId: string, ticketId: string): Promise<TicketCsatSummary | null> {
+    const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
+    return this.ticketsService.getCsatForCustomer(ticketId, customerId);
   }
 }

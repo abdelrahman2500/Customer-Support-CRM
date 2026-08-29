@@ -225,4 +225,92 @@ describe("Customer Portal — Tickets (e2e)", () => {
       .set("Authorization", `Bearer ${token}`)
       .expect(404);
   });
+
+  // Story 55 — Customer Portal — Ticket CSAT / Feedback.
+  describe("CSAT / feedback", () => {
+    it("returns 204 (not an error) before any feedback has been submitted", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/csat`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(204);
+    });
+
+    it("rejects feedback while the ticket is still OPEN", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/csat`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ rating: 5 })
+        .expect(400);
+    });
+
+    it("rejects an out-of-range rating", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/tickets/${ticketId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status: "RESOLVED" })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/csat`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ rating: 6 })
+        .expect(400);
+    });
+
+    it("submits feedback once the ticket is resolved, then blocks a second submission", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const submitResponse = await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/csat`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ rating: 4, comment: "Resolved quickly" })
+        .expect(201);
+      expect(submitResponse.body.id).toBeDefined();
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/csat`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ rating: 5 })
+        .expect(409);
+    });
+
+    it("returns the submitted feedback to the customer", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/csat`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(response.body.rating).toBe(4);
+      expect(response.body.comment).toBe("Resolved quickly");
+    });
+
+    it("is visible to an agent via GET /tickets/:id/csat", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/csat`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(response.body.rating).toBe(4);
+    });
+
+    it("returns 404 for a contact from a different customer", async () => {
+      const otherToken = await loginAsPortalContact(otherContactEmail);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/csat`)
+        .set("Authorization", `Bearer ${otherToken}`)
+        .expect(404);
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/csat`)
+        .set("Authorization", `Bearer ${otherToken}`)
+        .send({ rating: 3 })
+        .expect(404);
+    });
+  });
 });

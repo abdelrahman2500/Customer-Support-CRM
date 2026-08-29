@@ -1,7 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { TicketDetailView } from "./ticket-detail-view";
-import { useMyTicketHistoryQuery, useMyTicketQuery } from "@/hooks/use-portal-tickets";
+import {
+  useMyTicketCsatQuery,
+  useMyTicketHistoryQuery,
+  useMyTicketQuery,
+  useSubmitMyTicketCsatMutation,
+} from "@/hooks/use-portal-tickets";
 import { ApiError } from "@/lib/api";
 
 vi.mock("next/navigation", () => ({
@@ -15,6 +20,8 @@ vi.mock("next-intl", () => ({
 vi.mock("@/hooks/use-portal-tickets", () => ({
   useMyTicketQuery: vi.fn(),
   useMyTicketHistoryQuery: vi.fn(),
+  useMyTicketCsatQuery: vi.fn(),
+  useSubmitMyTicketCsatMutation: vi.fn(),
 }));
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -48,6 +55,13 @@ describe("TicketDetailView", () => {
     vi.mocked(useMyTicketHistoryQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
+    vi.mocked(useMyTicketCsatQuery).mockReturnValue(
+      queryResult({ data: undefined, isSuccess: true }) as never,
+    );
+    vi.mocked(useSubmitMyTicketCsatMutation).mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
   });
 
   it("renders a loading skeleton while the ticket query is pending", () => {
@@ -136,5 +150,72 @@ describe("TicketDetailView", () => {
     render(<TicketDetailView ticketId="ticket-1" />);
 
     expect(screen.getByText("detail.historyError")).toBeInTheDocument();
+  });
+
+  // Story 55 — Customer Portal — Ticket CSAT / Feedback.
+  it("does not render the feedback section for an OPEN ticket", () => {
+    vi.mocked(useMyTicketQuery).mockReturnValue(
+      queryResult({ data: baseTicket, isSuccess: true }) as never,
+    );
+
+    render(<TicketDetailView ticketId="ticket-1" />);
+
+    expect(screen.queryByText("detail.csatHeading")).not.toBeInTheDocument();
+  });
+
+  it("renders the feedback form for a RESOLVED ticket with no response yet", () => {
+    vi.mocked(useMyTicketQuery).mockReturnValue(
+      queryResult({ data: { ...baseTicket, status: "RESOLVED" }, isSuccess: true }) as never,
+    );
+
+    render(<TicketDetailView ticketId="ticket-1" />);
+
+    expect(screen.getByText("detail.csatHeading")).toBeInTheDocument();
+    expect(screen.getByText("detail.csatSubmit")).toBeInTheDocument();
+  });
+
+  it("renders the feedback form for a CLOSED ticket with no response yet", () => {
+    vi.mocked(useMyTicketQuery).mockReturnValue(
+      queryResult({ data: { ...baseTicket, status: "CLOSED" }, isSuccess: true }) as never,
+    );
+
+    render(<TicketDetailView ticketId="ticket-1" />);
+
+    expect(screen.getByText("detail.csatHeading")).toBeInTheDocument();
+    expect(screen.getByText("detail.csatSubmit")).toBeInTheDocument();
+  });
+
+  it("renders the read-only summary once a response exists, not the form", () => {
+    vi.mocked(useMyTicketQuery).mockReturnValue(
+      queryResult({ data: { ...baseTicket, status: "RESOLVED" }, isSuccess: true }) as never,
+    );
+    vi.mocked(useMyTicketCsatQuery).mockReturnValue(
+      queryResult({
+        data: {
+          id: "csat-1",
+          ticketId: "ticket-1",
+          submittedByContactId: "contact-1",
+          rating: 4,
+          comment: "Great support",
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<TicketDetailView ticketId="ticket-1" />);
+
+    expect(screen.getByText("Great support")).toBeInTheDocument();
+    expect(screen.queryByText("detail.csatSubmit")).not.toBeInTheDocument();
+  });
+
+  it("disables the submit button until a rating is chosen", () => {
+    vi.mocked(useMyTicketQuery).mockReturnValue(
+      queryResult({ data: { ...baseTicket, status: "RESOLVED" }, isSuccess: true }) as never,
+    );
+
+    render(<TicketDetailView ticketId="ticket-1" />);
+
+    expect(screen.getByText("detail.csatSubmit").closest("button")).toBeDisabled();
   });
 });

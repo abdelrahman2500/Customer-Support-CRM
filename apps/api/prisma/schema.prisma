@@ -232,6 +232,7 @@ model Contact {
   passwordHash  String?               @map("password_hash")
   tickets       Ticket[]
   refreshTokens ContactRefreshToken[]
+  csatResponses TicketCsatResponse[]
   createdAt     DateTime              @default(now()) @map("created_at")
 
   @@unique([customerId, email])
@@ -307,6 +308,7 @@ model Ticket {
   status           TicketStatus         @default(OPEN)
   historyEntries   TicketHistoryEntry[]
   notes            TicketNote[]
+  csatResponse     TicketCsatResponse?
   slaTarget        SlaTicketTarget?
   slaEscalations   SlaEscalation[]
   notificationLogs NotificationLog[]
@@ -360,6 +362,28 @@ model TicketNote {
 
   @@index([ticketId])
   @@map("ticket_notes")
+  @@schema("ticketing")
+}
+
+/// Story 55 — one-time customer satisfaction rating on a Ticket, submitted
+/// only via the Customer Portal once the ticket is RESOLVED or CLOSED — see
+/// docs/architecture/08-supporting-domains.md ("CSAT/feedback"). Mirrors
+/// `TicketNote` exactly except `submittedByContactId` is a Contact, never
+/// an agent User — a CSAT response can only ever come from a portal
+/// Contact. `@@unique([ticketId])`: exactly one response per ticket,
+/// immutable once created (append-only, no update/delete route, same
+/// convention as `TicketNote`).
+model TicketCsatResponse {
+  id                   String   @id @default(uuid())
+  ticketId             String   @unique @map("ticket_id")
+  ticket               Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  submittedByContactId String   @map("submitted_by_contact_id")
+  submittedByContact   Contact  @relation(fields: [submittedByContactId], references: [id])
+  rating               Int
+  comment              String?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@map("ticket_csat_responses")
   @@schema("ticketing")
 }
 

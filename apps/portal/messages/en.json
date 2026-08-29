@@ -41,7 +41,17 @@
       "priority": "Priority",
       "historyHeading": "History",
       "historyError": "Couldn't load this ticket's history.",
-      "historyEmpty": "No history entries yet."
+      "historyEmpty": "No history entries yet.",
+      "csatHeading": "Feedback",
+      "csatError": "Couldn't load your feedback.",
+      "csatPrompt": "How would you rate the support you received?",
+      "csatRatingSelectLabel": "Rating",
+      "csatCommentLabel": "Comments (optional)",
+      "csatSubmit": "Submit feedback",
+      "csatSubmitting": "Submitting...",
+      "csatSubmitFailed": "Couldn't submit your feedback. Please try again.",
+      "csatRatingLabel": "Your rating: {rating}/5",
+      "csatSubmitted": "Thank you for your feedback!"
     }
   },
   "knowledgeBase": {

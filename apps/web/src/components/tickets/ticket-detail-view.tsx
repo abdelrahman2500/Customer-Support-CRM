@@ -8,6 +8,7 @@ import {
   useCreateTicketNoteMutation,
   useCustomersQuery,
   useDepartmentsQuery,
+  useTicketCsatQuery,
   useTicketEscalationsQuery,
   useTicketHistoryQuery,
   useTicketNotesQuery,
@@ -73,6 +74,12 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * add-note form using `useCreateTicketNoteMutation`. Author names are
  * resolved via a `userNameById` memo built from the already-fetched
  * `useUsersQuery()` data, mirroring `customerNameById`'s exact shape.
+ *
+ * Story 55 — a new, read-only "Customer Satisfaction" card, appended after
+ * History, reading `GET /tickets/:id/csat` via `useTicketCsatQuery`. An
+ * agent never submits feedback — this card only ever shows "no feedback
+ * yet" or the customer's own rating/comment, mirroring the History card's
+ * loading/error/empty/populated shape.
  */
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -83,6 +90,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
   const ticketQuery = useTicketQuery(ticketId);
   const historyQuery = useTicketHistoryQuery(ticketId);
+  const csatQuery = useTicketCsatQuery(ticketId);
   const slaTargetQuery = useTicketSlaTargetQuery(ticketId);
   const escalationsQuery = useTicketEscalationsQuery(ticketId);
   const notesQuery = useTicketNotesQuery(ticketId);
@@ -318,6 +326,27 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               </li>
             ))}
           </ol>
+        )}
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-slate-900">{t("detail.csatHeading")}</h2>
+        {csatQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
+        {csatQuery.isError && (
+          <Alert variant="destructive" className="mt-2">{t("detail.csatError")}</Alert>
+        )}
+        {csatQuery.isSuccess && !csatQuery.data && (
+          <p className="mt-2 text-sm text-slate-500">{t("detail.csatEmpty")}</p>
+        )}
+        {csatQuery.isSuccess && csatQuery.data && (
+          <div className="mt-2 flex flex-col gap-1 text-sm">
+            <span className="font-medium text-slate-800">
+              {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
+            </span>
+            {csatQuery.data.comment && (
+              <p className="text-slate-700">{csatQuery.data.comment}</p>
+            )}
+          </div>
         )}
       </div>
 

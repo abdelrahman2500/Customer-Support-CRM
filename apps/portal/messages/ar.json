@@ -41,7 +41,17 @@
       "priority": "الأولوية",
       "historyHeading": "السجل",
       "historyError": "تعذّر تحميل سجل هذه التذكرة.",
-      "historyEmpty": "لا توجد إدخالات في السجل حتى الآن."
+      "historyEmpty": "لا توجد إدخالات في السجل حتى الآن.",
+      "csatHeading": "الملاحظات",
+      "csatError": "تعذّر تحميل ملاحظاتك.",
+      "csatPrompt": "كيف تقيّم الدعم الذي تلقيته؟",
+      "csatRatingSelectLabel": "التقييم",
+      "csatCommentLabel": "تعليقات (اختياري)",
+      "csatSubmit": "إرسال الملاحظات",
+      "csatSubmitting": "جارٍ الإرسال...",
+      "csatSubmitFailed": "تعذّر إرسال ملاحظاتك. حاول مرة أخرى.",
+      "csatRatingLabel": "تقييمك: {rating}/5",
+      "csatSubmitted": "شكرًا لك على ملاحظاتك!"
     }
   },
   "knowledgeBase": {

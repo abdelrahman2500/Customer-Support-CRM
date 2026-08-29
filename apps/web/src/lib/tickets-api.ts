@@ -59,6 +59,17 @@ export interface TicketNoteSummary {
   createdAt: string;
 }
 
+/** Story 55 — mirrors the backend's `TicketCsatSummary` exactly
+ * (`apps/api/src/modules/tickets/tickets.service.ts`). */
+export interface TicketCsat {
+  id: string;
+  ticketId: string;
+  submittedByContactId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+}
+
 export interface CustomerSummary {
   id: string;
   displayName: string;
@@ -157,6 +168,16 @@ export function createTicketNote(
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+/**
+ * Story 55 — `GET /tickets/:id/csat` (`ticket:read`), read-only. `undefined`
+ * (not `null`) means no feedback has been submitted yet — the backend
+ * replies `204 No Content` for that case, which `apiFetch` already maps to
+ * `undefined` (mirrors `apps/portal`'s own `getMyTicketCsat` exactly).
+ */
+export function getTicketCsat(id: string): Promise<TicketCsat | undefined> {
+  return apiFetch<TicketCsat | undefined>(`/tickets/${id}/csat`);
 }
 
 /**

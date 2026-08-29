@@ -13,6 +13,8 @@ function buildTicketsServiceMock() {
     listTicketsForCustomer: vi.fn(),
     getTicketForCustomer: vi.fn(),
     getTicketHistoryForCustomer: vi.fn(),
+    submitCsatForCustomer: vi.fn(),
+    getCsatForCustomer: vi.fn(),
   };
 }
 
@@ -80,5 +82,32 @@ describe("PortalTicketsService", () => {
       "customer-1",
     );
     expect(result).toEqual([]);
+  });
+
+  // Story 55 — Customer Portal — Ticket CSAT / Feedback.
+  it("submitCsat resolves customerId, then delegates with the ticket id and contact id", async () => {
+    portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
+    ticketsService.submitCsatForCustomer.mockResolvedValue({ id: "csat-1" });
+
+    const result = await service.submitCsat("contact-1", "ticket-1", { rating: 5 });
+
+    expect(portalService.getAuthenticatedContact).toHaveBeenCalledWith("contact-1");
+    expect(ticketsService.submitCsatForCustomer).toHaveBeenCalledWith(
+      "ticket-1",
+      "customer-1",
+      "contact-1",
+      { rating: 5 },
+    );
+    expect(result).toEqual({ id: "csat-1" });
+  });
+
+  it("getCsat resolves customerId, then delegates with the ticket id", async () => {
+    portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
+    ticketsService.getCsatForCustomer.mockResolvedValue(null);
+
+    const result = await service.getCsat("contact-1", "ticket-1");
+
+    expect(ticketsService.getCsatForCustomer).toHaveBeenCalledWith("ticket-1", "customer-1");
+    expect(result).toBeNull();
   });
 });

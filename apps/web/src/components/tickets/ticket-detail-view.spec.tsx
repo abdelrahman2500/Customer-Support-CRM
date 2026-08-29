@@ -5,6 +5,7 @@ import {
   useCreateTicketNoteMutation,
   useCustomersQuery,
   useDepartmentsQuery,
+  useTicketCsatQuery,
   useTicketEscalationsQuery,
   useTicketHistoryQuery,
   useTicketNotesQuery,
@@ -33,6 +34,7 @@ vi.mock("@/hooks/use-tickets", () => ({
   useTicketSlaTargetQuery: vi.fn(),
   useTicketEscalationsQuery: vi.fn(),
   useTicketNotesQuery: vi.fn(),
+  useTicketCsatQuery: vi.fn(),
   useCustomersQuery: vi.fn(),
   useUsersQuery: vi.fn(),
   useDepartmentsQuery: vi.fn(),
@@ -84,6 +86,9 @@ describe("TicketDetailView", () => {
     );
     vi.mocked(useTicketNotesQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useTicketCsatQuery).mockReturnValue(
+      queryResult({ data: undefined, isSuccess: true }) as never,
     );
     vi.mocked(useUpdateTicketMutation).mockReturnValue({
       mutate: vi.fn(),
@@ -622,6 +627,82 @@ describe("TicketDetailView", () => {
       render(<TicketDetailView ticketId="ticket-1" />);
 
       expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
+      expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
+    });
+  });
+
+  describe("Customer Satisfaction card (Story 55)", () => {
+    beforeEach(() => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+    });
+
+    it("renders a skeleton while feedback is loading", () => {
+      vi.mocked(useTicketCsatQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const heading = screen.getByText("detail.csatHeading");
+      const card = heading.parentElement as HTMLElement;
+      expect(card.querySelector(".animate-pulse")).toBeInTheDocument();
+    });
+
+    it("renders an inline error when feedback fails to load", () => {
+      vi.mocked(useTicketCsatQuery).mockReturnValue(
+        queryResult({ isError: true, error: new ApiError("Server error", 500) }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.csatError")).toBeInTheDocument();
+    });
+
+    it("renders the empty message when no feedback has been submitted yet", () => {
+      vi.mocked(useTicketCsatQuery).mockReturnValue(
+        queryResult({ data: undefined, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.csatEmpty")).toBeInTheDocument();
+    });
+
+    it("renders the customer's rating and comment once submitted", () => {
+      vi.mocked(useTicketCsatQuery).mockReturnValue(
+        queryResult({
+          data: {
+            id: "csat-1",
+            ticketId: "ticket-1",
+            submittedByContactId: "contact-1",
+            rating: 5,
+            comment: "Resolved quickly, thank you!",
+            createdAt: "2024-01-03T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(
+        screen.getByText(`detail.csatRatingLabel:${JSON.stringify({ rating: 5 })}`),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Resolved quickly, thank you!")).toBeInTheDocument();
+      expect(screen.queryByText("detail.csatEmpty")).not.toBeInTheDocument();
+    });
+
+    it("does not interfere with the Notes card's own rendering", () => {
+      vi.mocked(useTicketCsatQuery).mockReturnValue(
+        queryResult({ data: undefined, isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.csatEmpty")).toBeInTheDocument();
       expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
   });

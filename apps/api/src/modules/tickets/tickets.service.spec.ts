@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import type { EventEmitter2 } from "@nestjs/event-emitter";
 import { TicketsService } from "./tickets.service";
 import {
@@ -24,6 +25,10 @@ function buildPrismaMock() {
     },
     ticketNote: {
       findMany: vi.fn(),
+      create: vi.fn(),
+    },
+    ticketCsatResponse: {
+      findUnique: vi.fn(),
       create: vi.fn(),
     },
     customer: {
@@ -664,6 +669,53 @@ describe("TicketsService", () => {
     });
   });
 
+  // Story 55 — Customer Portal — Ticket CSAT / Feedback.
+  describe("getCsatForTicket", () => {
+    it("throws NotFoundException for an unknown/out-of-scope ticket id", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(service.getCsatForTicket("missing-id")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.ticketCsatResponse.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("returns null when no feedback has been submitted yet", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketCsatResponse.findUnique.mockResolvedValue(null);
+
+      const result = await service.getCsatForTicket("ticket-1");
+
+      expect(prisma.ticketCsatResponse.findUnique).toHaveBeenCalledWith({
+        where: { ticketId: "ticket-1" },
+      });
+      expect(result).toBeNull();
+    });
+
+    it("returns the feedback once submitted", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketCsatResponse.findUnique.mockResolvedValue({
+        id: "csat-1",
+        ticketId: "ticket-1",
+        submittedByContactId: "contact-1",
+        rating: 5,
+        comment: "Great support",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+
+      const result = await service.getCsatForTicket("ticket-1");
+
+      expect(result).toEqual({
+        id: "csat-1",
+        ticketId: "ticket-1",
+        submittedByContactId: "contact-1",
+        rating: 5,
+        comment: "Great support",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+    });
+  });
+
   describe("getTicketNotes", () => {
     it("throws NotFoundException for an unknown/out-of-scope ticket id", async () => {
       prisma.ticket.findFirst.mockResolvedValue(null);
@@ -909,6 +961,146 @@ describe("TicketsService", () => {
           createdAt: new Date("2026-01-01T00:00:00.000Z"),
         },
       ]);
+    });
+  });
+
+  // Story 55 — Customer Portal — Ticket CSAT / Feedback (customer-scoped).
+  describe("submitCsatForCustomer", () => {
+    it("throws NotFoundException for a ticket belonging to a different customer or unknown id", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.submitCsatForCustomer("ticket-1", "customer-1", "contact-1", { rating: 5 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticketCsatResponse.create).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException when the ticket isn't resolved or closed", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        customerId: "customer-1",
+        status: "OPEN",
+      });
+
+      await expect(
+        service.submitCsatForCustomer("ticket-1", "customer-1", "contact-1", { rating: 5 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.ticketCsatResponse.create).not.toHaveBeenCalled();
+    });
+
+    it.each(["RESOLVED", "CLOSED"])(
+      "creates the feedback when the ticket is %s",
+      async (status) => {
+        prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", customerId: "customer-1", status });
+        prisma.ticketCsatResponse.create.mockResolvedValue({ id: "csat-1" });
+
+        const result = await service.submitCsatForCustomer(
+          "ticket-1",
+          "customer-1",
+          "contact-1",
+          { rating: 4, comment: "Good" },
+        );
+
+        expect(prisma.ticketCsatResponse.create).toHaveBeenCalledWith({
+          data: {
+            ticketId: "ticket-1",
+            submittedByContactId: "contact-1",
+            rating: 4,
+            comment: "Good",
+          },
+        });
+        expect(result).toEqual({ id: "csat-1" });
+      },
+    );
+
+    it("defaults comment to null when omitted", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        customerId: "customer-1",
+        status: "RESOLVED",
+      });
+      prisma.ticketCsatResponse.create.mockResolvedValue({ id: "csat-1" });
+
+      await service.submitCsatForCustomer("ticket-1", "customer-1", "contact-1", { rating: 3 });
+
+      expect(prisma.ticketCsatResponse.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ comment: null }) }),
+      );
+    });
+
+    it("translates a duplicate submission (P2002) into ConflictException", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        customerId: "customer-1",
+        status: "RESOLVED",
+      });
+      prisma.ticketCsatResponse.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "test",
+        }),
+      );
+
+      await expect(
+        service.submitCsatForCustomer("ticket-1", "customer-1", "contact-1", { rating: 5 }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("rethrows unrelated errors from the create call", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        customerId: "customer-1",
+        status: "RESOLVED",
+      });
+      const unrelated = new Error("connection lost");
+      prisma.ticketCsatResponse.create.mockRejectedValue(unrelated);
+
+      await expect(
+        service.submitCsatForCustomer("ticket-1", "customer-1", "contact-1", { rating: 5 }),
+      ).rejects.toBe(unrelated);
+    });
+  });
+
+  describe("getCsatForCustomer", () => {
+    it("throws NotFoundException for a ticket belonging to a different customer or unknown id", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getCsatForCustomer("ticket-1", "customer-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticketCsatResponse.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("returns null when no feedback has been submitted yet", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", customerId: "customer-1" });
+      prisma.ticketCsatResponse.findUnique.mockResolvedValue(null);
+
+      const result = await service.getCsatForCustomer("ticket-1", "customer-1");
+
+      expect(result).toBeNull();
+    });
+
+    it("returns the feedback once submitted", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", customerId: "customer-1" });
+      prisma.ticketCsatResponse.findUnique.mockResolvedValue({
+        id: "csat-1",
+        ticketId: "ticket-1",
+        submittedByContactId: "contact-1",
+        rating: 5,
+        comment: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+
+      const result = await service.getCsatForCustomer("ticket-1", "customer-1");
+
+      expect(result).toEqual({
+        id: "csat-1",
+        ticketId: "ticket-1",
+        submittedByContactId: "contact-1",
+        rating: 5,
+        comment: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
     });
   });
 });

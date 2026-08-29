@@ -1,10 +1,15 @@
-import { Body, Controller, Get, Param, Post, Req } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Req, Res } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import type { JwtAccessTokenClaims } from "@crm/shared";
 import { PortalRoute } from "../../common/auth/portal-route.decorator";
 import { PortalCreateTicketDto } from "./dto/portal-create-ticket.dto";
-import type { TicketHistoryEntrySummary, TicketSummary } from "../tickets/tickets.service";
+import { SubmitCsatDto } from "./dto/submit-csat.dto";
+import type {
+  TicketCsatSummary,
+  TicketHistoryEntrySummary,
+  TicketSummary,
+} from "../tickets/tickets.service";
 import { PortalTicketsService } from "./portal-tickets.service";
 
 /**
@@ -52,5 +57,45 @@ export class PortalTicketsController {
   ): Promise<TicketHistoryEntrySummary[]> {
     const contact = request.user as JwtAccessTokenClaims;
     return this.portalTicketsService.getTicketHistory(contact.sub, id);
+  }
+
+  @PortalRoute()
+  @Post(":id/csat")
+  submitCsat(
+    @Req() request: Request,
+    @Param("id") id: string,
+    @Body() dto: SubmitCsatDto,
+  ): Promise<{ id: string }> {
+    const contact = request.user as JwtAccessTokenClaims;
+    return this.portalTicketsService.submitCsat(contact.sub, id, dto);
+  }
+
+  /**
+   * `@Res()` (no `passthrough`) bypasses Nest's automatic reply — needed to
+   * send a genuine `204 No Content` when no feedback has been submitted yet.
+   * Returning `null` directly from a Nest handler still replies `200` with
+   * an *empty* body (Nest's `isNil(body)` short-circuit in
+   * `express-adapter.js`'s `reply()`), which every fetch client's
+   * `response.json()` throws on — `204` is the only way to make "nothing
+   * yet" distinguishable and safely parseable. Mirrored exactly by the
+   * agent-facing `TicketsController.getCsat`.
+   */
+  @PortalRoute()
+  @Get(":id/csat")
+  async getCsat(
+    @Req() request: Request,
+    @Param("id") id: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const contact = request.user as JwtAccessTokenClaims;
+    const result: TicketCsatSummary | null = await this.portalTicketsService.getCsat(
+      contact.sub,
+      id,
+    );
+    if (!result) {
+      response.status(204).send();
+      return;
+    }
+    response.status(200).json(result);
   }
 }

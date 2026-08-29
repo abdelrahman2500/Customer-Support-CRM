@@ -1,9 +1,18 @@
 "use client";
 
+import { useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useMyTicketHistoryQuery, useMyTicketQuery } from "@/hooks/use-portal-tickets";
+import {
+  useMyTicketCsatQuery,
+  useMyTicketHistoryQuery,
+  useMyTicketQuery,
+  useSubmitMyTicketCsatMutation,
+} from "@/hooks/use-portal-tickets";
 import { ApiError } from "@/lib/api";
+import type { PortalTicketStatus } from "@/lib/tickets-api";
+
+const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
 /**
  * Story 53 — mirrors `apps/web`'s `TicketDetailView`'s loading/not-found/
@@ -97,6 +106,119 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </ol>
         )}
       </div>
+
+      {CSAT_ELIGIBLE_STATUSES.includes(ticket.status) && <CsatSection ticketId={ticketId} />}
     </section>
+  );
+}
+
+/**
+ * Story 55 — only rendered once the ticket is `RESOLVED`/`CLOSED` (mirrors
+ * the backend's own status gate). Shows a read-only summary once a response
+ * exists, otherwise a rating+comment submit form — never both at once.
+ */
+function CsatSection({ ticketId }: { ticketId: string }) {
+  const t = useTranslations("tickets");
+  const csatQuery = useMyTicketCsatQuery(ticketId);
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-6">
+      <h2 className="text-sm font-semibold text-slate-900">{t("detail.csatHeading")}</h2>
+
+      {csatQuery.isLoading && (
+        <div className="mt-2 h-16 w-full animate-pulse rounded-md bg-slate-100" />
+      )}
+
+      {csatQuery.isError && (
+        <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {t("detail.csatError")}
+        </div>
+      )}
+
+      {csatQuery.isSuccess && csatQuery.data && (
+        <div className="mt-2 flex flex-col gap-1 text-sm">
+          <span className="font-medium text-slate-800">
+            {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
+          </span>
+          {csatQuery.data.comment && (
+            <p className="text-slate-600">{csatQuery.data.comment}</p>
+          )}
+          <p className="text-slate-500">{t("detail.csatSubmitted")}</p>
+        </div>
+      )}
+
+      {csatQuery.isSuccess && !csatQuery.data && <CsatForm ticketId={ticketId} />}
+    </div>
+  );
+}
+
+function CsatForm({ ticketId }: { ticketId: string }) {
+  const t = useTranslations("tickets");
+  const [rating, setRating] = useState<number | null>(null);
+  const [comment, setComment] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useSubmitMyTicketCsatMutation(ticketId);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setError(null);
+    if (!rating) {
+      return;
+    }
+    try {
+      await mutation.mutateAsync({
+        rating,
+        ...(comment.trim() ? { comment: comment.trim() } : {}),
+      });
+    } catch (submitError) {
+      setError(
+        submitError instanceof ApiError ? submitError.message : t("detail.csatSubmitFailed"),
+      );
+    }
+  }
+
+  return (
+    <form className="mt-2 flex flex-col gap-3" onSubmit={handleSubmit}>
+      <p className="text-sm text-slate-700">{t("detail.csatPrompt")}</p>
+      <div role="radiogroup" aria-label={t("detail.csatRatingSelectLabel")} className="flex gap-2">
+        {[1, 2, 3, 4, 5].map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={rating === value}
+            onClick={() => setRating(value)}
+            className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm font-medium ${
+              rating === value
+                ? "border-slate-900 bg-slate-900 text-white"
+                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            {value}
+          </button>
+        ))}
+      </div>
+      <label className="flex flex-col gap-1 text-sm text-slate-700">
+        {t("detail.csatCommentLabel")}
+        <textarea
+          className="w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+          rows={3}
+        />
+      </label>
+      {error && (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={mutation.isPending || !rating}
+        className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {mutation.isPending ? t("detail.csatSubmitting") : t("detail.csatSubmit")}
+      </button>
+    </form>
   );
 }

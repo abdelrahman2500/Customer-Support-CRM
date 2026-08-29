@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
-import type { Prisma, TicketPriority, TicketStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { TicketPriority, TicketStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateTicketDto } from "./dto/create-ticket.dto";
@@ -8,6 +9,7 @@ import type { UpdateTicketDto } from "./dto/update-ticket.dto";
 import type { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
 import type { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
 import type { PortalCreateTicketDto } from "../portal/dto/portal-create-ticket.dto";
+import type { SubmitCsatDto } from "../portal/dto/submit-csat.dto";
 import {
   TICKET_CREATED_EVENT,
   TICKET_UPDATED_EVENT,
@@ -66,6 +68,15 @@ export interface TicketNoteSummary {
   ticketId: string;
   authorUserId: string;
   body: string;
+  createdAt: Date;
+}
+
+export interface TicketCsatSummary {
+  id: string;
+  ticketId: string;
+  submittedByContactId: string;
+  rating: number;
+  comment: string | null;
   createdAt: Date;
 }
 
@@ -281,6 +292,16 @@ export class TicketsService {
     return { id: note.id };
   }
 
+  /** Agent-facing, read-only — mirrors `getTicketHistory`'s exact scoping
+   * pattern. Returns `null` when no feedback has been submitted yet (not
+   * an error, same convention as every other "nothing yet" list/lookup in
+   * this codebase). */
+  async getCsatForTicket(id: string): Promise<TicketCsatSummary | null> {
+    await this.findTicketInScope(id);
+    const response = await this.prisma.ticketCsatResponse.findUnique({ where: { ticketId: id } });
+    return response ? toCsatSummary(response) : null;
+  }
+
   // ---------------------------------------------------------------------
   // Story 53 — Customer Portal (customer-scoped, no TenantContext)
   //
@@ -366,6 +387,62 @@ export class TicketsService {
       snapshot: entry.snapshot,
       createdAt: entry.createdAt,
     }));
+  }
+
+  // ---------------------------------------------------------------------
+  // Story 55 — Customer Portal — Ticket CSAT / Feedback (customer-scoped)
+  // ---------------------------------------------------------------------
+
+  /**
+   * Feedback is only accepted once the ticket is `RESOLVED` or `CLOSED`
+   * (plan Design item 2) and exactly once per ticket (plan Design item 1,
+   * enforced by the `@@unique([ticketId])` constraint — a second attempt
+   * is translated to `ConflictException`, mirroring
+   * `CustomersService.createContact`'s own P2002-translation precedent).
+   */
+  async submitCsatForCustomer(
+    ticketId: string,
+    customerId: string,
+    contactId: string,
+    dto: SubmitCsatDto,
+  ): Promise<{ id: string }> {
+    const ticket = await this.findTicketInCustomerScope(ticketId, customerId);
+    if (ticket.status !== "RESOLVED" && ticket.status !== "CLOSED") {
+      throw new BadRequestException(
+        "Feedback can only be submitted once the ticket is resolved or closed",
+      );
+    }
+
+    try {
+      const response = await this.prisma.ticketCsatResponse.create({
+        data: {
+          ticketId,
+          submittedByContactId: contactId,
+          rating: dto.rating,
+          comment: dto.comment ?? null,
+        },
+      });
+      return { id: response.id };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException("Feedback has already been submitted for this ticket");
+      }
+      throw error;
+    }
+  }
+
+  async getCsatForCustomer(
+    ticketId: string,
+    customerId: string,
+  ): Promise<TicketCsatSummary | null> {
+    await this.findTicketInCustomerScope(ticketId, customerId);
+    const response = await this.prisma.ticketCsatResponse.findUnique({
+      where: { ticketId },
+    });
+    return response ? toCsatSummary(response) : null;
   }
 
   // ---------------------------------------------------------------------
@@ -479,5 +556,23 @@ export function toTicketSummary(ticket: {
     assignedToUserId: ticket.assignedToUserId,
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,
+  };
+}
+
+function toCsatSummary(response: {
+  id: string;
+  ticketId: string;
+  submittedByContactId: string;
+  rating: number;
+  comment: string | null;
+  createdAt: Date;
+}): TicketCsatSummary {
+  return {
+    id: response.id,
+    ticketId: response.ticketId,
+    submittedByContactId: response.submittedByContactId,
+    rating: response.rating,
+    comment: response.comment,
+    createdAt: response.createdAt,
   };
 }

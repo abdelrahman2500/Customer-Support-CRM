@@ -7,6 +7,7 @@ import {
   createUser,
   getCustomer,
   getTicket,
+  getTicketCsat,
   getTicketEscalations,
   getTicketHistory,
   getTicketNotes,
@@ -46,6 +47,7 @@ export const ticketHistoryQueryKey = (id: string) => ["ticket", id, "history"] a
 export const ticketSlaTargetQueryKey = (id: string) => ["ticket", id, "sla-target"] as const;
 export const ticketEscalationsQueryKey = (id: string) => ["ticket", id, "escalations"] as const;
 export const ticketNotesQueryKey = (id: string) => ["ticket", id, "notes"] as const;
+export const ticketCsatQueryKey = (id: string) => ["ticket", id, "csat"] as const;
 
 export function useTicketsQuery(filters: ListTicketsFilters) {
   return useQuery({
@@ -84,6 +86,15 @@ export function useTicketNotesQuery(id: string) {
   return useQuery({
     queryKey: ticketNotesQueryKey(id),
     queryFn: () => getTicketNotes(id),
+  });
+}
+
+/** Story 55 — read-only, mirrors `useTicketNotesQuery`: no `staleTime`,
+ * since this can change the moment a customer submits feedback. */
+export function useTicketCsatQuery(id: string) {
+  return useQuery({
+    queryKey: ticketCsatQueryKey(id),
+    queryFn: () => getTicketCsat(id),
   });
 }
 
