@@ -1,5 +1,14 @@
 # squad-kit workspace
 
+> **Note:** the manual, human-in-the-loop workflow below describes how to
+> use the `squad` CLI directly. It is not the only path in this repository.
+> The root **`CLAUDE.md`** is the authoritative instruction set for
+> Claude Code sessions here and defines a continuous, autonomous Story loop
+> that plans and implements Stories without per-Story human confirmation,
+> writing into this same `.squad/plans/**`/`.squad/stories/**` structure.
+> Where the two read as contradictory (for example, a generated plan's own
+> "STOP HERE" closing line), `CLAUDE.md` wins.
+
 This folder is managed by [squad-kit](https://github.com/AzmSquad/squad-kit).
 
 - **Project:** Customer Support CRM
