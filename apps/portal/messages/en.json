@@ -14,6 +14,34 @@
   "home": {
     "signedInAs": "Signed in as {name}",
     "signOut": "Sign out",
-    "placeholder": "Ticket submission and tracking are coming in a future story — this page only confirms you're securely signed in."
+    "myTicketsLink": "View my tickets",
+    "placeholder": "This page confirms you're securely signed in."
+  },
+  "tickets": {
+    "nav": "My Tickets",
+    "list": {
+      "title": "My Tickets",
+      "error": "Couldn't load your tickets.",
+      "retry": "Retry",
+      "empty": "You haven't submitted any tickets yet.",
+      "noCategory": "—",
+      "createHeading": "Submit a new ticket",
+      "createSubjectLabel": "Subject",
+      "createCategoryLabel": "Category (optional)",
+      "createSubmit": "Submit ticket",
+      "createSubmitting": "Submitting...",
+      "createFailed": "Couldn't submit the ticket. Please try again."
+    },
+    "detail": {
+      "notFound": "This ticket could not be found.",
+      "loadError": "Couldn't load this ticket.",
+      "backToList": "Back to my tickets",
+      "category": "Category",
+      "status": "Status",
+      "priority": "Priority",
+      "historyHeading": "History",
+      "historyError": "Couldn't load this ticket's history.",
+      "historyEmpty": "No history entries yet."
+    }
   }
 }

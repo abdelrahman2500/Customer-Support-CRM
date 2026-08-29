@@ -44,6 +44,12 @@ describe("PortalHeader", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders a nav link to the tickets screen (Story 53)", () => {
+    render(<PortalHeader contact={contact} />);
+
+    expect(screen.getByRole("link", { name: "nav" })).toHaveAttribute("href", "/en/tickets");
+  });
+
   it("calls the real logout, then clears the local token and redirects to login, on sign-out", async () => {
     render(<PortalHeader contact={contact} />);
 

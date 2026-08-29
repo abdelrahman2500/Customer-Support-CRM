@@ -45,3 +45,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | agent-workspace-ticket-internal-notes | [agent-workspace-ticket-internal-notes/00-overview.md](./agent-workspace-ticket-internal-notes/00-overview.md) | 50–      |
 | knowledge-base-foundation | [knowledge-base-foundation/00-overview.md](./knowledge-base-foundation/00-overview.md) | 51–      |
 | customer-portal-authentication-foundation | [customer-portal-authentication-foundation/00-overview.md](./customer-portal-authentication-foundation/00-overview.md) | 52–      |
+| customer-portal-ticket-submission-tracking | [customer-portal-ticket-submission-tracking/00-overview.md](./customer-portal-ticket-submission-tracking/00-overview.md) | 53–      |

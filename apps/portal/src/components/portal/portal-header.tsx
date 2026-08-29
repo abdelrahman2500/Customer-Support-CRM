@@ -8,12 +8,13 @@ import { clearAccessToken, logout } from "@/lib/api";
 /**
  * Story 52 — the Customer Portal's minimal authenticated header, mirroring
  * `apps/web`'s `WorkspaceNav` sign-out logic exactly (real `POST
- * /portal/auth/logout` first, local cleanup always runs regardless), trimmed
- * to what a single-page portal foundation needs — no nav links yet (no
- * other portal screen exists until a future story).
+ * /portal/auth/logout` first, local cleanup always runs regardless).
+ *
+ * Story 53 — gains the portal's first real nav link, to `/tickets`.
  */
 export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const t = useTranslations("home");
+  const tTickets = useTranslations("tickets");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
@@ -29,9 +30,14 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
 
   return (
     <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
-      <span className="text-sm font-semibold text-slate-900">
-        {t("signedInAs", { name: contact.fullName })}
-      </span>
+      <nav className="flex items-center gap-4 text-sm">
+        <a href={`/${locale}/home`} className="font-semibold text-slate-900">
+          {t("signedInAs", { name: contact.fullName })}
+        </a>
+        <a href={`/${locale}/tickets`} className="text-slate-600 hover:text-slate-900 hover:underline">
+          {tTickets("nav")}
+        </a>
+      </nav>
       <button
         type="button"
         onClick={handleSignOut}

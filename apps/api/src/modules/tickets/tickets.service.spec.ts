@@ -31,6 +31,7 @@ function buildPrismaMock() {
     },
     contact: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
     },
     department: {
       findFirst: vi.fn(),
@@ -750,6 +751,164 @@ describe("TicketsService", () => {
           createdAt: new Date("2026-01-01T00:00:00.000Z"),
         },
       });
+    });
+  });
+
+  // Story 53 — Customer Portal — Submit & Track Own Tickets.
+  describe("createTicketForContact", () => {
+    it("throws NotFoundException for an unknown contact, never creating a ticket", async () => {
+      prisma.contact.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.createTicketForContact("missing-contact", { subject: "Help" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticket.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it("creates the ticket scoped to the contact's own customer/branch, with actorUserId null", async () => {
+      prisma.contact.findUnique.mockResolvedValue({
+        id: "contact-1",
+        customerId: "customer-1",
+        customer: { id: "customer-1", branchId: "branch-1" },
+      });
+      prisma.ticket.create.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: "contact-1",
+        departmentId: null,
+        assignedToUserId: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+
+      const result = await service.createTicketForContact("contact-1", {
+        subject: "Cannot log in",
+      });
+
+      expect(prisma.ticket.create).toHaveBeenCalledWith({
+        data: {
+          branchId: "branch-1",
+          customerId: "customer-1",
+          contactId: "contact-1",
+          subject: "Cannot log in",
+          category: null,
+        },
+      });
+      expect(result.customerId).toBe("customer-1");
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_CREATED_EVENT, {
+        ticket: result,
+        actorUserId: null,
+      });
+    });
+
+    it("passes through category when given", async () => {
+      prisma.contact.findUnique.mockResolvedValue({
+        id: "contact-1",
+        customerId: "customer-1",
+        customer: { id: "customer-1", branchId: "branch-1" },
+      });
+      prisma.ticket.create.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: "account",
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: "contact-1",
+        departmentId: null,
+        assignedToUserId: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+
+      await service.createTicketForContact("contact-1", {
+        subject: "Cannot log in",
+        category: "account",
+      });
+
+      expect(prisma.ticket.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ category: "account" }) }),
+      );
+    });
+  });
+
+  describe("listTicketsForCustomer", () => {
+    it("scopes the query to the given customerId, ordered createdAt desc", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTicketsForCustomer("customer-1");
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith({
+        where: { customerId: "customer-1" },
+        orderBy: { createdAt: "desc" },
+      });
+    });
+
+    it("returns [] for a customer with no tickets", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      const result = await service.listTicketsForCustomer("customer-1");
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("getTicketForCustomer", () => {
+    it("throws NotFoundException for a ticket belonging to a different customer or unknown id", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getTicketForCustomer("ticket-1", "customer-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticket.findFirst).toHaveBeenCalledWith({
+        where: { id: "ticket-1", customerId: "customer-1" },
+      });
+    });
+  });
+
+  describe("getTicketHistoryForCustomer", () => {
+    it("throws NotFoundException for a ticket belonging to a different customer", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getTicketHistoryForCustomer("ticket-1", "customer-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticketHistoryEntry.findMany).not.toHaveBeenCalled();
+    });
+
+    it("scopes and orders history entries once the ticket is confirmed in scope", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", customerId: "customer-1" });
+      prisma.ticketHistoryEntry.findMany.mockResolvedValue([
+        {
+          id: "history-1",
+          eventType: TICKET_CREATED_EVENT,
+          actorUserId: null,
+          snapshot: { id: "ticket-1" },
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
+
+      const result = await service.getTicketHistoryForCustomer("ticket-1", "customer-1");
+
+      expect(prisma.ticketHistoryEntry.findMany).toHaveBeenCalledWith({
+        where: { ticketId: "ticket-1" },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(result).toEqual([
+        {
+          id: "history-1",
+          eventType: TICKET_CREATED_EVENT,
+          actorUserId: null,
+          snapshot: { id: "ticket-1" },
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
     });
   });
 });

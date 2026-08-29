@@ -14,6 +14,34 @@
   "home": {
     "signedInAs": "مسجّل الدخول باسم {name}",
     "signOut": "تسجيل الخروج",
-    "placeholder": "إرسال التذاكر ومتابعتها سيُضافان في قصة قادمة — هذه الصفحة تؤكد فقط أنك مسجّل الدخول بأمان."
+    "myTicketsLink": "عرض تذاكري",
+    "placeholder": "هذه الصفحة تؤكد فقط أنك مسجّل الدخول بأمان."
+  },
+  "tickets": {
+    "nav": "تذاكري",
+    "list": {
+      "title": "تذاكري",
+      "error": "تعذّر تحميل تذاكرك.",
+      "retry": "إعادة المحاولة",
+      "empty": "لم تقم بإرسال أي تذاكر حتى الآن.",
+      "noCategory": "—",
+      "createHeading": "إرسال تذكرة جديدة",
+      "createSubjectLabel": "الموضوع",
+      "createCategoryLabel": "الفئة (اختياري)",
+      "createSubmit": "إرسال التذكرة",
+      "createSubmitting": "جارٍ الإرسال...",
+      "createFailed": "تعذّر إرسال التذكرة. حاول مرة أخرى."
+    },
+    "detail": {
+      "notFound": "تعذّر العثور على هذه التذكرة.",
+      "loadError": "تعذّر تحميل هذه التذكرة.",
+      "backToList": "العودة إلى تذاكري",
+      "category": "الفئة",
+      "status": "الحالة",
+      "priority": "الأولوية",
+      "historyHeading": "السجل",
+      "historyError": "تعذّر تحميل سجل هذه التذكرة.",
+      "historyEmpty": "لا توجد إدخالات في السجل حتى الآن."
+    }
   }
 }

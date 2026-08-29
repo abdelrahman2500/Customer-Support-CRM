@@ -7,6 +7,7 @@ import type { CreateTicketDto } from "./dto/create-ticket.dto";
 import type { UpdateTicketDto } from "./dto/update-ticket.dto";
 import type { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
 import type { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
+import type { PortalCreateTicketDto } from "../portal/dto/portal-create-ticket.dto";
 import {
   TICKET_CREATED_EVENT,
   TICKET_UPDATED_EVENT,
@@ -281,8 +282,122 @@ export class TicketsService {
   }
 
   // ---------------------------------------------------------------------
+  // Story 53 — Customer Portal (customer-scoped, no TenantContext)
+  //
+  // Branch scoping for a portal-authenticated request is derived
+  // transitively through the Contact -> Customer relation, never through
+  // `TenantContext` (which stays exactly what it already was: the
+  // agent-audience branch-scoping mechanism) — see the plan's Design item
+  // 2. None of the existing branch-scoped methods above are touched.
+  // ---------------------------------------------------------------------
+
+  /**
+   * The only way a portal Contact creates a ticket. `actorUserId` on the
+   * emitted event is always `null` — a Contact is not an agent `User` (and
+   * is not a valid `identity.users` foreign key), mirroring
+   * `TicketEscalatedEvent`'s existing "no human actor" precedent (plan
+   * Design item 3).
+   */
+  async createTicketForContact(
+    contactId: string,
+    dto: PortalCreateTicketDto,
+  ): Promise<TicketSummary> {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id: contactId },
+      include: { customer: true },
+    });
+    if (!contact) {
+      throw new NotFoundException("Contact not found");
+    }
+
+    const ticket = await this.prisma.ticket.create({
+      data: {
+        branchId: contact.customer.branchId,
+        customerId: contact.customerId,
+        contactId: contact.id,
+        subject: dto.subject,
+        category: dto.category ?? null,
+      },
+    });
+    const summary = toTicketSummary(ticket);
+    this.eventEmitter.emit(TICKET_CREATED_EVENT, {
+      ticket: summary,
+      actorUserId: null,
+    } satisfies TicketCreatedEvent);
+    return summary;
+  }
+
+  /**
+   * Every ticket belonging to a Customer, newest first — a deliberate
+   * deviation from `listTickets`'s own `createdAt asc` default (plan Design
+   * item 8): a customer-facing "my tickets" view reads naturally
+   * newest-first, and this is a new, separate list, not an extension of the
+   * agent one. Scoped by `customerId` alone (docs/architecture/08-supporting-domains.md:
+   * "every portal query adds `customerId = currentCustomer.id`" — every
+   * contact at a Customer sees that Customer's tickets, not only ones they
+   * personally opened).
+   */
+  async listTicketsForCustomer(customerId: string): Promise<TicketSummary[]> {
+    const tickets = await this.prisma.ticket.findMany({
+      where: { customerId },
+      orderBy: { createdAt: "desc" },
+    });
+    return tickets.map(toTicketSummary);
+  }
+
+  async getTicketForCustomer(id: string, customerId: string): Promise<TicketSummary> {
+    const ticket = await this.findTicketInCustomerScope(id, customerId);
+    return toTicketSummary(ticket);
+  }
+
+  async getTicketHistoryForCustomer(
+    id: string,
+    customerId: string,
+  ): Promise<TicketHistoryEntrySummary[]> {
+    await this.findTicketInCustomerScope(id, customerId);
+    const entries = await this.prisma.ticketHistoryEntry.findMany({
+      where: { ticketId: id },
+      orderBy: { createdAt: "asc" },
+    });
+    return entries.map((entry) => ({
+      id: entry.id,
+      eventType: entry.eventType,
+      actorUserId: entry.actorUserId,
+      snapshot: entry.snapshot,
+      createdAt: entry.createdAt,
+    }));
+  }
+
+  // ---------------------------------------------------------------------
   // internals
   // ---------------------------------------------------------------------
+
+  /** Mirrors `findTicketInScope` exactly, scoped by `customerId` instead of
+   * `branchId` — 404 masks both "doesn't exist" and "belongs to a
+   * different Customer" identically, the same convention every other
+   * scoped lookup in this codebase already follows. */
+  private async findTicketInCustomerScope(
+    id: string,
+    customerId: string,
+  ): Promise<{
+    id: string;
+    subject: string;
+    category: string | null;
+    priority: TicketPriority;
+    status: TicketStatus;
+    customerId: string;
+    contactId: string | null;
+    departmentId: string | null;
+    assignedToUserId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }> {
+    const ticket = await this.prisma.ticket.findFirst({ where: { id, customerId } });
+    if (!ticket) {
+      throw new NotFoundException("Ticket not found");
+    }
+    return ticket;
+  }
 
   private async findTicketInScope(id: string): Promise<{
     id: string;

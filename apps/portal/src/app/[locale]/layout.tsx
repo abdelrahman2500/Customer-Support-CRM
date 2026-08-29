@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
+import { QueryProvider } from "@/components/providers/query-provider";
 import "../globals.css";
 
 export function generateStaticParams(): Array<{ locale: string }> {
@@ -25,7 +26,9 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} dir={dir}>
       <body>
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        <NextIntlClientProvider>
+          <QueryProvider>{children}</QueryProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );
