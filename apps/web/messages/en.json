@@ -73,6 +73,9 @@
       "noDepartment": "No department",
       "departmentLoadError": "Couldn't load departments.",
       "slaHeading": "SLA",
+      "escalationsHeading": "SLA Escalations",
+      "escalationsError": "Couldn't load this ticket's escalations.",
+      "escalationsEmpty": "No escalations yet.",
       "historyHeading": "History",
       "historyError": "Couldn't load this ticket's history.",
       "historyEmpty": "No history entries yet.",
@@ -86,6 +89,12 @@
       "breached": "Breached",
       "breachedAt": "Breached at {time}",
       "remaining": "{time} remaining"
+    },
+    "escalations": {
+      "targetType": {
+        "response": "Response",
+        "resolution": "Resolution"
+      }
     },
     "create": {
       "title": "New ticket",

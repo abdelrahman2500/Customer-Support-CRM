@@ -6,6 +6,7 @@ import {
   createUser,
   getCustomer,
   getTicket,
+  getTicketEscalations,
   getTicketHistory,
   getTicketSlaTarget,
   listBranches,
@@ -38,6 +39,7 @@ export const ticketsQueryKey = (filters: ListTicketsFilters) => ["tickets", filt
 export const ticketQueryKey = (id: string) => ["ticket", id] as const;
 export const ticketHistoryQueryKey = (id: string) => ["ticket", id, "history"] as const;
 export const ticketSlaTargetQueryKey = (id: string) => ["ticket", id, "sla-target"] as const;
+export const ticketEscalationsQueryKey = (id: string) => ["ticket", id, "escalations"] as const;
 
 export function useTicketsQuery(filters: ListTicketsFilters) {
   return useQuery({
@@ -58,6 +60,15 @@ export function useTicketSlaTargetQuery(id: string) {
   return useQuery({
     queryKey: ticketSlaTargetQueryKey(id),
     queryFn: () => getTicketSlaTarget(id),
+  });
+}
+
+/** Story 49 — mirrors `useTicketHistoryQuery`: no `staleTime`, since this is
+ * per-ticket event data (not infrequently-changing reference data). */
+export function useTicketEscalationsQuery(id: string) {
+  return useQuery({
+    queryKey: ticketEscalationsQueryKey(id),
+    queryFn: () => getTicketEscalations(id),
   });
 }
 
@@ -268,5 +279,6 @@ export function invalidateTicketQueries(
   void queryClient.invalidateQueries({ queryKey: ticketQueryKey(id) });
   void queryClient.invalidateQueries({ queryKey: ticketHistoryQueryKey(id) });
   void queryClient.invalidateQueries({ queryKey: ticketSlaTargetQueryKey(id) });
+  void queryClient.invalidateQueries({ queryKey: ticketEscalationsQueryKey(id) });
   void queryClient.invalidateQueries({ queryKey: ["tickets"] });
 }

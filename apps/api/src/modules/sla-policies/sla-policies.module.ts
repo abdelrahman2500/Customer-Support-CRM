@@ -6,6 +6,8 @@ import { SlaEscalationListener } from "./sla-escalation.listener";
 import { SlaTargetListener } from "./sla-target.listener";
 import { SlaTargetsController } from "./sla-targets.controller";
 import { SlaTargetsService } from "./sla-targets.service";
+import { SlaEscalationsController } from "./sla-escalations.controller";
+import { SlaEscalationsService } from "./sla-escalations.service";
 import { BusinessHoursCalendarsController } from "./business-hours-calendars.controller";
 import { BusinessHoursCalendarsService } from "./business-hours-calendars.service";
 
@@ -21,15 +23,21 @@ import { BusinessHoursCalendarsService } from "./business-hours-calendars.servic
  * for `SlaTargets*`.
  */
 @Module({
-  controllers: [SlaPoliciesController, SlaTargetsController, BusinessHoursCalendarsController],
+  controllers: [
+    SlaPoliciesController,
+    SlaTargetsController,
+    SlaEscalationsController,
+    BusinessHoursCalendarsController,
+  ],
   providers: [
     SlaPoliciesService,
     SlaTargetsService,
+    SlaEscalationsService,
     BusinessHoursCalendarsService,
     TenantContext,
     SlaTargetListener,
     SlaEscalationListener,
   ],
-  exports: [SlaPoliciesService, SlaTargetsService, BusinessHoursCalendarsService],
+  exports: [SlaPoliciesService, SlaTargetsService, SlaEscalationsService, BusinessHoursCalendarsService],
 })
 export class SlaPoliciesModule {}

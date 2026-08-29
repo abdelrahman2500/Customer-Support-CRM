@@ -38,6 +38,17 @@ export interface TicketHistoryEntry {
   createdAt: string;
 }
 
+/** Story 49 — mirrors the backend's `SlaEscalationSummary` exactly
+ * (`apps/api/src/modules/sla-policies/sla-escalations.service.ts`). */
+export interface TicketEscalation {
+  id: string;
+  ticketId: string;
+  branchId: string;
+  targetType: string;
+  targetAt: string;
+  escalatedAt: string;
+}
+
 export interface CustomerSummary {
   id: string;
   displayName: string;
@@ -106,6 +117,13 @@ export function getTicket(id: string): Promise<TicketSummary> {
 
 export function getTicketHistory(id: string): Promise<TicketHistoryEntry[]> {
   return apiFetch<TicketHistoryEntry[]>(`/tickets/${id}/history`);
+}
+
+/** Story 49 — `GET /tickets/:id/sla-escalations` (`sla:read`), returns `[]`
+ * when the ticket has no escalations yet (not a 404) — mirrors the backend's
+ * own list-read convention (never swallowed like `getTicketSlaTarget`'s 404). */
+export function getTicketEscalations(id: string): Promise<TicketEscalation[]> {
+  return apiFetch<TicketEscalation[]>(`/tickets/${id}/sla-escalations`);
 }
 
 /**

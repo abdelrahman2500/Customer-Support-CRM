@@ -73,6 +73,9 @@
       "noDepartment": "بدون قسم",
       "departmentLoadError": "تعذّر تحميل الأقسام.",
       "slaHeading": "اتفاقية مستوى الخدمة",
+      "escalationsHeading": "تصعيدات اتفاقية مستوى الخدمة",
+      "escalationsError": "تعذّر تحميل تصعيدات هذه التذكرة.",
+      "escalationsEmpty": "لا توجد تصعيدات حتى الآن.",
       "historyHeading": "السجل",
       "historyError": "تعذّر تحميل سجل هذه التذكرة.",
       "historyEmpty": "لا توجد إدخالات في السجل حتى الآن.",
@@ -86,6 +89,12 @@
       "breached": "تم الخرق",
       "breachedAt": "تم الخرق في {time}",
       "remaining": "الوقت المتبقي: {time}"
+    },
+    "escalations": {
+      "targetType": {
+        "response": "الاستجابة",
+        "resolution": "الحل"
+      }
     },
     "create": {
       "title": "تذكرة جديدة",

@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import {
   useCustomersQuery,
   useDepartmentsQuery,
+  useTicketEscalationsQuery,
   useTicketHistoryQuery,
   useTicketQuery,
   useTicketSlaTargetQuery,
@@ -32,6 +33,15 @@ import {
 const STATUS_OPTIONS: TicketStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
+/** The only two real `targetType` values the backend ever emits (`response`/
+ * `resolution` — see `SlaEscalationSummary`); an unrecognized value falls
+ * back to the raw string rather than a missing-translation crash. Mirrors
+ * `NotificationHistoryView`'s local `TARGET_TYPE_LABEL_KEYS` convention. */
+const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
+  response: "escalations.targetType.response",
+  resolution: "escalations.targetType.resolution",
+};
+
 /**
  * Story 23 — Ticket Detail (plan Task 8). Reads `GET /tickets/:id`,
  * `/history`, and `/sla-target` (the last tolerating a 404 as "no SLA
@@ -47,6 +57,12 @@ const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
  * through the same `PATCH /tickets/:id` and the same never-optimistic,
  * 403-vs-generic error convention as every other field here — no new
  * mutation hook, no new error-handling branch.
+ *
+ * Story 49 — a new escalations card (below the SLA card, Design item 6),
+ * reading the existing `GET /tickets/:id/sla-escalations` via
+ * `useTicketEscalationsQuery`, mirroring the History card's exact
+ * loading/error/empty/populated JSX shape. Empty is a normal, non-error
+ * state (`[]`, never a 404) — same convention as `historyQuery`.
  */
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -58,6 +74,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const ticketQuery = useTicketQuery(ticketId);
   const historyQuery = useTicketHistoryQuery(ticketId);
   const slaTargetQuery = useTicketSlaTargetQuery(ticketId);
+  const escalationsQuery = useTicketEscalationsQuery(ticketId);
   const customersQuery = useCustomersQuery();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
@@ -235,6 +252,34 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <p className="mt-1 text-sm text-slate-700">
             {t("sla.remaining", { time: formatRemaining(slaStatus.remainingMs) })}
           </p>
+        )}
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-slate-900">{t("detail.escalationsHeading")}</h2>
+        {escalationsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+        {escalationsQuery.isError && (
+          <Alert variant="destructive" className="mt-2">{t("detail.escalationsError")}</Alert>
+        )}
+        {escalationsQuery.isSuccess && escalationsQuery.data.length === 0 && (
+          <p className="mt-2 text-sm text-slate-500">{t("detail.escalationsEmpty")}</p>
+        )}
+        {escalationsQuery.isSuccess && escalationsQuery.data.length > 0 && (
+          <ol className="mt-2 flex flex-col gap-2 text-sm">
+            {escalationsQuery.data.map((escalation) => {
+              const targetTypeLabelKey = TARGET_TYPE_LABEL_KEYS[escalation.targetType];
+              return (
+                <li key={escalation.id} className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="font-medium text-slate-800">
+                    {targetTypeLabelKey ? t(targetTypeLabelKey) : escalation.targetType}
+                  </span>
+                  <span className="text-slate-500">
+                    {new Date(escalation.escalatedAt).toLocaleString(locale)}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
         )}
       </div>
 
