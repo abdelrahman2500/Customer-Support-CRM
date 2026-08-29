@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Bash(git fetch)",
+      "Bash(git fetch *)",
+      "Bash(git add *)",
+      "Bash(git commit -m *)",
+      "Bash(git push origin main)",
+      "Bash(pnpm test)",
+      "Bash(pnpm --filter @crm/api test)",
+      "Bash(pnpm --filter @crm/api test:e2e)",
+      "Bash(pnpm --filter @crm/web test)",
+      "Bash(pnpm --filter @crm/portal test)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm build)"
+    ]
+  }
+}
