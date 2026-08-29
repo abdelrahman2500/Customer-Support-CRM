@@ -190,4 +190,75 @@ describe("KnowledgeBaseService", () => {
       });
     });
   });
+
+  // Story 54 — Customer Portal — Knowledge Base Browsing.
+  const publishedArticleRow = {
+    ...baseArticleRow,
+    id: "article-2",
+    status: "PUBLISHED" as const,
+    publishedAt: new Date("2026-01-02T00:00:00.000Z"),
+  };
+
+  describe("listPublishedArticlesForBranch", () => {
+    it("scopes the query to the given branch and PUBLISHED status, ordered publishedAt desc", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listPublishedArticlesForBranch("branch-1");
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", status: "PUBLISHED" },
+        orderBy: { publishedAt: "desc" },
+      });
+    });
+
+    it("returns [] for a branch with no published articles", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      const result = await service.listPublishedArticlesForBranch("branch-1");
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("getPublishedArticleForBranch", () => {
+    it("returns the article when found published in the given branch", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(publishedArticleRow);
+
+      const result = await service.getPublishedArticleForBranch("article-2", "branch-1");
+
+      expect(prisma.knowledgeBaseArticle.findFirst).toHaveBeenCalledWith({
+        where: { id: "article-2", branchId: "branch-1", status: "PUBLISHED" },
+      });
+      expect(result).toEqual(publishedArticleRow);
+    });
+
+    it("throws NotFoundException for an unknown id", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getPublishedArticleForBranch("missing-id", "branch-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("throws NotFoundException for a draft article (never confirms it exists)", async () => {
+      // The `where` clause itself filters by status: PUBLISHED, so a draft
+      // row never matches — this test documents that guarantee explicitly.
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getPublishedArticleForBranch("article-1", "branch-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.knowledgeBaseArticle.findFirst).toHaveBeenCalledWith({
+        where: { id: "article-1", branchId: "branch-1", status: "PUBLISHED" },
+      });
+    });
+
+    it("throws NotFoundException for a published article in a different branch", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getPublishedArticleForBranch("article-2", "branch-2"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });

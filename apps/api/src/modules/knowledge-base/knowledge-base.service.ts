@@ -83,6 +83,35 @@ export class KnowledgeBaseService {
   }
 
   // ---------------------------------------------------------------------
+  // Story 54 — Customer Portal (published-only, branch-scoped, no
+  // TenantContext — the caller's branch comes from the JWT's own claim,
+  // see PortalKnowledgeBaseController). None of the existing agent-facing
+  // methods above are touched.
+  // ---------------------------------------------------------------------
+
+  /** Most-recently-published first — every row is guaranteed
+   * `status: PUBLISHED`, so `publishedAt` is never null here. */
+  async listPublishedArticlesForBranch(branchId: string): Promise<ArticleSummary[]> {
+    const articles = await this.prisma.knowledgeBaseArticle.findMany({
+      where: { branchId, status: "PUBLISHED" },
+      orderBy: { publishedAt: "desc" },
+    });
+    return articles.map(toArticleSummary);
+  }
+
+  /** 404s identically for a draft article, one in a different branch, or an
+   * unknown id — a portal caller never learns a draft exists. */
+  async getPublishedArticleForBranch(id: string, branchId: string): Promise<ArticleSummary> {
+    const article = await this.prisma.knowledgeBaseArticle.findFirst({
+      where: { id, branchId, status: "PUBLISHED" },
+    });
+    if (!article) {
+      throw new NotFoundException("Article not found");
+    }
+    return toArticleSummary(article);
+  }
+
+  // ---------------------------------------------------------------------
   // internals
   // ---------------------------------------------------------------------
 

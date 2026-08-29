@@ -43,5 +43,20 @@
       "historyError": "Couldn't load this ticket's history.",
       "historyEmpty": "No history entries yet."
     }
+  },
+  "knowledgeBase": {
+    "nav": "Knowledge Base",
+    "list": {
+      "title": "Knowledge Base",
+      "error": "Couldn't load articles.",
+      "retry": "Retry",
+      "empty": "No articles are available yet.",
+      "noCategory": "—"
+    },
+    "detail": {
+      "notFound": "This article could not be found.",
+      "loadError": "Couldn't load this article.",
+      "backToList": "Back to Knowledge Base"
+    }
   }
 }

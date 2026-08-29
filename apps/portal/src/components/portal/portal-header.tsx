@@ -11,10 +11,12 @@ import { clearAccessToken, logout } from "@/lib/api";
  * /portal/auth/logout` first, local cleanup always runs regardless).
  *
  * Story 53 — gains the portal's first real nav link, to `/tickets`.
+ * Story 54 — gains a second, to `/knowledge-base`.
  */
 export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const t = useTranslations("home");
   const tTickets = useTranslations("tickets");
+  const tKnowledgeBase = useTranslations("knowledgeBase");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
@@ -36,6 +38,12 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         </a>
         <a href={`/${locale}/tickets`} className="text-slate-600 hover:text-slate-900 hover:underline">
           {tTickets("nav")}
+        </a>
+        <a
+          href={`/${locale}/knowledge-base`}
+          className="text-slate-600 hover:text-slate-900 hover:underline"
+        >
+          {tKnowledgeBase("nav")}
         </a>
       </nav>
       <button

@@ -46,3 +46,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | knowledge-base-foundation | [knowledge-base-foundation/00-overview.md](./knowledge-base-foundation/00-overview.md) | 51–      |
 | customer-portal-authentication-foundation | [customer-portal-authentication-foundation/00-overview.md](./customer-portal-authentication-foundation/00-overview.md) | 52–      |
 | customer-portal-ticket-submission-tracking | [customer-portal-ticket-submission-tracking/00-overview.md](./customer-portal-ticket-submission-tracking/00-overview.md) | 53–      |
+| customer-portal-knowledge-base-browsing | [customer-portal-knowledge-base-browsing/00-overview.md](./customer-portal-knowledge-base-browsing/00-overview.md) | 54–      |

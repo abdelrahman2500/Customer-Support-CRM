@@ -1,10 +1,12 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../../common/auth/auth.module";
 import { TicketsModule } from "../tickets/tickets.module";
+import { KnowledgeBaseModule } from "../knowledge-base/knowledge-base.module";
 import { PortalController } from "./portal.controller";
 import { PortalService } from "./portal.service";
 import { PortalTicketsController } from "./portal-tickets.controller";
 import { PortalTicketsService } from "./portal-tickets.service";
+import { PortalKnowledgeBaseController } from "./portal-knowledge-base.controller";
 
 /**
  * Story 52 — the Customer Portal's first module. `AuthModule` provides the
@@ -17,10 +19,15 @@ import { PortalTicketsService } from "./portal-tickets.service";
  * the already-exported `TicketsService` directly (see that service's
  * additive, customer-scoped methods) rather than reimplementing ticket
  * creation/lookup.
+ *
+ * Story 54 — `KnowledgeBaseModule` imported the same way, so
+ * `PortalKnowledgeBaseController` can inject `KnowledgeBaseService`
+ * directly (no intermediate service layer needed — see that controller's
+ * own doc comment).
  */
 @Module({
-  imports: [AuthModule, TicketsModule],
-  controllers: [PortalController, PortalTicketsController],
+  imports: [AuthModule, TicketsModule, KnowledgeBaseModule],
+  controllers: [PortalController, PortalTicketsController, PortalKnowledgeBaseController],
   providers: [PortalService, PortalTicketsService],
   exports: [PortalService],
 })
