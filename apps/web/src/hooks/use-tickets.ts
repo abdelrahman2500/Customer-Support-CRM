@@ -17,6 +17,7 @@ import {
   listTickets,
   listUsers,
   resetPassword,
+  setContactPortalPassword,
   updateContact,
   updateCustomer,
   updateTicket,
@@ -31,6 +32,7 @@ import type {
   CreateUserInput,
   ListTicketsFilters,
   ResetPasswordInput,
+  SetContactPortalPasswordInput,
   UpdateContactInput,
   UpdateCustomerInput,
   UpdateTicketInput,
@@ -205,6 +207,19 @@ export function useUpdateContactMutation(customerId: string, contactId: string) 
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
     },
+  });
+}
+
+/**
+ * Story 52 — never applies optimistically, same convention as every other
+ * mutation here: no field of `ContactSummary` reflects the password, so
+ * there is nothing new to invalidate — mirrors `useResetPasswordMutation`'s
+ * own "nothing to invalidate but still on the same convention" precedent.
+ */
+export function useSetContactPortalPasswordMutation(customerId: string, contactId: string) {
+  return useMutation({
+    mutationFn: (input: SetContactPortalPasswordInput) =>
+      setContactPortalPassword(customerId, contactId, input),
   });
 }
 

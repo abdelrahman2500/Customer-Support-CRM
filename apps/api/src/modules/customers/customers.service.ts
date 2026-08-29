@@ -1,11 +1,15 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import * as bcrypt from "bcryptjs";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateCustomerDto } from "./dto/create-customer.dto";
 import type { UpdateCustomerDto } from "./dto/update-customer.dto";
 import type { CreateContactDto } from "./dto/create-contact.dto";
 import type { UpdateContactDto } from "./dto/update-contact.dto";
+import type { SetContactPortalPasswordDto } from "./dto/set-contact-portal-password.dto";
+
+const BCRYPT_ROUNDS = 12;
 
 export interface CustomerSummary {
   id: string;
@@ -125,6 +129,56 @@ export class CustomersService {
     } catch (error) {
       throw translateDuplicateEmail(error);
     }
+  }
+
+  /**
+   * Story 52 — the only way a `Contact` gets Customer Portal access: an
+   * agent explicitly sets a password for them (no self-registration, plan
+   * Design item 6, mirrors `IdentityService.resetPassword`'s exact
+   * "agent-driven, no forgot-password email" precedent). Requires the
+   * contact to have an email on file (portal login is email-based) and
+   * enforces, at write time, that no *other* contact already has portal
+   * access with the same email — `Contact.email` is unique only per-Customer
+   * (this model's own doc comment), so this is the invariant
+   * `PortalService.login`'s lookup relies on being safe (plan Design item
+   * 2). Revokes every existing `ContactRefreshToken` for this contact,
+   * mirroring `resetPassword`'s own session-invalidation rule.
+   */
+  async setContactPortalPassword(
+    customerId: string,
+    contactId: string,
+    dto: SetContactPortalPasswordDto,
+  ): Promise<{ id: string }> {
+    await this.requireCustomerInScope(customerId);
+    const existing = await this.prisma.contact.findFirst({
+      where: { id: contactId, customerId },
+    });
+    if (!existing) {
+      throw new NotFoundException("Contact not found");
+    }
+    if (!existing.email) {
+      throw new BadRequestException("This contact has no email on file — portal login requires one");
+    }
+
+    const duplicate = await this.prisma.contact.findFirst({
+      where: { email: existing.email, passwordHash: { not: null }, id: { not: contactId } },
+    });
+    if (duplicate) {
+      throw new ConflictException(
+        "Another contact already has portal access with this email address",
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+    await this.prisma.$transaction([
+      this.prisma.contact.update({ where: { id: contactId }, data: { passwordHash } }),
+      this.prisma.contactRefreshToken.updateMany({
+        where: { contactId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    return { id: contactId };
   }
 
   // ---------------------------------------------------------------------

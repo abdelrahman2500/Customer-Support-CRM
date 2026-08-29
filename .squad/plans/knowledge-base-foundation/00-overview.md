@@ -1,0 +1,17 @@
+# knowledge-base-foundation — plan overview
+
+Entry point for the **knowledge-base-foundation** feature. Stories execute in order by their `NN` prefix.
+
+## Stories
+
+| NN  | File                                                                     | Title                     | Tracker id | Depends on |
+| --- | ------------------------------------------------------------------------- | -------------------------- | ---------- | ---------- |
+| 51  | [51-story-knowledge-base-foundation.md](./51-story-knowledge-base-foundation.md) | Knowledge Base Foundation (Agent Workspace Article Management) | — | `project-foundation` Stories 01–05 (`pgvector`/`pg_trgm` extensions, `TenantContext`), `agent-workspace-sla-policy-admin` Story 31 (the direct structural template for a standalone branch-scoped admin domain) |
+
+## Dependency notes
+
+- Story 51 was selected via a repository-level Next-Story Recon performed after `agent-workspace-ticket-internal-notes` Story 50, the most recently completed story at the time. `docs/architecture/03-domain-boundaries.md` lists Knowledge Base, Communication/Channels, AI Services, Reporting & Analytics, Customer Portal, and Integrations as the domains with zero implementation in the repository at that point.
+- Communication/Channels was evaluated and deliberately **not** selected next: `docs/architecture/06-communication-and-realtime.md` ties real channel messages to "buy provider delivery, build orchestration/adapters" and the Integration Hub, and no channel provider (email/WhatsApp/SMS/web-form/live-chat) has been product-decided anywhere in the repository — an unresolved external-provider decision, not something safe to infer (see this story's own escalation note, and `docs/architecture/12-risks-tradeoffs-and-scope.md`'s trade-off table, which lists "Build vs. buy channels" as already decided in principle but names no concrete provider).
+- Knowledge Base was selected instead because it has no undecided external dependency: `docs/architecture/04-data-and-multitenancy.md`'s Prisma datasource already provisions the `pgvector`/`pg_trgm` extensions Story 01–05 anticipated specifically for it, it feeds both the future Customer Portal ("Knowledge Base browsing") and future AI Services ("uses articles... for grounding") domains per `docs/architecture/08-supporting-domains.md`, and — per this story's own rule against building infrastructure without a real consumer — this story pairs the new domain with its own first real consumer (an Agent Workspace admin screen), the same "schema-owning module + admin UI in one story" shape `agent-workspace-sla-policy-admin` Story 31 already established for `SlaPolicy`.
+- Story 51 deliberately scopes to **article management only**: create/list/get/update (including a draft↔published toggle), branch-scoped, permission-gated. It does **not** implement full-text (`tsvector`) or vector (`pgvector`) search, multi-version publish history (`docs/architecture/08-supporting-domains.md`'s "publishing creates a new version rather than mutating published content" is deferred — the same "foundation before behavior" split `sla-policy-foundation` Stories 10→11 and 12→13 already used), Customer Portal consumption, or any AI grounding. Each is a distinct, separately-planned future story once a concrete consumer/need exists.
+- Communication/Channels, Customer Portal, AI Services, Reporting & Analytics, and Integrations remain separate, not-yet-started feature slugs per `docs/architecture/03-domain-boundaries.md`. No story in this feature implements any of them.

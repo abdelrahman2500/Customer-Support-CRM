@@ -2,5 +2,18 @@
   "common": {
     "appName": "Customer Portal",
     "placeholder": "The customer portal will let you submit tickets, track requests, view history, browse FAQs, and send feedback. This is a placeholder page for Story 02 — see docs/architecture/08-supporting-domains.md."
+  },
+  "auth": {
+    "title": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in...",
+    "loginFailed": "Sign-in failed. Check your email and password and try again."
+  },
+  "home": {
+    "signedInAs": "Signed in as {name}",
+    "signOut": "Sign out",
+    "placeholder": "Ticket submission and tracking are coming in a future story — this page only confirms you're securely signed in."
   }
 }

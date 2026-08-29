@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ConflictException, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { CustomersService } from "./customers.service";
 import type { PrismaService } from "../../prisma/prisma.service";
@@ -19,6 +19,15 @@ function buildPrismaMock() {
       findFirst: vi.fn(),
       update: vi.fn(),
     },
+    contactRefreshToken: {
+      updateMany: vi.fn(),
+    },
+    $transaction: vi.fn((arg: unknown) => {
+      if (Array.isArray(arg)) {
+        return Promise.all(arg);
+      }
+      return (arg as (tx: unknown) => unknown)(undefined);
+    }),
   };
 }
 
@@ -268,6 +277,72 @@ describe("CustomersService", () => {
       expect(prisma.contact.update).toHaveBeenCalledWith({
         where: { id: "contact-1" },
         data: { isPrimary: true },
+      });
+    });
+  });
+
+  describe("setContactPortalPassword", () => {
+    it("throws NotFoundException when the contact doesn't belong to the customer", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.setContactPortalPassword("customer-1", "missing-contact", {
+          newPassword: "a-strong-password",
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.contact.update).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException when the contact has no email on file", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.findFirst.mockResolvedValueOnce({ id: "contact-1", email: null });
+
+      await expect(
+        service.setContactPortalPassword("customer-1", "contact-1", {
+          newPassword: "a-strong-password",
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.contact.update).not.toHaveBeenCalled();
+    });
+
+    it("throws ConflictException when another contact already has portal access with the same email", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.findFirst
+        .mockResolvedValueOnce({ id: "contact-1", email: "jane@example.com" })
+        .mockResolvedValueOnce({ id: "contact-2" });
+
+      await expect(
+        service.setContactPortalPassword("customer-1", "contact-1", {
+          newPassword: "a-strong-password",
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.contact.findFirst).toHaveBeenNthCalledWith(2, {
+        where: { email: "jane@example.com", passwordHash: { not: null }, id: { not: "contact-1" } },
+      });
+      expect(prisma.contact.update).not.toHaveBeenCalled();
+    });
+
+    it("sets the password hash and revokes every existing refresh token", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.findFirst
+        .mockResolvedValueOnce({ id: "contact-1", email: "jane@example.com" })
+        .mockResolvedValueOnce(null);
+      prisma.contact.update.mockResolvedValue({ id: "contact-1" });
+      prisma.contactRefreshToken.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.setContactPortalPassword("customer-1", "contact-1", {
+        newPassword: "a-strong-password",
+      });
+
+      expect(result).toEqual({ id: "contact-1" });
+      expect(prisma.contact.update).toHaveBeenCalledWith({
+        where: { id: "contact-1" },
+        data: { passwordHash: expect.any(String) },
+      });
+      expect(prisma.contactRefreshToken.updateMany).toHaveBeenCalledWith({
+        where: { contactId: "contact-1", revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
       });
     });
   });

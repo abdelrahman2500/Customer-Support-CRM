@@ -1,0 +1,228 @@
+import { randomUUID } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+import cookieParser from "cookie-parser";
+import request from "supertest";
+import { AppModule } from "../src/app.module";
+
+/**
+ * Integration suite for the `knowledge-base/articles/*` HTTP surface —
+ * Story 51 (Knowledge Base Foundation).
+ *
+ * Bootstraps the REAL `AppModule` against a REAL Postgres/Redis, exactly
+ * like `sla-policies.e2e-spec.ts`/`tickets.e2e-spec.ts`. Requires
+ * `DATABASE_URL`/`REDIS_URL` pointed at a real, migrated, and SEEDED
+ * database (re-seeded with the `kb:*` permissions this story adds).
+ *
+ * Known scope limit, same as every sibling e2e suite: `prisma/seed.ts`
+ * creates exactly one Branch, so this suite cannot exercise true
+ * cross-branch isolation end-to-end — the "unknown article id" case stands
+ * in for that; true cross-branch rejection is covered by
+ * `knowledge-base.service.spec.ts`'s mocked-TenantContext tests.
+ */
+describe("Knowledge Base (e2e)", () => {
+  let app: INestApplication;
+  let adminAccessToken: string;
+  let articleId: string;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = moduleRef.createNestApplication();
+
+    app.use(cookieParser());
+    app.setGlobalPrefix("api/v1", { exclude: ["health", "health/ready"] });
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
+
+    await app.init();
+
+    const email = process.env.SEED_ADMIN_EMAIL;
+    const password = process.env.SEED_ADMIN_PASSWORD;
+    if (!email || !password) {
+      throw new Error("SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD must be set for this suite to run");
+    }
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email, password })
+      .expect(200);
+    adminAccessToken = loginResponse.body.accessToken;
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it("rejects an unauthenticated request for every route", async () => {
+    await request(app.getHttpServer()).get("/api/v1/knowledge-base/articles").expect(401);
+    await request(app.getHttpServer())
+      .post("/api/v1/knowledge-base/articles")
+      .send({ title: "t", body: "b" })
+      .expect(401);
+  });
+
+  it("rejects an empty title/body with a validation error", async () => {
+    await request(app.getHttpServer())
+      .post("/api/v1/knowledge-base/articles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ title: "", body: "Some body" })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post("/api/v1/knowledge-base/articles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ title: "Some title", body: "" })
+      .expect(400);
+  });
+
+  it("creates a DRAFT article", async () => {
+    const response = await request(app.getHttpServer())
+      .post("/api/v1/knowledge-base/articles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ title: "How to reset a password", body: "Step-by-step instructions...", category: "account" })
+      .expect(201);
+
+    expect(response.body.status).toBe("DRAFT");
+    expect(response.body.publishedAt).toBeNull();
+    expect(response.body.category).toBe("account");
+    articleId = response.body.id;
+  });
+
+  it("lists articles in the caller's branch, including the new one", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/knowledge-base/articles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    const ids = response.body.map((article: { id: string }) => article.id);
+    expect(ids).toContain(articleId);
+  });
+
+  it("gets a single article", async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body.id).toBe(articleId);
+  });
+
+  it("returns 404 for an unknown article id on get/update", async () => {
+    await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${randomUUID()}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${randomUUID()}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ title: "Should not apply" })
+      .expect(404);
+  });
+
+  it("rejects an invalid status value with a validation error", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "NOT_A_REAL_STATUS" })
+      .expect(400);
+  });
+
+  it("updates title/body/category", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ title: "How to reset your password", category: "accounts" })
+      .expect(200);
+
+    const after = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(after.body.title).toBe("How to reset your password");
+    expect(after.body.category).toBe("accounts");
+  });
+
+  it("publishes the article, stamping publishedAt", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "PUBLISHED" })
+      .expect(200);
+
+    const after = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(after.body.status).toBe("PUBLISHED");
+    expect(after.body.publishedAt).not.toBeNull();
+  });
+
+  it("unpublishes the article, leaving publishedAt set to its last value", async () => {
+    const before = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "DRAFT" })
+      .expect(200);
+
+    const after = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(after.body.status).toBe("DRAFT");
+    expect(after.body.publishedAt).toBe(before.body.publishedAt);
+  });
+
+  it("rejects an Agent-role user attempting to create, read, or update articles (403)", async () => {
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+
+    const me = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    const agentEmail = `agent-kb-${randomUUID()}@example.com`;
+    const agentPassword = "agent-test-password-123";
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: agentEmail,
+        password: agentPassword,
+        fullName: "Test Agent KB",
+        branchId: me.body.branchId,
+        departmentId: me.body.departmentId ?? undefined,
+        roleId: agentRole.id,
+      })
+      .expect(201);
+
+    const agentLogin = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: agentEmail, password: agentPassword })
+      .expect(200);
+    const agentAccessToken = agentLogin.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .post("/api/v1/knowledge-base/articles")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ title: "Should not be created", body: "..." })
+      .expect(403);
+    await request(app.getHttpServer())
+      .get("/api/v1/knowledge-base/articles")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .send({ title: "Should not apply" })
+      .expect(403);
+  });
+});

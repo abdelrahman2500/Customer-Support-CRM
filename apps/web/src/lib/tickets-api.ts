@@ -251,6 +251,26 @@ export function updateContact(
   });
 }
 
+/** Story 52 — mirrors the existing `ResetPasswordInput`/`resetPassword` shape
+ * exactly (`apps/api/src/modules/customers/dto/set-contact-portal-password.dto.ts`). */
+export interface SetContactPortalPasswordInput {
+  newPassword: string;
+}
+
+export function setContactPortalPassword(
+  customerId: string,
+  contactId: string,
+  input: SetContactPortalPasswordInput,
+): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(
+    `/customers/${customerId}/contacts/${contactId}/portal-password`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export function listUsers(): Promise<UserSummary[]> {
   return apiFetch<UserSummary[]>("/identity/users");
 }

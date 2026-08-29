@@ -1,9 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { CustomerDetailView } from "./customer-detail-view";
 import {
   useCreateContactMutation,
   useCustomerQuery,
+  useSetContactPortalPasswordMutation,
   useTicketsQuery,
   useUpdateContactMutation,
   useUpdateCustomerMutation,
@@ -28,6 +29,7 @@ vi.mock("@/hooks/use-tickets", () => ({
   useUpdateCustomerMutation: vi.fn(),
   useCreateContactMutation: vi.fn(),
   useUpdateContactMutation: vi.fn(),
+  useSetContactPortalPasswordMutation: vi.fn(),
 }));
 
 const mockedUseCustomerQuery = vi.mocked(useCustomerQuery);
@@ -35,6 +37,7 @@ const mockedUseTicketsQuery = vi.mocked(useTicketsQuery);
 const mockedUseUpdateCustomerMutation = vi.mocked(useUpdateCustomerMutation);
 const mockedUseCreateContactMutation = vi.mocked(useCreateContactMutation);
 const mockedUseUpdateContactMutation = vi.mocked(useUpdateContactMutation);
+const mockedUseSetContactPortalPasswordMutation = vi.mocked(useSetContactPortalPasswordMutation);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -70,6 +73,7 @@ describe("CustomerDetailView", () => {
     mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation() as never);
     mockedUseCreateContactMutation.mockReturnValue(idleMutation() as never);
     mockedUseUpdateContactMutation.mockReturnValue(idleMutation() as never);
+    mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation() as never);
   });
 
   it("shows a loading state while the customer query is pending", () => {
@@ -392,6 +396,95 @@ describe("CustomerDetailView", () => {
       fireEvent.click(within(form).getByText("detail.addContactSubmit"));
 
       expect(await screen.findByText("Email already in use")).toBeInTheDocument();
+    });
+  });
+
+  // Story 52 — Customer Portal — Contact Authentication Foundation.
+  describe("set contact portal password (Story 52)", () => {
+    beforeEach(() => {
+      mockedUseCustomerQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: {
+            id: "customer-1",
+            displayName: "Acme Inc.",
+            isActive: true,
+            contacts: [
+              { id: "contact-1", fullName: "Jane Doe", email: "jane@acme.test", phone: null, isPrimary: false },
+            ],
+          },
+        }) as never,
+      );
+    });
+
+    it("keeps the submit button disabled until the draft is at least 8 characters", () => {
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      const input = screen.getByPlaceholderText("detail.portalPasswordPlaceholder");
+      const submit = screen.getByText("detail.portalPasswordSubmit");
+      expect(submit).toBeDisabled();
+
+      fireEvent.change(input, { target: { value: "short1" } });
+      expect(submit).toBeDisabled();
+
+      fireEvent.change(input, { target: { value: "longenough1" } });
+      expect(submit).not.toBeDisabled();
+    });
+
+    it("does not commit on blur — only an explicit click submits, with the exact { newPassword } payload", () => {
+      const mutate = vi.fn();
+      mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      const input = screen.getByPlaceholderText("detail.portalPasswordPlaceholder");
+      fireEvent.change(input, { target: { value: "newpassword1" } });
+      fireEvent.blur(input);
+      expect(mutate).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText("detail.portalPasswordSubmit"));
+
+      expect(mockedUseSetContactPortalPasswordMutation).toHaveBeenCalledWith(
+        "customer-1",
+        "contact-1",
+      );
+      expect(mutate).toHaveBeenCalledWith(
+        { newPassword: "newpassword1" },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+
+    it("clears the field and shows a success message when the mutation succeeds", () => {
+      let capturedOnSuccess: (() => void) | undefined;
+      const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
+        capturedOnSuccess = options?.onSuccess;
+      });
+      mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      const input = screen.getByPlaceholderText("detail.portalPasswordPlaceholder");
+      fireEvent.change(input, { target: { value: "newpassword1" } });
+      fireEvent.click(screen.getByText("detail.portalPasswordSubmit"));
+      act(() => {
+        capturedOnSuccess?.();
+      });
+
+      expect(input).toHaveValue("");
+      expect(screen.getByText("detail.portalPasswordSuccess")).toBeInTheDocument();
+    });
+
+    it("renders the backend's own message inline when the mutation fails", () => {
+      mockedUseSetContactPortalPasswordMutation.mockReturnValue(
+        idleMutation({
+          isError: true,
+          error: new ApiError("Another contact already has portal access with this email address", 409),
+        }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(
+        screen.getByText("Another contact already has portal access with this email address"),
+      ).toBeInTheDocument();
     });
   });
 });

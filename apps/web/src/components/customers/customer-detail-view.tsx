@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import {
   useCreateContactMutation,
   useCustomerQuery,
+  useSetContactPortalPasswordMutation,
   useTicketsQuery,
   useUpdateContactMutation,
   useUpdateCustomerMutation,
@@ -51,6 +52,21 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
   const [emailDraft, setEmailDraft] = useState<string | null>(null);
   const [phoneDraft, setPhoneDraft] = useState<string | null>(null);
   const mutation = useUpdateContactMutation(customerId, contact.id);
+  const portalPasswordMutation = useSetContactPortalPasswordMutation(customerId, contact.id);
+  const [portalPasswordDraft, setPortalPasswordDraft] = useState("");
+  const [portalPasswordSuccess, setPortalPasswordSuccess] = useState(false);
+
+  function handleSetPortalPassword() {
+    portalPasswordMutation.mutate(
+      { newPassword: portalPasswordDraft },
+      {
+        onSuccess: () => {
+          setPortalPasswordDraft("");
+          setPortalPasswordSuccess(true);
+        },
+      },
+    );
+  }
 
   return (
     <li className="flex flex-col gap-1 border-b border-slate-100 pb-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -110,6 +126,43 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
             : t("detail.actionFailed")}
         </span>
       )}
+
+      <div className="flex flex-col gap-1 border-t border-slate-200 pt-2 sm:w-full">
+        <span className="text-xs text-slate-500">{t("detail.portalPasswordLabel")}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            className="w-40"
+            type="password"
+            placeholder={t("detail.portalPasswordPlaceholder")}
+            value={portalPasswordDraft}
+            onChange={(event) => {
+              setPortalPasswordDraft(event.target.value);
+              setPortalPasswordSuccess(false);
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={portalPasswordDraft.length < 8 || portalPasswordMutation.isPending}
+            onClick={handleSetPortalPassword}
+          >
+            {portalPasswordMutation.isPending
+              ? t("detail.portalPasswordSubmitting")
+              : t("detail.portalPasswordSubmit")}
+          </Button>
+        </div>
+        {portalPasswordSuccess && (
+          <p className="text-xs text-emerald-600">{t("detail.portalPasswordSuccess")}</p>
+        )}
+        {portalPasswordMutation.isError && (
+          <p className="text-xs text-red-600">
+            {portalPasswordMutation.error instanceof ApiError
+              ? portalPasswordMutation.error.message
+              : t("detail.actionFailed")}
+          </p>
+        )}
+      </div>
     </li>
   );
 }
@@ -201,6 +254,10 @@ function AddContactForm({ customerId }: { customerId: string }) {
  * `POST/PATCH /customers/:id/contacts` contracts (no new backend). Never
  * optimistic: every field commits only on blur/submit and only ever
  * reflects the real, re-fetched server state afterward.
+ *
+ * Story 52 — `ContactRow` gains an inline "set portal password" control
+ * (commits on click, not blur — mirrors `UserRow`'s password-reset UI
+ * exactly), the only way a Contact gets Customer Portal access.
  */
 export function CustomerDetailView({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");

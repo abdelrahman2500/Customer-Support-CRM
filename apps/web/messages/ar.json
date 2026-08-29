@@ -31,7 +31,8 @@
       "users": "المستخدمون",
       "roles": "الأدوار والصلاحيات",
       "auditLogs": "سجل التدقيق",
-      "notifications": "سجل الإشعارات"
+      "notifications": "سجل الإشعارات",
+      "knowledgeBase": "قاعدة المعرفة"
     }
   },
   "tickets": {
@@ -161,7 +162,12 @@
       "unsetPrimary": "إلغاء التعيين كأساسي",
       "addContactSubmit": "إضافة جهة اتصال",
       "addContactSubmitting": "جارٍ الإضافة...",
-      "addContactFailed": "تعذّر إضافة جهة الاتصال. حاول مرة أخرى."
+      "addContactFailed": "تعذّر إضافة جهة الاتصال. حاول مرة أخرى.",
+      "portalPasswordLabel": "كلمة مرور بوابة العملاء",
+      "portalPasswordPlaceholder": "كلمة مرور جديدة (8 أحرف على الأقل)",
+      "portalPasswordSubmit": "تعيين كلمة مرور البوابة",
+      "portalPasswordSubmitting": "جارٍ التعيين...",
+      "portalPasswordSuccess": "تم تعيين كلمة مرور البوابة. تم تسجيل خروج جلسات البوابة الحالية."
     },
     "create": {
       "title": "عميل جديد",
@@ -422,6 +428,45 @@
     "slaBreached": "تم خرق هدف {targetType} للتذكرة {ticketId}.",
     "ticketEscalated": "تم تصعيد التذكرة: {subject}",
     "generic": "إشعار جديد"
+  },
+  "knowledgeBase": {
+    "list": {
+      "title": "قاعدة المعرفة",
+      "createButton": "مقالة جديدة",
+      "error": "تعذّر تحميل المقالات.",
+      "retry": "إعادة المحاولة",
+      "empty": "لا توجد مقالات حتى الآن.",
+      "noCategory": "—",
+      "draft": "مسودة",
+      "published": "منشورة",
+      "publish": "نشر",
+      "unpublish": "إلغاء النشر",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+      "columns": {
+        "title": "العنوان",
+        "category": "الفئة",
+        "status": "الحالة"
+      }
+    },
+    "create": {
+      "title": "مقالة جديدة",
+      "articleTitle": "العنوان",
+      "category": "الفئة",
+      "body": "المحتوى",
+      "submit": "إنشاء المقالة",
+      "submitting": "جارٍ الإنشاء...",
+      "createFailed": "تعذّر إنشاء المقالة. حاول مرة أخرى."
+    },
+    "detail": {
+      "titleLabel": "عنوان المقالة",
+      "categoryLabel": "الفئة",
+      "bodyLabel": "المحتوى",
+      "notFound": "تعذّر العثور على هذه المقالة.",
+      "loadError": "تعذّر تحميل هذه المقالة.",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى."
+    }
   },
   "notificationHistory": {
     "title": "سجل الإشعارات",

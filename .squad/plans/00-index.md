@@ -43,3 +43,5 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | agent-workspace-user-profile-correction | [agent-workspace-user-profile-correction/00-overview.md](./agent-workspace-user-profile-correction/00-overview.md) | 48–      |
 | agent-workspace-sla-escalation-visibility | [agent-workspace-sla-escalation-visibility/00-overview.md](./agent-workspace-sla-escalation-visibility/00-overview.md) | 49–      |
 | agent-workspace-ticket-internal-notes | [agent-workspace-ticket-internal-notes/00-overview.md](./agent-workspace-ticket-internal-notes/00-overview.md) | 50–      |
+| knowledge-base-foundation | [knowledge-base-foundation/00-overview.md](./knowledge-base-foundation/00-overview.md) | 51–      |
+| customer-portal-authentication-foundation | [customer-portal-authentication-foundation/00-overview.md](./customer-portal-authentication-foundation/00-overview.md) | 52–      |

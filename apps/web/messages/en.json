@@ -31,7 +31,8 @@
       "users": "Users",
       "roles": "Roles & Permissions",
       "auditLogs": "Audit Log",
-      "notifications": "Notification History"
+      "notifications": "Notification History",
+      "knowledgeBase": "Knowledge Base"
     }
   },
   "tickets": {
@@ -161,7 +162,12 @@
       "unsetPrimary": "Unset primary",
       "addContactSubmit": "Add contact",
       "addContactSubmitting": "Adding...",
-      "addContactFailed": "Couldn't add the contact. Please try again."
+      "addContactFailed": "Couldn't add the contact. Please try again.",
+      "portalPasswordLabel": "Customer Portal password",
+      "portalPasswordPlaceholder": "New password (min. 8 characters)",
+      "portalPasswordSubmit": "Set portal password",
+      "portalPasswordSubmitting": "Setting...",
+      "portalPasswordSuccess": "Portal password set. Existing portal sessions were signed out."
     },
     "create": {
       "title": "New customer",
@@ -422,6 +428,45 @@
     "slaBreached": "The {targetType} target for ticket {ticketId} has been breached.",
     "ticketEscalated": "Ticket escalated: {subject}",
     "generic": "New notification"
+  },
+  "knowledgeBase": {
+    "list": {
+      "title": "Knowledge Base",
+      "createButton": "New article",
+      "error": "Couldn't load articles.",
+      "retry": "Retry",
+      "empty": "No articles yet.",
+      "noCategory": "—",
+      "draft": "Draft",
+      "published": "Published",
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "actionForbidden": "You don't have permission to perform that action.",
+      "actionFailed": "That change couldn't be saved. Please try again.",
+      "columns": {
+        "title": "Title",
+        "category": "Category",
+        "status": "Status"
+      }
+    },
+    "create": {
+      "title": "New article",
+      "articleTitle": "Title",
+      "category": "Category",
+      "body": "Body",
+      "submit": "Create article",
+      "submitting": "Creating...",
+      "createFailed": "Couldn't create the article. Please try again."
+    },
+    "detail": {
+      "titleLabel": "Article title",
+      "categoryLabel": "Category",
+      "bodyLabel": "Body",
+      "notFound": "This article could not be found.",
+      "loadError": "Couldn't load this article.",
+      "actionForbidden": "You don't have permission to perform that action.",
+      "actionFailed": "That change couldn't be saved. Please try again."
+    }
   },
   "notificationHistory": {
     "title": "Notification History",

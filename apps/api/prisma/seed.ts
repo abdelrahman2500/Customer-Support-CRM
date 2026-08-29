@@ -42,6 +42,9 @@ const PERMISSION_CATALOG = [
   "sla:update",
   "notification:read",
   "audit:read",
+  "kb:create",
+  "kb:read",
+  "kb:update",
 ] as const;
 
 // No ticketing/customer/etc. permissions yet — those land with the stories

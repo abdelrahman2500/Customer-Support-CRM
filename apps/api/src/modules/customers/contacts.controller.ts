@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
 import { CreateContactDto } from "./dto/create-contact.dto";
 import { UpdateContactDto } from "./dto/update-contact.dto";
+import { SetContactPortalPasswordDto } from "./dto/set-contact-portal-password.dto";
 import type { ContactSummary } from "./customers.service";
 import { CustomersService } from "./customers.service";
 
@@ -37,5 +38,15 @@ export class ContactsController {
     @Body() dto: UpdateContactDto,
   ): Promise<{ id: string }> {
     return this.customersService.updateContact(customerId, contactId, dto);
+  }
+
+  @Patch(":id/contacts/:contactId/portal-password")
+  @RequirePermissions("customer:update")
+  setPortalPassword(
+    @Param("id") customerId: string,
+    @Param("contactId") contactId: string,
+    @Body() dto: SetContactPortalPasswordDto,
+  ): Promise<{ id: string }> {
+    return this.customersService.setContactPortalPassword(customerId, contactId, dto);
   }
 }

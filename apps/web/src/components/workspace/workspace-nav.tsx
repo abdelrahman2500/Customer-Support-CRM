@@ -7,14 +7,17 @@ import { Button } from "@/components/ui/button";
 import { clearAccessToken, logout } from "@/lib/api";
 
 /**
- * Story 44 — the nine existing top-level Agent Workspace screens, in a
- * fixed, always-rendered order (day-to-day operational screens first, then
+ * Story 44 — the top-level Agent Workspace screens, in a fixed,
+ * always-rendered order (day-to-day operational screens first, then
  * administrative/oversight screens). No client-side permission gating: no
  * such pattern exists anywhere in this codebase, and the seeded `Agent`
  * role has zero granted permissions today, so there is no real per-permission
  * signal to key visibility off — a screen the current session lacks
  * permission for renders its own existing 403/forbidden state after
  * navigation, exactly as it already does when reached by direct URL.
+ *
+ * Story 51 — `knowledge-base` appended as the new last entry, the same
+ * append convention every prior addition to this list has used.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -27,6 +30,7 @@ const NAV_ITEMS = [
   { href: "roles", labelKey: "nav.roles" },
   { href: "audit-logs", labelKey: "nav.auditLogs" },
   { href: "notifications", labelKey: "nav.notifications" },
+  { href: "knowledge-base", labelKey: "nav.knowledgeBase" },
 ] as const;
 
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
