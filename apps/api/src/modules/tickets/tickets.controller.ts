@@ -4,7 +4,13 @@ import { RequirePermissions } from "../../common/auth/require-permissions.decora
 import { CreateTicketDto } from "./dto/create-ticket.dto";
 import { UpdateTicketDto } from "./dto/update-ticket.dto";
 import { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
-import type { TicketHistoryEntrySummary, TicketListItem, TicketSummary } from "./tickets.service";
+import { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
+import type {
+  TicketHistoryEntrySummary,
+  TicketListItem,
+  TicketNoteSummary,
+  TicketSummary,
+} from "./tickets.service";
 import { TicketsService } from "./tickets.service";
 
 @ApiTags("tickets")
@@ -41,5 +47,17 @@ export class TicketsController {
   @RequirePermissions("ticket:read")
   getHistory(@Param("id") id: string): Promise<TicketHistoryEntrySummary[]> {
     return this.ticketsService.getTicketHistory(id);
+  }
+
+  @Post(":id/notes")
+  @RequirePermissions("ticket:create")
+  createNote(@Param("id") id: string, @Body() dto: CreateTicketNoteDto): Promise<{ id: string }> {
+    return this.ticketsService.createTicketNote(id, dto);
+  }
+
+  @Get(":id/notes")
+  @RequirePermissions("ticket:read")
+  getNotes(@Param("id") id: string): Promise<TicketNoteSummary[]> {
+    return this.ticketsService.getTicketNotes(id);
   }
 }

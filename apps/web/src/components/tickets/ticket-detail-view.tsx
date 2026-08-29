@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
+  useCreateTicketNoteMutation,
   useCustomersQuery,
   useDepartmentsQuery,
   useTicketEscalationsQuery,
   useTicketHistoryQuery,
+  useTicketNotesQuery,
   useTicketQuery,
   useTicketSlaTargetQuery,
   useUpdateTicketMutation,
@@ -20,6 +22,7 @@ import { ApiError } from "@/lib/api";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
@@ -63,6 +66,13 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * `useTicketEscalationsQuery`, mirroring the History card's exact
  * loading/error/empty/populated JSX shape. Empty is a normal, non-error
  * state (`[]`, never a 404) — same convention as `historyQuery`.
+ *
+ * Story 50 — a new notes card, appended after History (Design item 7),
+ * reading `GET /tickets/:id/notes` via `useTicketNotesQuery` (same
+ * loading/error/empty/populated shape as History/Escalations) and an inline
+ * add-note form using `useCreateTicketNoteMutation`. Author names are
+ * resolved via a `userNameById` memo built from the already-fetched
+ * `useUsersQuery()` data, mirroring `customerNameById`'s exact shape.
  */
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -75,6 +85,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const historyQuery = useTicketHistoryQuery(ticketId);
   const slaTargetQuery = useTicketSlaTargetQuery(ticketId);
   const escalationsQuery = useTicketEscalationsQuery(ticketId);
+  const notesQuery = useTicketNotesQuery(ticketId);
   const customersQuery = useCustomersQuery();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
@@ -90,6 +101,14 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
     }
     return map;
   }, [customersQuery.data]);
+
+  const userNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const user of usersQuery.data ?? []) {
+      map.set(user.id, user.fullName);
+    }
+    return map;
+  }, [usersQuery.data]);
 
   if (ticketQuery.isLoading) {
     return (
@@ -301,7 +320,79 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </ol>
         )}
       </div>
+
+      <div className="rounded-md border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-slate-900">{t("detail.notesHeading")}</h2>
+        {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+        {notesQuery.isError && (
+          <Alert variant="destructive" className="mt-2">{t("detail.notesError")}</Alert>
+        )}
+        {notesQuery.isSuccess && notesQuery.data.length === 0 && (
+          <p className="mt-2 text-sm text-slate-500">{t("detail.notesEmpty")}</p>
+        )}
+        {notesQuery.isSuccess && notesQuery.data.length > 0 && (
+          <ol className="mt-2 flex flex-col gap-2 text-sm">
+            {notesQuery.data.map((note) => (
+              <li key={note.id} className="border-b border-slate-100 pb-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-slate-800">
+                    {userNameById.get(note.authorUserId) ?? note.authorUserId}
+                  </span>
+                  <span className="text-slate-500">
+                    {new Date(note.createdAt).toLocaleString(locale)}
+                  </span>
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-slate-700">{note.body}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+        <AddNoteForm ticketId={ticketId} />
+      </div>
     </section>
+  );
+}
+
+/**
+ * The smallest UI surface for a one-field create (Design item 8) — an
+ * inline textarea + submit button below the notes list, mirroring
+ * `AddDepartmentForm`'s submit/error-handling pattern.
+ */
+function AddNoteForm({ ticketId }: { ticketId: string }) {
+  const t = useTranslations("tickets");
+  const [body, setBody] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useCreateTicketNoteMutation(ticketId);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setError(null);
+    try {
+      await mutation.mutateAsync({ body: body.trim() });
+      setBody("");
+    } catch (submitError) {
+      setError(
+        submitError instanceof ApiError ? submitError.message : t("detail.notesCreateFailed"),
+      );
+    }
+  }
+
+  return (
+    <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+      <textarea
+        className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        rows={3}
+        value={body}
+        placeholder={t("detail.notesPlaceholder")}
+        onChange={(event) => setBody(event.target.value)}
+      />
+      <div>
+        <Button type="submit" size="sm" disabled={mutation.isPending || !body.trim()}>
+          {mutation.isPending ? t("detail.notesSubmitting") : t("detail.notesSubmit")}
+        </Button>
+      </div>
+      {error && <Alert variant="destructive">{error}</Alert>}
+    </form>
   );
 }
 

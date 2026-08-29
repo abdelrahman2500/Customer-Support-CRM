@@ -79,6 +79,7 @@ model User {
   refreshTokens        RefreshToken[]
   assignedTickets      Ticket[]
   ticketHistoryEntries TicketHistoryEntry[]
+  ticketNotes          TicketNote[]
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")
 
@@ -274,6 +275,7 @@ model Ticket {
   priority         TicketPriority       @default(MEDIUM)
   status           TicketStatus         @default(OPEN)
   historyEntries   TicketHistoryEntry[]
+  notes            TicketNote[]
   slaTarget        SlaTicketTarget?
   slaEscalations   SlaEscalation[]
   notificationLogs NotificationLog[]
@@ -305,6 +307,28 @@ model TicketHistoryEntry {
 
   @@index([ticketId])
   @@map("ticket_history_entries")
+  @@schema("ticketing")
+}
+
+/// Free-text, agent-only note on a Ticket — never customer-visible, never
+/// sourced from an external channel (see docs/architecture/03-domain-boundaries.md,
+/// "Communication / Channels" — that domain, not this model, owns
+/// customer-facing messages/threads). Append-only: no update/delete route.
+/// No `branchId` — scoping is always derived from the parent Ticket, the
+/// same way `TicketHistoryEntry` has none. Unlike `TicketHistoryEntry`,
+/// `authorUserId` is required, not nullable — a note can only ever result
+/// from a deliberate, authenticated agent action, never a system event.
+model TicketNote {
+  id           String   @id @default(uuid())
+  ticketId     String   @map("ticket_id")
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorUserId String   @map("author_user_id")
+  author       User     @relation(fields: [authorUserId], references: [id])
+  body         String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@map("ticket_notes")
   @@schema("ticketing")
 }
 

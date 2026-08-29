@@ -49,6 +49,16 @@ export interface TicketEscalation {
   escalatedAt: string;
 }
 
+/** Story 50 — mirrors the backend's `TicketNoteSummary` exactly
+ * (`apps/api/src/modules/tickets/tickets.service.ts`). */
+export interface TicketNoteSummary {
+  id: string;
+  ticketId: string;
+  authorUserId: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface CustomerSummary {
   id: string;
   displayName: string;
@@ -124,6 +134,29 @@ export function getTicketHistory(id: string): Promise<TicketHistoryEntry[]> {
  * own list-read convention (never swallowed like `getTicketSlaTarget`'s 404). */
 export function getTicketEscalations(id: string): Promise<TicketEscalation[]> {
   return apiFetch<TicketEscalation[]>(`/tickets/${id}/sla-escalations`);
+}
+
+/** Story 50 — `GET /tickets/:id/notes` (`ticket:read`), returns `[]` when
+ * the ticket has no notes yet (not a 404) — mirrors `getTicketHistory`'s own
+ * list-read convention. */
+export function getTicketNotes(id: string): Promise<TicketNoteSummary[]> {
+  return apiFetch<TicketNoteSummary[]>(`/tickets/${id}/notes`);
+}
+
+/** Story 50 — mirrors the existing `CreateTicketNoteDto` exactly
+ * (`apps/api/src/modules/tickets/dto/create-ticket-note.dto.ts`). */
+export interface CreateTicketNoteInput {
+  body: string;
+}
+
+export function createTicketNote(
+  id: string,
+  input: CreateTicketNoteInput,
+): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/tickets/${id}/notes`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 /**

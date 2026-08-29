@@ -42,3 +42,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | agent-workspace-user-role-assignment | [agent-workspace-user-role-assignment/00-overview.md](./agent-workspace-user-role-assignment/00-overview.md) | 47–      |
 | agent-workspace-user-profile-correction | [agent-workspace-user-profile-correction/00-overview.md](./agent-workspace-user-profile-correction/00-overview.md) | 48–      |
 | agent-workspace-sla-escalation-visibility | [agent-workspace-sla-escalation-visibility/00-overview.md](./agent-workspace-sla-escalation-visibility/00-overview.md) | 49–      |
+| agent-workspace-ticket-internal-notes | [agent-workspace-ticket-internal-notes/00-overview.md](./agent-workspace-ticket-internal-notes/00-overview.md) | 50–      |

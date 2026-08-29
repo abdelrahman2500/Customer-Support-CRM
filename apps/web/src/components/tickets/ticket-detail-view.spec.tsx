@@ -2,10 +2,12 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TicketDetailView } from "./ticket-detail-view";
 import {
+  useCreateTicketNoteMutation,
   useCustomersQuery,
   useDepartmentsQuery,
   useTicketEscalationsQuery,
   useTicketHistoryQuery,
+  useTicketNotesQuery,
   useTicketQuery,
   useTicketSlaTargetQuery,
   useUpdateTicketMutation,
@@ -30,10 +32,12 @@ vi.mock("@/hooks/use-tickets", () => ({
   useTicketHistoryQuery: vi.fn(),
   useTicketSlaTargetQuery: vi.fn(),
   useTicketEscalationsQuery: vi.fn(),
+  useTicketNotesQuery: vi.fn(),
   useCustomersQuery: vi.fn(),
   useUsersQuery: vi.fn(),
   useDepartmentsQuery: vi.fn(),
   useUpdateTicketMutation: vi.fn(),
+  useCreateTicketNoteMutation: vi.fn(),
 }));
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -78,8 +82,18 @@ describe("TicketDetailView", () => {
     vi.mocked(useTicketEscalationsQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
+    vi.mocked(useTicketNotesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
     vi.mocked(useUpdateTicketMutation).mockReturnValue({
       mutate: vi.fn(),
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({ id: "note-new" }),
+      isPending: false,
       isError: false,
       error: null,
     } as never);
@@ -403,6 +417,212 @@ describe("TicketDetailView", () => {
 
       expect(screen.getByText("detail.historyEmpty")).toBeInTheDocument();
       expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
+    });
+  });
+
+  // Story 50 — Ticket Internal Notes (Agent-Only).
+  describe("Notes card (Story 50)", () => {
+    beforeEach(() => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+    });
+
+    it("renders a skeleton while notes are loading", () => {
+      vi.mocked(useTicketNotesQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const heading = screen.getByText("detail.notesHeading");
+      const card = heading.parentElement as HTMLElement;
+      expect(card.querySelector(".animate-pulse")).toBeInTheDocument();
+    });
+
+    it("renders an inline error when notes fail to load", () => {
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ isError: true, error: new ApiError("Server error", 500) }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.notesError")).toBeInTheDocument();
+    });
+
+    it("renders the empty message when there are no notes", () => {
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
+    });
+
+    it("renders each note's resolved author name and timestamp", () => {
+      vi.mocked(useUsersQuery).mockReturnValue(
+        queryResult({
+          data: [{ id: "user-1", fullName: "Jane Agent" }],
+          isSuccess: true,
+        }) as never,
+      );
+      const notes = [
+        {
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-1",
+          body: "Called the customer back.",
+          createdAt: "2024-01-01T10:05:00.000Z",
+        },
+      ];
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: notes, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("Jane Agent")).toBeInTheDocument();
+      expect(screen.getByText("Called the customer back.")).toBeInTheDocument();
+      expect(
+        screen.getByText(new Date(notes[0]!.createdAt).toLocaleString("en")),
+      ).toBeInTheDocument();
+    });
+
+    it("falls back to the raw authorUserId when the author isn't found in the users list", () => {
+      const notes = [
+        {
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-unknown",
+          body: "Note from an unresolvable author.",
+          createdAt: "2024-01-01T10:05:00.000Z",
+        },
+      ];
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: notes, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("user-unknown")).toBeInTheDocument();
+    });
+
+    it("disables the submit button until the note body is non-empty", () => {
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const submit = screen.getByText("detail.notesSubmit");
+      expect(submit).toBeDisabled();
+
+      fireEvent.change(screen.getByPlaceholderText("detail.notesPlaceholder"), {
+        target: { value: "A new note" },
+      });
+
+      expect(submit).not.toBeDisabled();
+    });
+
+    it("submits the exact { body } payload and clears the field on success", async () => {
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "note-new" });
+      vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const textarea = screen.getByPlaceholderText(
+        "detail.notesPlaceholder",
+      ) as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: "A new note" } });
+      fireEvent.click(screen.getByText("detail.notesSubmit"));
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mutateAsync).toHaveBeenCalledWith({ body: "A new note" });
+      expect(textarea.value).toBe("");
+    });
+
+    it("shows the backend's own error message when adding a note fails", async () => {
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Note too long", 400));
+      vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      fireEvent.change(screen.getByPlaceholderText("detail.notesPlaceholder"), {
+        target: { value: "A new note" },
+      });
+      fireEvent.click(screen.getByText("detail.notesSubmit"));
+
+      expect(await screen.findByText("Note too long")).toBeInTheDocument();
+    });
+
+    it("shows the generic create-failed fallback for a non-ApiError failure", async () => {
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      const mutateAsync = vi.fn().mockRejectedValue(new Error("network down"));
+      vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      fireEvent.change(screen.getByPlaceholderText("detail.notesPlaceholder"), {
+        target: { value: "A new note" },
+      });
+      fireEvent.click(screen.getByText("detail.notesSubmit"));
+
+      expect(await screen.findByText("detail.notesCreateFailed")).toBeInTheDocument();
+    });
+
+    it("does not interfere with the History card's own rendering", () => {
+      vi.mocked(useTicketHistoryQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.historyEmpty")).toBeInTheDocument();
+      expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
+    });
+
+    it("does not interfere with the Escalations card's own rendering", () => {
+      vi.mocked(useTicketEscalationsQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
+      expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
   });
 });

@@ -3,11 +3,13 @@ import {
   createContact,
   createCustomer,
   createTicket,
+  createTicketNote,
   createUser,
   getCustomer,
   getTicket,
   getTicketEscalations,
   getTicketHistory,
+  getTicketNotes,
   getTicketSlaTarget,
   listBranches,
   listCustomers,
@@ -25,6 +27,7 @@ import type {
   CreateContactInput,
   CreateCustomerInput,
   CreateTicketInput,
+  CreateTicketNoteInput,
   CreateUserInput,
   ListTicketsFilters,
   ResetPasswordInput,
@@ -40,6 +43,7 @@ export const ticketQueryKey = (id: string) => ["ticket", id] as const;
 export const ticketHistoryQueryKey = (id: string) => ["ticket", id, "history"] as const;
 export const ticketSlaTargetQueryKey = (id: string) => ["ticket", id, "sla-target"] as const;
 export const ticketEscalationsQueryKey = (id: string) => ["ticket", id, "escalations"] as const;
+export const ticketNotesQueryKey = (id: string) => ["ticket", id, "notes"] as const;
 
 export function useTicketsQuery(filters: ListTicketsFilters) {
   return useQuery({
@@ -69,6 +73,15 @@ export function useTicketEscalationsQuery(id: string) {
   return useQuery({
     queryKey: ticketEscalationsQueryKey(id),
     queryFn: () => getTicketEscalations(id),
+  });
+}
+
+/** Story 50 — mirrors `useTicketHistoryQuery`/`useTicketEscalationsQuery`:
+ * no `staleTime`, since this is per-ticket event data. */
+export function useTicketNotesQuery(id: string) {
+  return useQuery({
+    queryKey: ticketNotesQueryKey(id),
+    queryFn: () => getTicketNotes(id),
   });
 }
 
@@ -270,8 +283,22 @@ export function useCreateUserMutation() {
   });
 }
 
-/** Invalidates every query a live `ticket.updated`/`ticket.escalated` event
- * for this ticket could have changed — used by `useTicketRealtime`. */
+/** Story 50 — never applies optimistically, same convention as
+ * `useCreateContactMutation`: only a successful `POST /tickets/:id/notes`
+ * invalidates this ticket's notes query. */
+export function useCreateTicketNoteMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateTicketNoteInput) => createTicketNote(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ticketNotesQueryKey(id) });
+    },
+  });
+}
+
+/** Invalidates every query a live `ticket.updated`/`ticket.escalated`/
+ * `ticket.note-added` event for this ticket could have changed — used by
+ * `useTicketRealtime`. */
 export function invalidateTicketQueries(
   queryClient: ReturnType<typeof useQueryClient>,
   id: string,
@@ -280,5 +307,6 @@ export function invalidateTicketQueries(
   void queryClient.invalidateQueries({ queryKey: ticketHistoryQueryKey(id) });
   void queryClient.invalidateQueries({ queryKey: ticketSlaTargetQueryKey(id) });
   void queryClient.invalidateQueries({ queryKey: ticketEscalationsQueryKey(id) });
+  void queryClient.invalidateQueries({ queryKey: ticketNotesQueryKey(id) });
   void queryClient.invalidateQueries({ queryKey: ["tickets"] });
 }

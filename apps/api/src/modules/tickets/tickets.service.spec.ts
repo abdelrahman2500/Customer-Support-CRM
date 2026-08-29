@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotFoundException } from "@nestjs/common";
 import type { EventEmitter2 } from "@nestjs/event-emitter";
 import { TicketsService } from "./tickets.service";
-import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT, TICKET_RECATEGORIZED_EVENT } from "./tickets.events";
+import {
+  TICKET_CREATED_EVENT,
+  TICKET_UPDATED_EVENT,
+  TICKET_RECATEGORIZED_EVENT,
+  TICKET_NOTE_ADDED_EVENT,
+} from "./tickets.events";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 
@@ -16,6 +21,10 @@ function buildPrismaMock() {
     },
     ticketHistoryEntry: {
       findMany: vi.fn(),
+    },
+    ticketNote: {
+      findMany: vi.fn(),
+      create: vi.fn(),
     },
     customer: {
       findFirst: vi.fn(),
@@ -651,6 +660,96 @@ describe("TicketsService", () => {
           createdAt: new Date("2026-01-01T00:00:00.000Z"),
         },
       ]);
+    });
+  });
+
+  describe("getTicketNotes", () => {
+    it("throws NotFoundException for an unknown/out-of-scope ticket id", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(service.getTicketNotes("missing-id")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.ticketNote.findMany).not.toHaveBeenCalled();
+    });
+
+    it("returns [] for a ticket with no notes", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketNote.findMany.mockResolvedValue([]);
+
+      const result = await service.getTicketNotes("ticket-1");
+
+      expect(result).toEqual([]);
+    });
+
+    it("scopes and orders notes chronologically (asc) once the ticket is confirmed in scope", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketNote.findMany.mockResolvedValue([
+        {
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-1",
+          body: "Called the customer back.",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
+
+      const result = await service.getTicketNotes("ticket-1");
+
+      expect(prisma.ticketNote.findMany).toHaveBeenCalledWith({
+        where: { ticketId: "ticket-1" },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(result).toEqual([
+        {
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-1",
+          body: "Called the customer back.",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
+    });
+  });
+
+  describe("createTicketNote", () => {
+    it("throws NotFoundException for a ticket not in the caller's branch, never creating a note", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createTicketNote("missing-id", { body: "Some note" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticketNote.create).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it("creates the note as the authenticated actor and emits ticket.note-added", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketNote.create.mockResolvedValue({
+        id: "note-1",
+        ticketId: "ticket-1",
+        authorUserId: "user-1",
+        body: "Called the customer back.",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+
+      const result = await service.createTicketNote("ticket-1", { body: "Called the customer back." });
+
+      expect(prisma.ticketNote.create).toHaveBeenCalledWith({
+        data: { ticketId: "ticket-1", authorUserId: "user-1", body: "Called the customer back." },
+      });
+      expect(result).toEqual({ id: "note-1" });
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_NOTE_ADDED_EVENT, {
+        ticketId: "ticket-1",
+        note: {
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-1",
+          body: "Called the customer back.",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      });
     });
   });
 });

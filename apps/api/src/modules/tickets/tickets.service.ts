@@ -6,8 +6,19 @@ import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateTicketDto } from "./dto/create-ticket.dto";
 import type { UpdateTicketDto } from "./dto/update-ticket.dto";
 import type { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
-import { TICKET_CREATED_EVENT, TICKET_UPDATED_EVENT, TICKET_RECATEGORIZED_EVENT } from "./tickets.events";
-import type { TicketCreatedEvent, TicketUpdatedEvent, TicketRecategorizedEvent } from "./tickets.events";
+import type { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
+import {
+  TICKET_CREATED_EVENT,
+  TICKET_UPDATED_EVENT,
+  TICKET_RECATEGORIZED_EVENT,
+  TICKET_NOTE_ADDED_EVENT,
+} from "./tickets.events";
+import type {
+  TicketCreatedEvent,
+  TicketUpdatedEvent,
+  TicketRecategorizedEvent,
+  TicketNoteAddedEvent,
+} from "./tickets.events";
 
 export interface TicketSummary {
   id: string;
@@ -46,6 +57,14 @@ export interface TicketHistoryEntrySummary {
   eventType: string;
   actorUserId: string | null;
   snapshot: unknown;
+  createdAt: Date;
+}
+
+export interface TicketNoteSummary {
+  id: string;
+  ticketId: string;
+  authorUserId: string;
+  body: string;
   createdAt: Date;
 }
 
@@ -225,6 +244,42 @@ export class TicketsService {
     }));
   }
 
+  async getTicketNotes(id: string): Promise<TicketNoteSummary[]> {
+    await this.findTicketInScope(id);
+    const notes = await this.prisma.ticketNote.findMany({
+      where: { ticketId: id },
+      orderBy: { createdAt: "asc" },
+    });
+    return notes.map((note) => ({
+      id: note.id,
+      ticketId: note.ticketId,
+      authorUserId: note.authorUserId,
+      body: note.body,
+      createdAt: note.createdAt,
+    }));
+  }
+
+  async createTicketNote(id: string, dto: CreateTicketNoteDto): Promise<{ id: string }> {
+    await this.findTicketInScope(id);
+    const authorUserId = this.requireAuthenticatedUserId();
+
+    const note = await this.prisma.ticketNote.create({
+      data: { ticketId: id, authorUserId, body: dto.body },
+    });
+    const summary: TicketNoteSummary = {
+      id: note.id,
+      ticketId: note.ticketId,
+      authorUserId: note.authorUserId,
+      body: note.body,
+      createdAt: note.createdAt,
+    };
+    this.eventEmitter.emit(TICKET_NOTE_ADDED_EVENT, {
+      ticketId: id,
+      note: summary,
+    } satisfies TicketNoteAddedEvent);
+    return { id: note.id };
+  }
+
   // ---------------------------------------------------------------------
   // internals
   // ---------------------------------------------------------------------
@@ -267,6 +322,20 @@ export class TicketsService {
     if (!membership) {
       throw new NotFoundException("User not found in this branch");
     }
+  }
+
+  /**
+   * `TicketNote.authorUserId` is required (Design item 2) — every route that
+   * creates one sits behind `AuthGuard`, so `TenantContext.userId` is always
+   * populated in practice; this only guards the invariant, mirroring
+   * `requireBranchScope`'s own plain-`Error`-on-violation convention.
+   */
+  private requireAuthenticatedUserId(): string {
+    const userId = this.tenantContext.userId;
+    if (!userId) {
+      throw new Error("TenantContext: no authenticated user on this request");
+    }
+    return userId;
   }
 }
 

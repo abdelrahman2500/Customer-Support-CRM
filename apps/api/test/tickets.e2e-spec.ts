@@ -506,4 +506,129 @@ describe("Ticketing (e2e)", () => {
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(403);
   });
+
+  // Story 50 — Ticket Internal Notes (Agent-Only).
+  describe("ticket notes (Story 50)", () => {
+    it("rejects an unauthenticated request for both routes", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/notes`)
+        .send({ body: "Should not be created" })
+        .expect(401);
+      await request(app.getHttpServer()).get(`/api/v1/tickets/${ticketId}/notes`).expect(401);
+    });
+
+    it("rejects an Agent-role user attempting to create or read notes (403)", async () => {
+      const agentEmail = `agent-notes-${randomUUID()}@example.com`;
+      const agentPassword = "agent-test-password-123";
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: agentPassword,
+          fullName: "Test Agent Notes",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+      const agentAccessToken = agentLogin.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .send({ body: "Should not be created" })
+        .expect(403);
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(403);
+    });
+
+    it("returns [] for a ticket with no notes yet", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+
+    it("rejects an empty body with a validation error", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "" })
+        .expect(400);
+    });
+
+    it("returns 404 for an unknown ticket id on both routes", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${randomUUID()}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Some note" })
+        .expect(404);
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${randomUUID()}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("creates a note and reflects it (with the authenticated author) on a subsequent GET", async () => {
+      const created = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Called the customer back, awaiting reply." })
+        .expect(201);
+
+      expect(created.body).toEqual({ id: expect.any(String) });
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const note = response.body.find((entry: { id: string }) => entry.id === created.body.id);
+      expect(note).toBeDefined();
+      expect(note.body).toBe("Called the customer back, awaiting reply.");
+      expect(note.authorUserId).toBe(adminUserId);
+      expect(note.ticketId).toBe(ticketId);
+    });
+
+    it("orders notes chronologically ascending", async () => {
+      const first = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "First note in this ordering test." })
+        .expect(201);
+      const second = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Second note in this ordering test." })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const ids = response.body.map((entry: { id: string }) => entry.id);
+      expect(ids.indexOf(first.body.id)).toBeLessThan(ids.indexOf(second.body.id));
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import type { TicketSummary } from "./tickets.service";
+import type { TicketNoteSummary, TicketSummary } from "./tickets.service";
 
 export const TICKET_CREATED_EVENT = "ticket.created";
 export const TICKET_UPDATED_EVENT = "ticket.updated";
@@ -43,4 +43,16 @@ export const TICKET_ESCALATED_EVENT = "ticket.escalated";
 export interface TicketEscalatedEvent {
   ticket: TicketSummary;
   actorUserId: string | null;
+}
+
+export const TICKET_NOTE_ADDED_EVENT = "ticket.note-added";
+
+/**
+ * Emitted once, after `TicketsService.createTicketNote` successfully persists
+ * the row. Payload deliberately differs from the other ticket events' shared
+ * shape (Design item 6) — carries the note itself, not the whole ticket.
+ */
+export interface TicketNoteAddedEvent {
+  ticketId: string;
+  note: TicketNoteSummary;
 }

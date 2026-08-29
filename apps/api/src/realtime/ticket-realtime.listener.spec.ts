@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TicketRealtimeListener } from "./ticket-realtime.listener";
-import { TICKET_UPDATED_EVENT, TICKET_ESCALATED_EVENT } from "../modules/tickets/tickets.events";
+import {
+  TICKET_UPDATED_EVENT,
+  TICKET_ESCALATED_EVENT,
+  TICKET_NOTE_ADDED_EVENT,
+} from "../modules/tickets/tickets.events";
 import type { RealtimeGateway } from "./realtime.gateway";
 
 function buildGatewayMock() {
@@ -53,6 +57,24 @@ describe("TicketRealtimeListener", () => {
 
     expect(gateway._to).toHaveBeenCalledWith("ticket:ticket-1");
     expect(gateway._emit).toHaveBeenCalledWith(TICKET_ESCALATED_EVENT, event);
+  });
+
+  it("relays ticket.note-added into ticket:{id} with the unmodified event payload (Story 50)", () => {
+    const event = {
+      ticketId: "ticket-1",
+      note: {
+        id: "note-1",
+        ticketId: "ticket-1",
+        authorUserId: "user-1",
+        body: "Called the customer back.",
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      },
+    };
+
+    listener.onTicketNoteAdded(event);
+
+    expect(gateway._to).toHaveBeenCalledWith("ticket:ticket-1");
+    expect(gateway._emit).toHaveBeenCalledWith(TICKET_NOTE_ADDED_EVENT, event);
   });
 
   it("does not throw when server.to(...).emit(...) throws — catches and logs instead", () => {
