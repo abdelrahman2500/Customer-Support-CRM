@@ -511,6 +511,82 @@ describe("TicketsService", () => {
       expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
+    // Story 69 — the "assignment" half of the same disclosed doc sentence
+    // Story 68 closed the "visibility" half of.
+    it("rejects a DEPARTMENT-scoped caller reassigning a ticket to a different department", async () => {
+      tenantContext.roles = ["DeptOnly"];
+      tenantContext.departmentId = "dept-1";
+      prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        category: null,
+        priority: "MEDIUM",
+        departmentId: "dept-1",
+      });
+      prisma.department.findFirst.mockResolvedValue({ id: "dept-2", branchId: "branch-1" });
+
+      await expect(
+        service.updateTicket("ticket-1", { departmentId: "dept-2" }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.ticket.update).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it("allows a DEPARTMENT-scoped caller reassigning a ticket to their own department", async () => {
+      tenantContext.roles = ["DeptOnly"];
+      tenantContext.departmentId = "dept-1";
+      prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        category: null,
+        priority: "MEDIUM",
+        departmentId: null,
+      });
+      prisma.department.findFirst.mockResolvedValue({ id: "dept-1", branchId: "branch-1" });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: "dept-1",
+        assignedToUserId: null,
+      });
+
+      await expect(
+        service.updateTicket("ticket-1", { departmentId: "dept-1" }),
+      ).resolves.toEqual({ id: "ticket-1" });
+      expect(prisma.ticket.update).toHaveBeenCalledOnce();
+    });
+
+    it("allows a BRANCH-scoped caller (unchanged, pre-Story-69 behavior) to reassign to any department", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        category: null,
+        priority: "MEDIUM",
+        departmentId: null,
+      });
+      prisma.department.findFirst.mockResolvedValue({ id: "dept-2", branchId: "branch-1" });
+      prisma.ticket.update.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: "dept-2",
+        assignedToUserId: null,
+      });
+
+      await expect(
+        service.updateTicket("ticket-1", { departmentId: "dept-2" }),
+      ).resolves.toEqual({ id: "ticket-1" });
+      expect(prisma.role.findMany).not.toHaveBeenCalled();
+    });
+
     it("only includes fields present in the DTO", async () => {
       prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
       prisma.ticket.update.mockResolvedValue({

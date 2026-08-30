@@ -205,6 +205,7 @@ export class TicketsService {
 
     if (dto.departmentId !== undefined) {
       await this.requireDepartmentInScope(dto.departmentId, branchId);
+      await this.requireAllowedDepartmentReassignment(dto.departmentId);
     }
     if (dto.assignedToUserId !== undefined) {
       await this.requireUserInScope(dto.assignedToUserId, branchId);
@@ -513,20 +514,51 @@ export class TicketsService {
    * never to a filter that would silently hide every ticket.
    */
   private async resolveDepartmentVisibilityFilter(): Promise<Prisma.TicketWhereInput> {
+    if (!(await this.isDepartmentScopedCaller())) {
+      return {};
+    }
+    return { OR: [{ departmentId: this.tenantContext.departmentId }, { departmentId: null }] };
+  }
+
+  /**
+   * Story 69 — the "assignment" half of the same disclosed doc sentence
+   * Story 68 closed the "visibility" half of: a `DEPARTMENT`-scoped caller
+   * may not move a ticket they can already see into a *different*
+   * department (they could otherwise use their own department's read
+   * access to relocate a ticket somewhere they'd never be granted
+   * visibility into). Deliberately narrow: only `departmentId`
+   * reassignment is restricted here — restricting `assignedToUserId` by
+   * the target user's own department is a separate, still-open design
+   * question (a user can hold multiple department memberships in this
+   * branch; which one would even apply is genuinely ambiguous) and stays
+   * an explicit non-goal, same discipline as Story 68's own.
+   */
+  private async requireAllowedDepartmentReassignment(newDepartmentId: string): Promise<void> {
+    if (!(await this.isDepartmentScopedCaller())) {
+      return;
+    }
+    if (newDepartmentId !== this.tenantContext.departmentId) {
+      throw new BadRequestException(
+        "Your role can only assign tickets within your own department",
+      );
+    }
+  }
+
+  /** Shared by `resolveDepartmentVisibilityFilter` and
+   * `requireAllowedDepartmentReassignment` — `true` only when every Role
+   * the caller holds for the active branch+department session is
+   * `DEPARTMENT`-scoped (most-permissive-wins across held roles). Fails
+   * safe: an empty/ambiguous role-name lookup resolves to `false`. */
+  private async isDepartmentScopedCaller(): Promise<boolean> {
     const roleNames = this.tenantContext.roles;
     if (roleNames.length === 0) {
-      return {};
+      return false;
     }
     const roles = await this.prisma.role.findMany({
       where: { name: { in: roleNames } },
       select: { ticketVisibilityScope: true },
     });
-    const allDepartmentScoped =
-      roles.length > 0 && roles.every((role) => role.ticketVisibilityScope === "DEPARTMENT");
-    if (!allDepartmentScoped) {
-      return {};
-    }
-    return { OR: [{ departmentId: this.tenantContext.departmentId }, { departmentId: null }] };
+    return roles.length > 0 && roles.every((role) => role.ticketVisibilityScope === "DEPARTMENT");
   }
 
   private async requireDepartmentInScope(departmentId: string, branchId: string): Promise<void> {

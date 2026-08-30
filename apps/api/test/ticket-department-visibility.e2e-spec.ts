@@ -9,18 +9,22 @@ import { AppModule } from "../src/app.module";
 /**
  * Integration suite for Story 68 (Ticket Department-Scoped Visibility) —
  * `Role.ticketVisibilityScope` and the resulting `GET /tickets`/
- * `GET /tickets/:id` filtering. Bootstraps the REAL `AppModule` against a
- * REAL Postgres/Redis, exactly like every sibling e2e suite.
+ * `GET /tickets/:id` filtering — and Story 69 (its "assignment" half:
+ * `PATCH /tickets/:id`'s `departmentId` reassignment restriction).
+ * Bootstraps the REAL `AppModule` against a REAL Postgres/Redis, exactly
+ * like every sibling e2e suite.
  *
  * Deliberately its own file, not appended to `identity.e2e-spec.ts` — that
  * file has disclosed, pre-existing test-isolation defects (`CLAUDE.md`
- * §13) unrelated to this Story; keeping this suite separate avoids
+ * §13) unrelated to these Stories; keeping this suite separate avoids
  * entangling with them.
  */
 describe("Ticket Department-Scoped Visibility (e2e)", () => {
   let app: INestApplication;
   let adminAccessToken: string;
   let deptScopedAccessToken: string;
+  let deptAId: string;
+  let deptBId: string;
   let deptATicketId: string;
   let deptBTicketId: string;
   let unassignedTicketId: string;
@@ -65,7 +69,7 @@ describe("Ticket Department-Scoped Visibility (e2e)", () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/identity/roles/${roleId}/permissions`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ permissionKeys: ["ticket:read", "ticket:create"] })
+      .send({ permissionKeys: ["ticket:read", "ticket:create", "ticket:update"] })
       .expect(200);
 
     const deptA = await request(app.getHttpServer())
@@ -78,6 +82,8 @@ describe("Ticket Department-Scoped Visibility (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({ name: `Dept B ${randomUUID()}` })
       .expect(201);
+    deptAId = deptA.body.id;
+    deptBId = deptB.body.id;
 
     const deptScopedEmail = `dept-scoped-${randomUUID()}@example.com`;
     const deptScopedPassword = "dept-scoped-test-password-123";
@@ -172,5 +178,45 @@ describe("Ticket Department-Scoped Visibility (e2e)", () => {
     expect(ids).toContain(deptATicketId);
     expect(ids).toContain(deptBTicketId);
     expect(ids).toContain(unassignedTicketId);
+  });
+
+  // ---------------------------------------------------------------------
+  // Story 69 — the "assignment" half of the same disclosed doc sentence.
+  // ---------------------------------------------------------------------
+
+  it("rejects a DEPARTMENT-scoped caller reassigning their own department's ticket to a different department", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${deptATicketId}`)
+      .set("Authorization", `Bearer ${deptScopedAccessToken}`)
+      .send({ departmentId: deptBId })
+      .expect(400);
+  });
+
+  it("allows a DEPARTMENT-scoped caller reassigning the unassigned ticket into their own department", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${unassignedTicketId}`)
+      .set("Authorization", `Bearer ${deptScopedAccessToken}`)
+      .send({ departmentId: deptAId })
+      .expect(200);
+
+    const after = await request(app.getHttpServer())
+      .get(`/api/v1/tickets/${unassignedTicketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(after.body.departmentId).toBe(deptAId);
+  });
+
+  it("allows a BRANCH-scoped caller (the seed admin, default scope) to reassign to any department — unchanged, pre-Story-69 behavior", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${deptBTicketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ departmentId: deptAId })
+      .expect(200);
+
+    const after = await request(app.getHttpServer())
+      .get(`/api/v1/tickets/${deptBTicketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(after.body.departmentId).toBe(deptAId);
   });
 });
