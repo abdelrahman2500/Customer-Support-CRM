@@ -60,3 +60,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | knowledge-base-article-versioning | [knowledge-base-article-versioning/00-overview.md](./knowledge-base-article-versioning/00-overview.md) | 65–      |
 | ticket-attachments | [ticket-attachments/00-overview.md](./ticket-attachments/00-overview.md) | 66–      |
 | customer-attachments | [customer-attachments/00-overview.md](./customer-attachments/00-overview.md) | 67–      |
+| ticket-department-visibility | [ticket-department-visibility/00-overview.md](./ticket-department-visibility/00-overview.md) | 68–      |

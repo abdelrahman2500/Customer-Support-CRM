@@ -313,9 +313,12 @@
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
       "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
       "permissionsAssignHeading": "تعيين الصلاحيات",
+      "visibilityBranch": "الفرع بأكمله",
+      "visibilityDepartment": "قسمه فقط",
       "columns": {
         "name": "الدور",
         "permissionCount": "عدد الصلاحيات",
+        "visibility": "رؤية التذاكر",
         "actions": "الإجراءات"
       }
     }

@@ -17,6 +17,13 @@ import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /** The two seeded roles `seed.ts` reconciles by literal name — the backend
  * rejects a rename/deactivate on either (Design item 5); this is a
@@ -53,6 +60,10 @@ function RoleRow({
     updateMutation.mutate({ isActive: !role.isActive });
   }
 
+  function changeVisibilityScope(value: string) {
+    updateMutation.mutate({ ticketVisibilityScope: value as RoleSummary["ticketVisibilityScope"] });
+  }
+
   function togglePermission(permissionKey: string) {
     const next = role.permissions.includes(permissionKey)
       ? role.permissions.filter((key) => key !== permissionKey)
@@ -82,6 +93,17 @@ function RoleRow({
           )}
         </TableCell>
         <TableCell className="text-slate-500">{role.permissions.length}</TableCell>
+        <TableCell>
+          <Select value={role.ticketVisibilityScope} onValueChange={changeVisibilityScope}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="BRANCH">{t("list.visibilityBranch")}</SelectItem>
+              <SelectItem value="DEPARTMENT">{t("list.visibilityDepartment")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </TableCell>
         <TableCell>
           <div className="flex flex-wrap items-center gap-2">
             {!isProtected && (
@@ -117,7 +139,7 @@ function RoleRow({
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={3}>
+          <TableCell colSpan={4}>
             <h3 className="text-xs font-semibold text-slate-700">{t("list.permissionsAssignHeading")}</h3>
             {allPermissions.length === 0 ? (
               <p className="mt-1 text-sm text-slate-500">{t("list.noPermissions")}</p>
@@ -255,6 +277,7 @@ export function RoleListView() {
               <TableRow>
                 <TableHead>{t("list.columns.name")}</TableHead>
                 <TableHead>{t("list.columns.permissionCount")}</TableHead>
+                <TableHead>{t("list.columns.visibility")}</TableHead>
                 <TableHead>{t("list.columns.actions")}</TableHead>
               </TableRow>
             </TableHeader>

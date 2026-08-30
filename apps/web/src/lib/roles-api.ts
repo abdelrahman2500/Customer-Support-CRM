@@ -19,11 +19,18 @@ import { apiFetch } from "./api";
  * `listRoles()` (active-only, still used by `CreateUserView`'s role
  * picker) — same "picker vs. management" split as `branches-api.ts`.
  */
+/** Story 68 — `BRANCH` (default) reproduces every pre-Story-68 role's
+ * exact ticket-visibility behavior; `DEPARTMENT` restricts an agent
+ * holding only that role (for the active branch+department) to their own
+ * department's tickets plus unassigned ones. */
+export type TicketVisibilityScope = "BRANCH" | "DEPARTMENT";
+
 export interface RoleSummary {
   id: string;
   name: string;
   permissions: string[];
   isActive: boolean;
+  ticketVisibilityScope: TicketVisibilityScope;
 }
 
 export interface PermissionSummary {
@@ -33,11 +40,13 @@ export interface PermissionSummary {
 
 export interface CreateRoleInput {
   name: string;
+  ticketVisibilityScope?: TicketVisibilityScope;
 }
 
 export interface UpdateRoleInput {
   name?: string;
   isActive?: boolean;
+  ticketVisibilityScope?: TicketVisibilityScope;
 }
 
 export interface SetRolePermissionsInput {

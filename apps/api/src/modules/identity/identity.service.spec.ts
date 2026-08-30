@@ -1018,6 +1018,25 @@ describe("IdentityService", () => {
         ConflictException,
       );
     });
+
+    // Story 68 — Ticket Department-Scoped Visibility.
+    it("omits ticketVisibilityScope when not given, defaulting to the Prisma column's own BRANCH default", async () => {
+      prisma.role.create.mockResolvedValue({ id: "role-1" });
+
+      await service.createRole({ name: "Custom Role" });
+
+      expect(prisma.role.create).toHaveBeenCalledWith({ data: { name: "Custom Role" } });
+    });
+
+    it("passes ticketVisibilityScope through when given", async () => {
+      prisma.role.create.mockResolvedValue({ id: "role-1" });
+
+      await service.createRole({ name: "Dept Role", ticketVisibilityScope: "DEPARTMENT" });
+
+      expect(prisma.role.create).toHaveBeenCalledWith({
+        data: { name: "Dept Role", ticketVisibilityScope: "DEPARTMENT" },
+      });
+    });
   });
 
   describe("updateRole", () => {
@@ -1105,6 +1124,21 @@ describe("IdentityService", () => {
       await expect(
         service.updateRole("role-1", { name: "Duplicate Name" }),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    // Story 68 — Ticket Department-Scoped Visibility. Deliberately allowed
+    // on a protected role (mirrors `setRolePermissions`'s own precedent):
+    // opting `Agent` into department scoping is the entire point.
+    it("allows setting ticketVisibilityScope on a protected role (Agent) with no name/isActive change", async () => {
+      prisma.role.findUnique.mockResolvedValue({ id: "role-agent", name: "Agent", isActive: true });
+      prisma.role.update.mockResolvedValue({ id: "role-agent" });
+
+      await service.updateRole("role-agent", { ticketVisibilityScope: "DEPARTMENT" });
+
+      expect(prisma.role.update).toHaveBeenCalledWith({
+        where: { id: "role-agent" },
+        data: { ticketVisibilityScope: "DEPARTMENT" },
+      });
     });
   });
 
@@ -1229,6 +1263,23 @@ describe("IdentityService", () => {
       expect(result).toEqual([
         { id: "role-1", name: "SuperAdmin", permissions: ["user:create", "user:read"] },
       ]);
+    });
+
+    // Story 68 — Ticket Department-Scoped Visibility.
+    it("includes each role's ticketVisibilityScope", async () => {
+      prisma.role.findMany.mockResolvedValue([
+        {
+          id: "role-1",
+          name: "Dept Role",
+          isActive: true,
+          ticketVisibilityScope: "DEPARTMENT",
+          permissions: [],
+        },
+      ]);
+
+      const result = await service.listRoles();
+
+      expect(result[0]).toMatchObject({ ticketVisibilityScope: "DEPARTMENT" });
     });
 
     it("by default excludes inactive roles from the where clause", async () => {

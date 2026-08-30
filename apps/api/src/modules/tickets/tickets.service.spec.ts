@@ -44,12 +44,26 @@ function buildPrismaMock() {
     userBranchRole: {
       findFirst: vi.fn(),
     },
+    // Story 68 — Ticket Department-Scoped Visibility.
+    role: {
+      findMany: vi.fn(),
+    },
   };
 }
 
-function buildTenantContextMock(branchId: string | null = "branch-1", userId: string | null = "user-1") {
+/** Story 68 — `roles` defaults to `[]`, so `resolveDepartmentVisibilityFilter`
+ * short-circuits to `{}` (today's exact, unchanged behavior) for every
+ * pre-existing test that doesn't explicitly opt into department scoping. */
+function buildTenantContextMock(
+  branchId: string | null = "branch-1",
+  userId: string | null = "user-1",
+  roles: string[] = [],
+  departmentId: string | null = null,
+) {
   return {
     userId,
+    roles,
+    departmentId,
     requireBranchScope: vi.fn(() => {
       if (!branchId) {
         throw new Error("TenantContext: no active branch on this request");
@@ -351,6 +365,110 @@ describe("TicketsService", () => {
       expect(prisma.ticket.findFirst).toHaveBeenCalledWith({
         where: { id: "missing-id", branchId: "branch-1" },
       });
+    });
+  });
+
+  // Story 68 — Ticket Department-Scoped Visibility.
+  describe("department-scoped visibility", () => {
+    it("listTickets: adds no extra filter when the caller holds no roles (today's exact behavior)", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets();
+
+      expect(prisma.role.findMany).not.toHaveBeenCalled();
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1" } }),
+      );
+    });
+
+    it("listTickets: adds no extra filter when any held role is BRANCH-scoped (most-permissive-wins)", async () => {
+      tenantContext.roles = ["Agent", "DeptOnly"];
+      prisma.role.findMany.mockResolvedValue([
+        { ticketVisibilityScope: "BRANCH" },
+        { ticketVisibilityScope: "DEPARTMENT" },
+      ]);
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets();
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1" } }),
+      );
+    });
+
+    it("listTickets: filters to the caller's department plus unassigned tickets when every held role is DEPARTMENT-scoped", async () => {
+      tenantContext.roles = ["DeptOnly"];
+      tenantContext.departmentId = "dept-1";
+      prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets();
+
+      expect(prisma.role.findMany).toHaveBeenCalledWith({
+        where: { name: { in: ["DeptOnly"] } },
+        select: { ticketVisibilityScope: true },
+      });
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            branchId: "branch-1",
+            OR: [{ departmentId: "dept-1" }, { departmentId: null }],
+          },
+        }),
+      );
+    });
+
+    it("getTicket: 404s for a DEPARTMENT-scoped caller requesting a ticket outside their department", async () => {
+      tenantContext.roles = ["DeptOnly"];
+      tenantContext.departmentId = "dept-1";
+      prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
+      prisma.ticket.findFirst.mockResolvedValue(null); // the real DB query itself excludes it.
+
+      await expect(service.getTicket("ticket-in-other-dept")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.ticket.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: "ticket-in-other-dept",
+          branchId: "branch-1",
+          OR: [{ departmentId: "dept-1" }, { departmentId: null }],
+        },
+      });
+    });
+
+    it("getTicket: succeeds for a DEPARTMENT-scoped caller requesting their own department's ticket", async () => {
+      tenantContext.roles = ["DeptOnly"];
+      tenantContext.departmentId = "dept-1";
+      prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        category: null,
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: "dept-1",
+        assignedToUserId: null,
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2024-01-02T00:00:00.000Z"),
+      });
+
+      const result = await service.getTicket("ticket-1");
+
+      expect(result.id).toBe("ticket-1");
+    });
+
+    it("resolves to no extra filter (fails safe) when the role-name lookup returns nothing", async () => {
+      tenantContext.roles = ["RenamedOrDeletedRole"];
+      prisma.role.findMany.mockResolvedValue([]);
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets();
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1" } }),
+      );
     });
   });
 

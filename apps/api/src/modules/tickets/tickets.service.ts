@@ -168,6 +168,7 @@ export class TicketsService {
     const sortDir = query.sortDir ?? "asc";
     const where: Prisma.TicketWhereInput = {
       branchId,
+      ...(await this.resolveDepartmentVisibilityFilter()),
       ...(query.status !== undefined ? { status: query.status } : {}),
       ...(query.priority !== undefined ? { priority: query.priority } : {}),
       ...(query.category !== undefined ? { category: query.category } : {}),
@@ -490,11 +491,42 @@ export class TicketsService {
     updatedAt: Date;
   }> {
     const { branchId } = this.tenantContext.requireBranchScope();
-    const ticket = await this.prisma.ticket.findFirst({ where: { id, branchId } });
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { id, branchId, ...(await this.resolveDepartmentVisibilityFilter()) },
+    });
     if (!ticket) {
       throw new NotFoundException("Ticket not found");
     }
     return ticket;
+  }
+
+  /**
+   * Story 68 — see docs/architecture/05-auth-and-security.md ("department
+   * visibility"). Returns `{}` (no extra filter — today's exact, unchanged
+   * behavior) unless every Role the caller holds for the active
+   * branch+department session (`TenantContext.roles`, already scoped to
+   * exactly one branch+department pair — see `issueAccessToken`'s own doc
+   * comment) is `DEPARTMENT`-scoped. Most-permissive-wins across held
+   * roles, mirroring how this codebase already unions permissions across
+   * roles rather than intersecting them. Fails safe, not open: an empty/
+   * ambiguous role-name lookup resolves to `{}` (full branch visibility),
+   * never to a filter that would silently hide every ticket.
+   */
+  private async resolveDepartmentVisibilityFilter(): Promise<Prisma.TicketWhereInput> {
+    const roleNames = this.tenantContext.roles;
+    if (roleNames.length === 0) {
+      return {};
+    }
+    const roles = await this.prisma.role.findMany({
+      where: { name: { in: roleNames } },
+      select: { ticketVisibilityScope: true },
+    });
+    const allDepartmentScoped =
+      roles.length > 0 && roles.every((role) => role.ticketVisibilityScope === "DEPARTMENT");
+    if (!allDepartmentScoped) {
+      return {};
+    }
+    return { OR: [{ departmentId: this.tenantContext.departmentId }, { departmentId: null }] };
   }
 
   private async requireDepartmentInScope(departmentId: string, branchId: string): Promise<void> {

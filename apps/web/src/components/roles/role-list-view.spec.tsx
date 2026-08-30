@@ -477,6 +477,55 @@ describe("RoleListView", () => {
     });
   });
 
+  // Story 68 — Ticket Department-Scoped Visibility.
+  describe("ticket visibility scope (Story 68)", () => {
+    it("renders the role's current visibility scope", () => {
+      mockedUseManagedRolesQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [
+            {
+              id: "role-1",
+              name: "Viewer",
+              permissions: [],
+              isActive: true,
+              ticketVisibilityScope: "DEPARTMENT",
+            },
+          ],
+        }) as never,
+      );
+
+      renderView();
+
+      expect(screen.getByText("Own department only")).toBeInTheDocument();
+    });
+
+    it("commits a visibility scope change when a different option is selected", async () => {
+      mockedUseManagedRolesQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [
+            {
+              id: "role-1",
+              name: "Viewer",
+              permissions: [],
+              isActive: true,
+              ticketVisibilityScope: "BRANCH",
+            },
+          ],
+        }) as never,
+      );
+      const mutate = vi.fn();
+      mockedUseUpdateRoleMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+      renderView();
+      fireEvent.click(screen.getByText("Whole branch"));
+      fireEvent.click(await screen.findByRole("option", { name: "Own department only" }));
+
+      expect(mutate).toHaveBeenCalledWith({ ticketVisibilityScope: "DEPARTMENT" });
+    });
+  });
+
   describe("bilingual rendering", () => {
     it("renders the roles heading, create-role form, and system-role text in English", () => {
       mockedUseManagedRolesQuery.mockReturnValue(

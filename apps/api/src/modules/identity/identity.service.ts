@@ -10,6 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
+import type { TicketVisibilityScope } from "@prisma/client";
 import type { AuthenticatedUser, AuthTokenPair, JwtAccessTokenClaims } from "@crm/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
@@ -78,6 +79,7 @@ export interface RoleSummary {
   id: string;
   name: string;
   isActive: boolean;
+  ticketVisibilityScope: TicketVisibilityScope;
   permissions: string[];
 }
 
@@ -521,6 +523,7 @@ export class IdentityService {
       id: role.id,
       name: role.name,
       isActive: role.isActive,
+      ticketVisibilityScope: role.ticketVisibilityScope,
       permissions: role.permissions.map((rp) => rp.permission.key),
     }));
   }
@@ -536,7 +539,16 @@ export class IdentityService {
    */
   async createRole(dto: CreateRoleDto): Promise<{ id: string }> {
     try {
-      const role = await this.prisma.role.create({ data: { name: dto.name } });
+      const role = await this.prisma.role.create({
+        data: {
+          name: dto.name,
+          // Story 68 — omitted defaults to the Prisma column's own default
+          // (`BRANCH`), reproducing every pre-Story-68 caller's behavior.
+          ...(dto.ticketVisibilityScope !== undefined
+            ? { ticketVisibilityScope: dto.ticketVisibilityScope }
+            : {}),
+        },
+      });
       return { id: role.id };
     } catch (error) {
       throw translateDuplicateRoleName(error);
@@ -568,6 +580,13 @@ export class IdentityService {
         data: {
           ...(dto.name !== undefined ? { name: dto.name } : {}),
           ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+          // Story 68 — deliberately allowed on every role including the two
+          // protected ones (mirrors `setRolePermissions`'s own precedent):
+          // opting an existing role like `Agent` into department-scoped
+          // visibility is the entire point of this Story.
+          ...(dto.ticketVisibilityScope !== undefined
+            ? { ticketVisibilityScope: dto.ticketVisibilityScope }
+            : {}),
         },
       });
       return { id };

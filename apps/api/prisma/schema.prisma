@@ -95,13 +95,26 @@ model User {
   @@schema("identity")
 }
 
+/// Story 68 — `BRANCH` (default) reproduces every pre-Story-68 role's
+/// exact ticket-visibility behavior; `DEPARTMENT` restricts
+/// `TicketsService`'s ticket list/get to the caller's own department plus
+/// unassigned (`departmentId: null`) tickets. See
+/// docs/architecture/05-auth-and-security.md ("department visibility").
+enum TicketVisibilityScope {
+  BRANCH
+  DEPARTMENT
+
+  @@schema("identity")
+}
+
 model Role {
-  id          String           @id @default(uuid())
-  name        String           @unique
-  isActive    Boolean          @default(true) @map("is_active")
-  permissions RolePermission[]
-  userRoles   UserBranchRole[]
-  createdAt   DateTime         @default(now()) @map("created_at")
+  id                    String                @id @default(uuid())
+  name                  String                @unique
+  isActive              Boolean               @default(true) @map("is_active")
+  ticketVisibilityScope TicketVisibilityScope @default(BRANCH) @map("ticket_visibility_scope")
+  permissions           RolePermission[]
+  userRoles             UserBranchRole[]
+  createdAt             DateTime              @default(now()) @map("created_at")
 
   @@map("roles")
   @@schema("identity")

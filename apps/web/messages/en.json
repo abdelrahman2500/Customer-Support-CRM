@@ -313,9 +313,12 @@
       "actionForbidden": "You don't have permission to perform that action.",
       "actionFailed": "That change couldn't be saved. Please try again.",
       "permissionsAssignHeading": "Assign permissions",
+      "visibilityBranch": "Whole branch",
+      "visibilityDepartment": "Own department only",
       "columns": {
         "name": "Role",
         "permissionCount": "Permissions",
+        "visibility": "Ticket visibility",
         "actions": "Actions"
       }
     }
