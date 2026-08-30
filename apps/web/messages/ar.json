@@ -33,7 +33,8 @@
       "auditLogs": "سجل التدقيق",
       "notifications": "سجل الإشعارات",
       "knowledgeBase": "قاعدة المعرفة",
-      "reports": "التقارير"
+      "reports": "التقارير",
+      "automationRules": "قواعد الأتمتة"
     }
   },
   "tickets": {
@@ -517,5 +518,32 @@
       "empty": "لم يتم إرسال أي ملاحظات حتى الآن.",
       "detail": "استنادًا إلى {count} ردود"
     }
+  },
+  "automationRules": {
+    "title": "قواعد الأتمتة",
+    "error": "تعذّر تحميل قواعد الأتمتة.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد قواعد أتمتة حتى الآن.",
+    "anyCategory": "أي فئة",
+    "active": "نشطة",
+    "inactive": "غير نشطة",
+    "activate": "تفعيل",
+    "deactivate": "إلغاء التفعيل",
+    "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+    "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+    "columns": {
+      "name": "الاسم",
+      "condition": "الشرط",
+      "assignTo": "التعيين إلى",
+      "status": "الحالة"
+    },
+    "createHeading": "قاعدة أتمتة جديدة",
+    "nameLabel": "الاسم",
+    "conditionCategoryLabel": "الفئة (اختياري)",
+    "actionAssignToLabel": "التعيين إلى",
+    "actionAssignToPlaceholder": "اختر وكيلاً",
+    "createSubmit": "إنشاء القاعدة",
+    "createSubmitting": "جارٍ الإنشاء...",
+    "createFailed": "تعذّر إنشاء القاعدة. حاول مرة أخرى."
   }
 }

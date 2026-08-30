@@ -47,6 +47,7 @@ model Branch {
   slaPolicies           SlaPolicy[]
   businessHoursCalendar BusinessHoursCalendar?
   knowledgeBaseArticles KnowledgeBaseArticle[]
+  automationRules       AutomationRule[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -81,6 +82,7 @@ model User {
   assignedTickets      Ticket[]
   ticketHistoryEntries TicketHistoryEntry[]
   ticketNotes          TicketNote[]
+  automationRules      AutomationRule[]
   createdAt            DateTime             @default(now()) @map("created_at")
   updatedAt            DateTime             @updatedAt @map("updated_at")
 
@@ -419,6 +421,33 @@ model SlaPolicy {
 
   @@index([branchId])
   @@map("sla_policies")
+  @@schema("sla")
+}
+
+/// Story 57 — a simple trigger-condition-action automation rule
+/// (docs/architecture/07-sla-automation-and-ai.md — "AutomationRule"). v1:
+/// the trigger is implicitly `ticket.created` (not persisted — every rule
+/// is one); the condition is a single optional `category` equality match
+/// (`null` matches any category, mirroring `SlaPolicy.category`'s own
+/// wildcard convention); the action is always "assign to a specific
+/// agent" — deliberately excludes category/priority/department (those are
+/// `SlaPolicy`'s own matching dimensions; an automation-driven change to
+/// any of them would risk desyncing a ticket's SLA target with no existing
+/// reconciliation mechanism, unlike a real agent's `ticket.recategorized`).
+model AutomationRule {
+  id                   String   @id @default(uuid())
+  branchId             String   @map("branch_id")
+  branch               Branch   @relation(fields: [branchId], references: [id])
+  name                 String
+  isActive             Boolean  @default(true) @map("is_active")
+  conditionCategory    String?  @map("condition_category")
+  actionAssignToUserId String   @map("action_assign_to_user_id")
+  actionAssignToUser   User     @relation(fields: [actionAssignToUserId], references: [id])
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@index([branchId])
+  @@map("automation_rules")
   @@schema("sla")
 }
 

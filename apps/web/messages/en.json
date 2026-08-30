@@ -33,7 +33,8 @@
       "auditLogs": "Audit Log",
       "notifications": "Notification History",
       "knowledgeBase": "Knowledge Base",
-      "reports": "Reports"
+      "reports": "Reports",
+      "automationRules": "Automation Rules"
     }
   },
   "tickets": {
@@ -517,5 +518,32 @@
       "empty": "No feedback submitted yet.",
       "detail": "based on {count} responses"
     }
+  },
+  "automationRules": {
+    "title": "Automation Rules",
+    "error": "Couldn't load automation rules.",
+    "retry": "Retry",
+    "empty": "No automation rules yet.",
+    "anyCategory": "Any category",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "actionForbidden": "You don't have permission to perform that action.",
+    "actionFailed": "That change couldn't be saved. Please try again.",
+    "columns": {
+      "name": "Name",
+      "condition": "Condition",
+      "assignTo": "Assign to",
+      "status": "Status"
+    },
+    "createHeading": "New automation rule",
+    "nameLabel": "Name",
+    "conditionCategoryLabel": "Category (optional)",
+    "actionAssignToLabel": "Assign to",
+    "actionAssignToPlaceholder": "Select an agent",
+    "createSubmit": "Create rule",
+    "createSubmitting": "Creating...",
+    "createFailed": "Couldn't create the rule. Please try again."
   }
 }

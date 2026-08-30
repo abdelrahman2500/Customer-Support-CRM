@@ -1,0 +1,183 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { AutomationRulesView } from "./automation-rules-view";
+import {
+  useAutomationRulesQuery,
+  useCreateAutomationRuleMutation,
+  useUpdateAutomationRuleMutation,
+} from "@/hooks/use-automation-rules";
+import { useUsersQuery } from "@/hooks/use-tickets";
+import { ApiError } from "@/lib/api";
+
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
+    vars ? `${key}:${JSON.stringify(vars)}` : key,
+}));
+
+vi.mock("@/hooks/use-automation-rules", () => ({
+  useAutomationRulesQuery: vi.fn(),
+  useCreateAutomationRuleMutation: vi.fn(),
+  useUpdateAutomationRuleMutation: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-tickets", () => ({
+  useUsersQuery: vi.fn(),
+}));
+
+const mockedUseAutomationRulesQuery = vi.mocked(useAutomationRulesQuery);
+const mockedUseCreateAutomationRuleMutation = vi.mocked(useCreateAutomationRuleMutation);
+const mockedUseUpdateAutomationRuleMutation = vi.mocked(useUpdateAutomationRuleMutation);
+const mockedUseUsersQuery = vi.mocked(useUsersQuery);
+
+function queryResult(overrides: Record<string, unknown>) {
+  return {
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    isSuccess: false,
+    error: null,
+    refetch: vi.fn(),
+    ...overrides,
+  };
+}
+
+function mutationResult(overrides: Record<string, unknown> = {}) {
+  return {
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+    ...overrides,
+  };
+}
+
+const baseRule = {
+  id: "rule-1",
+  name: "Auto-assign billing",
+  isActive: true,
+  conditionCategory: "billing",
+  actionAssignToUserId: "user-1",
+};
+
+describe("AutomationRulesView", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedUseUpdateAutomationRuleMutation.mockReturnValue(mutationResult() as never);
+    mockedUseCreateAutomationRuleMutation.mockReturnValue(mutationResult() as never);
+    mockedUseUsersQuery.mockReturnValue(
+      queryResult({ data: [{ id: "user-1", fullName: "Jane Agent" }], isSuccess: true }) as never,
+    );
+  });
+
+  it("shows a loading state while the rules query is pending", () => {
+    mockedUseAutomationRulesQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = render(<AutomationRulesView />);
+
+    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+  });
+
+  it("shows a generic error state with a retry action", () => {
+    const refetch = vi.fn();
+    mockedUseAutomationRulesQuery.mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("Server error", 500), refetch }) as never,
+    );
+
+    render(<AutomationRulesView />);
+
+    expect(screen.getByText("error")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("retry"));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("shows the empty state when there are no rules yet", () => {
+    mockedUseAutomationRulesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+    render(<AutomationRulesView />);
+
+    expect(screen.getByText("empty")).toBeInTheDocument();
+  });
+
+  it("renders a rule's name, condition, resolved assignee name, and status", () => {
+    mockedUseAutomationRulesQuery.mockReturnValue(
+      queryResult({ data: [baseRule], isSuccess: true }) as never,
+    );
+
+    render(<AutomationRulesView />);
+
+    expect(screen.getByText("Auto-assign billing")).toBeInTheDocument();
+    expect(screen.getByText("billing")).toBeInTheDocument();
+    // "Jane Agent" also appears in the create-form's hidden native <select>
+    // option Radix's Select renders for accessibility — at least one visible
+    // occurrence (the row's assignee cell) is what this asserts.
+    expect(screen.getAllByText("Jane Agent").length).toBeGreaterThan(0);
+    expect(screen.getByText("active")).toBeInTheDocument();
+  });
+
+  it("falls back to the raw user id when the assignee isn't found in the users list", () => {
+    mockedUseAutomationRulesQuery.mockReturnValue(
+      queryResult({
+        data: [{ ...baseRule, actionAssignToUserId: "user-unknown" }],
+        isSuccess: true,
+      }) as never,
+    );
+    mockedUseUsersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+    render(<AutomationRulesView />);
+
+    expect(screen.getByText("user-unknown")).toBeInTheDocument();
+  });
+
+  it("shows 'any category' for a wildcard rule", () => {
+    mockedUseAutomationRulesQuery.mockReturnValue(
+      queryResult({ data: [{ ...baseRule, conditionCategory: null }], isSuccess: true }) as never,
+    );
+
+    render(<AutomationRulesView />);
+
+    expect(screen.getAllByText("anyCategory").length).toBeGreaterThan(0);
+  });
+
+  it("toggles a rule's active state", () => {
+    const mutate = vi.fn();
+    mockedUseAutomationRulesQuery.mockReturnValue(
+      queryResult({ data: [baseRule], isSuccess: true }) as never,
+    );
+    mockedUseUpdateAutomationRuleMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+    render(<AutomationRulesView />);
+
+    fireEvent.click(screen.getByText("deactivate"));
+
+    expect(mutate).toHaveBeenCalledWith({ isActive: false });
+  });
+
+  it("shows a forbidden message when toggling fails with 403", () => {
+    mockedUseAutomationRulesQuery.mockReturnValue(
+      queryResult({ data: [baseRule], isSuccess: true }) as never,
+    );
+    mockedUseUpdateAutomationRuleMutation.mockReturnValue(
+      mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
+    );
+
+    render(<AutomationRulesView />);
+
+    expect(screen.getByText("actionForbidden")).toBeInTheDocument();
+  });
+
+  it("disables the create-rule submit button until a name is entered", () => {
+    mockedUseAutomationRulesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+    render(<AutomationRulesView />);
+
+    expect(screen.getByText("createSubmit").closest("button")).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("nameLabel"), {
+      target: { value: "Auto-assign support" },
+    });
+
+    // Still disabled: no assignee has been chosen yet.
+    expect(screen.getByText("createSubmit").closest("button")).toBeDisabled();
+  });
+});

@@ -10,6 +10,9 @@ import { SlaEscalationsController } from "./sla-escalations.controller";
 import { SlaEscalationsService } from "./sla-escalations.service";
 import { BusinessHoursCalendarsController } from "./business-hours-calendars.controller";
 import { BusinessHoursCalendarsService } from "./business-hours-calendars.service";
+import { AutomationRulesController } from "./automation-rules.controller";
+import { AutomationRulesService } from "./automation-rules.service";
+import { AutomationEvaluationListener } from "./automation-evaluation.listener";
 
 /**
  * Owns the `sla` schema — see docs/architecture/03-domain-boundaries.md
@@ -21,6 +24,11 @@ import { BusinessHoursCalendarsService } from "./business-hours-calendars.servic
  * (Story 12) is added here rather than a new module, continuing the same
  * "grow this module per `sla`-schema concern" pattern Story 11 already used
  * for `SlaTargets*`.
+ *
+ * Story 57 — `AutomationRules*`/`AutomationEvaluationListener` added the
+ * same way. `AutomationEvaluationListener` only ever emits
+ * `AUTOMATION_RULE_MATCHED_EVENT`; the actual `Ticket` write happens in
+ * `TicketsModule`'s own `AutomationActionListener` (Design decision 6).
  */
 @Module({
   controllers: [
@@ -28,16 +36,25 @@ import { BusinessHoursCalendarsService } from "./business-hours-calendars.servic
     SlaTargetsController,
     SlaEscalationsController,
     BusinessHoursCalendarsController,
+    AutomationRulesController,
   ],
   providers: [
     SlaPoliciesService,
     SlaTargetsService,
     SlaEscalationsService,
     BusinessHoursCalendarsService,
+    AutomationRulesService,
     TenantContext,
     SlaTargetListener,
     SlaEscalationListener,
+    AutomationEvaluationListener,
   ],
-  exports: [SlaPoliciesService, SlaTargetsService, SlaEscalationsService, BusinessHoursCalendarsService],
+  exports: [
+    SlaPoliciesService,
+    SlaTargetsService,
+    SlaEscalationsService,
+    BusinessHoursCalendarsService,
+    AutomationRulesService,
+  ],
 })
 export class SlaPoliciesModule {}
