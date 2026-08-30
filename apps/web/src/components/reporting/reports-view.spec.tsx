@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ReportsView } from "./reports-view";
 import {
+  useAgentPerformanceQuery,
   useCsatSummaryQuery,
   useSlaComplianceQuery,
   useTicketVolumeQuery,
@@ -17,11 +18,13 @@ vi.mock("@/hooks/use-reporting", () => ({
   useTicketVolumeQuery: vi.fn(),
   useSlaComplianceQuery: vi.fn(),
   useCsatSummaryQuery: vi.fn(),
+  useAgentPerformanceQuery: vi.fn(),
 }));
 
 const mockedUseTicketVolumeQuery = vi.mocked(useTicketVolumeQuery);
 const mockedUseSlaComplianceQuery = vi.mocked(useSlaComplianceQuery);
 const mockedUseCsatSummaryQuery = vi.mocked(useCsatSummaryQuery);
+const mockedUseAgentPerformanceQuery = vi.mocked(useAgentPerformanceQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -48,6 +51,9 @@ describe("ReportsView", () => {
     mockedUseCsatSummaryQuery.mockReturnValue(
       queryResult({ data: { responseCount: 0, averageRating: null }, isSuccess: true }) as never,
     );
+    mockedUseAgentPerformanceQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
   });
 
   it("renders each card's empty state when there is no data yet", () => {
@@ -56,6 +62,7 @@ describe("ReportsView", () => {
     expect(screen.getByText("ticketVolume.empty")).toBeInTheDocument();
     expect(screen.getByText("slaCompliance.empty")).toBeInTheDocument();
     expect(screen.getByText("csat.empty")).toBeInTheDocument();
+    expect(screen.getByText("agentPerformance.empty")).toBeInTheDocument();
   });
 
   it("renders the ticket-volume card's populated rows", () => {
@@ -103,6 +110,22 @@ describe("ReportsView", () => {
     expect(screen.getByText("4.5/5")).toBeInTheDocument();
   });
 
+  it("renders the agent-performance card's populated rows", () => {
+    mockedUseAgentPerformanceQuery.mockReturnValue(
+      queryResult({
+        data: [{ userId: "user-1", fullName: "Jane Agent", openCount: 2, resolvedCount: 5 }],
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<ReportsView />);
+
+    expect(screen.getByText("Jane Agent")).toBeInTheDocument();
+    expect(
+      screen.getByText(`agentPerformance.detail:${JSON.stringify({ open: 2, resolved: 5 })}`),
+    ).toBeInTheDocument();
+  });
+
   it("shows a forbidden message on a card whose query 403s, independent of the others", () => {
     mockedUseTicketVolumeQuery.mockReturnValue(
       queryResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
@@ -111,9 +134,10 @@ describe("ReportsView", () => {
     render(<ReportsView />);
 
     expect(screen.getByText("forbidden")).toBeInTheDocument();
-    // The other two cards still render their own (unaffected) state.
+    // The other cards still render their own (unaffected) state.
     expect(screen.getByText("slaCompliance.empty")).toBeInTheDocument();
     expect(screen.getByText("csat.empty")).toBeInTheDocument();
+    expect(screen.getByText("agentPerformance.empty")).toBeInTheDocument();
   });
 
   it("shows a generic error with a retry action for a non-403 failure", () => {

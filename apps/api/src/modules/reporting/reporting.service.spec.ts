@@ -17,6 +17,9 @@ function buildPrismaMock() {
     ticketCsatResponse: {
       aggregate: vi.fn(),
     },
+    user: {
+      findMany: vi.fn(),
+    },
   };
 }
 
@@ -193,6 +196,77 @@ describe("ReportingService", () => {
         _avg: { rating: true },
         _count: { _all: true },
       });
+    });
+  });
+
+  describe("getAgentPerformance", () => {
+    it("scopes the groupBy query by branch and excludes unassigned tickets", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getAgentPerformance();
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["assignedToUserId", "status"],
+        where: { branchId: "branch-1", assignedToUserId: { not: null } },
+        _count: { _all: true },
+      });
+    });
+
+    it("returns [] and skips the user lookup when no ticket is assigned to anyone", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      const result = await service.getAgentPerformance();
+
+      expect(result).toEqual([]);
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+    });
+
+    it("buckets OPEN/IN_PROGRESS into openCount and RESOLVED/CLOSED into resolvedCount, per agent", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([
+        { assignedToUserId: "user-1", status: "OPEN", _count: { _all: 2 } },
+        { assignedToUserId: "user-1", status: "IN_PROGRESS", _count: { _all: 1 } },
+        { assignedToUserId: "user-1", status: "RESOLVED", _count: { _all: 3 } },
+        { assignedToUserId: "user-2", status: "CLOSED", _count: { _all: 5 } },
+      ]);
+      prisma.user.findMany.mockResolvedValue([
+        { id: "user-1", fullName: "Bob Agent" },
+        { id: "user-2", fullName: "Alice Agent" },
+      ]);
+
+      const result = await service.getAgentPerformance();
+
+      expect(result).toEqual([
+        { userId: "user-2", fullName: "Alice Agent", openCount: 0, resolvedCount: 5 },
+        { userId: "user-1", fullName: "Bob Agent", openCount: 3, resolvedCount: 3 },
+      ]);
+    });
+
+    it("looks up only the distinct assigned user ids", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([
+        { assignedToUserId: "user-1", status: "OPEN", _count: { _all: 1 } },
+        { assignedToUserId: "user-1", status: "RESOLVED", _count: { _all: 1 } },
+      ]);
+      prisma.user.findMany.mockResolvedValue([{ id: "user-1", fullName: "Bob Agent" }]);
+
+      await service.getAgentPerformance();
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["user-1"] } },
+        select: { id: true, fullName: true },
+      });
+    });
+
+    it("falls back to the raw user id when the user can't be resolved", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([
+        { assignedToUserId: "user-unknown", status: "OPEN", _count: { _all: 1 } },
+      ]);
+      prisma.user.findMany.mockResolvedValue([]);
+
+      const result = await service.getAgentPerformance();
+
+      expect(result).toEqual([
+        { userId: "user-unknown", fullName: "user-unknown", openCount: 1, resolvedCount: 0 },
+      ]);
     });
   });
 });

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import {
+  useAgentPerformanceQuery,
   useCsatSummaryQuery,
   useSlaComplianceQuery,
   useTicketVolumeQuery,
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
- * Story 56 — Reporting & Analytics Foundation. Three independent cards over
+ * Story 56 — Reporting & Analytics Foundation. Independent cards over
  * `GET /reports/ticket-volume`, `/reports/sla-compliance`, `/reports/csat` —
  * each with its own loading/forbidden/generic-error/populated state, so one
  * query's failure never blocks another's data (Design decision 9 of the
@@ -21,6 +22,9 @@ import { Skeleton } from "@/components/ui/skeleton";
  * no charting library exists anywhere in this codebase (Recon finding), so
  * this renders plain stat tiles, consistent with every other data screen
  * here.
+ *
+ * Story 59 — a fourth card, `GET /reports/agent-performance`, added the
+ * same way; no permission/layout-shell change beyond widening the grid.
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
@@ -28,12 +32,13 @@ export function ReportsView() {
   const ticketVolumeQuery = useTicketVolumeQuery();
   const slaComplianceQuery = useSlaComplianceQuery();
   const csatQuery = useCsatSummaryQuery();
+  const agentPerformanceQuery = useAgentPerformanceQuery();
 
   return (
     <section className="flex flex-col gap-6">
       <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <ReportCard
           heading={t("ticketVolume.heading")}
           query={ticketVolumeQuery}
@@ -90,6 +95,27 @@ export function ReportsView() {
                 {t("csat.detail", { count: csatQuery.data.responseCount })}
               </span>
             </div>
+          )}
+        </ReportCard>
+
+        <ReportCard heading={t("agentPerformance.heading")} query={agentPerformanceQuery} t={t}>
+          {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length === 0 && (
+            <p className="text-sm text-slate-500">{t("agentPerformance.empty")}</p>
+          )}
+          {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length > 0 && (
+            <ul className="flex flex-col gap-2 text-sm">
+              {agentPerformanceQuery.data.map((row) => (
+                <li key={row.userId} className="flex flex-col">
+                  <span className="font-medium text-slate-900">{row.fullName}</span>
+                  <span className="text-slate-500">
+                    {t("agentPerformance.detail", {
+                      open: row.openCount,
+                      resolved: row.resolvedCount,
+                    })}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </ReportCard>
       </div>

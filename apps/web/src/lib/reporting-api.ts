@@ -25,6 +25,15 @@ export interface CsatSummary {
   averageRating: number | null;
 }
 
+/** Story 59 — one row per agent with at least one ticket currently assigned
+ * to them in this branch. */
+export interface AgentPerformanceSummary {
+  userId: string;
+  fullName: string;
+  openCount: number;
+  resolvedCount: number;
+}
+
 export function getTicketVolumeByStatus(): Promise<TicketVolumeByStatus[]> {
   return apiFetch<TicketVolumeByStatus[]>("/reports/ticket-volume");
 }
@@ -35,4 +44,8 @@ export function getSlaCompliance(): Promise<SlaComplianceSummary> {
 
 export function getCsatSummary(): Promise<CsatSummary> {
   return apiFetch<CsatSummary>("/reports/csat");
+}
+
+export function getAgentPerformance(): Promise<AgentPerformanceSummary[]> {
+  return apiFetch<AgentPerformanceSummary[]>("/reports/agent-performance");
 }

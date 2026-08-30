@@ -528,6 +528,11 @@
       "heading": "رضا العميل",
       "empty": "لم يتم إرسال أي ملاحظات حتى الآن.",
       "detail": "استنادًا إلى {count} ردود"
+    },
+    "agentPerformance": {
+      "heading": "أداء الوكلاء",
+      "empty": "لا توجد تذاكر مسندة حتى الآن.",
+      "detail": "{open} مفتوحة · {resolved} محلولة"
     }
   },
   "automationRules": {

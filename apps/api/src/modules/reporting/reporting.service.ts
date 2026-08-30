@@ -30,6 +30,20 @@ export interface CsatSummary {
   averageRating: number | null;
 }
 
+/** One row per agent with at least one ticket currently assigned to them in
+ * the caller's branch (an agent with none does not appear — same
+ * "only what exists" convention as `TicketVolumeByStatus`).
+ * `openCount` is `OPEN`+`IN_PROGRESS`; `resolvedCount` is `RESOLVED`+`CLOSED`
+ * — there is no `Ticket.resolvedAt` column, so a real time-to-resolution
+ * measure is still not possible (same gap `SlaComplianceSummary` already
+ * documents) and this is a count, not a duration. */
+export interface AgentPerformanceSummary {
+  userId: string;
+  fullName: string;
+  openCount: number;
+  resolvedCount: number;
+}
+
 /**
  * Story 56 — Reporting & Analytics Foundation. Every query is a direct
  * Prisma read over already-modeled data (`Ticket`/`SlaTicketTarget`/
@@ -102,5 +116,51 @@ export class ReportingService {
       responseCount: result._count._all,
       averageRating: result._avg.rating,
     };
+  }
+
+  /**
+   * Story 59 — one more direct query over already-modeled data, no schema
+   * change. Unassigned tickets (`assignedToUserId: null`) are excluded
+   * entirely — there is no "agent" to attribute them to. Sorted by
+   * `fullName` ascending — simple, deterministic, no workload-ranking
+   * judgment call baked into the API response itself.
+   */
+  async getAgentPerformance(): Promise<AgentPerformanceSummary[]> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const grouped = await this.prisma.ticket.groupBy({
+      by: ["assignedToUserId", "status"],
+      where: { branchId, assignedToUserId: { not: null } },
+      _count: { _all: true },
+    });
+
+    const countsByUserId = new Map<string, { openCount: number; resolvedCount: number }>();
+    for (const row of grouped) {
+      const userId = row.assignedToUserId as string;
+      const counts = countsByUserId.get(userId) ?? { openCount: 0, resolvedCount: 0 };
+      if (row.status === "OPEN" || row.status === "IN_PROGRESS") {
+        counts.openCount += row._count._all;
+      } else {
+        counts.resolvedCount += row._count._all;
+      }
+      countsByUserId.set(userId, counts);
+    }
+
+    if (countsByUserId.size === 0) {
+      return [];
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: [...countsByUserId.keys()] } },
+      select: { id: true, fullName: true },
+    });
+    const fullNameById = new Map(users.map((user) => [user.id, user.fullName]));
+
+    return [...countsByUserId.entries()]
+      .map(([userId, counts]) => ({
+        userId,
+        fullName: fullNameById.get(userId) ?? userId,
+        ...counts,
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
   }
 }

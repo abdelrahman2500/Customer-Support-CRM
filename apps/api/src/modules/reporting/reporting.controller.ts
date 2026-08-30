@@ -1,7 +1,12 @@
 import { Controller, Get } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
-import type { CsatSummary, SlaComplianceSummary, TicketVolumeByStatus } from "./reporting.service";
+import type {
+  AgentPerformanceSummary,
+  CsatSummary,
+  SlaComplianceSummary,
+  TicketVolumeByStatus,
+} from "./reporting.service";
 import { ReportingService } from "./reporting.service";
 
 /** Story 56 — Reporting & Analytics Foundation. Every route is read-only,
@@ -9,7 +14,10 @@ import { ReportingService } from "./reporting.service";
  * `AuditLogsController`. Three separate, focused endpoints rather than one
  * combined payload — mirrors this codebase's existing convention of one
  * endpoint per concern (`sla-target`/`sla-escalations`/`notes`/`csat` as
- * separate `Ticket` sub-resources). */
+ * separate `Ticket` sub-resources).
+ *
+ * Story 59 — `GET /reports/agent-performance` added the same way; no new
+ * permission. */
 @ApiTags("reporting")
 @ApiBearerAuth()
 @Controller("reports")
@@ -32,5 +40,11 @@ export class ReportingController {
   @RequirePermissions("report:read")
   getCsat(): Promise<CsatSummary> {
     return this.reportingService.getCsatSummary();
+  }
+
+  @Get("agent-performance")
+  @RequirePermissions("report:read")
+  getAgentPerformance(): Promise<AgentPerformanceSummary[]> {
+    return this.reportingService.getAgentPerformance();
   }
 }

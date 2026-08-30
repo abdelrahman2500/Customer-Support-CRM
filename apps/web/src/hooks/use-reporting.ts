@@ -1,5 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { getCsatSummary, getSlaCompliance, getTicketVolumeByStatus } from "@/lib/reporting-api";
+import {
+  getAgentPerformance,
+  getCsatSummary,
+  getSlaCompliance,
+  getTicketVolumeByStatus,
+} from "@/lib/reporting-api";
 
 /**
  * Story 56 — dedicated reporting hooks, mirroring `use-audit-logs.ts`'s "own
@@ -18,4 +23,8 @@ export function useSlaComplianceQuery() {
 
 export function useCsatSummaryQuery() {
   return useQuery({ queryKey: ["reports", "csat"], queryFn: getCsatSummary });
+}
+
+export function useAgentPerformanceQuery() {
+  return useQuery({ queryKey: ["reports", "agent-performance"], queryFn: getAgentPerformance });
 }

@@ -51,3 +51,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | reporting-analytics-foundation | [reporting-analytics-foundation/00-overview.md](./reporting-analytics-foundation/00-overview.md) | 56–      |
 | sla-automation-rules | [sla-automation-rules/00-overview.md](./sla-automation-rules/00-overview.md) | 57–      |
 | notification-preferences | [notification-preferences/00-overview.md](./notification-preferences/00-overview.md) | 58–      |
+| reporting-agent-performance | [reporting-agent-performance/00-overview.md](./reporting-agent-performance/00-overview.md) | 59–      |

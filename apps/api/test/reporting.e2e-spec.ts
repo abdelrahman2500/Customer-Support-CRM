@@ -125,10 +125,21 @@ describe("Reporting & Analytics (e2e)", () => {
     return response.body;
   }
 
+  async function getAgentPerformance(): Promise<
+    { userId: string; fullName: string; openCount: number; resolvedCount: number }[]
+  > {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/reports/agent-performance")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    return response.body;
+  }
+
   it("rejects unauthenticated requests on every route", async () => {
     await request(app.getHttpServer()).get("/api/v1/reports/ticket-volume").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/sla-compliance").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/csat").expect(401);
+    await request(app.getHttpServer()).get("/api/v1/reports/agent-performance").expect(401);
   });
 
   it("rejects an Agent-role user lacking report:read on every route (403)", async () => {
@@ -174,6 +185,10 @@ describe("Reporting & Analytics (e2e)", () => {
       .expect(403);
     await request(app.getHttpServer())
       .get("/api/v1/reports/csat")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get("/api/v1/reports/agent-performance")
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(403);
   });
@@ -290,5 +305,77 @@ describe("Reporting & Analytics (e2e)", () => {
     const after = await getCsat();
     expect(after.responseCount).toBe(before.responseCount + 1);
     expect(after.averageRating).not.toBeNull();
+  });
+
+  it("reflects a real assignment in openCount, then a real resolution in resolvedCount", async () => {
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+    const me = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    const agentEmail = `agent-performance-e2e-${randomUUID()}@example.com`;
+    const agent = await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: agentEmail,
+        password: "agent-test-password-123",
+        fullName: "Test Agent Performance",
+        branchId: me.body.branchId,
+        departmentId: me.body.departmentId ?? undefined,
+        roleId: agentRole.id,
+      })
+      .expect(201);
+    const agentUserId = agent.body.id;
+
+    const ticket = await request(app.getHttpServer())
+      .post("/api/v1/tickets")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        customerId: await createCustomer(),
+        subject: "Agent performance e2e ticket",
+        assignedToUserId: agentUserId,
+      })
+      .expect(201);
+
+    const afterAssign = await getAgentPerformance();
+    const agentRowAfterAssign = afterAssign.find((row) => row.userId === agentUserId);
+    expect(agentRowAfterAssign).toEqual({
+      userId: agentUserId,
+      fullName: "Test Agent Performance",
+      openCount: 1,
+      resolvedCount: 0,
+    });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticket.body.id}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "RESOLVED" })
+      .expect(200);
+
+    const afterResolve = await getAgentPerformance();
+    const agentRowAfterResolve = afterResolve.find((row) => row.userId === agentUserId);
+    expect(agentRowAfterResolve).toEqual({
+      userId: agentUserId,
+      fullName: "Test Agent Performance",
+      openCount: 0,
+      resolvedCount: 1,
+    });
+  });
+
+  it("never includes an unassigned ticket for any agent", async () => {
+    const before = await getAgentPerformance();
+    const totalBefore = before.reduce((sum, row) => sum + row.openCount + row.resolvedCount, 0);
+
+    await createTicket();
+
+    const after = await getAgentPerformance();
+    const totalAfter = after.reduce((sum, row) => sum + row.openCount + row.resolvedCount, 0);
+    expect(totalAfter).toBe(totalBefore);
   });
 });

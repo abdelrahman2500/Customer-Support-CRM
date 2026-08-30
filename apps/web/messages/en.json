@@ -528,6 +528,11 @@
       "heading": "Customer Satisfaction",
       "empty": "No feedback submitted yet.",
       "detail": "based on {count} responses"
+    },
+    "agentPerformance": {
+      "heading": "Agent Performance",
+      "empty": "No tickets assigned yet.",
+      "detail": "{open} open · {resolved} resolved"
     }
   },
   "automationRules": {
