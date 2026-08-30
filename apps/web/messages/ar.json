@@ -35,7 +35,8 @@
       "knowledgeBase": "قاعدة المعرفة",
       "reports": "التقارير",
       "automationRules": "قواعد الأتمتة",
-      "notificationTemplates": "قوالب الإشعارات"
+      "notificationTemplates": "قوالب الإشعارات",
+      "branding": "الهوية البصرية"
     }
   },
   "tickets": {
@@ -582,5 +583,21 @@
       "slaBreached": "تم خرق اتفاقية الخدمة",
       "ticketEscalated": "تم تصعيد التذكرة"
     }
+  },
+  "branding": {
+    "title": "الهوية البصرية",
+    "description": "خصّص شعار فرعك وألوانه المميزة. هذه معاينة فقط حاليًا — لم تُطبّق بعد في أي مكان آخر من التطبيق.",
+    "error": "تعذّر تحميل إعدادات الهوية البصرية.",
+    "retry": "إعادة المحاولة",
+    "logoUrlLabel": "رابط الشعار",
+    "logoUrlPlaceholder": "https://example.com/logo.png",
+    "primaryColorLabel": "اللون الأساسي",
+    "secondaryColorLabel": "اللون الثانوي",
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ...",
+    "saveFailed": "تعذّر حفظ إعدادات الهوية البصرية. حاول مرة أخرى.",
+    "previewHeading": "المعاينة",
+    "logoPreviewAlt": "معاينة الشعار",
+    "noLogo": "لم يتم تعيين شعار"
   }
 }

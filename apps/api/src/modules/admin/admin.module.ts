@@ -2,6 +2,8 @@ import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { AuditLogsController } from "./audit-logs.controller";
 import { AuditLogsService } from "./audit-logs.service";
+import { BrandingController } from "./branding.controller";
+import { BrandingService } from "./branding.service";
 
 /**
  * Owns the `admin` schema's HTTP surface — see
@@ -12,9 +14,12 @@ import { AuditLogsService } from "./audit-logs.service";
  * `GET /audit-logs` over that already-populated table — `TenantContext` is
  * provided here the same way every other feature module provides it (see
  * `CustomersModule`'s own doc comment).
+ *
+ * Story 62 — `Branding*` added the same way, growing this module's HTTP
+ * surface for the "branding" piece of Administration's documented scope.
  */
 @Module({
-  controllers: [AuditLogsController],
-  providers: [AuditLogsService, TenantContext],
+  controllers: [AuditLogsController, BrandingController],
+  providers: [AuditLogsService, BrandingService, TenantContext],
 })
 export class AdminModule {}

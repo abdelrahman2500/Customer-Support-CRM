@@ -49,6 +49,7 @@ model Branch {
   knowledgeBaseArticles KnowledgeBaseArticle[]
   automationRules       AutomationRule[]
   notificationTemplates NotificationTemplate[]
+  brandingConfig        BrandingConfig?
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -185,6 +186,27 @@ model AuditLog {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("audit_logs")
+  @@schema("admin")
+}
+
+/// Story 62 — a branch's optional visual identity (logo URL, two brand
+/// colors). One row per branch (`branchId` `@unique`) — an unconfigured
+/// branch has no row at all, not a row of nulls; `GET /branding` defaults to
+/// nulls rather than 404ing (mirrors `NotificationPreference`'s own
+/// "absence means default" convention). Config + admin-form preview only
+/// for now — not yet consumed by either frontend app's shared layout (see
+/// the plan's Design decisions for why).
+model BrandingConfig {
+  id             String   @id @default(uuid())
+  branchId       String   @unique @map("branch_id")
+  branch         Branch   @relation(fields: [branchId], references: [id])
+  logoUrl        String?  @map("logo_url")
+  primaryColor   String?  @map("primary_color")
+  secondaryColor String?  @map("secondary_color")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("branding_configs")
   @@schema("admin")
 }
 

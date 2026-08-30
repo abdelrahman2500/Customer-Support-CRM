@@ -51,6 +51,8 @@ const PERMISSION_CATALOG = [
   "automation:create",
   "automation:read",
   "automation:update",
+  "branding:read",
+  "branding:update",
 ] as const;
 
 // No ticketing/customer/etc. permissions yet — those land with the stories

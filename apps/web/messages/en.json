@@ -35,7 +35,8 @@
       "knowledgeBase": "Knowledge Base",
       "reports": "Reports",
       "automationRules": "Automation Rules",
-      "notificationTemplates": "Notification Templates"
+      "notificationTemplates": "Notification Templates",
+      "branding": "Branding"
     }
   },
   "tickets": {
@@ -582,5 +583,21 @@
       "slaBreached": "SLA breached",
       "ticketEscalated": "Ticket escalated"
     }
+  },
+  "branding": {
+    "title": "Branding",
+    "description": "Configure your branch's logo and brand colors. This is a preview only for now — it is not yet applied anywhere else in the app.",
+    "error": "Couldn't load your branding settings.",
+    "retry": "Retry",
+    "logoUrlLabel": "Logo URL",
+    "logoUrlPlaceholder": "https://example.com/logo.png",
+    "primaryColorLabel": "Primary color",
+    "secondaryColorLabel": "Secondary color",
+    "save": "Save",
+    "saving": "Saving...",
+    "saveFailed": "Couldn't save your branding settings. Please try again.",
+    "previewHeading": "Preview",
+    "logoPreviewAlt": "Logo preview",
+    "noLogo": "No logo set"
   }
 }
