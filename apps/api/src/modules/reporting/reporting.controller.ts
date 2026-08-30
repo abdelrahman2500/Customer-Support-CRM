@@ -5,6 +5,7 @@ import type {
   AgentPerformanceSummary,
   CsatSummary,
   SlaComplianceSummary,
+  TicketAgingBucket,
   TicketVolumeByStatus,
 } from "./reporting.service";
 import { ReportingService } from "./reporting.service";
@@ -17,6 +18,9 @@ import { ReportingService } from "./reporting.service";
  * separate `Ticket` sub-resources).
  *
  * Story 59 — `GET /reports/agent-performance` added the same way; no new
+ * permission.
+ *
+ * Story 60 — `GET /reports/ticket-aging` added the same way; no new
  * permission. */
 @ApiTags("reporting")
 @ApiBearerAuth()
@@ -46,5 +50,11 @@ export class ReportingController {
   @RequirePermissions("report:read")
   getAgentPerformance(): Promise<AgentPerformanceSummary[]> {
     return this.reportingService.getAgentPerformance();
+  }
+
+  @Get("ticket-aging")
+  @RequirePermissions("report:read")
+  getTicketAging(): Promise<TicketAgingBucket[]> {
+    return this.reportingService.getTicketAging();
   }
 }

@@ -533,6 +533,9 @@
       "heading": "Agent Performance",
       "empty": "No tickets assigned yet.",
       "detail": "{open} open · {resolved} resolved"
+    },
+    "ticketAging": {
+      "heading": "Ticket Aging"
     }
   },
   "automationRules": {

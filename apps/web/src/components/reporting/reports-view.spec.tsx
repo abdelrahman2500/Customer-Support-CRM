@@ -5,6 +5,7 @@ import {
   useAgentPerformanceQuery,
   useCsatSummaryQuery,
   useSlaComplianceQuery,
+  useTicketAgingQuery,
   useTicketVolumeQuery,
 } from "@/hooks/use-reporting";
 import { ApiError } from "@/lib/api";
@@ -19,12 +20,14 @@ vi.mock("@/hooks/use-reporting", () => ({
   useSlaComplianceQuery: vi.fn(),
   useCsatSummaryQuery: vi.fn(),
   useAgentPerformanceQuery: vi.fn(),
+  useTicketAgingQuery: vi.fn(),
 }));
 
 const mockedUseTicketVolumeQuery = vi.mocked(useTicketVolumeQuery);
 const mockedUseSlaComplianceQuery = vi.mocked(useSlaComplianceQuery);
 const mockedUseCsatSummaryQuery = vi.mocked(useCsatSummaryQuery);
 const mockedUseAgentPerformanceQuery = vi.mocked(useAgentPerformanceQuery);
+const mockedUseTicketAgingQuery = vi.mocked(useTicketAgingQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -54,6 +57,17 @@ describe("ReportsView", () => {
     mockedUseAgentPerformanceQuery.mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
+    mockedUseTicketAgingQuery.mockReturnValue(
+      queryResult({
+        data: [
+          { bucket: "0-1d", count: 0 },
+          { bucket: "1-3d", count: 0 },
+          { bucket: "3-7d", count: 0 },
+          { bucket: "7d+", count: 0 },
+        ],
+        isSuccess: true,
+      }) as never,
+    );
   });
 
   it("renders each card's empty state when there is no data yet", () => {
@@ -63,6 +77,34 @@ describe("ReportsView", () => {
     expect(screen.getByText("slaCompliance.empty")).toBeInTheDocument();
     expect(screen.getByText("csat.empty")).toBeInTheDocument();
     expect(screen.getByText("agentPerformance.empty")).toBeInTheDocument();
+  });
+
+  it("renders the ticket-aging card's four buckets, even when all are zero", () => {
+    render(<ReportsView />);
+
+    expect(screen.getByText("0-1d")).toBeInTheDocument();
+    expect(screen.getByText("1-3d")).toBeInTheDocument();
+    expect(screen.getByText("3-7d")).toBeInTheDocument();
+    expect(screen.getByText("7d+")).toBeInTheDocument();
+  });
+
+  it("renders the ticket-aging card's populated counts", () => {
+    mockedUseTicketAgingQuery.mockReturnValue(
+      queryResult({
+        data: [
+          { bucket: "0-1d", count: 3 },
+          { bucket: "1-3d", count: 1 },
+          { bucket: "3-7d", count: 0 },
+          { bucket: "7d+", count: 2 },
+        ],
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<ReportsView />);
+
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
   });
 
   it("renders the ticket-volume card's populated rows", () => {

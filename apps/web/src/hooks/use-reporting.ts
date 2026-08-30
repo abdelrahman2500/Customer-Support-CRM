@@ -3,6 +3,7 @@ import {
   getAgentPerformance,
   getCsatSummary,
   getSlaCompliance,
+  getTicketAging,
   getTicketVolumeByStatus,
 } from "@/lib/reporting-api";
 
@@ -27,4 +28,8 @@ export function useCsatSummaryQuery() {
 
 export function useAgentPerformanceQuery() {
   return useQuery({ queryKey: ["reports", "agent-performance"], queryFn: getAgentPerformance });
+}
+
+export function useTicketAgingQuery() {
+  return useQuery({ queryKey: ["reports", "ticket-aging"], queryFn: getTicketAging });
 }

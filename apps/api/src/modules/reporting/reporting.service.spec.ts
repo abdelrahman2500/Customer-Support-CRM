@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReportingService } from "./reporting.service";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
@@ -7,6 +7,7 @@ function buildPrismaMock() {
   return {
     ticket: {
       groupBy: vi.fn(),
+      findMany: vi.fn(),
     },
     slaTicketTarget: {
       count: vi.fn(),
@@ -266,6 +267,68 @@ describe("ReportingService", () => {
 
       expect(result).toEqual([
         { userId: "user-unknown", fullName: "user-unknown", openCount: 1, resolvedCount: 0 },
+      ]);
+    });
+  });
+
+  describe("getTicketAging", () => {
+    const NOW = new Date("2026-01-08T00:00:00.000Z");
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function daysBeforeNow(days: number): Date {
+      return new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000);
+    }
+
+    it("scopes the query to OPEN/IN_PROGRESS tickets in the caller's branch", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.getTicketAging();
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", status: { in: ["OPEN", "IN_PROGRESS"] } },
+        select: { createdAt: true },
+      });
+    });
+
+    it("returns all four buckets, zero-filled, when there are no open tickets", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      const result = await service.getTicketAging();
+
+      expect(result).toEqual([
+        { bucket: "0-1d", count: 0 },
+        { bucket: "1-3d", count: 0 },
+        { bucket: "3-7d", count: 0 },
+        { bucket: "7d+", count: 0 },
+      ]);
+    });
+
+    it("buckets tickets by age, including right at each boundary", async () => {
+      prisma.ticket.findMany.mockResolvedValue([
+        { createdAt: daysBeforeNow(0.5) }, // 0-1d
+        { createdAt: daysBeforeNow(1) }, // 1-3d (boundary: >= 1 day)
+        { createdAt: daysBeforeNow(2.9) }, // 1-3d
+        { createdAt: daysBeforeNow(3) }, // 3-7d (boundary: >= 3 days)
+        { createdAt: daysBeforeNow(6.9) }, // 3-7d
+        { createdAt: daysBeforeNow(7) }, // 7d+ (boundary: >= 7 days)
+        { createdAt: daysBeforeNow(30) }, // 7d+
+      ]);
+
+      const result = await service.getTicketAging();
+
+      expect(result).toEqual([
+        { bucket: "0-1d", count: 1 },
+        { bucket: "1-3d", count: 2 },
+        { bucket: "3-7d", count: 2 },
+        { bucket: "7d+", count: 2 },
       ]);
     });
   });

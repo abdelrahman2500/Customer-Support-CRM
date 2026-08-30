@@ -135,11 +135,20 @@ describe("Reporting & Analytics (e2e)", () => {
     return response.body;
   }
 
+  async function getTicketAging(): Promise<{ bucket: string; count: number }[]> {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/reports/ticket-aging")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    return response.body;
+  }
+
   it("rejects unauthenticated requests on every route", async () => {
     await request(app.getHttpServer()).get("/api/v1/reports/ticket-volume").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/sla-compliance").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/csat").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/agent-performance").expect(401);
+    await request(app.getHttpServer()).get("/api/v1/reports/ticket-aging").expect(401);
   });
 
   it("rejects an Agent-role user lacking report:read on every route (403)", async () => {
@@ -189,6 +198,10 @@ describe("Reporting & Analytics (e2e)", () => {
       .expect(403);
     await request(app.getHttpServer())
       .get("/api/v1/reports/agent-performance")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get("/api/v1/reports/ticket-aging")
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(403);
   });
@@ -377,5 +390,37 @@ describe("Reporting & Analytics (e2e)", () => {
     const after = await getAgentPerformance();
     const totalAfter = after.reduce((sum, row) => sum + row.openCount + row.resolvedCount, 0);
     expect(totalAfter).toBe(totalBefore);
+  });
+
+  it("always returns all four buckets, and reflects a real, freshly-created open ticket in 0-1d", async () => {
+    const before = await getTicketAging();
+    expect(before.map((row) => row.bucket)).toEqual(["0-1d", "1-3d", "3-7d", "7d+"]);
+    const beforeCount = before.find((row) => row.bucket === "0-1d")?.count ?? 0;
+
+    await createTicket();
+
+    const after = await getTicketAging();
+    const afterCount = after.find((row) => row.bucket === "0-1d")?.count ?? 0;
+    expect(afterCount).toBe(beforeCount + 1);
+  });
+
+  it("excludes a resolved ticket from every bucket", async () => {
+    const ticketId = await createTicket();
+    const before = await getTicketAging();
+    const totalBefore = before.reduce((sum, row) => sum + row.count, 0);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "RESOLVED" })
+      .expect(200);
+
+    const after = await getTicketAging();
+    const totalAfter = after.reduce((sum, row) => sum + row.count, 0);
+    // The ticket created just before this test's own resolve step is counted
+    // in `before` (it was OPEN) but excluded from `after` (now RESOLVED) —
+    // the total drops by exactly one, even though other e2e activity may be
+    // concurrently changing other tickets' ages between buckets.
+    expect(totalAfter).toBe(totalBefore - 1);
   });
 });

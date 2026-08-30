@@ -34,6 +34,12 @@ export interface AgentPerformanceSummary {
   resolvedCount: number;
 }
 
+/** Story 60 — always exactly these four buckets, in this order, zero-filled. */
+export interface TicketAgingBucket {
+  bucket: string;
+  count: number;
+}
+
 export function getTicketVolumeByStatus(): Promise<TicketVolumeByStatus[]> {
   return apiFetch<TicketVolumeByStatus[]>("/reports/ticket-volume");
 }
@@ -48,4 +54,8 @@ export function getCsatSummary(): Promise<CsatSummary> {
 
 export function getAgentPerformance(): Promise<AgentPerformanceSummary[]> {
   return apiFetch<AgentPerformanceSummary[]>("/reports/agent-performance");
+}
+
+export function getTicketAging(): Promise<TicketAgingBucket[]> {
+  return apiFetch<TicketAgingBucket[]>("/reports/ticket-aging");
 }

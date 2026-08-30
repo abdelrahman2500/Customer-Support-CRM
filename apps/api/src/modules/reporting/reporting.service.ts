@@ -44,6 +44,26 @@ export interface AgentPerformanceSummary {
   resolvedCount: number;
 }
 
+/** Fixed age buckets for currently-open tickets, always returned in this
+ * order regardless of counts (Design decision 1 of the plan — a small,
+ * always-complete distribution reads more naturally than a sparse list). */
+export const AGE_BUCKET_LABELS = ["0-1d", "1-3d", "3-7d", "7d+"] as const;
+export type AgeBucketLabel = (typeof AGE_BUCKET_LABELS)[number];
+
+export interface TicketAgingBucket {
+  bucket: AgeBucketLabel;
+  count: number;
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function bucketForAgeDays(ageDays: number): AgeBucketLabel {
+  if (ageDays < 1) return "0-1d";
+  if (ageDays < 3) return "1-3d";
+  if (ageDays < 7) return "3-7d";
+  return "7d+";
+}
+
 /**
  * Story 56 — Reporting & Analytics Foundation. Every query is a direct
  * Prisma read over already-modeled data (`Ticket`/`SlaTicketTarget`/
@@ -162,5 +182,36 @@ export class ReportingService {
         ...counts,
       }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }
+
+  /**
+   * Story 60 — the last of Reporting's four named dimensions. Scoped to
+   * currently-open tickets only (`OPEN`+`IN_PROGRESS`) — a resolved/closed
+   * ticket's age is no longer operationally actionable the way an open
+   * one's is. Age is a plain wall-clock difference from `createdAt` to now
+   * — no business-hours awareness (unlike SLA target computation), and no
+   * `Ticket.resolvedAt` column exists, so this is age-since-creation, never
+   * a resolution-duration measure. Every bucket always appears, even at
+   * `0` (Design decision 1) — unlike `TicketVolumeByStatus`'s sparse
+   * "only what exists" convention.
+   */
+  async getTicketAging(): Promise<TicketAgingBucket[]> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const tickets = await this.prisma.ticket.findMany({
+      where: { branchId, status: { in: ["OPEN", "IN_PROGRESS"] } },
+      select: { createdAt: true },
+    });
+
+    const countsByBucket = new Map<AgeBucketLabel, number>(
+      AGE_BUCKET_LABELS.map((label) => [label, 0]),
+    );
+    const now = Date.now();
+    for (const ticket of tickets) {
+      const ageDays = (now - ticket.createdAt.getTime()) / MS_PER_DAY;
+      const bucket = bucketForAgeDays(ageDays);
+      countsByBucket.set(bucket, (countsByBucket.get(bucket) ?? 0) + 1);
+    }
+
+    return AGE_BUCKET_LABELS.map((bucket) => ({ bucket, count: countsByBucket.get(bucket) ?? 0 }));
   }
 }

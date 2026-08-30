@@ -6,6 +6,7 @@ import {
   useAgentPerformanceQuery,
   useCsatSummaryQuery,
   useSlaComplianceQuery,
+  useTicketAgingQuery,
   useTicketVolumeQuery,
 } from "@/hooks/use-reporting";
 import { ApiError } from "@/lib/api";
@@ -25,6 +26,10 @@ import { Skeleton } from "@/components/ui/skeleton";
  *
  * Story 59 — a fourth card, `GET /reports/agent-performance`, added the
  * same way; no permission/layout-shell change beyond widening the grid.
+ *
+ * Story 60 — a fifth card, `GET /reports/ticket-aging`, added the same
+ * way; always renders all four fixed buckets (no "empty" state — the
+ * backend already zero-fills every bucket).
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
@@ -33,12 +38,13 @@ export function ReportsView() {
   const slaComplianceQuery = useSlaComplianceQuery();
   const csatQuery = useCsatSummaryQuery();
   const agentPerformanceQuery = useAgentPerformanceQuery();
+  const ticketAgingQuery = useTicketAgingQuery();
 
   return (
     <section className="flex flex-col gap-6">
       <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <ReportCard
           heading={t("ticketVolume.heading")}
           query={ticketVolumeQuery}
@@ -113,6 +119,19 @@ export function ReportsView() {
                       resolved: row.resolvedCount,
                     })}
                   </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </ReportCard>
+
+        <ReportCard heading={t("ticketAging.heading")} query={ticketAgingQuery} t={t}>
+          {ticketAgingQuery.isSuccess && (
+            <ul className="flex flex-col gap-1 text-sm">
+              {ticketAgingQuery.data.map((row) => (
+                <li key={row.bucket} className="flex items-center justify-between">
+                  <span className="text-slate-600">{row.bucket}</span>
+                  <span className="font-medium text-slate-900">{row.count}</span>
                 </li>
               ))}
             </ul>
