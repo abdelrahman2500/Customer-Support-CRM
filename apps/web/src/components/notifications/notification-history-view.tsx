@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { NotificationPreferencesSection } from "./notification-preferences-section";
 
 /** The real, backend-defined event-type strings this history can ever show
  * (`SLA_AT_RISK_EVENT`/`SLA_BREACHED_EVENT`/`TICKET_ESCALATED_EVENT` —
@@ -118,6 +119,11 @@ function NotificationRow({
  * `CustomerDetailView`'s Contacts/Related-Tickets cards or `RoleListView`'s
  * roles/permissions sections): an unresolved row falls back to the raw
  * `ticketId`/an "unknown customer" label.
+ *
+ * Story 58 — `NotificationPreferencesSection` rendered above the history
+ * table, entirely independent of `notificationsQuery`'s own `notification:read`
+ * gate: a user lacking that permission must still be able to manage their
+ * own live toast preferences.
  */
 export function NotificationHistoryView() {
   const t = useTranslations("notificationHistory");
@@ -152,6 +158,8 @@ export function NotificationHistoryView() {
   return (
     <section className="flex flex-col gap-4">
       <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+
+      <NotificationPreferencesSection />
 
       {notificationsQuery.isLoading && (
         <div className="flex flex-col gap-2">

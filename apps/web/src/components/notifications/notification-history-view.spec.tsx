@@ -3,6 +3,10 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { NotificationHistoryView } from "./notification-history-view";
 import { useNotificationsQuery } from "@/hooks/use-notifications";
 import { useCustomersQuery, useTicketsQuery } from "@/hooks/use-tickets";
+import {
+  useNotificationPreferencesQuery,
+  useUpdateNotificationPreferenceMutation,
+} from "@/hooks/use-notification-preferences";
 import { ApiError } from "@/lib/api";
 
 const push = vi.fn();
@@ -26,9 +30,18 @@ vi.mock("@/hooks/use-tickets", () => ({
   useCustomersQuery: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-notification-preferences", () => ({
+  useNotificationPreferencesQuery: vi.fn(),
+  useUpdateNotificationPreferenceMutation: vi.fn(),
+}));
+
 const mockedUseNotificationsQuery = vi.mocked(useNotificationsQuery);
 const mockedUseTicketsQuery = vi.mocked(useTicketsQuery);
 const mockedUseCustomersQuery = vi.mocked(useCustomersQuery);
+const mockedUseNotificationPreferencesQuery = vi.mocked(useNotificationPreferencesQuery);
+const mockedUseUpdateNotificationPreferenceMutation = vi.mocked(
+  useUpdateNotificationPreferenceMutation,
+);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -67,6 +80,15 @@ describe("NotificationHistoryView", () => {
     vi.clearAllMocks();
     mockedUseTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseNotificationPreferencesQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    mockedUseUpdateNotificationPreferenceMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
   });
 
   it("shows a loading state while the notifications query is pending", () => {

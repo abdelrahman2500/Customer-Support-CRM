@@ -72,19 +72,20 @@ model Department {
 }
 
 model User {
-  id                   String               @id @default(uuid())
-  email                String               @unique
-  passwordHash         String               @map("password_hash")
-  fullName             String               @map("full_name")
-  isActive             Boolean              @default(true) @map("is_active")
-  branchRoles          UserBranchRole[]
-  refreshTokens        RefreshToken[]
-  assignedTickets      Ticket[]
-  ticketHistoryEntries TicketHistoryEntry[]
-  ticketNotes          TicketNote[]
-  automationRules      AutomationRule[]
-  createdAt            DateTime             @default(now()) @map("created_at")
-  updatedAt            DateTime             @updatedAt @map("updated_at")
+  id                      String                   @id @default(uuid())
+  email                   String                   @unique
+  passwordHash            String                   @map("password_hash")
+  fullName                String                   @map("full_name")
+  isActive                Boolean                  @default(true) @map("is_active")
+  branchRoles             UserBranchRole[]
+  refreshTokens           RefreshToken[]
+  assignedTickets         Ticket[]
+  ticketHistoryEntries    TicketHistoryEntry[]
+  ticketNotes             TicketNote[]
+  automationRules         AutomationRule[]
+  notificationPreferences NotificationPreference[]
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
 
   @@map("users")
   @@schema("identity")
@@ -638,6 +639,28 @@ model NotificationLog {
   @@unique([eventType, ticketId, targetType, targetAt])
   @@unique([eventType, dedupeKey])
   @@map("notification_logs")
+  @@schema("notifications")
+}
+
+/// Story 58 — a per-user, per-event-type toggle for the three live,
+/// branch-wide in-app notification events (`sla.at_risk`/`sla.breached`/
+/// `ticket.escalated` — the same set `BranchNotificationRealtimeListener`
+/// relays). Self-scoped (owned by the requesting user, resolved from the
+/// JWT, never an admin resource) — no row means "enabled" (the default),
+/// mirroring `SlaPolicy`'s own "absence means unrestricted" convention.
+/// Governs only the live in-app toast, never `NotificationLog`/history
+/// (Design decision 1).
+model NotificationPreference {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventType    String   @map("event_type")
+  inAppEnabled Boolean  @default(true) @map("in_app_enabled")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, eventType])
+  @@map("notification_preferences")
   @@schema("notifications")
 }
 
