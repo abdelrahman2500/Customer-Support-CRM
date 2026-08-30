@@ -180,7 +180,12 @@
       "portalPasswordPlaceholder": "كلمة مرور جديدة (8 أحرف على الأقل)",
       "portalPasswordSubmit": "تعيين كلمة مرور البوابة",
       "portalPasswordSubmitting": "جارٍ التعيين...",
-      "portalPasswordSuccess": "تم تعيين كلمة مرور البوابة. تم تسجيل خروج جلسات البوابة الحالية."
+      "portalPasswordSuccess": "تم تعيين كلمة مرور البوابة. تم تسجيل خروج جلسات البوابة الحالية.",
+      "attachmentsHeading": "المرفقات",
+      "attachmentsError": "تعذّر تحميل مرفقات هذا العميل.",
+      "attachmentsEmpty": "لا توجد مرفقات حتى الآن.",
+      "attachmentsUploading": "جارٍ الرفع...",
+      "attachmentsUploadFailed": "تعذّر رفع الملف. حاول مرة أخرى."
     },
     "create": {
       "title": "عميل جديد",

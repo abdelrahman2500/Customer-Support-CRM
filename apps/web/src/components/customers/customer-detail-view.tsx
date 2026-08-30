@@ -11,6 +11,7 @@ import {
   useUpdateContactMutation,
   useUpdateCustomerMutation,
 } from "@/hooks/use-tickets";
+import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { ApiError } from "@/lib/api";
 import type { ContactSummary } from "@/lib/tickets-api";
 import { Badge } from "@/components/ui/badge";
@@ -258,6 +259,11 @@ function AddContactForm({ customerId }: { customerId: string }) {
  * Story 52 — `ContactRow` gains an inline "set portal password" control
  * (commits on click, not blur — mirrors `UserRow`'s password-reset UI
  * exactly), the only way a Contact gets Customer Portal access.
+ *
+ * Story 67 — a new Attachments card, appended last, reusing the exact
+ * `AttachmentsCard` component `TicketDetailView` (Story 66) already built
+ * — the same shared list-plus-upload-form shape, parametrized to
+ * `{ type: "customer", id: customerId }`.
  */
 export function CustomerDetailView({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");
@@ -396,6 +402,18 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           </ul>
         )}
       </div>
+
+      <AttachmentsCard
+        owner={{ type: "customer", id: customerId }}
+        locale={locale}
+        strings={{
+          heading: t("detail.attachmentsHeading"),
+          error: t("detail.attachmentsError"),
+          empty: t("detail.attachmentsEmpty"),
+          uploading: t("detail.attachmentsUploading"),
+          uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+        }}
+      />
     </section>
   );
 }

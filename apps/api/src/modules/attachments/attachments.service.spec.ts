@@ -16,6 +16,14 @@ function buildPrismaMock() {
       findMany: vi.fn(),
       findFirst: vi.fn(),
     },
+    customer: {
+      findFirst: vi.fn(),
+    },
+    customerAttachment: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
   };
 }
 
@@ -218,6 +226,131 @@ describe("AttachmentsService", () => {
         where: { id: "attachment-1", ticketId: "ticket-1" },
       });
       expect(s3Storage.getPresignedDownloadUrl).toHaveBeenCalledWith(attachmentRow.key);
+      expect(result).toBe("https://minio.local/presigned-url");
+    });
+  });
+
+  // Story 67 — Customer Attachments. Mirrors every ticket-side test above.
+  describe("uploadCustomerAttachment", () => {
+    it("throws NotFoundException for an unknown/out-of-scope customer id", async () => {
+      prisma.customer.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.uploadCustomerAttachment("missing-id", validFile),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(s3Storage.uploadObject).not.toHaveBeenCalled();
+    });
+
+    it("rejects a file exceeding the size limit before any S3 call", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+
+      await expect(
+        service.uploadCustomerAttachment("customer-1", {
+          ...validFile,
+          size: MAX_ATTACHMENT_SIZE_BYTES + 1,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(s3Storage.uploadObject).not.toHaveBeenCalled();
+      expect(prisma.customerAttachment.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a disallowed MIME type before any S3 call", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+
+      await expect(
+        service.uploadCustomerAttachment("customer-1", {
+          ...validFile,
+          mimetype: "application/x-msdownload",
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(s3Storage.uploadObject).not.toHaveBeenCalled();
+      expect(prisma.customerAttachment.create).not.toHaveBeenCalled();
+    });
+
+    it("uploads to S3 with a server-generated key and records the metadata row", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customerAttachment.create.mockResolvedValue({
+        ...attachmentRow,
+        id: "customer-attachment-1",
+        customerId: "customer-1",
+        key: "customers/customer-1/some-uuid",
+      });
+
+      const result = await service.uploadCustomerAttachment("customer-1", validFile);
+
+      expect(s3Storage.uploadObject).toHaveBeenCalledWith(
+        expect.stringMatching(/^customers\/customer-1\//),
+        validFile.buffer,
+        "image/png",
+      );
+      expect(prisma.customerAttachment.create).toHaveBeenCalledWith({
+        data: {
+          customerId: "customer-1",
+          key: expect.stringMatching(/^customers\/customer-1\//),
+          filename: "screenshot.png",
+          size: 1024,
+          mimeType: "image/png",
+          uploadedByUserId: "user-1",
+        },
+      });
+      expect(result).toMatchObject({ id: "customer-attachment-1", customerId: "customer-1" });
+      expect(result).not.toHaveProperty("key");
+    });
+  });
+
+  describe("listCustomerAttachments", () => {
+    it("throws NotFoundException for an unknown/out-of-scope customer id", async () => {
+      prisma.customer.findFirst.mockResolvedValue(null);
+
+      await expect(service.listCustomerAttachments("missing-id")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it("scopes the query to the customer, ordered createdAt desc", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customerAttachment.findMany.mockResolvedValue([]);
+
+      await service.listCustomerAttachments("customer-1");
+
+      expect(prisma.customerAttachment.findMany).toHaveBeenCalledWith({
+        where: { customerId: "customer-1" },
+        orderBy: { createdAt: "desc" },
+      });
+    });
+  });
+
+  describe("getCustomerAttachmentDownloadUrl", () => {
+    it("throws NotFoundException for an unknown/out-of-scope customer id", async () => {
+      prisma.customer.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getCustomerAttachmentDownloadUrl("missing-id", "attachment-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("throws NotFoundException for an unknown attachment id", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customerAttachment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getCustomerAttachmentDownloadUrl("customer-1", "missing-attachment"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("returns a presigned URL for the attachment's S3 key", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customerAttachment.findFirst.mockResolvedValue({
+        ...attachmentRow,
+        customerId: "customer-1",
+      });
+      s3Storage.getPresignedDownloadUrl.mockResolvedValue("https://minio.local/presigned-url");
+
+      const result = await service.getCustomerAttachmentDownloadUrl("customer-1", "attachment-1");
+
+      expect(prisma.customerAttachment.findFirst).toHaveBeenCalledWith({
+        where: { id: "attachment-1", customerId: "customer-1" },
+      });
       expect(result).toBe("https://minio.local/presigned-url");
     });
   });

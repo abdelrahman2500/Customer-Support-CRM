@@ -180,7 +180,12 @@
       "portalPasswordPlaceholder": "New password (min. 8 characters)",
       "portalPasswordSubmit": "Set portal password",
       "portalPasswordSubmitting": "Setting...",
-      "portalPasswordSuccess": "Portal password set. Existing portal sessions were signed out."
+      "portalPasswordSuccess": "Portal password set. Existing portal sessions were signed out.",
+      "attachmentsHeading": "Attachments",
+      "attachmentsError": "Couldn't load this customer's attachments.",
+      "attachmentsEmpty": "No attachments yet.",
+      "attachmentsUploading": "Uploading...",
+      "attachmentsUploadFailed": "Couldn't upload the file. Please try again."
     },
     "create": {
       "title": "New customer",

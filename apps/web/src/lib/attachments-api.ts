@@ -4,10 +4,19 @@ import { apiFetch, ApiError, getAccessToken, getApiBaseUrl } from "./api";
  * Story 66 — Ticket Attachments Foundation. A dedicated API client file,
  * mirroring `knowledge-base-api.ts`'s own precedent: a distinct concern
  * with no forcing reason to share a file with `tickets-api.ts`.
+ *
+ * Story 67 — generalized to a `AttachmentOwner` parameter (`"ticket"` or
+ * `"customer"`) rather than duplicating this file — the request/response
+ * shapes are otherwise identical between `/tickets/:id/attachments` and
+ * `/customers/:id/attachments`. `AttachmentSummary` omits the
+ * owner-specific `ticketId`/`customerId` field the backend actually
+ * returns — no call site in this codebase needs it (every consumer only
+ * ever reads `id`/`filename`/`size`/etc.), and TypeScript's structural
+ * typing means the extra field on the real response is simply ignored,
+ * not stripped or invalid.
  */
 export interface AttachmentSummary {
   id: string;
-  ticketId: string;
   filename: string;
   size: number;
   mimeType: string;
@@ -15,8 +24,15 @@ export interface AttachmentSummary {
   createdAt: string;
 }
 
-export function listAttachments(ticketId: string): Promise<AttachmentSummary[]> {
-  return apiFetch<AttachmentSummary[]>(`/tickets/${ticketId}/attachments`);
+export type AttachmentOwner = { type: "ticket" | "customer"; id: string };
+
+function ownerBasePath(owner: AttachmentOwner): string {
+  const segment = owner.type === "ticket" ? "tickets" : "customers";
+  return `/${segment}/${owner.id}/attachments`;
+}
+
+export function listAttachments(owner: AttachmentOwner): Promise<AttachmentSummary[]> {
+  return apiFetch<AttachmentSummary[]>(ownerBasePath(owner));
 }
 
 /**
@@ -27,12 +43,15 @@ export function listAttachments(ticketId: string): Promise<AttachmentSummary[]> 
  * header. Mirrors `apiFetch`'s own error-shape handling (a non-2xx
  * response becomes a typed `ApiError`).
  */
-export async function uploadAttachment(ticketId: string, file: File): Promise<AttachmentSummary> {
+export async function uploadAttachment(
+  owner: AttachmentOwner,
+  file: File,
+): Promise<AttachmentSummary> {
   const formData = new FormData();
   formData.append("file", file);
 
   const token = getAccessToken();
-  const response = await fetch(`${getApiBaseUrl()}/tickets/${ticketId}/attachments`, {
+  const response = await fetch(`${getApiBaseUrl()}${ownerBasePath(owner)}`, {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
@@ -62,8 +81,8 @@ export async function uploadAttachment(ticketId: string, file: File): Promise<At
  * the returned URL — not subject to CORS, unlike a script-initiated read.
  */
 export function getAttachmentDownloadUrl(
-  ticketId: string,
+  owner: AttachmentOwner,
   attachmentId: string,
 ): Promise<{ url: string }> {
-  return apiFetch<{ url: string }>(`/tickets/${ticketId}/attachments/${attachmentId}/download`);
+  return apiFetch<{ url: string }>(`${ownerBasePath(owner)}/${attachmentId}/download`);
 }

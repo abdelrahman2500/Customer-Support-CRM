@@ -74,21 +74,22 @@ model Department {
 }
 
 model User {
-  id                      String                   @id @default(uuid())
-  email                   String                   @unique
-  passwordHash            String                   @map("password_hash")
-  fullName                String                   @map("full_name")
-  isActive                Boolean                  @default(true) @map("is_active")
-  branchRoles             UserBranchRole[]
-  refreshTokens           RefreshToken[]
-  assignedTickets         Ticket[]
-  ticketHistoryEntries    TicketHistoryEntry[]
-  ticketNotes             TicketNote[]
-  automationRules         AutomationRule[]
-  notificationPreferences NotificationPreference[]
-  uploadedAttachments     TicketAttachment[]
-  createdAt               DateTime                 @default(now()) @map("created_at")
-  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  id                          String                   @id @default(uuid())
+  email                       String                   @unique
+  passwordHash                String                   @map("password_hash")
+  fullName                    String                   @map("full_name")
+  isActive                    Boolean                  @default(true) @map("is_active")
+  branchRoles                 UserBranchRole[]
+  refreshTokens               RefreshToken[]
+  assignedTickets             Ticket[]
+  ticketHistoryEntries        TicketHistoryEntry[]
+  ticketNotes                 TicketNote[]
+  automationRules             AutomationRule[]
+  notificationPreferences     NotificationPreference[]
+  uploadedAttachments         TicketAttachment[]
+  uploadedCustomerAttachments CustomerAttachment[]
+  createdAt                   DateTime                 @default(now()) @map("created_at")
+  updatedAt                   DateTime                 @updatedAt @map("updated_at")
 
   @@map("users")
   @@schema("identity")
@@ -221,15 +222,16 @@ model BrandingConfig {
 /// departmentId — departments route tickets, not customer identity, and no
 /// story has justified department-scoping a customer yet.
 model Customer {
-  id          String    @id @default(uuid())
-  branchId    String    @map("branch_id")
-  branch      Branch    @relation(fields: [branchId], references: [id])
-  displayName String    @map("display_name")
-  isActive    Boolean   @default(true) @map("is_active")
+  id          String               @id @default(uuid())
+  branchId    String               @map("branch_id")
+  branch      Branch               @relation(fields: [branchId], references: [id])
+  displayName String               @map("display_name")
+  isActive    Boolean              @default(true) @map("is_active")
   contacts    Contact[]
   tickets     Ticket[]
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  attachments CustomerAttachment[]
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
 
   @@index([branchId])
   @@map("customers")
@@ -314,6 +316,29 @@ model TicketAttachment {
 
   @@index([ticketId])
   @@map("ticket_attachments")
+  @@schema("customers")
+}
+
+/// Story 67 — the second named consumer `TicketAttachment`'s own doc
+/// comment already anticipated ("customer-level attachments are a
+/// deferred, separately-planned follow-up"). A separate model, not a
+/// retrofit of `TicketAttachment` into a polymorphic entity-type table —
+/// same reasoning: no existing precedent for polymorphic entity tables
+/// anywhere in this schema. Identical shape to `TicketAttachment`.
+model CustomerAttachment {
+  id               String   @id @default(uuid())
+  customerId       String   @map("customer_id")
+  customer         Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  key              String   @unique
+  filename         String
+  size             Int
+  mimeType         String   @map("mime_type")
+  uploadedByUserId String   @map("uploaded_by_user_id")
+  uploadedByUser   User     @relation(fields: [uploadedByUserId], references: [id])
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([customerId])
+  @@map("customer_attachments")
   @@schema("customers")
 }
 
@@ -756,16 +781,16 @@ enum KnowledgeBaseArticleStatus {
 /// version history lives in `KnowledgeBaseArticleVersion` (Story 65). No
 /// Customer Portal or AI Services consumption yet.
 model KnowledgeBaseArticle {
-  id          String                     @id @default(uuid())
-  branchId    String                     @map("branch_id")
-  branch      Branch                     @relation(fields: [branchId], references: [id])
+  id          String                        @id @default(uuid())
+  branchId    String                        @map("branch_id")
+  branch      Branch                        @relation(fields: [branchId], references: [id])
   title       String
   body        String
   category    String?
-  status      KnowledgeBaseArticleStatus @default(DRAFT)
-  publishedAt DateTime?                  @map("published_at")
-  createdAt   DateTime                   @default(now()) @map("created_at")
-  updatedAt   DateTime                   @updatedAt @map("updated_at")
+  status      KnowledgeBaseArticleStatus    @default(DRAFT)
+  publishedAt DateTime?                     @map("published_at")
+  createdAt   DateTime                      @default(now()) @map("created_at")
+  updatedAt   DateTime                      @updatedAt @map("updated_at")
   versions    KnowledgeBaseArticleVersion[]
 
   @@index([branchId])

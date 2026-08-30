@@ -9,6 +9,7 @@ import {
   useUpdateContactMutation,
   useUpdateCustomerMutation,
 } from "@/hooks/use-tickets";
+import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { ApiError } from "@/lib/api";
 
 const push = vi.fn();
@@ -32,12 +33,19 @@ vi.mock("@/hooks/use-tickets", () => ({
   useSetContactPortalPasswordMutation: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-attachments", () => ({
+  useAttachmentsQuery: vi.fn(),
+  useUploadAttachmentMutation: vi.fn(),
+}));
+
 const mockedUseCustomerQuery = vi.mocked(useCustomerQuery);
 const mockedUseTicketsQuery = vi.mocked(useTicketsQuery);
 const mockedUseUpdateCustomerMutation = vi.mocked(useUpdateCustomerMutation);
 const mockedUseCreateContactMutation = vi.mocked(useCreateContactMutation);
 const mockedUseUpdateContactMutation = vi.mocked(useUpdateContactMutation);
 const mockedUseSetContactPortalPasswordMutation = vi.mocked(useSetContactPortalPasswordMutation);
+const mockedUseAttachmentsQuery = vi.mocked(useAttachmentsQuery);
+const mockedUseUploadAttachmentMutation = vi.mocked(useUploadAttachmentMutation);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -74,6 +82,11 @@ describe("CustomerDetailView", () => {
     mockedUseCreateContactMutation.mockReturnValue(idleMutation() as never);
     mockedUseUpdateContactMutation.mockReturnValue(idleMutation() as never);
     mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation() as never);
+    // Story 67 — every render path also calls `useAttachmentsQuery` (the
+    // new Attachments card); default to an empty, successful result so
+    // pre-existing tests are unaffected.
+    mockedUseAttachmentsQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
+    mockedUseUploadAttachmentMutation.mockReturnValue(idleMutation() as never);
   });
 
   it("shows a loading state while the customer query is pending", () => {
@@ -485,6 +498,54 @@ describe("CustomerDetailView", () => {
       expect(
         screen.getByText("Another contact already has portal access with this email address"),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("Attachments card (Story 67)", () => {
+    beforeEach(() => {
+      mockedUseCustomerQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: { id: "customer-1", displayName: "Acme Inc.", isActive: true, contacts: [] },
+        }) as never,
+      );
+    });
+
+    it("renders the empty message when there are no attachments", () => {
+      mockedUseAttachmentsQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.attachmentsEmpty")).toBeInTheDocument();
+    });
+
+    it("renders an inline error when attachments fail to load", () => {
+      mockedUseAttachmentsQuery.mockReturnValue(
+        queryResult({ isError: true, error: new ApiError("Server error", 500) }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.attachmentsError")).toBeInTheDocument();
+    });
+
+    it("uploads the selected file, scoped to this customer", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "attachment-new" });
+      mockedUseAttachmentsQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      mockedUseUploadAttachmentMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      const file = new File(["hello"], "contract.txt", { type: "text/plain" });
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [file] } });
+
+      await waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(file);
+      });
     });
   });
 });

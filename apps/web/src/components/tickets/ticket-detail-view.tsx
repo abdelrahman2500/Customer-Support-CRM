@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ChangeEvent, FormEvent, ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -17,8 +17,7 @@ import {
   useUpdateTicketMutation,
   useUsersQuery,
 } from "@/hooks/use-tickets";
-import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
-import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
+import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
@@ -388,7 +387,17 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <AddNoteForm ticketId={ticketId} />
       </div>
 
-      <AttachmentsCard ticketId={ticketId} />
+      <AttachmentsCard
+        owner={{ type: "ticket", id: ticketId }}
+        locale={locale}
+        strings={{
+          heading: t("detail.attachmentsHeading"),
+          error: t("detail.attachmentsError"),
+          empty: t("detail.attachmentsEmpty"),
+          uploading: t("detail.attachmentsUploading"),
+          uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+        }}
+      />
     </section>
   );
 }
@@ -433,98 +442,6 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
       </div>
       {error && <Alert variant="destructive">{error}</Alert>}
     </form>
-  );
-}
-
-/** Story 66 — read-only list + a one-field upload form, mirroring the Notes
- * card's own shape/JSX conventions (`AddNoteForm`). Client-side size/MIME
- * validation is a courtesy message only — the server-side check (identical
- * limits, `attachment-limits.ts`) is authoritative. */
-function AttachmentsCard({ ticketId }: { ticketId: string }) {
-  const t = useTranslations("tickets");
-  const { locale } = useParams<{ locale: string }>();
-  const attachmentsQuery = useAttachmentsQuery(ticketId);
-
-  async function handleDownload(attachmentId: string): Promise<void> {
-    const { url } = await getAttachmentDownloadUrl(ticketId, attachmentId);
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-
-  return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("detail.attachmentsHeading")}</h2>
-      {attachmentsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
-      {attachmentsQuery.isError && (
-        <Alert variant="destructive" className="mt-2">{t("detail.attachmentsError")}</Alert>
-      )}
-      {attachmentsQuery.isSuccess && attachmentsQuery.data.length === 0 && (
-        <p className="mt-2 text-sm text-slate-500">{t("detail.attachmentsEmpty")}</p>
-      )}
-      {attachmentsQuery.isSuccess && attachmentsQuery.data.length > 0 && (
-        <ol className="mt-2 flex flex-col gap-2 text-sm">
-          {attachmentsQuery.data.map((attachment) => (
-            <li key={attachment.id} className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <button
-                type="button"
-                className="text-left font-medium text-slate-800 hover:underline"
-                onClick={() => void handleDownload(attachment.id)}
-              >
-                {attachment.filename}
-              </button>
-              <span className="text-slate-500">
-                {formatFileSize(attachment.size)} ·{" "}
-                {new Date(attachment.createdAt).toLocaleString(locale)}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-      <AddAttachmentForm ticketId={ticketId} />
-    </div>
-  );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function AddAttachmentForm({ ticketId }: { ticketId: string }) {
-  const t = useTranslations("tickets");
-  const [error, setError] = useState<string | null>(null);
-  const mutation = useUploadAttachmentMutation(ticketId);
-
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.target.files?.[0];
-    event.target.value = ""; // allow re-selecting the same file next time.
-    if (!file) return;
-
-    setError(null);
-    try {
-      await mutation.mutateAsync(file);
-    } catch (uploadError) {
-      setError(
-        uploadError instanceof ApiError ? uploadError.message : t("detail.attachmentsUploadFailed"),
-      );
-    }
-  }
-
-  return (
-    <div className="mt-3 flex flex-col gap-2">
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
-        <input
-          type="file"
-          disabled={mutation.isPending}
-          onChange={(event) => void handleFileChange(event)}
-          className="text-sm text-slate-700"
-        />
-      </label>
-      {mutation.isPending && (
-        <p className="text-xs text-slate-500">{t("detail.attachmentsUploading")}</p>
-      )}
-      {error && <Alert variant="destructive">{error}</Alert>}
-    </div>
   );
 }
 
