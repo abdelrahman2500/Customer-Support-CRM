@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
@@ -9,16 +10,30 @@ import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
  * edit/publish controls exist here (that's agent-only, `apps/web`).
  * Mirrors `apps/portal`'s `TicketListView`'s loading/error/empty/populated
  * shape exactly.
+ *
+ * Story 64 — a plain, un-debounced search input above the list, mirroring
+ * `apps/web`'s own `ArticleListView` addition; local `useState`, wired
+ * straight into `usePublishedArticlesQuery(search)`.
  */
 export function ArticleListView() {
   const t = useTranslations("knowledgeBase");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
-  const articlesQuery = usePublishedArticlesQuery();
+  const [search, setSearch] = useState("");
+  const articlesQuery = usePublishedArticlesQuery(search);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-6">
       <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+
+      <input
+        type="text"
+        aria-label={t("list.searchLabel")}
+        placeholder={t("list.searchPlaceholder")}
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        className="mt-3 w-full max-w-sm rounded-md border border-slate-300 px-3 py-1.5 text-sm shadow-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+      />
 
       {articlesQuery.isLoading && (
         <div className="mt-3 flex flex-col gap-2">
@@ -41,7 +56,11 @@ export function ArticleListView() {
         </div>
       )}
 
-      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && (
+      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search !== "" && (
+        <p className="mt-3 text-sm text-slate-500">{t("list.noResults")}</p>
+      )}
+
+      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search === "" && (
         <p className="mt-3 text-sm text-slate-500">{t("list.empty")}</p>
       )}
 

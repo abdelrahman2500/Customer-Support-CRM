@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
+import { ListArticlesQueryDto } from "./dto/list-articles-query.dto";
 import type { ArticleSummary } from "./knowledge-base.service";
 import { KnowledgeBaseService } from "./knowledge-base.service";
 
@@ -20,8 +21,8 @@ export class KnowledgeBaseController {
 
   @Get()
   @RequirePermissions("kb:read")
-  list(): Promise<ArticleSummary[]> {
-    return this.knowledgeBaseService.listArticles();
+  list(@Query() query: ListArticlesQueryDto): Promise<ArticleSummary[]> {
+    return this.knowledgeBaseService.listArticles(query.search);
   }
 
   @Get(":id")

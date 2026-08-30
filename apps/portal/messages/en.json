@@ -61,6 +61,9 @@
       "error": "Couldn't load articles.",
       "retry": "Retry",
       "empty": "No articles are available yet.",
+      "searchLabel": "Search articles",
+      "searchPlaceholder": "Search by title or body...",
+      "noResults": "No articles match your search.",
       "noCategory": "—"
     },
     "detail": {

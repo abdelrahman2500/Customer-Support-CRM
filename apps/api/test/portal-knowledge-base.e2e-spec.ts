@@ -158,6 +158,32 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
       .expect(404);
   });
 
+  // Story 64 — Article Search.
+  it("filters the list by title/body, case-insensitive, via ?search=, and never surfaces a draft", async () => {
+    const byTitle = await request(app.getHttpServer())
+      .get("/api/v1/portal/knowledge-base/articles")
+      .query({ search: "RESET YOUR password" })
+      .set("Authorization", `Bearer ${portalAccessToken}`)
+      .expect(200);
+    const byTitleIds = byTitle.body.map((article: { id: string }) => article.id);
+    expect(byTitleIds).toContain(publishedArticleId);
+    expect(byTitleIds).not.toContain(draftArticleId);
+
+    const byDraftTitle = await request(app.getHttpServer())
+      .get("/api/v1/portal/knowledge-base/articles")
+      .query({ search: "Draft-only" })
+      .set("Authorization", `Bearer ${portalAccessToken}`)
+      .expect(200);
+    expect(byDraftTitle.body).toEqual([]);
+
+    const noMatch = await request(app.getHttpServer())
+      .get("/api/v1/portal/knowledge-base/articles")
+      .query({ search: "no-such-article-content-xyz" })
+      .set("Authorization", `Bearer ${portalAccessToken}`)
+      .expect(200);
+    expect(noMatch.body).toEqual([]);
+  });
+
   it("unpublishing the article makes it disappear from the portal view", async () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/knowledge-base/articles/${publishedArticleId}`)

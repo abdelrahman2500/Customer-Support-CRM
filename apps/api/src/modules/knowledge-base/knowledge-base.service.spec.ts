@@ -119,6 +119,35 @@ describe("KnowledgeBaseService", () => {
 
       expect(result).toEqual([]);
     });
+
+    // Story 64 — Article Search.
+    it("adds a title/body OR clause when search is given", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listArticles("password");
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
+        where: {
+          branchId: "branch-1",
+          OR: [
+            { title: { contains: "password", mode: "insensitive" } },
+            { body: { contains: "password", mode: "insensitive" } },
+          ],
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+    });
+
+    it("behaves identically to the no-arg call when search is an empty string", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listArticles("");
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1" },
+        orderBy: { updatedAt: "desc" },
+      });
+    });
   });
 
   describe("getArticle", () => {
@@ -217,6 +246,36 @@ describe("KnowledgeBaseService", () => {
       const result = await service.listPublishedArticlesForBranch("branch-1");
 
       expect(result).toEqual([]);
+    });
+
+    // Story 64 — Article Search.
+    it("adds a title/body OR clause when search is given", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listPublishedArticlesForBranch("branch-1", "password");
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
+        where: {
+          branchId: "branch-1",
+          status: "PUBLISHED",
+          OR: [
+            { title: { contains: "password", mode: "insensitive" } },
+            { body: { contains: "password", mode: "insensitive" } },
+          ],
+        },
+        orderBy: { publishedAt: "desc" },
+      });
+    });
+
+    it("behaves identically to the no-search call when search is an empty string", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listPublishedArticlesForBranch("branch-1", "");
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", status: "PUBLISHED" },
+        orderBy: { publishedAt: "desc" },
+      });
     });
   });
 

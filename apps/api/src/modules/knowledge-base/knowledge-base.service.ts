@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import type { KnowledgeBaseArticleStatus } from "@prisma/client";
+import type { KnowledgeBaseArticleStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateArticleDto } from "./dto/create-article.dto";
@@ -22,9 +22,17 @@ export interface ArticleSummary {
  * docs/architecture/03-domain-boundaries.md ("Knowledge Base"). Story 51 —
  * foundation only: `KnowledgeBaseArticle` is a standalone, branch-scoped
  * aggregate root, the same shape as `SlaPolicy`/`Customer`/`Ticket` — never
- * a sub-entity of anything else. No full-text/vector search, no
- * multi-version publish history, no Customer Portal or AI Services
- * consumption — see the plan's Story Goal / Design items 3, 5, 7.
+ * a sub-entity of anything else. No multi-version publish history, no AI
+ * Services consumption — see the plan's Story Goal / Design items 3, 5, 7.
+ *
+ * Story 64 — `listArticles`/`listPublishedArticlesForBranch` both take an
+ * optional `search`, matching `title` or `body` via a plain `contains`/
+ * `mode: "insensitive"` filter — not `tsvector`/GIN full-text search, which
+ * this codebase has no existing raw-SQL precedent for (`$queryRaw` is used
+ * exactly once, for a trivial healthcheck) and is deliberately deferred
+ * until this simpler mechanism's relevance/performance is a measured
+ * problem (mirrors `ReportingService`'s own "direct queries before
+ * materialized views" precedent).
  */
 @Injectable()
 export class KnowledgeBaseService {
@@ -47,10 +55,10 @@ export class KnowledgeBaseService {
     return toArticleSummary(article);
   }
 
-  async listArticles(): Promise<ArticleSummary[]> {
+  async listArticles(search?: string): Promise<ArticleSummary[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const articles = await this.prisma.knowledgeBaseArticle.findMany({
-      where: { branchId },
+      where: { branchId, ...searchWhereClause(search) },
       orderBy: { updatedAt: "desc" },
     });
     return articles.map(toArticleSummary);
@@ -91,9 +99,12 @@ export class KnowledgeBaseService {
 
   /** Most-recently-published first — every row is guaranteed
    * `status: PUBLISHED`, so `publishedAt` is never null here. */
-  async listPublishedArticlesForBranch(branchId: string): Promise<ArticleSummary[]> {
+  async listPublishedArticlesForBranch(
+    branchId: string,
+    search?: string,
+  ): Promise<ArticleSummary[]> {
     const articles = await this.prisma.knowledgeBaseArticle.findMany({
-      where: { branchId, status: "PUBLISHED" },
+      where: { branchId, status: "PUBLISHED", ...searchWhereClause(search) },
       orderBy: { publishedAt: "desc" },
     });
     return articles.map(toArticleSummary);
@@ -135,6 +146,25 @@ export class KnowledgeBaseService {
     }
     return article;
   }
+}
+
+/** Empty object (no-op `where` clause addition) for an empty/missing
+ * `search` — every existing caller sees the exact same unfiltered query it
+ * always has. `OR` on `title`/`body`, case-insensitive substring — plain
+ * Prisma `contains`, never raw SQL (see this file's own doc comment for
+ * why `tsvector` is deliberately deferred). */
+function searchWhereClause(
+  search: string | undefined,
+): { OR: Prisma.KnowledgeBaseArticleWhereInput[] } | Record<string, never> {
+  if (!search) {
+    return {};
+  }
+  return {
+    OR: [
+      { title: { contains: search, mode: "insensitive" } },
+      { body: { contains: search, mode: "insensitive" } },
+    ],
+  };
 }
 
 function toArticleSummary(article: {

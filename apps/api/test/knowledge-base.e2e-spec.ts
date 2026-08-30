@@ -177,6 +177,30 @@ describe("Knowledge Base (e2e)", () => {
     expect(after.body.publishedAt).toBe(before.body.publishedAt);
   });
 
+  // Story 64 — Article Search.
+  it("filters the list by title/body, case-insensitive, via ?search=", async () => {
+    const byTitle = await request(app.getHttpServer())
+      .get("/api/v1/knowledge-base/articles")
+      .query({ search: "RESET YOUR password" })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(byTitle.body.map((article: { id: string }) => article.id)).toContain(articleId);
+
+    const byBody = await request(app.getHttpServer())
+      .get("/api/v1/knowledge-base/articles")
+      .query({ search: "step-by-step" })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(byBody.body.map((article: { id: string }) => article.id)).toContain(articleId);
+
+    const noMatch = await request(app.getHttpServer())
+      .get("/api/v1/knowledge-base/articles")
+      .query({ search: "no-such-article-content-xyz" })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(noMatch.body).toEqual([]);
+  });
+
   it("rejects an Agent-role user attempting to create, read, or update articles (403)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")

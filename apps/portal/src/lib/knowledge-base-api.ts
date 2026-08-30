@@ -18,8 +18,20 @@ export interface PortalArticleSummary {
   updatedAt: string;
 }
 
-export function listPublishedArticles(): Promise<PortalArticleSummary[]> {
-  return apiFetch<PortalArticleSummary[]>("/portal/knowledge-base/articles");
+/** Story 64 — Article Search. Mirrors `apps/web`'s own `toQueryString`
+ * convention: an omitted/empty `search` produces the exact same request
+ * every existing caller already sends. */
+function toQueryString(search: string | undefined): string {
+  const params = new URLSearchParams();
+  if (search !== undefined && search !== "") {
+    params.set("search", search);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export function listPublishedArticles(search?: string): Promise<PortalArticleSummary[]> {
+  return apiFetch<PortalArticleSummary[]>(`/portal/knowledge-base/articles${toQueryString(search)}`);
 }
 
 export function getPublishedArticle(id: string): Promise<PortalArticleSummary> {

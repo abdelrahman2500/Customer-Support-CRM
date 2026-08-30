@@ -99,4 +99,32 @@ describe("ArticleListView", () => {
 
     expect(screen.getByText("list.noCategory")).toBeInTheDocument();
   });
+
+  // Story 64 — Article Search.
+  it("passes the typed search text through to usePublishedArticlesQuery", () => {
+    mockedUsePublishedArticlesQuery.mockReturnValue(
+      queryResult({ data: [baseArticle], isSuccess: true }) as never,
+    );
+
+    render(<ArticleListView />);
+    fireEvent.change(screen.getByPlaceholderText("list.searchPlaceholder"), {
+      target: { value: "password" },
+    });
+
+    expect(mockedUsePublishedArticlesQuery).toHaveBeenLastCalledWith("password");
+  });
+
+  it("shows a distinct no-results state (not the browse-prompting empty state) when a search yields nothing", () => {
+    mockedUsePublishedArticlesQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+
+    render(<ArticleListView />);
+    fireEvent.change(screen.getByPlaceholderText("list.searchPlaceholder"), {
+      target: { value: "no-such-article" },
+    });
+
+    expect(screen.getByText("list.noResults")).toBeInTheDocument();
+    expect(screen.queryByText("list.empty")).not.toBeInTheDocument();
+  });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useArticlesQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
@@ -7,6 +8,7 @@ import type { ArticleSummary } from "@/lib/knowledge-base-api";
 import { ApiError } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,13 +17,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
  * Story 51 — Knowledge Base article list, over the new `GET
  * /knowledge-base/articles`. Mirrors `SlaPolicyListView`'s exact
  * loading/error/empty/populated conventions.
+ *
+ * Story 64 — a plain, un-debounced search input above the list (plan
+ * Non-Goal explicitly defers debouncing/highlighting/snippets); local
+ * `useState`, wired straight into `useArticlesQuery(search)`.
  */
 export function ArticleListView() {
   const t = useTranslations("knowledgeBase");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
+  const [search, setSearch] = useState("");
 
-  const articlesQuery = useArticlesQuery();
+  const articlesQuery = useArticlesQuery(search);
 
   return (
     <section className="flex flex-col gap-4">
@@ -31,6 +38,14 @@ export function ArticleListView() {
           {t("list.createButton")}
         </Button>
       </div>
+
+      <Input
+        aria-label={t("list.searchLabel")}
+        placeholder={t("list.searchPlaceholder")}
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        className="max-w-sm"
+      />
 
       {articlesQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -49,7 +64,13 @@ export function ArticleListView() {
         </Alert>
       )}
 
-      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && (
+      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search !== "" && (
+        <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
+          <p className="text-sm text-slate-500">{t("list.noResults")}</p>
+        </div>
+      )}
+
+      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search === "" && (
         <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
           <p className="text-sm text-slate-500">{t("list.empty")}</p>
           <Button

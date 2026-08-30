@@ -11,14 +11,21 @@ import type { CreateArticleInput, UpdateArticleInput } from "@/lib/knowledge-bas
  * Story 51 — dedicated Knowledge Base hooks (plan Design item 8), mirroring
  * `use-sla-policies.ts`'s never-optimistic convention exactly but living in
  * their own file — no import from `use-sla-policies.ts`/`use-tickets.ts`.
+ *
+ * Story 64 — `articlesQueryKey` becomes a function of `search`, mirroring
+ * `ticketsQueryKey`'s own filters-as-key-function convention; mutations
+ * still invalidate the bare `["knowledge-base-articles"]` prefix, which
+ * matches every search variant (same partial-match convention `use-tickets.ts`
+ * relies on for `["tickets"]`).
  */
-export const articlesQueryKey = ["knowledge-base-articles"] as const;
+export const articlesQueryKey = (search?: string) =>
+  ["knowledge-base-articles", search ?? ""] as const;
 export const articleQueryKey = (id: string) => ["knowledge-base-articles", id] as const;
 
-export function useArticlesQuery() {
+export function useArticlesQuery(search?: string) {
   return useQuery({
-    queryKey: articlesQueryKey,
-    queryFn: listArticles,
+    queryKey: articlesQueryKey(search),
+    queryFn: () => listArticles(search),
   });
 }
 
@@ -39,7 +46,7 @@ export function useCreateArticleMutation() {
   return useMutation({
     mutationFn: (input: CreateArticleInput) => createArticle(input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: articlesQueryKey });
+      void queryClient.invalidateQueries({ queryKey: ["knowledge-base-articles"] });
     },
   });
 }
@@ -56,7 +63,7 @@ export function useUpdateArticleMutation(id: string) {
     mutationFn: (input: UpdateArticleInput) => updateArticle(id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: articleQueryKey(id) });
-      void queryClient.invalidateQueries({ queryKey: articlesQueryKey });
+      void queryClient.invalidateQueries({ queryKey: ["knowledge-base-articles"] });
     },
   });
 }

@@ -1,8 +1,9 @@
-import { Controller, Get, Param, Req, UnauthorizedException } from "@nestjs/common";
+import { Controller, Get, Param, Query, Req, UnauthorizedException } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Request } from "express";
 import type { JwtAccessTokenClaims } from "@crm/shared";
 import { PortalRoute } from "../../common/auth/portal-route.decorator";
+import { ListArticlesQueryDto } from "../knowledge-base/dto/list-articles-query.dto";
 import { KnowledgeBaseService } from "../knowledge-base/knowledge-base.service";
 import type { ArticleSummary } from "../knowledge-base/knowledge-base.service";
 
@@ -23,8 +24,14 @@ export class PortalKnowledgeBaseController {
 
   @PortalRoute()
   @Get()
-  list(@Req() request: Request): Promise<ArticleSummary[]> {
-    return this.knowledgeBaseService.listPublishedArticlesForBranch(this.requireBranchId(request));
+  list(
+    @Req() request: Request,
+    @Query() query: ListArticlesQueryDto,
+  ): Promise<ArticleSummary[]> {
+    return this.knowledgeBaseService.listPublishedArticlesForBranch(
+      this.requireBranchId(request),
+      query.search,
+    );
   }
 
   @PortalRoute()
