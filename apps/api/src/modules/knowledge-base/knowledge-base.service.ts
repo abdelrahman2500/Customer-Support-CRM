@@ -17,13 +17,26 @@ export interface ArticleSummary {
   updatedAt: Date;
 }
 
+/** Story 65 — one immutable snapshot of an article's content at the moment
+ * it was published. Mirrors `ArticleSummary`'s own flat shape. */
+export interface ArticleVersionSummary {
+  id: string;
+  articleId: string;
+  versionNumber: number;
+  title: string;
+  body: string;
+  category: string | null;
+  publishedAt: Date;
+  createdAt: Date;
+}
+
 /**
  * Owns the `knowledge_base` schema — see
  * docs/architecture/03-domain-boundaries.md ("Knowledge Base"). Story 51 —
  * foundation only: `KnowledgeBaseArticle` is a standalone, branch-scoped
  * aggregate root, the same shape as `SlaPolicy`/`Customer`/`Ticket` — never
- * a sub-entity of anything else. No multi-version publish history, no AI
- * Services consumption — see the plan's Story Goal / Design items 3, 5, 7.
+ * a sub-entity of anything else. No AI Services consumption — see the
+ * plan's Story Goal / Design items 3, 7.
  *
  * Story 64 — `listArticles`/`listPublishedArticlesForBranch` both take an
  * optional `search`, matching `title` or `body` via a plain `contains`/
@@ -33,6 +46,13 @@ export interface ArticleSummary {
  * until this simpler mechanism's relevance/performance is a measured
  * problem (mirrors `ReportingService`'s own "direct queries before
  * materialized views" precedent).
+ *
+ * Story 65 — every `PUBLISHED` transition in `updateArticle` also
+ * snapshots the fully-merged post-update content into a new
+ * `KnowledgeBaseArticleVersion` row (docs/architecture/08-supporting-
+ * domains.md: "publishing creates a new version rather than mutating
+ * published content"), inside the same `$transaction` as the article
+ * update. A plain content edit or an unpublish creates no version.
  */
 @Injectable()
 export class KnowledgeBaseService {
@@ -72,22 +92,80 @@ export class KnowledgeBaseService {
   /**
    * `publishedAt` is set to `now()` whenever `dto.status` is `PUBLISHED`
    * (including a re-publish after an edit) and left untouched otherwise — a
-   * plain last-transition timestamp, not a version log (plan Design item 5).
+   * plain last-transition timestamp on the live row, not a version log
+   * (plan Design item 5).
+   *
+   * Story 65 — that same `PUBLISHED` transition also snapshots the
+   * fully-merged post-update content (an agent may edit and publish in one
+   * call) into a new `KnowledgeBaseArticleVersion` row, inside the same
+   * `$transaction` as the article `update` — a version is never created
+   * without the corresponding publish landing, or vice versa (plan Design
+   * items 1/2). A plain content edit or an unpublish creates no version.
    */
   async updateArticle(id: string, dto: UpdateArticleDto): Promise<{ id: string }> {
-    await this.findArticleInScope(id);
+    const existing = await this.findArticleInScope(id);
+    const isPublishing = dto.status === "PUBLISHED";
 
-    await this.prisma.knowledgeBaseArticle.update({
-      where: { id },
-      data: {
-        ...(dto.title !== undefined ? { title: dto.title } : {}),
-        ...(dto.body !== undefined ? { body: dto.body } : {}),
-        ...(dto.category !== undefined ? { category: dto.category } : {}),
-        ...(dto.status !== undefined ? { status: dto.status } : {}),
-        ...(dto.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
-      },
+    const data = {
+      ...(dto.title !== undefined ? { title: dto.title } : {}),
+      ...(dto.body !== undefined ? { body: dto.body } : {}),
+      ...(dto.category !== undefined ? { category: dto.category } : {}),
+      ...(dto.status !== undefined ? { status: dto.status } : {}),
+      ...(isPublishing ? { publishedAt: new Date() } : {}),
+    };
+
+    if (!isPublishing) {
+      await this.prisma.knowledgeBaseArticle.update({ where: { id }, data });
+      return { id };
+    }
+
+    const merged = {
+      title: dto.title ?? existing.title,
+      body: dto.body ?? existing.body,
+      category: dto.category !== undefined ? dto.category : existing.category,
+    };
+    const publishedAt = data.publishedAt as Date;
+
+    await this.prisma.$transaction(async (tx) => {
+      const lastVersion = await tx.knowledgeBaseArticleVersion.findFirst({
+        where: { articleId: id },
+        orderBy: { versionNumber: "desc" },
+        select: { versionNumber: true },
+      });
+      await tx.knowledgeBaseArticleVersion.create({
+        data: {
+          articleId: id,
+          versionNumber: (lastVersion?.versionNumber ?? 0) + 1,
+          title: merged.title,
+          body: merged.body,
+          category: merged.category,
+          publishedAt,
+        },
+      });
+      await tx.knowledgeBaseArticle.update({ where: { id }, data });
     });
     return { id };
+  }
+
+  /** Story 65 — newest-first. Reuses `findArticleInScope`'s existing
+   * branch-scope/404 guarantee: a version is never reachable outside the
+   * parent article's own branch scope, exactly like `getArticle`. */
+  async listArticleVersions(id: string): Promise<ArticleVersionSummary[]> {
+    await this.findArticleInScope(id);
+    const versions = await this.prisma.knowledgeBaseArticleVersion.findMany({
+      where: { articleId: id },
+      orderBy: { versionNumber: "desc" },
+    });
+    return versions.map((version) => ({
+      id: version.id,
+      articleId: version.articleId,
+      versionNumber: version.versionNumber,
+      title: version.title,
+      body: version.body,
+      category: version.category,
+      publishedAt: version.publishedAt,
+      createdAt: version.createdAt,
+    }));
   }
 
   // ---------------------------------------------------------------------

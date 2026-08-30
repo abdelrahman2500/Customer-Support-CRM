@@ -2,13 +2,18 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { useArticleQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
+import {
+  useArticleQuery,
+  useArticleVersionsQuery,
+  useUpdateArticleMutation,
+} from "@/hooks/use-knowledge-base";
 import { ApiError } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /**
  * Story 51 — Article Detail/Edit. Mirrors `TicketDetailView`'s
@@ -16,6 +21,9 @@ import { Skeleton } from "@/components/ui/skeleton";
  * blur-commit-with-revert-on-error field pattern for title/body/category.
  * The publish/unpublish toggle mirrors `SlaPolicyRow`'s activate/deactivate
  * button (Design item 10).
+ *
+ * Story 65 — a read-only "Version History" section appended below the
+ * existing fields (plan Design item 5); no other behavior changed.
  */
 export function ArticleDetailView({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
@@ -114,6 +122,52 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
           }}
         />
       </label>
+
+      <ArticleVersionHistory articleId={articleId} />
+    </section>
+  );
+}
+
+/** Story 65 — read-only; no restore action (plan Non-Goal). Mirrors
+ * `ArticleListView`'s own loading/error/empty/populated shape. */
+function ArticleVersionHistory({ articleId }: { articleId: string }) {
+  const t = useTranslations("knowledgeBase");
+  const versionsQuery = useArticleVersionsQuery(articleId);
+
+  return (
+    <section className="flex flex-col gap-2 border-t border-slate-200 pt-4">
+      <h2 className="text-sm font-semibold text-slate-900">{t("detail.versions.title")}</h2>
+
+      {versionsQuery.isLoading && <Skeleton className="h-10 w-full" />}
+
+      {versionsQuery.isError && (
+        <Alert variant="destructive">{t("detail.versions.error")}</Alert>
+      )}
+
+      {versionsQuery.isSuccess && versionsQuery.data.length === 0 && (
+        <p className="text-sm text-slate-500">{t("detail.versions.empty")}</p>
+      )}
+
+      {versionsQuery.isSuccess && versionsQuery.data.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("detail.versions.columns.version")}</TableHead>
+              <TableHead>{t("detail.versions.columns.title")}</TableHead>
+              <TableHead>{t("detail.versions.columns.publishedAt")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {versionsQuery.data.map((version) => (
+              <TableRow key={version.id}>
+                <TableCell>{version.versionNumber}</TableCell>
+                <TableCell>{version.title}</TableCell>
+                <TableCell>{new Date(version.publishedAt).toLocaleString()}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </section>
   );
 }

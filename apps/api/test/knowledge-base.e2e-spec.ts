@@ -177,6 +177,89 @@ describe("Knowledge Base (e2e)", () => {
     expect(after.body.publishedAt).toBe(before.body.publishedAt);
   });
 
+  // Story 65 — Article Version History.
+  it("created a version 1 snapshot the first time it was published", async () => {
+    const versions = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}/versions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(versions.body).toHaveLength(1);
+    expect(versions.body[0]).toMatchObject({
+      articleId,
+      versionNumber: 1,
+      title: "How to reset your password",
+      category: "accounts",
+    });
+    expect(versions.body[0].publishedAt).not.toBeNull();
+  });
+
+  it("creates a further, correctly-sequenced version on a re-publish after an edit; a plain edit or unpublish creates none", async () => {
+    // Currently DRAFT (left there by the "unpublishes" test above).
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ body: "Revised, more detailed step-by-step instructions..." })
+      .expect(200);
+
+    const afterPlainEdit = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}/versions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(afterPlainEdit.body).toHaveLength(1); // still just version 1 — no new version yet.
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "PUBLISHED" })
+      .expect(200);
+
+    const afterRepublish = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}/versions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(afterRepublish.body).toHaveLength(2);
+    const [latest, original] = afterRepublish.body;
+    expect(latest).toMatchObject({
+      versionNumber: 2,
+      body: "Revised, more detailed step-by-step instructions...",
+    });
+    expect(original).toMatchObject({ versionNumber: 1 });
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "DRAFT" })
+      .expect(200);
+
+    const afterUnpublish = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}/versions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(afterUnpublish.body).toHaveLength(2); // unchanged — unpublishing creates no version.
+  });
+
+  it("returns [] for an article that has never been published", async () => {
+    const neverPublished = await request(app.getHttpServer())
+      .post("/api/v1/knowledge-base/articles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ title: "Never published", body: "Draft content only." })
+      .expect(201);
+
+    const versions = await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${neverPublished.body.id}/versions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(versions.body).toEqual([]);
+  });
+
+  it("returns 404 for an unknown article id's versions", async () => {
+    await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${randomUUID()}/versions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(404);
+  });
+
   // Story 64 — Article Search.
   it("filters the list by title/body, case-insensitive, via ?search=", async () => {
     const byTitle = await request(app.getHttpServer())
@@ -247,6 +330,10 @@ describe("Knowledge Base (e2e)", () => {
       .patch(`/api/v1/knowledge-base/articles/${articleId}`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .send({ title: "Should not apply" })
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(`/api/v1/knowledge-base/articles/${articleId}/versions`)
+      .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(403);
   });
 });

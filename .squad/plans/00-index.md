@@ -57,3 +57,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | admin-branch-branding | [admin-branch-branding/00-overview.md](./admin-branch-branding/00-overview.md) | 62–      |
 | notification-templates-live-toast | [notification-templates-live-toast/00-overview.md](./notification-templates-live-toast/00-overview.md) | 63–      |
 | knowledge-base-article-search | [knowledge-base-article-search/00-overview.md](./knowledge-base-article-search/00-overview.md) | 64–      |
+| knowledge-base-article-versioning | [knowledge-base-article-versioning/00-overview.md](./knowledge-base-article-versioning/00-overview.md) | 65–      |

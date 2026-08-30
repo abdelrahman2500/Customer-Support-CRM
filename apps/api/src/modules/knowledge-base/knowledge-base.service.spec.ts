@@ -5,14 +5,38 @@ import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 
 function buildPrismaMock() {
-  return {
+  const prisma: {
+    knowledgeBaseArticle: {
+      create: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+      findFirst: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+    };
+    knowledgeBaseArticleVersion: {
+      create: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+      findFirst: ReturnType<typeof vi.fn>;
+    };
+    $transaction: ReturnType<typeof vi.fn>;
+  } = {
     knowledgeBaseArticle: {
       create: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
     },
+    knowledgeBaseArticleVersion: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    // Story 65 — the interactive callback form: `tx` is the same mock
+    // object as `prisma` itself, so assertions on
+    // `prisma.knowledgeBaseArticleVersion.create` etc. see calls made
+    // through `tx` too, exactly as if it were a real, single connection.
+    $transaction: vi.fn((callback: (tx: unknown) => unknown) => callback(prisma)),
   };
+  return prisma;
 }
 
 function buildTenantContextMock(branchId: string | null = "branch-1") {
@@ -217,6 +241,128 @@ describe("KnowledgeBaseService", () => {
         where: { id: "article-1" },
         data: { body: "Revised instructions..." },
       });
+    });
+
+    // Story 65 — Article Version History.
+    it("creates version 1 with the fully-merged content when publishing for the first time", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      prisma.knowledgeBaseArticleVersion.findFirst.mockResolvedValue(null);
+
+      await service.updateArticle("article-1", {
+        title: "How to reset your password",
+        status: "PUBLISHED" as never,
+      });
+
+      expect(prisma.$transaction).toHaveBeenCalledOnce();
+      expect(prisma.knowledgeBaseArticleVersion.findFirst).toHaveBeenCalledWith({
+        where: { articleId: "article-1" },
+        orderBy: { versionNumber: "desc" },
+        select: { versionNumber: true },
+      });
+      expect(prisma.knowledgeBaseArticleVersion.create).toHaveBeenCalledWith({
+        data: {
+          articleId: "article-1",
+          versionNumber: 1,
+          title: "How to reset your password",
+          body: baseArticleRow.body,
+          category: baseArticleRow.category,
+          publishedAt: expect.any(Date),
+        },
+      });
+      expect(prisma.knowledgeBaseArticle.update).toHaveBeenCalledWith({
+        where: { id: "article-1" },
+        data: { title: "How to reset your password", status: "PUBLISHED", publishedAt: expect.any(Date) },
+      });
+    });
+
+    it("creates a correctly-sequenced next version with the newly-edited content on a re-publish", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({
+        ...baseArticleRow,
+        status: "PUBLISHED",
+        publishedAt: new Date("2026-01-02T00:00:00.000Z"),
+      });
+      prisma.knowledgeBaseArticleVersion.findFirst.mockResolvedValue({ versionNumber: 1 });
+
+      await service.updateArticle("article-1", {
+        body: "Revised, more detailed instructions...",
+        status: "PUBLISHED" as never,
+      });
+
+      expect(prisma.knowledgeBaseArticleVersion.create).toHaveBeenCalledWith({
+        data: {
+          articleId: "article-1",
+          versionNumber: 2,
+          title: baseArticleRow.title,
+          body: "Revised, more detailed instructions...",
+          category: baseArticleRow.category,
+          publishedAt: expect.any(Date),
+        },
+      });
+    });
+
+    it("creates no version for a plain content edit (no status change)", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+
+      await service.updateArticle("article-1", { title: "Updated title" });
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.knowledgeBaseArticleVersion.create).not.toHaveBeenCalled();
+    });
+
+    it("creates no version when unpublishing", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({
+        ...baseArticleRow,
+        status: "PUBLISHED",
+        publishedAt: new Date("2026-01-02T00:00:00.000Z"),
+      });
+
+      await service.updateArticle("article-1", { status: "DRAFT" as never });
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.knowledgeBaseArticleVersion.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("listArticleVersions", () => {
+    it("throws NotFoundException for an unknown/out-of-scope id", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
+
+      await expect(service.listArticleVersions("missing-id")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.knowledgeBaseArticleVersion.findMany).not.toHaveBeenCalled();
+    });
+
+    it("returns versions newest-first for an in-scope article", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      const versionRow = {
+        id: "version-1",
+        articleId: "article-1",
+        versionNumber: 2,
+        title: "How to reset your password",
+        body: "Revised instructions...",
+        category: null,
+        publishedAt: new Date("2026-01-03T00:00:00.000Z"),
+        createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      };
+      prisma.knowledgeBaseArticleVersion.findMany.mockResolvedValue([versionRow]);
+
+      const result = await service.listArticleVersions("article-1");
+
+      expect(prisma.knowledgeBaseArticleVersion.findMany).toHaveBeenCalledWith({
+        where: { articleId: "article-1" },
+        orderBy: { versionNumber: "desc" },
+      });
+      expect(result).toEqual([versionRow]);
+    });
+
+    it("returns [] for an article that has never been published", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      prisma.knowledgeBaseArticleVersion.findMany.mockResolvedValue([]);
+
+      const result = await service.listArticleVersions("article-1");
+
+      expect(result).toEqual([]);
     });
   });
 

@@ -70,3 +70,21 @@ export function updateArticle(id: string, input: UpdateArticleInput): Promise<{ 
     body: JSON.stringify(input),
   });
 }
+
+/** Story 65 — Article Version History. Mirrors the backend's own
+ * `ArticleVersionSummary` exactly
+ * (`apps/api/src/modules/knowledge-base/knowledge-base.service.ts`). */
+export interface ArticleVersionSummary {
+  id: string;
+  articleId: string;
+  versionNumber: number;
+  title: string;
+  body: string;
+  category: string | null;
+  publishedAt: string;
+  createdAt: string;
+}
+
+export function listArticleVersions(articleId: string): Promise<ArticleVersionSummary[]> {
+  return apiFetch<ArticleVersionSummary[]>(`/knowledge-base/articles/${articleId}/versions`);
+}

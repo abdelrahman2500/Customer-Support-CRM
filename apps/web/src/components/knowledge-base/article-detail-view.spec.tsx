@@ -1,7 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ArticleDetailView } from "./article-detail-view";
-import { useArticleQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
+import {
+  useArticleQuery,
+  useArticleVersionsQuery,
+  useUpdateArticleMutation,
+} from "@/hooks/use-knowledge-base";
 import { ApiError } from "@/lib/api";
 
 vi.mock("next-intl", () => ({
@@ -11,6 +15,7 @@ vi.mock("next-intl", () => ({
 
 vi.mock("@/hooks/use-knowledge-base", () => ({
   useArticleQuery: vi.fn(),
+  useArticleVersionsQuery: vi.fn(),
   useUpdateArticleMutation: vi.fn(),
 }));
 
@@ -46,6 +51,9 @@ describe("ArticleDetailView", () => {
       isError: false,
       error: null,
     } as never);
+    // Story 65 — default: version history query still pending, matching
+    // every pre-existing test's own expectation of not asserting on it.
+    vi.mocked(useArticleVersionsQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
   });
 
   it("renders a loading skeleton while the article query is pending", () => {
@@ -198,5 +206,72 @@ describe("ArticleDetailView", () => {
     render(<ArticleDetailView articleId="article-1" />);
 
     expect(screen.getByText("detail.actionFailed")).toBeInTheDocument();
+  });
+
+  // Story 65 — Article Version History.
+  it("renders a row per version once the version history query succeeds", () => {
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ data: baseArticle, isSuccess: true }) as never,
+    );
+    vi.mocked(useArticleVersionsQuery).mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: [
+          {
+            id: "version-2",
+            articleId: "article-1",
+            versionNumber: 2,
+            title: "How to reset your password",
+            body: "Revised instructions...",
+            category: "account",
+            publishedAt: "2026-01-03T00:00:00.000Z",
+            createdAt: "2026-01-03T00:00:00.000Z",
+          },
+          {
+            id: "version-1",
+            articleId: "article-1",
+            versionNumber: 1,
+            title: "How to reset a password",
+            body: "Step-by-step instructions...",
+            category: "account",
+            publishedAt: "2026-01-02T00:00:00.000Z",
+            createdAt: "2026-01-02T00:00:00.000Z",
+          },
+        ],
+      }) as never,
+    );
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    expect(screen.getByText("detail.versions.title")).toBeInTheDocument();
+    expect(screen.getByText("How to reset your password")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when the article has never been published", () => {
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ data: baseArticle, isSuccess: true }) as never,
+    );
+    vi.mocked(useArticleVersionsQuery).mockReturnValue(
+      queryResult({ isSuccess: true, data: [] }) as never,
+    );
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    expect(screen.getByText("detail.versions.empty")).toBeInTheDocument();
+  });
+
+  it("shows an error state when the version history query fails", () => {
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ data: baseArticle, isSuccess: true }) as never,
+    );
+    vi.mocked(useArticleVersionsQuery).mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("Server error", 500) }) as never,
+    );
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    expect(screen.getByText("detail.versions.error")).toBeInTheDocument();
   });
 });

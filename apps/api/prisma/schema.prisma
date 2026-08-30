@@ -721,11 +721,10 @@ enum KnowledgeBaseArticleStatus {
 /// Story 51 — see docs/architecture/03-domain-boundaries.md ("Knowledge
 /// Base") and docs/architecture/08-supporting-domains.md. Foundation only:
 /// a branch-scoped aggregate root (mirroring `SlaPolicy`'s exact shape) with
-/// a draft/published toggle. No full-text/vector search consumption (the
-/// `pgvector`/`pg_trgm` extensions already exist at the datasource level,
-/// unused by this story), no multi-version publish history — `publishedAt`
-/// is a plain last-transition timestamp, overwritten on every re-publish,
-/// not a version log. No Customer Portal or AI Services consumption yet.
+/// a draft/published toggle. `publishedAt` remains a plain last-transition
+/// timestamp on the live row, overwritten on every re-publish — the actual
+/// version history lives in `KnowledgeBaseArticleVersion` (Story 65). No
+/// Customer Portal or AI Services consumption yet.
 model KnowledgeBaseArticle {
   id          String                     @id @default(uuid())
   branchId    String                     @map("branch_id")
@@ -737,8 +736,36 @@ model KnowledgeBaseArticle {
   publishedAt DateTime?                  @map("published_at")
   createdAt   DateTime                   @default(now()) @map("created_at")
   updatedAt   DateTime                   @updatedAt @map("updated_at")
+  versions    KnowledgeBaseArticleVersion[]
 
   @@index([branchId])
   @@map("knowledge_base_articles")
+  @@schema("knowledge_base")
+}
+
+/// Story 65 — see docs/architecture/08-supporting-domains.md ("publishing
+/// creates a new version rather than mutating published content").
+/// Immutable, append-only: a row is created only when `updateArticle`
+/// transitions `status` to `PUBLISHED` (see `KnowledgeBaseService`'s own
+/// doc comment for the exact site), never on a plain content edit or an
+/// unpublish. `versionNumber` is 1-based and per-article sequential,
+/// derived from the existing rows at write time rather than a redundant
+/// counter column. `publishedAt` here is this version's own publish
+/// timestamp — distinct from the live article's own, separately-mutable
+/// `publishedAt`.
+model KnowledgeBaseArticleVersion {
+  id            String               @id @default(uuid())
+  articleId     String               @map("article_id")
+  article       KnowledgeBaseArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  versionNumber Int                  @map("version_number")
+  title         String
+  body          String
+  category      String?
+  publishedAt   DateTime             @map("published_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  @@unique([articleId, versionNumber])
+  @@index([articleId])
+  @@map("knowledge_base_article_versions")
   @@schema("knowledge_base")
 }

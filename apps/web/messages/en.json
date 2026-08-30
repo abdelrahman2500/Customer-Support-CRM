@@ -476,7 +476,17 @@
       "notFound": "This article could not be found.",
       "loadError": "Couldn't load this article.",
       "actionForbidden": "You don't have permission to perform that action.",
-      "actionFailed": "That change couldn't be saved. Please try again."
+      "actionFailed": "That change couldn't be saved. Please try again.",
+      "versions": {
+        "title": "Version history",
+        "empty": "This article has no published versions yet.",
+        "error": "Couldn't load version history.",
+        "columns": {
+          "version": "Version",
+          "title": "Title",
+          "publishedAt": "Published at"
+        }
+      }
     }
   },
   "notificationHistory": {

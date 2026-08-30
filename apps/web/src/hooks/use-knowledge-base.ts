@@ -3,6 +3,7 @@ import {
   createArticle,
   getArticle,
   listArticles,
+  listArticleVersions,
   updateArticle,
 } from "@/lib/knowledge-base-api";
 import type { CreateArticleInput, UpdateArticleInput } from "@/lib/knowledge-base-api";
@@ -36,6 +37,17 @@ export function useArticleQuery(id: string) {
   });
 }
 
+/** Story 65 — Article Version History. */
+export const articleVersionsQueryKey = (articleId: string) =>
+  ["knowledge-base-article-versions", articleId] as const;
+
+export function useArticleVersionsQuery(articleId: string) {
+  return useQuery({
+    queryKey: articleVersionsQueryKey(articleId),
+    queryFn: () => listArticleVersions(articleId),
+  });
+}
+
 /**
  * Never applies optimistically (same rule every other mutation hook in this
  * codebase follows): only a successful `POST /knowledge-base/articles`
@@ -53,9 +65,11 @@ export function useCreateArticleMutation() {
 
 /**
  * Never applies optimistically: only a successful `PATCH
- * /knowledge-base/articles/:id` invalidates both this one article's query
- * and the branch-wide list — a rejected mutation leaves the cache untouched
- * and the caller renders `mutation.error`.
+ * /knowledge-base/articles/:id` invalidates this one article's query, the
+ * branch-wide list, and its version history (Story 65 — a publish may have
+ * just created a new version; invalidating unconditionally is simpler and
+ * no more costly than checking `input.status` first) — a rejected mutation
+ * leaves the cache untouched and the caller renders `mutation.error`.
  */
 export function useUpdateArticleMutation(id: string) {
   const queryClient = useQueryClient();
@@ -64,6 +78,7 @@ export function useUpdateArticleMutation(id: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: articleQueryKey(id) });
       void queryClient.invalidateQueries({ queryKey: ["knowledge-base-articles"] });
+      void queryClient.invalidateQueries({ queryKey: articleVersionsQueryKey(id) });
     },
   });
 }

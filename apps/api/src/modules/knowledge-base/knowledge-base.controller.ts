@@ -4,7 +4,7 @@ import { RequirePermissions } from "../../common/auth/require-permissions.decora
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { ListArticlesQueryDto } from "./dto/list-articles-query.dto";
-import type { ArticleSummary } from "./knowledge-base.service";
+import type { ArticleSummary, ArticleVersionSummary } from "./knowledge-base.service";
 import { KnowledgeBaseService } from "./knowledge-base.service";
 
 @ApiTags("knowledge-base")
@@ -35,5 +35,12 @@ export class KnowledgeBaseController {
   @RequirePermissions("kb:update")
   update(@Param("id") id: string, @Body() dto: UpdateArticleDto): Promise<{ id: string }> {
     return this.knowledgeBaseService.updateArticle(id, dto);
+  }
+
+  /** Story 65 — reuses `kb:read` (no new permission, plan Design item 4). */
+  @Get(":id/versions")
+  @RequirePermissions("kb:read")
+  listVersions(@Param("id") id: string): Promise<ArticleVersionSummary[]> {
+    return this.knowledgeBaseService.listArticleVersions(id);
   }
 }
