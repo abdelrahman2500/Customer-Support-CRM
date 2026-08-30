@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useNotificationsQuery } from "@/hooks/use-notifications";
+import { useNotificationTemplatesQuery } from "@/hooks/use-notification-templates";
 import { useCustomersQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import type { NotificationSummary } from "@/lib/notifications-api";
 import { ApiError } from "@/lib/api";
@@ -36,6 +37,20 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
 };
 
 /**
+ * Story 61 — plain `{name}` substitution only (never `next-intl`/ICU — an
+ * admin-authored template is plain text, not a message-catalog entry).
+ * `{ticketId}` is shortened to 8 characters, matching
+ * `NotificationToaster`'s own existing short-form convention; an
+ * unrecognized placeholder is left verbatim (no error, simplest safe
+ * behavior for a v1 foundation).
+ */
+function renderTemplate(template: string, notification: NotificationSummary): string {
+  return template
+    .replace(/\{ticketId\}/g, notification.ticketId.slice(0, 8))
+    .replace(/\{targetType\}/g, notification.targetType ?? "");
+}
+
+/**
  * One notification row's ticket/customer cells, resolved through the
  * already-fetched, already-shared `useTicketsQuery({})`/`useCustomersQuery()`
  * caches — the same client-side-join convention `TicketListView`'s
@@ -43,16 +58,23 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * ticket this branch's unpaginated ticket list doesn't contain (e.g. one
  * outside this lookup) falls back to the raw `ticketId`, exactly like those
  * existing fallbacks.
+ *
+ * Story 61 — `template` is the caller's own `NotificationTemplate.template`
+ * for this row's `eventType`, when one exists; falls back to the exact
+ * existing `EVENT_LABEL_KEYS`-driven label otherwise (zero behavior change
+ * for any branch that has never created one).
  */
 function NotificationRow({
   notification,
   ticketSubject,
   customerName,
+  template,
   onOpenTicket,
 }: {
   notification: NotificationSummary;
   ticketSubject: string | undefined;
   customerName: string | undefined;
+  template: string | undefined;
   onOpenTicket: () => void;
 }) {
   const t = useTranslations("notificationHistory");
@@ -62,11 +84,16 @@ function NotificationRow({
   const targetTypeLabelKey = notification.targetType
     ? TARGET_TYPE_LABEL_KEYS[notification.targetType]
     : undefined;
+  const eventLabel = template
+    ? renderTemplate(template, notification)
+    : eventLabelKey
+      ? t(eventLabelKey)
+      : notification.eventType;
 
   return (
     <TableRow>
       <TableCell>
-        <Badge variant="outline">{eventLabelKey ? t(eventLabelKey) : notification.eventType}</Badge>
+        <Badge variant="outline">{eventLabel}</Badge>
       </TableCell>
       <TableCell>
         <button type="button" className="hover:underline" onClick={onOpenTicket}>
@@ -124,6 +151,12 @@ function NotificationRow({
  * table, entirely independent of `notificationsQuery`'s own `notification:read`
  * gate: a user lacking that permission must still be able to manage their
  * own live toast preferences.
+ *
+ * Story 61 — `templatesQuery` is its own, independent query: a loading or
+ * errored fetch never blocks the notification list itself from rendering
+ * (same independent-failure convention already established for
+ * ticket/customer name resolution above) — every row simply falls back to
+ * its default label until templates are available.
  */
 export function NotificationHistoryView() {
   const t = useTranslations("notificationHistory");
@@ -133,6 +166,15 @@ export function NotificationHistoryView() {
   const notificationsQuery = useNotificationsQuery();
   const ticketsQuery = useTicketsQuery({});
   const customersQuery = useCustomersQuery();
+  const templatesQuery = useNotificationTemplatesQuery();
+
+  const templateByEventType = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const template of templatesQuery.data ?? []) {
+      map.set(template.eventType, template.template);
+    }
+    return map;
+  }, [templatesQuery.data]);
 
   const ticketById = useMemo(() => {
     const map = new Map<string, { subject: string; customerId: string }>();
@@ -210,6 +252,7 @@ export function NotificationHistoryView() {
                     notification={notification}
                     ticketSubject={ticket?.subject}
                     customerName={customerName}
+                    template={templateByEventType.get(notification.eventType)}
                     onOpenTicket={() => router.push(`/${locale}/tickets/${notification.ticketId}`)}
                   />
                 );

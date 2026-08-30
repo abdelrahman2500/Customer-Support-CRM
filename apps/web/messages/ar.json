@@ -34,7 +34,8 @@
       "notifications": "سجل الإشعارات",
       "knowledgeBase": "قاعدة المعرفة",
       "reports": "التقارير",
-      "automationRules": "قواعد الأتمتة"
+      "automationRules": "قواعد الأتمتة",
+      "notificationTemplates": "قوالب الإشعارات"
     }
   },
   "tickets": {
@@ -564,5 +565,22 @@
     "createSubmit": "إنشاء القاعدة",
     "createSubmitting": "جارٍ الإنشاء...",
     "createFailed": "تعذّر إنشاء القاعدة. حاول مرة أخرى."
+  },
+  "notificationTemplates": {
+    "title": "قوالب الإشعارات",
+    "description": "خصّص الرسالة المعروضة في سجل الإشعارات لكل نوع حدث. اتركه فارغًا لاستخدام الصياغة الافتراضية.",
+    "error": "تعذّر تحميل قوالب الإشعارات.",
+    "retry": "إعادة المحاولة",
+    "templateLabel": "الرسالة",
+    "templatePlaceholder": "استخدام الصياغة الافتراضية",
+    "placeholderHint": "المتغيرات المتاحة: '{ticketId}' و '{targetType}'",
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ...",
+    "saveFailed": "تعذّر حفظ هذا القالب. حاول مرة أخرى.",
+    "eventLabel": {
+      "slaAtRisk": "اتفاقية الخدمة في خطر",
+      "slaBreached": "تم خرق اتفاقية الخدمة",
+      "ticketEscalated": "تم تصعيد التذكرة"
+    }
   }
 }

@@ -48,6 +48,7 @@ model Branch {
   businessHoursCalendar BusinessHoursCalendar?
   knowledgeBaseArticles KnowledgeBaseArticle[]
   automationRules       AutomationRule[]
+  notificationTemplates NotificationTemplate[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -661,6 +662,26 @@ model NotificationPreference {
 
   @@unique([userId, eventType])
   @@map("notification_preferences")
+  @@schema("notifications")
+}
+
+/// Story 61 — a branch admin's custom message for one notification event
+/// type. Plain text with `{ticketId}`/`{targetType}` placeholders,
+/// substituted at render time (never rendered through `next-intl`/ICU) —
+/// consumed only by the Notification History table for now (Design
+/// decision 3); the live in-app toast is untouched. `@@unique([branchId,
+/// eventType])`: exactly one template per event type per branch, upserted.
+model NotificationTemplate {
+  id        String   @id @default(uuid())
+  branchId  String   @map("branch_id")
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  eventType String   @map("event_type")
+  template  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([branchId, eventType])
+  @@map("notification_templates")
   @@schema("notifications")
 }
 

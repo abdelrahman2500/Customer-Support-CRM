@@ -41,6 +41,8 @@ const PERMISSION_CATALOG = [
   "sla:read",
   "sla:update",
   "notification:read",
+  "notification:create",
+  "notification:update",
   "audit:read",
   "kb:create",
   "kb:read",

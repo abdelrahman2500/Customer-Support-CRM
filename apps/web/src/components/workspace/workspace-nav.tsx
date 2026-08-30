@@ -23,6 +23,9 @@ import { clearAccessToken, logout } from "@/lib/api";
  *
  * Story 57 — `automation-rules` appended as the new last entry, same
  * convention.
+ *
+ * Story 61 — `notification-templates` appended as the new last entry,
+ * same convention.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -38,6 +41,7 @@ const NAV_ITEMS = [
   { href: "knowledge-base", labelKey: "nav.knowledgeBase" },
   { href: "reports", labelKey: "nav.reports" },
   { href: "automation-rules", labelKey: "nav.automationRules" },
+  { href: "notification-templates", labelKey: "nav.notificationTemplates" },
 ] as const;
 
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {

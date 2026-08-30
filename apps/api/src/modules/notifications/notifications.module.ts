@@ -4,6 +4,8 @@ import { NotificationsController } from "./notifications.controller";
 import { NotificationsService } from "./notifications.service";
 import { NotificationPreferencesController } from "./notification-preferences.controller";
 import { NotificationPreferencesService } from "./notification-preferences.service";
+import { NotificationTemplatesController } from "./notification-templates.controller";
+import { NotificationTemplatesService } from "./notification-templates.service";
 import { SlaAtRiskNotificationListener } from "./sla-at-risk-notification.listener";
 import { TicketEscalatedNotificationListener } from "./ticket-escalated-notification.listener";
 
@@ -27,12 +29,22 @@ import { TicketEscalatedNotificationListener } from "./ticket-escalated-notifica
  * Story 58 — `NotificationPreferences*` added the same way. Self-scoped by
  * the caller's own `userId` (never `TenantContext`/a permission) — see that
  * service's own doc comment.
+ *
+ * Story 61 — `NotificationTemplates*` added the same way. Branch-scoped
+ * (like `NotificationsController`), never self-scoped (unlike
+ * `NotificationPreferencesController`) — a template is a branch-admin
+ * resource.
  */
 @Module({
-  controllers: [NotificationsController, NotificationPreferencesController],
+  controllers: [
+    NotificationsController,
+    NotificationPreferencesController,
+    NotificationTemplatesController,
+  ],
   providers: [
     NotificationsService,
     NotificationPreferencesService,
+    NotificationTemplatesService,
     TenantContext,
     SlaAtRiskNotificationListener,
     TicketEscalatedNotificationListener,

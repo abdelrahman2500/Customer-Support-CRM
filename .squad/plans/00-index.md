@@ -53,3 +53,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | notification-preferences | [notification-preferences/00-overview.md](./notification-preferences/00-overview.md) | 58–      |
 | reporting-agent-performance | [reporting-agent-performance/00-overview.md](./reporting-agent-performance/00-overview.md) | 59–      |
 | reporting-ticket-aging | [reporting-ticket-aging/00-overview.md](./reporting-ticket-aging/00-overview.md) | 60–      |
+| notification-templates | [notification-templates/00-overview.md](./notification-templates/00-overview.md) | 61–      |

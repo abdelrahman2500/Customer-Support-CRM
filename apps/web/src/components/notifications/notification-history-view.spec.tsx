@@ -7,6 +7,7 @@ import {
   useNotificationPreferencesQuery,
   useUpdateNotificationPreferenceMutation,
 } from "@/hooks/use-notification-preferences";
+import { useNotificationTemplatesQuery } from "@/hooks/use-notification-templates";
 import { ApiError } from "@/lib/api";
 
 const push = vi.fn();
@@ -35,6 +36,10 @@ vi.mock("@/hooks/use-notification-preferences", () => ({
   useUpdateNotificationPreferenceMutation: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-notification-templates", () => ({
+  useNotificationTemplatesQuery: vi.fn(),
+}));
+
 const mockedUseNotificationsQuery = vi.mocked(useNotificationsQuery);
 const mockedUseTicketsQuery = vi.mocked(useTicketsQuery);
 const mockedUseCustomersQuery = vi.mocked(useCustomersQuery);
@@ -42,6 +47,7 @@ const mockedUseNotificationPreferencesQuery = vi.mocked(useNotificationPreferenc
 const mockedUseUpdateNotificationPreferenceMutation = vi.mocked(
   useUpdateNotificationPreferenceMutation,
 );
+const mockedUseNotificationTemplatesQuery = vi.mocked(useNotificationTemplatesQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -89,6 +95,9 @@ describe("NotificationHistoryView", () => {
       isError: false,
       error: null,
     } as never);
+    mockedUseNotificationTemplatesQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
   });
 
   it("shows a loading state while the notifications query is pending", () => {
@@ -206,5 +215,55 @@ describe("NotificationHistoryView", () => {
 
     expect(screen.getByText("eventLabel.ticketEscalated")).toBeInTheDocument();
     expect(screen.getByText("noTarget")).toBeInTheDocument();
+  });
+
+  // Story 61 — custom notification templates.
+  it("renders a custom template's substituted text in place of the default label, when one exists", () => {
+    mockedUseNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [atRiskNotification] }) as never,
+    );
+    mockedUseNotificationTemplatesQuery.mockReturnValue(
+      queryResult({
+        data: [{ id: "t-1", eventType: "sla.at_risk", template: "Watch ticket {ticketId} closely" }],
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("Watch ticket ticket-1 closely")).toBeInTheDocument();
+    expect(screen.queryByText("eventLabel.slaAtRisk")).not.toBeInTheDocument();
+  });
+
+  it("keeps the exact existing default label when no template exists for that eventType", () => {
+    mockedUseNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [atRiskNotification] }) as never,
+    );
+    mockedUseNotificationTemplatesQuery.mockReturnValue(
+      queryResult({
+        data: [{ id: "t-1", eventType: "ticket.escalated", template: "Should not apply here" }],
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("eventLabel.slaAtRisk")).toBeInTheDocument();
+  });
+
+  it("substitutes {targetType} in a custom template", () => {
+    mockedUseNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [atRiskNotification] }) as never,
+    );
+    mockedUseNotificationTemplatesQuery.mockReturnValue(
+      queryResult({
+        data: [{ id: "t-1", eventType: "sla.at_risk", template: "{targetType} at risk" }],
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("response at risk")).toBeInTheDocument();
   });
 });

@@ -34,7 +34,8 @@
       "notifications": "Notification History",
       "knowledgeBase": "Knowledge Base",
       "reports": "Reports",
-      "automationRules": "Automation Rules"
+      "automationRules": "Automation Rules",
+      "notificationTemplates": "Notification Templates"
     }
   },
   "tickets": {
@@ -564,5 +565,22 @@
     "createSubmit": "Create rule",
     "createSubmitting": "Creating...",
     "createFailed": "Couldn't create the rule. Please try again."
+  },
+  "notificationTemplates": {
+    "title": "Notification Templates",
+    "description": "Customize the message shown in Notification History for each event type. Leave blank to use the default wording.",
+    "error": "Couldn't load notification templates.",
+    "retry": "Retry",
+    "templateLabel": "Message",
+    "templatePlaceholder": "Use the default wording",
+    "placeholderHint": "Available placeholders: '{ticketId}' and '{targetType}'",
+    "save": "Save",
+    "saving": "Saving...",
+    "saveFailed": "Couldn't save this template. Please try again.",
+    "eventLabel": {
+      "slaAtRisk": "SLA at risk",
+      "slaBreached": "SLA breached",
+      "ticketEscalated": "Ticket escalated"
+    }
   }
 }
