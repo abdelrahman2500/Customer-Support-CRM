@@ -254,6 +254,89 @@ describe("Ticketing (e2e)", () => {
     expect(updatedAts).toEqual(sorted);
   });
 
+  // Story 70 — Ticket Search Foundation. Dedicated, self-contained fixture
+  // tickets (random content) so these tests don't depend on other tests'
+  // ordering or fixture state.
+  describe("ticket search", () => {
+    let searchSubjectTicketId: string;
+    let searchCategoryTicketId: string;
+    const searchSubjectMarker = `UniqueSubjectMarker${randomUUID().replace(/-/g, "")}`;
+    const searchCategoryMarker = `UniqueCategoryMarker${randomUUID().replace(/-/g, "")}`;
+
+    beforeAll(async () => {
+      const subjectTicket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, subject: `Cannot log in — ${searchSubjectMarker}` })
+        .expect(201);
+      searchSubjectTicketId = subjectTicket.body.id;
+
+      const categoryTicket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, subject: "Unrelated subject", category: searchCategoryMarker })
+        .expect(201);
+      searchCategoryTicketId = categoryTicket.body.id;
+    });
+
+    it("matches by subject, case-insensitive", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ search: searchSubjectMarker.toLowerCase() })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const ids = response.body.map((ticket: { id: string }) => ticket.id);
+      expect(ids).toContain(searchSubjectTicketId);
+      expect(ids).not.toContain(searchCategoryTicketId);
+    });
+
+    it("matches by category, case-insensitive", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ search: searchCategoryMarker.toUpperCase() })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const ids = response.body.map((ticket: { id: string }) => ticket.id);
+      expect(ids).toContain(searchCategoryTicketId);
+      expect(ids).not.toContain(searchSubjectTicketId);
+    });
+
+    it("returns [] for a non-matching search term", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ search: `no-such-ticket-content-${randomUUID()}` })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+
+    it("composes with an existing equality filter (status)", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ search: searchSubjectMarker, status: "OPEN" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const ids = response.body.map((ticket: { id: string }) => ticket.id);
+      expect(ids).toContain(searchSubjectTicketId);
+      expect(response.body.every((t: { status: string }) => t.status === "OPEN")).toBe(true);
+    });
+
+    it("omitted search behaves identically to today — the fixture tickets still appear unfiltered", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const ids = response.body.map((ticket: { id: string }) => ticket.id);
+      expect(ids).toContain(searchSubjectTicketId);
+      expect(ids).toContain(searchCategoryTicketId);
+    });
+  });
+
   it("gets a single ticket", async () => {
     const response = await request(app.getHttpServer())
       .get(`/api/v1/tickets/${ticketId}`)

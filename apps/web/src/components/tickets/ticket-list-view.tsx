@@ -48,9 +48,14 @@ function SlaCell({ ticket }: { ticket: TicketListItem }) {
  * Story 23 — the Ticket List (plan Task 7). Consumes `GET /tickets`
  * (filter/sort query params, Task 2) plus `GET /customers`/`GET
  * /identity/users` for client-side display-name resolution (Design item 9)
- * — no new backend "expand" parameter. No search, no pagination (plan
- * Design item 2 — deferred, not built). Does not join any realtime room —
- * only Ticket Detail does (Design item 8).
+ * — no new backend "expand" parameter. No pagination (still no precedent
+ * anywhere in this codebase). Does not join any realtime room — only
+ * Ticket Detail does (Design item 8).
+ *
+ * Story 70 — a `search` filter, blur-commit like the existing `category`
+ * filter Input, appended to the same filter bar (matches `subject`/
+ * `category`, case-insensitive — mirrors `ArticleListView`'s own search
+ * input, added for Knowledge Base in Story 64).
  */
 export function TicketListView() {
   const t = useTranslations("tickets");
@@ -135,6 +140,15 @@ export function TicketListView() {
           options={(usersQuery.data ?? []).map((user) => user.id)}
           renderLabel={(id) => userNameById.get(id) ?? id}
         />
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("list.searchLabel")}
+          <Input
+            className="min-w-[10rem]"
+            defaultValue={filters.search ?? ""}
+            placeholder={t("list.searchPlaceholder")}
+            onBlur={(event) => updateFilter("search", event.target.value.trim() || ALL_VALUE)}
+          />
+        </label>
       </div>
 
       {ticketsQuery.isLoading && <ListSkeleton />}

@@ -355,6 +355,101 @@ describe("TicketsService", () => {
 
       expect(result[0]?.slaTarget).toEqual(slaTarget);
     });
+
+    // Story 70 — Ticket Search Foundation.
+    describe("search", () => {
+      it("adds a subject/category OR clause when search is given", async () => {
+        prisma.ticket.findMany.mockResolvedValue([]);
+
+        await service.listTickets({ search: "login" });
+
+        expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              branchId: "branch-1",
+              OR: [
+                { subject: { contains: "login", mode: "insensitive" } },
+                { category: { contains: "login", mode: "insensitive" } },
+              ],
+            },
+          }),
+        );
+      });
+
+      it("behaves identically to the no-arg call when search is an empty string", async () => {
+        prisma.ticket.findMany.mockResolvedValue([]);
+
+        await service.listTickets({ search: "" });
+
+        expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { branchId: "branch-1" } }),
+        );
+      });
+
+      it("composes with existing equality filters (status/priority/category/assignedToUserId)", async () => {
+        prisma.ticket.findMany.mockResolvedValue([]);
+
+        await service.listTickets({ search: "login", status: "OPEN", assignedToUserId: "user-1" });
+
+        expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              branchId: "branch-1",
+              OR: [
+                { subject: { contains: "login", mode: "insensitive" } },
+                { category: { contains: "login", mode: "insensitive" } },
+              ],
+              status: "OPEN",
+              assignedToUserId: "user-1",
+            },
+          }),
+        );
+      });
+
+      it("ANDs the search filter with the department-visibility filter rather than letting either OR clobber the other", async () => {
+        tenantContext.roles = ["DeptOnly"];
+        tenantContext.departmentId = "dept-1";
+        prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
+        prisma.ticket.findMany.mockResolvedValue([]);
+
+        await service.listTickets({ search: "login" });
+
+        expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              branchId: "branch-1",
+              AND: [
+                { OR: [{ departmentId: "dept-1" }, { departmentId: null }] },
+                {
+                  OR: [
+                    { subject: { contains: "login", mode: "insensitive" } },
+                    { category: { contains: "login", mode: "insensitive" } },
+                  ],
+                },
+              ],
+            },
+          }),
+        );
+      });
+
+      it("uses only the department-visibility OR clause (unchanged Story 68 shape) when search is absent", async () => {
+        tenantContext.roles = ["DeptOnly"];
+        tenantContext.departmentId = "dept-1";
+        prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
+        prisma.ticket.findMany.mockResolvedValue([]);
+
+        await service.listTickets();
+
+        expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              branchId: "branch-1",
+              OR: [{ departmentId: "dept-1" }, { departmentId: null }],
+            },
+          }),
+        );
+      });
+    });
   });
 
   describe("getTicket", () => {

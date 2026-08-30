@@ -9,10 +9,12 @@ import { AppModule } from "../src/app.module";
 /**
  * Integration suite for Story 68 (Ticket Department-Scoped Visibility) —
  * `Role.ticketVisibilityScope` and the resulting `GET /tickets`/
- * `GET /tickets/:id` filtering — and Story 69 (its "assignment" half:
- * `PATCH /tickets/:id`'s `departmentId` reassignment restriction).
- * Bootstraps the REAL `AppModule` against a REAL Postgres/Redis, exactly
- * like every sibling e2e suite.
+ * `GET /tickets/:id` filtering — Story 69 (its "assignment" half:
+ * `PATCH /tickets/:id`'s `departmentId` reassignment restriction) — and
+ * Story 70 (confirming `GET /tickets?search=` composes safely with the
+ * department-visibility filter rather than one `OR` clobbering the
+ * other). Bootstraps the REAL `AppModule` against a REAL Postgres/Redis,
+ * exactly like every sibling e2e suite.
  *
  * Deliberately its own file, not appended to `identity.e2e-spec.ts` — that
  * file has disclosed, pre-existing test-isolation defects (`CLAUDE.md`
@@ -178,6 +180,28 @@ describe("Ticket Department-Scoped Visibility (e2e)", () => {
     expect(ids).toContain(deptATicketId);
     expect(ids).toContain(deptBTicketId);
     expect(ids).toContain(unassignedTicketId);
+  });
+
+  // ---------------------------------------------------------------------
+  // Story 70 — Ticket Search Foundation. Confirms `search` composes with
+  // Story 68's department-visibility filter via an explicit `AND` rather
+  // than one `OR` clobbering the other: "ticket" matches all three fixture
+  // tickets' subjects ("Dept A ticket"/"Dept B ticket"/"Unassigned-
+  // department ticket"), but the DEPARTMENT-scoped caller must still never
+  // see Dept B's, proving the visibility restriction survives a search.
+  // ---------------------------------------------------------------------
+
+  it("composes search with Story 68's department-visibility filter — a matching term never surfaces a different department's ticket", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/tickets")
+      .query({ search: "ticket" })
+      .set("Authorization", `Bearer ${deptScopedAccessToken}`)
+      .expect(200);
+
+    const ids = response.body.map((ticket: { id: string }) => ticket.id);
+    expect(ids).toContain(deptATicketId);
+    expect(ids).toContain(unassignedTicketId);
+    expect(ids).not.toContain(deptBTicketId);
   });
 
   // ---------------------------------------------------------------------

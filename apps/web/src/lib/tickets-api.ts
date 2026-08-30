@@ -113,6 +113,9 @@ export interface ListTicketsFilters {
   priority?: TicketPriority;
   category?: string;
   assignedToUserId?: string;
+  /** Story 70 — matches `subject`/`category`, case-insensitive. Mirrors
+   * `knowledge-base-api.ts`'s own `search` filter shape. */
+  search?: string;
   sortBy?: "createdAt" | "updatedAt";
   sortDir?: "asc" | "desc";
 }

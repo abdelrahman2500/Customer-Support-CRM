@@ -48,6 +48,8 @@
       "filterCategory": "Category",
       "filterCategoryPlaceholder": "Filter by category",
       "filterAssignedAgent": "Assigned agent",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by subject or category...",
       "error": "Couldn't load tickets.",
       "retry": "Retry",
       "empty": "No tickets match the current filters.",

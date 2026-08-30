@@ -48,6 +48,8 @@
       "filterCategory": "الفئة",
       "filterCategoryPlaceholder": "تصفية حسب الفئة",
       "filterAssignedAgent": "الوكيل المكلّف",
+      "searchLabel": "بحث",
+      "searchPlaceholder": "ابحث بالموضوع أو الفئة...",
       "error": "تعذّر تحميل التذاكر.",
       "retry": "إعادة المحاولة",
       "empty": "لا توجد تذاكر مطابقة للمرشحات الحالية.",

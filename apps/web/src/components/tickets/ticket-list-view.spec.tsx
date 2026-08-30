@@ -96,4 +96,29 @@ describe("TicketListView", () => {
 
     expect(screen.getByText("Cannot log in")).toBeInTheDocument();
   });
+
+  // Story 70 — Ticket Search Foundation.
+  it("commits the search filter on blur, passing it through to useTicketsQuery", () => {
+    mockedUseTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+    render(<TicketListView />);
+    const input = screen.getByPlaceholderText("list.searchPlaceholder");
+    fireEvent.change(input, { target: { value: "login" } });
+    fireEvent.blur(input);
+
+    expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: "login" }),
+    );
+  });
+
+  it("does not commit the search filter when blurred unchanged (empty)", () => {
+    mockedUseTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+    render(<TicketListView />);
+    fireEvent.blur(screen.getByPlaceholderText("list.searchPlaceholder"));
+
+    expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ search: expect.anything() }),
+    );
+  });
 });

@@ -159,8 +159,19 @@ export class TicketsService {
    * the two timestamp columns this story also exposes on `TicketSummary`
    * (Task 1), and the ticket's already-existing `slaTarget` relation
    * eager-loaded (no new query, no new table — see the plan's Design item
-   * 3). No search, no pagination — neither has any existing precedent in
-   * this codebase to extend (see `ListTicketsQueryDto`'s own doc comment).
+   * 3). No pagination — no precedent in this codebase to extend (see
+   * `ListTicketsQueryDto`'s own doc comment).
+   *
+   * Story 70 — `query.search` matches `subject`/`category`, mirroring
+   * `KnowledgeBaseService`'s own `searchWhereClause` exactly (plain
+   * `contains`/`mode: "insensitive"`, not `tsvector` — see this file's own
+   * `searchWhereClause` doc comment). Composed with
+   * `resolveDepartmentVisibilityFilter()` via an explicit `AND` when both
+   * are present, never a flat spread: both fragments can independently
+   * carry their own top-level `OR`, and naively spreading two `OR` keys
+   * into one object would let one silently clobber the other — which here
+   * would mean a department-scoped search could silently drop its own
+   * branch/department authorization. See `resolveSearchAndVisibilityFilter`.
    */
   async listTickets(query: ListTicketsQueryDto = {}): Promise<TicketListItem[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
@@ -168,7 +179,7 @@ export class TicketsService {
     const sortDir = query.sortDir ?? "asc";
     const where: Prisma.TicketWhereInput = {
       branchId,
-      ...(await this.resolveDepartmentVisibilityFilter()),
+      ...(await this.resolveSearchAndVisibilityFilter(query.search)),
       ...(query.status !== undefined ? { status: query.status } : {}),
       ...(query.priority !== undefined ? { priority: query.priority } : {}),
       ...(query.category !== undefined ? { category: query.category } : {}),
@@ -521,6 +532,31 @@ export class TicketsService {
   }
 
   /**
+   * Story 70 — combines `resolveDepartmentVisibilityFilter()` and
+   * `searchWhereClause(search)` for `listTickets` only (single-ticket
+   * lookups via `findTicketInScope` take no `search` param). Both
+   * fragments may independently carry a top-level `OR`; a flat spread of
+   * both into one object would let the second one silently overwrite the
+   * first — for a department-scoped caller performing a search, that
+   * would mean the department restriction *itself* silently disappears
+   * from the query, never surfacing as an error, just as tickets the
+   * caller was never granted visibility into. Only wrap them in an
+   * explicit `AND` when *both* are non-empty; otherwise return whichever
+   * one is non-empty (or `{}`), which produces the exact same `where`
+   * shape as before this Story for every caller that isn't searching.
+   */
+  private async resolveSearchAndVisibilityFilter(
+    search: string | undefined,
+  ): Promise<Prisma.TicketWhereInput> {
+    const visibilityFilter = await this.resolveDepartmentVisibilityFilter();
+    const searchFilter = searchWhereClause(search);
+    if (Object.keys(visibilityFilter).length > 0 && Object.keys(searchFilter).length > 0) {
+      return { AND: [visibilityFilter, searchFilter] };
+    }
+    return { ...visibilityFilter, ...searchFilter };
+  }
+
+  /**
    * Story 69 — the "assignment" half of the same disclosed doc sentence
    * Story 68 closed the "visibility" half of: a `DEPARTMENT`-scoped caller
    * may not move a ticket they can already see into a *different*
@@ -638,5 +674,26 @@ function toCsatSummary(response: {
     rating: response.rating,
     comment: response.comment,
     createdAt: response.createdAt,
+  };
+}
+
+/** Story 70 — mirrors `KnowledgeBaseService`'s own `searchWhereClause`
+ * exactly: empty object (no-op `where` clause addition) for an empty/
+ * missing `search` — every existing caller sees the exact same
+ * unfiltered query it always has. `OR` on `subject`/`category`,
+ * case-insensitive substring — plain Prisma `contains`, never raw SQL
+ * (see `listTickets`'s own doc comment for why `tsvector` is deliberately
+ * deferred). */
+function searchWhereClause(
+  search: string | undefined,
+): { OR: Prisma.TicketWhereInput[] } | Record<string, never> {
+  if (!search) {
+    return {};
+  }
+  return {
+    OR: [
+      { subject: { contains: search, mode: "insensitive" } },
+      { category: { contains: search, mode: "insensitive" } },
+    ],
   };
 }
