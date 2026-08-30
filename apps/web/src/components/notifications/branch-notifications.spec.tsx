@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { io } from "socket.io-client";
 import { BranchNotifications } from "./branch-notifications";
 import { useNotificationPreferencesQuery } from "@/hooks/use-notification-preferences";
+import { useNotificationTemplatesQuery } from "@/hooks/use-notification-templates";
 import { useNotificationsStore } from "@/lib/notifications-store";
 import enMessages from "../../../messages/en.json";
 
@@ -23,7 +24,12 @@ vi.mock("@/hooks/use-notification-preferences", () => ({
   useNotificationPreferencesQuery: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-notification-templates", () => ({
+  useNotificationTemplatesQuery: vi.fn(),
+}));
+
 const mockedUseNotificationPreferencesQuery = vi.mocked(useNotificationPreferencesQuery);
+const mockedUseNotificationTemplatesQuery = vi.mocked(useNotificationTemplatesQuery);
 
 function buildSocketMock() {
   const handlers = new Map<string, (...args: unknown[]) => void>();
@@ -50,6 +56,17 @@ describe("BranchNotifications", () => {
       isLoading: true,
       isError: false,
       isSuccess: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never);
+    // Defaults to "no custom templates yet" — every pre-existing test below
+    // (which never configures this mock) keeps exercising exactly the same
+    // default-message behavior it always has.
+    mockedUseNotificationTemplatesQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
       error: null,
       refetch: vi.fn(),
     } as never);

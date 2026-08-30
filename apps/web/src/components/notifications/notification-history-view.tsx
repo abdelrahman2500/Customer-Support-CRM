@@ -7,6 +7,7 @@ import { useNotificationsQuery } from "@/hooks/use-notifications";
 import { useNotificationTemplatesQuery } from "@/hooks/use-notification-templates";
 import { useCustomersQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import type { NotificationSummary } from "@/lib/notifications-api";
+import { renderNotificationTemplate } from "@/lib/notification-template-render";
 import { ApiError } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,20 +36,6 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
   response: "targetType.response",
   resolution: "targetType.resolution",
 };
-
-/**
- * Story 61 — plain `{name}` substitution only (never `next-intl`/ICU — an
- * admin-authored template is plain text, not a message-catalog entry).
- * `{ticketId}` is shortened to 8 characters, matching
- * `NotificationToaster`'s own existing short-form convention; an
- * unrecognized placeholder is left verbatim (no error, simplest safe
- * behavior for a v1 foundation).
- */
-function renderTemplate(template: string, notification: NotificationSummary): string {
-  return template
-    .replace(/\{ticketId\}/g, notification.ticketId.slice(0, 8))
-    .replace(/\{targetType\}/g, notification.targetType ?? "");
-}
 
 /**
  * One notification row's ticket/customer cells, resolved through the
@@ -85,7 +72,10 @@ function NotificationRow({
     ? TARGET_TYPE_LABEL_KEYS[notification.targetType]
     : undefined;
   const eventLabel = template
-    ? renderTemplate(template, notification)
+    ? renderNotificationTemplate(template, {
+        ticketId: notification.ticketId,
+        targetType: notification.targetType,
+      })
     : eventLabelKey
       ? t(eventLabelKey)
       : notification.eventType;

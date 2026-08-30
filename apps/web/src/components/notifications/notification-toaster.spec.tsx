@@ -114,4 +114,77 @@ describe("NotificationToaster", () => {
     expect(push).toHaveBeenCalledWith("/en/tickets/ticket-42");
     expect(useNotificationsStore.getState().notifications).toHaveLength(0);
   });
+
+  // Story 63 — custom notification templates in the live toast.
+  it("renders a custom template's substituted text as the message body when one exists for that event type", () => {
+    seed("sla.at_risk", {
+      ticketId: "12345678-abcd",
+      branchId: "branch-1",
+      targetType: "response",
+      targetAt: "2024-01-01T00:00:00.000Z",
+    });
+
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <NotificationToaster
+          templateByEventType={new Map([["sla.at_risk", "Watch ticket {ticketId} ({targetType})"]])}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.getByText("Watch ticket 12345678 (response)")).toBeInTheDocument();
+  });
+
+  it("leaves the Badge's event-type label unaffected by a custom template", () => {
+    seed("sla.at_risk", {
+      ticketId: "12345678-abcd",
+      branchId: "branch-1",
+      targetType: "response",
+      targetAt: "2024-01-01T00:00:00.000Z",
+    });
+
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <NotificationToaster
+          templateByEventType={new Map([["sla.at_risk", "Custom message"]])}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.getByText("SLA at risk")).toBeInTheDocument();
+    expect(screen.getByText("Custom message")).toBeInTheDocument();
+  });
+
+  it("falls back to the exact existing message when no template exists for that event type", () => {
+    seed("sla.at_risk", {
+      ticketId: "12345678-abcd",
+      branchId: "branch-1",
+      targetType: "response",
+      targetAt: "2024-01-01T00:00:00.000Z",
+    });
+
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <NotificationToaster
+          templateByEventType={new Map([["ticket.escalated", "Should not apply here"]])}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.getByText(/response target for ticket 12345678 is at risk/i)).toBeInTheDocument();
+  });
+
+  it("substitutes {ticketId} (shortened to 8 characters) for a ticket.escalated notification via ticketIdFor's own resolution", () => {
+    seed("ticket.escalated", { ticket: { id: "ticket-4242", subject: "Cannot log in" }, actorUserId: null });
+
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <NotificationToaster
+          templateByEventType={new Map([["ticket.escalated", "Escalated: {ticketId}"]])}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.getByText("Escalated: ticket-4")).toBeInTheDocument();
+  });
 });

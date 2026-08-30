@@ -8,6 +8,7 @@ import type {
   SlaDetectionNotificationPayload,
   TicketEscalatedNotificationPayload,
 } from "@/lib/notifications-store";
+import { renderNotificationTemplate } from "@/lib/notification-template-render";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -60,8 +61,20 @@ function ticketIdFor(notification: BranchNotification): string | null {
  * — no persistence, no read/unread state; a notification's only lifecycle
  * is "shown" -> "dismissed" (manually or via the store's own auto-dismiss
  * timer).
+ *
+ * Story 63 — `templateByEventType` (built by `BranchNotifications` from
+ * `useNotificationTemplatesQuery()`) replaces only the message body via
+ * `messageFor()` when a custom template exists for a notification's event
+ * type; the Badge's plain event-type label is deliberately untouched
+ * (Design decision 2 of the plan) — falls back to the exact existing
+ * message when the map has no entry for that event type (including while
+ * still loading, since the caller passes an empty map until then).
  */
-export function NotificationToaster() {
+export function NotificationToaster({
+  templateByEventType = new Map(),
+}: {
+  templateByEventType?: Map<string, string>;
+}) {
   const t = useTranslations("notifications");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
@@ -103,7 +116,9 @@ export function NotificationToaster() {
                 ×
               </button>
             </div>
-            <p className="text-sm text-slate-800">{messageFor(notification, t)}</p>
+            <p className="text-sm text-slate-800">
+              {messageFor(notification, t, templateByEventType.get(notification.eventType))}
+            </p>
             {ticketId && (
               <Button
                 variant="outline"
@@ -127,7 +142,14 @@ export function NotificationToaster() {
 function messageFor(
   notification: BranchNotification,
   t: ReturnType<typeof useTranslations<"notifications">>,
+  template: string | undefined,
 ): string {
+  if (template) {
+    return renderNotificationTemplate(template, {
+      ticketId: ticketIdFor(notification) ?? "",
+      targetType: isSlaDetectionPayload(notification) ? notification.payload.targetType : undefined,
+    });
+  }
   if (isSlaDetectionPayload(notification)) {
     const { ticketId, targetType } = notification.payload;
     const key = notification.eventType === "sla.breached" ? "slaBreached" : "slaAtRisk";

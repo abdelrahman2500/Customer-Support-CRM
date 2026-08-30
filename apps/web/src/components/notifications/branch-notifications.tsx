@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useBranchNotifications } from "@/hooks/use-branch-notifications";
 import { useNotificationPreferencesQuery } from "@/hooks/use-notification-preferences";
+import { useNotificationTemplatesQuery } from "@/hooks/use-notification-templates";
 import { useNotificationsStore } from "@/lib/notifications-store";
 import type {
   BranchNotificationEventType,
@@ -22,10 +23,24 @@ import { NotificationToaster } from "./notification-toaster";
  * resolution). While the preferences query is still loading or has failed,
  * every event type is treated as enabled — a transient fetch hiccup must
  * never silently suppress a real toast.
+ *
+ * Story 63 — `useNotificationTemplatesQuery()` fetched here too, the same
+ * independent-query pattern preferences already established: while loading
+ * or erroring, `templateByEventType` is simply empty, and every toast falls
+ * back to its default message (never blocking rendering).
  */
 export function BranchNotifications({ branchId }: { branchId: string | null }) {
   const add = useNotificationsStore((state) => state.add);
   const preferencesQuery = useNotificationPreferencesQuery();
+  const templatesQuery = useNotificationTemplatesQuery();
+
+  const templateByEventType = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const template of templatesQuery.data ?? []) {
+      map.set(template.eventType, template.template);
+    }
+    return map;
+  }, [templatesQuery.data]);
 
   const handleEvent = useCallback(
     (eventType: BranchNotificationEventType, payload: BranchNotificationPayload) => {
@@ -39,5 +54,5 @@ export function BranchNotifications({ branchId }: { branchId: string | null }) {
   );
 
   useBranchNotifications(branchId, handleEvent);
-  return <NotificationToaster />;
+  return <NotificationToaster templateByEventType={templateByEventType} />;
 }

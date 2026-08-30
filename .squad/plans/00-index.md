@@ -55,3 +55,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | reporting-ticket-aging | [reporting-ticket-aging/00-overview.md](./reporting-ticket-aging/00-overview.md) | 60–      |
 | notification-templates | [notification-templates/00-overview.md](./notification-templates/00-overview.md) | 61–      |
 | admin-branch-branding | [admin-branch-branding/00-overview.md](./admin-branch-branding/00-overview.md) | 62–      |
+| notification-templates-live-toast | [notification-templates-live-toast/00-overview.md](./notification-templates-live-toast/00-overview.md) | 63–      |
