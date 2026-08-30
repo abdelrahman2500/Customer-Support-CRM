@@ -14,6 +14,8 @@ import {
   useUpdateTicketMutation,
   useUsersQuery,
 } from "@/hooks/use-tickets";
+import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
+import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { ApiError } from "@/lib/api";
 
 vi.mock("next/navigation", () => ({
@@ -40,6 +42,15 @@ vi.mock("@/hooks/use-tickets", () => ({
   useDepartmentsQuery: vi.fn(),
   useUpdateTicketMutation: vi.fn(),
   useCreateTicketNoteMutation: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-attachments", () => ({
+  useAttachmentsQuery: vi.fn(),
+  useUploadAttachmentMutation: vi.fn(),
+}));
+
+vi.mock("@/lib/attachments-api", () => ({
+  getAttachmentDownloadUrl: vi.fn(),
 }));
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -98,6 +109,16 @@ describe("TicketDetailView", () => {
     vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
       mutate: vi.fn(),
       mutateAsync: vi.fn().mockResolvedValue({ id: "note-new" }),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(useAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({ id: "attachment-new" }),
       isPending: false,
       isError: false,
       error: null,
@@ -703,6 +724,151 @@ describe("TicketDetailView", () => {
       render(<TicketDetailView ticketId="ticket-1" />);
 
       expect(screen.getByText("detail.csatEmpty")).toBeInTheDocument();
+      expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
+    });
+  });
+
+  describe("Attachments card (Story 66)", () => {
+    beforeEach(() => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+    });
+
+    it("renders a skeleton while attachments are loading", () => {
+      vi.mocked(useAttachmentsQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      const { container } = render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    });
+
+    it("renders an inline error when attachments fail to load", () => {
+      vi.mocked(useAttachmentsQuery).mockReturnValue(
+        queryResult({ isError: true, error: new ApiError("Server error", 500) }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.attachmentsError")).toBeInTheDocument();
+    });
+
+    it("renders the empty message when there are no attachments", () => {
+      vi.mocked(useAttachmentsQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.attachmentsEmpty")).toBeInTheDocument();
+    });
+
+    it("renders each attachment's filename and size", () => {
+      vi.mocked(useAttachmentsQuery).mockReturnValue(
+        queryResult({
+          data: [
+            {
+              id: "attachment-1",
+              ticketId: "ticket-1",
+              filename: "screenshot.png",
+              size: 2048,
+              mimeType: "image/png",
+              uploadedByUserId: "user-1",
+              createdAt: "2024-01-03T00:00:00.000Z",
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("screenshot.png")).toBeInTheDocument();
+      expect(screen.getByText(/2\.0 KB/)).toBeInTheDocument();
+    });
+
+    it("opens the presigned download URL when an attachment is clicked", async () => {
+      vi.mocked(useAttachmentsQuery).mockReturnValue(
+        queryResult({
+          data: [
+            {
+              id: "attachment-1",
+              ticketId: "ticket-1",
+              filename: "screenshot.png",
+              size: 2048,
+              mimeType: "image/png",
+              uploadedByUserId: "user-1",
+              createdAt: "2024-01-03T00:00:00.000Z",
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+      vi.mocked(getAttachmentDownloadUrl).mockResolvedValue({
+        url: "https://minio.local/presigned-url",
+      });
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByText("screenshot.png"));
+
+      await vi.waitFor(() => {
+        expect(windowOpenSpy).toHaveBeenCalledWith(
+          "https://minio.local/presigned-url",
+          "_blank",
+          "noopener,noreferrer",
+        );
+      });
+    });
+
+    it("uploads the selected file", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "attachment-new" });
+      vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [file] } });
+
+      await vi.waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(file);
+      });
+    });
+
+    it("shows the backend's own error message when an upload fails", async () => {
+      vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(new ApiError("File type not allowed", 400)),
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      const file = new File(["hello"], "script.sh", { type: "application/x-sh" });
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [file] } });
+
+      await screen.findByText("File type not allowed");
+    });
+
+    it("does not interfere with the Notes card's own rendering", () => {
+      vi.mocked(useAttachmentsQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.attachmentsEmpty")).toBeInTheDocument();
       expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
   });

@@ -58,3 +58,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | notification-templates-live-toast | [notification-templates-live-toast/00-overview.md](./notification-templates-live-toast/00-overview.md) | 63–      |
 | knowledge-base-article-search | [knowledge-base-article-search/00-overview.md](./knowledge-base-article-search/00-overview.md) | 64–      |
 | knowledge-base-article-versioning | [knowledge-base-article-versioning/00-overview.md](./knowledge-base-article-versioning/00-overview.md) | 65–      |
+| ticket-attachments | [ticket-attachments/00-overview.md](./ticket-attachments/00-overview.md) | 66–      |

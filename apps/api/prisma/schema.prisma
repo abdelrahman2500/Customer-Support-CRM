@@ -86,6 +86,7 @@ model User {
   ticketNotes             TicketNote[]
   automationRules         AutomationRule[]
   notificationPreferences NotificationPreference[]
+  uploadedAttachments     TicketAttachment[]
   createdAt               DateTime                 @default(now()) @map("created_at")
   updatedAt               DateTime                 @updatedAt @map("updated_at")
 
@@ -288,6 +289,34 @@ model ContactRefreshToken {
   @@schema("customers")
 }
 
+/// Story 66 — see docs/architecture/03-domain-boundaries.md ("Customer
+/// Management" owns "attachment metadata") and
+/// docs/architecture/04-data-and-multitenancy.md ("Attachment binaries
+/// live in S3-compatible object storage; Postgres stores key, filename,
+/// size, MIME type, and owning entity metadata"). A direct `ticketId` FK,
+/// not a polymorphic entity-type table — mirrors `TicketNote`/
+/// `TicketCsatResponse`'s own plain-single-parent-FK shape, this
+/// codebase's only existing precedent. Foundation only: ticket attachments
+/// are the first real consumer; customer-level attachments are a
+/// deferred, separately-planned follow-up. `key` is the S3 object key
+/// (server-generated, never derived from the client-supplied filename).
+model TicketAttachment {
+  id               String   @id @default(uuid())
+  ticketId         String   @map("ticket_id")
+  ticket           Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  key              String   @unique
+  filename         String
+  size             Int
+  mimeType         String   @map("mime_type")
+  uploadedByUserId String   @map("uploaded_by_user_id")
+  uploadedByUser   User     @relation(fields: [uploadedByUserId], references: [id])
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@map("ticket_attachments")
+  @@schema("customers")
+}
+
 // ---------------------------------------------------------------------------
 // ticketing schema
 // ---------------------------------------------------------------------------
@@ -338,6 +367,7 @@ model Ticket {
   slaTarget        SlaTicketTarget?
   slaEscalations   SlaEscalation[]
   notificationLogs NotificationLog[]
+  attachments      TicketAttachment[]
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 

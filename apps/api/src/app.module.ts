@@ -22,6 +22,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { KnowledgeBaseModule } from "./modules/knowledge-base/knowledge-base.module";
 import { PortalModule } from "./modules/portal/portal.module";
 import { ReportingModule } from "./modules/reporting/reporting.module";
+import { AttachmentsModule } from "./modules/attachments/attachments.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 
 @Module({
@@ -47,6 +48,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
     KnowledgeBaseModule,
     PortalModule,
     ReportingModule,
+    AttachmentsModule,
     RealtimeModule,
   ],
   providers: [
