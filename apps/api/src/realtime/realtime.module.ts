@@ -3,6 +3,7 @@ import { AuthModule } from "../common/auth/auth.module";
 import { RealtimeGateway } from "./realtime.gateway";
 import { TicketRealtimeListener } from "./ticket-realtime.listener";
 import { BranchNotificationRealtimeListener } from "./branch-notification-realtime.listener";
+import { PresenceService } from "./presence.service";
 
 /**
  * Cross-cutting real-time transport infrastructure — see
@@ -15,9 +16,19 @@ import { BranchNotificationRealtimeListener } from "./branch-notification-realti
  * `TicketRealtimeListener`'s `@OnEvent` handlers are discovered
  * automatically once instantiated as a provider here, the same convention
  * every other domain-event listener in this codebase already relies on.
+ *
+ * Story 71 — `PresenceService` (its own direct `ioredis` client, mirroring
+ * `RedisIoAdapter`'s construction) is a plain provider `RealtimeGateway`
+ * injects; no new module import needed since it reads `REDIS_URL` from the
+ * already-global `ConfigModule`.
  */
 @Module({
   imports: [AuthModule],
-  providers: [RealtimeGateway, TicketRealtimeListener, BranchNotificationRealtimeListener],
+  providers: [
+    RealtimeGateway,
+    TicketRealtimeListener,
+    BranchNotificationRealtimeListener,
+    PresenceService,
+  ],
 })
 export class RealtimeModule {}

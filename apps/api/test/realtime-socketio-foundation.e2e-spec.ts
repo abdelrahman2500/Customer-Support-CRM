@@ -29,6 +29,7 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
   let moduleRef: TestingModule;
   let eventEmitter: EventEmitter2;
   let adminAccessToken: string;
+  let adminUserId: string;
   let baseUrl: string;
   const clients: Socket[] = [];
 
@@ -62,6 +63,12 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
       .send({ email, password })
       .expect(200);
     adminAccessToken = loginResponse.body.accessToken;
+
+    const me = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    adminUserId = me.body.id;
   });
 
   afterEach(() => {
@@ -204,6 +211,106 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
 
     const payload = await received;
     expect(payload.ticket.id).toBe(ticket.id);
+  });
+
+  // ---------------------------------------------------------------------
+  // Story 71 — Agent Presence. Reuses this file's own `connect`/`join`/
+  // `waitForEvent` helpers and the same real Postgres/Redis/Socket.IO
+  // infrastructure. Known scope limit, same as every sibling e2e suite:
+  // `prisma/seed.ts` creates exactly one Branch, so cross-branch presence
+  // denial cannot be exercised end-to-end here — that case is covered by
+  // `realtime.gateway.spec.ts`'s mocked-Prisma tests instead.
+  // ---------------------------------------------------------------------
+  describe("agent presence", () => {
+    let secondAgentAccessToken: string;
+
+    beforeAll(async () => {
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const secondAgentEmail = `presence-watcher-${randomUUID()}@example.com`;
+      const secondAgentPassword = "presence-watcher-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: secondAgentEmail,
+          password: secondAgentPassword,
+          fullName: "Presence Watcher",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+
+      const login = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: secondAgentEmail, password: secondAgentPassword })
+        .expect(200);
+      secondAgentAccessToken = login.body.accessToken;
+    });
+
+    it("tells a fresh joiner the current (offline) status before the watched agent ever connects", async () => {
+      const watcher = connect(secondAgentAccessToken);
+      await waitForConnect(watcher);
+
+      const received = waitForEvent<{ userId: string; status: string }>(
+        watcher,
+        "agent.presence.changed",
+      );
+      const ack = await join(watcher, `agent:${adminUserId}:presence`);
+      expect(ack).toEqual({ ok: true });
+
+      const payload = await received;
+      expect(payload).toEqual({ userId: adminUserId, status: "offline" });
+    });
+
+    it("broadcasts online when the watched agent connects, and offline when they disconnect", async () => {
+      const watcher = connect(secondAgentAccessToken);
+      await waitForConnect(watcher);
+      await join(watcher, `agent:${adminUserId}:presence`);
+
+      const wentOnline = waitForEvent<{ userId: string; status: string }>(
+        watcher,
+        "agent.presence.changed",
+      );
+      const watched = connect(adminAccessToken);
+      await waitForConnect(watched);
+      expect(await wentOnline).toEqual({ userId: adminUserId, status: "online" });
+
+      const wentOffline = waitForEvent<{ userId: string; status: string }>(
+        watcher,
+        "agent.presence.changed",
+      );
+      watched.disconnect();
+      expect(await wentOffline).toEqual({ userId: adminUserId, status: "offline" });
+    });
+
+    it("allows a same-branch colleague to join another agent's presence room", async () => {
+      const watcher = connect(secondAgentAccessToken);
+      await waitForConnect(watcher);
+
+      const ack = await join(watcher, `agent:${adminUserId}:presence`);
+
+      expect(ack).toEqual({ ok: true });
+    });
+
+    it("always allows an agent to join their own presence room", async () => {
+      const client = connect(adminAccessToken);
+      await waitForConnect(client);
+
+      const ack = await join(client, `agent:${adminUserId}:presence`);
+
+      expect(ack).toEqual({ ok: true });
+    });
   });
 
   it(
