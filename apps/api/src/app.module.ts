@@ -23,6 +23,7 @@ import { KnowledgeBaseModule } from "./modules/knowledge-base/knowledge-base.mod
 import { PortalModule } from "./modules/portal/portal.module";
 import { ReportingModule } from "./modules/reporting/reporting.module";
 import { AttachmentsModule } from "./modules/attachments/attachments.module";
+import { AiModule } from "./modules/ai/ai.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 
 @Module({
@@ -49,6 +50,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
     PortalModule,
     ReportingModule,
     AttachmentsModule,
+    AiModule,
     RealtimeModule,
   ],
   providers: [

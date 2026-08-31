@@ -61,3 +61,6 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | ticket-attachments | [ticket-attachments/00-overview.md](./ticket-attachments/00-overview.md) | 66–      |
 | customer-attachments | [customer-attachments/00-overview.md](./customer-attachments/00-overview.md) | 67–      |
 | ticket-department-visibility | [ticket-department-visibility/00-overview.md](./ticket-department-visibility/00-overview.md) | 68–      |
+| _(unplanned)_ ticket-search-foundation | Story 70 — implemented directly from an approved Recon recommendation; no formal `.squad` plan artifact (self-evidently small, `CLAUDE.md` §3.4) | 70        |
+| _(unplanned)_ realtime-agent-presence | Story 71 — implemented directly after an approved batching check; no formal `.squad` plan artifact (self-evidently small extension of `realtime-socketio-foundation`, `CLAUDE.md` §3.4) | 71        |
+| ai-services-foundation | [ai-services-foundation/00-overview.md](./ai-services-foundation/00-overview.md) | 72–      |

@@ -16,7 +16,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   extensions = [pgvector(map: "vector"), pg_trgm]
-  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base"]
+  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base", "ai"]
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +50,7 @@ model Branch {
   automationRules       AutomationRule[]
   notificationTemplates NotificationTemplate[]
   brandingConfig        BrandingConfig?
+  aiPromptLogs          AiPromptLog[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -836,4 +837,65 @@ model KnowledgeBaseArticleVersion {
   @@index([articleId])
   @@map("knowledge_base_article_versions")
   @@schema("knowledge_base")
+}
+
+// ---------------------------------------------------------------------------
+// ai schema
+// ---------------------------------------------------------------------------
+
+/// Story 72 — the four capabilities `AiProvider` exposes, per
+/// docs/architecture/07-sla-automation-and-ai.md. `CHAT` covers every
+/// chatbot-session turn — a future story may split this further, not this
+/// foundation slice.
+enum AiFeature {
+  SUMMARIZE
+  SUGGEST_REPLY
+  CATEGORIZE
+  CHAT
+
+  @@schema("ai")
+}
+
+/// Story 72 — `DISABLED` is a first-class, expected outcome (no
+/// `ANTHROPIC_API_KEY` configured), never conflated with `ERROR` (a real
+/// provider failure) — a caller or operator reading this log must be able
+/// to tell "AI is off" from "AI is broken" at a glance.
+enum AiOutcome {
+  SUCCESS
+  ERROR
+  DISABLED
+
+  @@schema("ai")
+}
+
+/// Story 72 — AI Services Foundation. See
+/// docs/architecture/03-domain-boundaries.md ("AI Services") and
+/// docs/architecture/07-sla-automation-and-ai.md ("Every call logs prompt
+/// reference, model, token usage, latency, and outcome"). Append-only,
+/// mirrors `NotificationLog`'s own flat shape — never mutated after
+/// creation. `promptRef` is a short opaque reference/hash, never the raw
+/// prompt body: this table has no retention story of its own yet, and
+/// logging full ticket/customer content here would silently duplicate
+/// Ticketing's own data under a different (undecided) retention policy.
+/// No `AiGatewayService` caller exists yet (Stories 80-84) — every row
+/// written by this foundation slice's own tests comes from direct calls
+/// against the service, not a live feature.
+model AiPromptLog {
+  id           String    @id @default(uuid())
+  branchId     String    @map("branch_id")
+  branch       Branch    @relation(fields: [branchId], references: [id])
+  feature      AiFeature
+  model        String
+  promptRef    String    @map("prompt_ref")
+  inputTokens  Int?      @map("input_tokens")
+  outputTokens Int?      @map("output_tokens")
+  latencyMs    Int       @map("latency_ms")
+  outcome      AiOutcome
+  errorMessage String?   @map("error_message")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([branchId])
+  @@index([feature])
+  @@map("ai_prompt_logs")
+  @@schema("ai")
 }
