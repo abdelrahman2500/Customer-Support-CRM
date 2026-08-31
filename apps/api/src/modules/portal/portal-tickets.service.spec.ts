@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PortalTicketsService } from "./portal-tickets.service";
 import type { PortalService } from "./portal.service";
 import type { TicketsService } from "../tickets/tickets.service";
+import type { TicketChannelService } from "../tickets/ticket-channel.service";
 
 function buildPortalServiceMock() {
   return { getAuthenticatedContact: vi.fn() };
@@ -18,18 +19,28 @@ function buildTicketsServiceMock() {
   };
 }
 
+function buildTicketChannelServiceMock() {
+  return {
+    createCustomerMessage: vi.fn(),
+    listMessagesForCustomer: vi.fn(),
+  };
+}
+
 describe("PortalTicketsService", () => {
   let portalService: ReturnType<typeof buildPortalServiceMock>;
   let ticketsService: ReturnType<typeof buildTicketsServiceMock>;
+  let ticketChannelService: ReturnType<typeof buildTicketChannelServiceMock>;
   let service: PortalTicketsService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     portalService = buildPortalServiceMock();
     ticketsService = buildTicketsServiceMock();
+    ticketChannelService = buildTicketChannelServiceMock();
     service = new PortalTicketsService(
       portalService as unknown as PortalService,
       ticketsService as unknown as TicketsService,
+      ticketChannelService as unknown as TicketChannelService,
     );
   });
 
@@ -109,5 +120,35 @@ describe("PortalTicketsService", () => {
 
     expect(ticketsService.getCsatForCustomer).toHaveBeenCalledWith("ticket-1", "customer-1");
     expect(result).toBeNull();
+  });
+
+  // Story 77 — Customer Portal Live Chat.
+  it("sendMessage resolves customerId, then delegates to TicketChannelService.createCustomerMessage with the contact id", async () => {
+    portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
+    ticketChannelService.createCustomerMessage.mockResolvedValue({ id: "message-1" });
+
+    const result = await service.sendMessage("contact-1", "ticket-1", { body: "Hi there" });
+
+    expect(portalService.getAuthenticatedContact).toHaveBeenCalledWith("contact-1");
+    expect(ticketChannelService.createCustomerMessage).toHaveBeenCalledWith(
+      "ticket-1",
+      "customer-1",
+      "contact-1",
+      "Hi there",
+    );
+    expect(result).toEqual({ id: "message-1" });
+  });
+
+  it("getMessages resolves customerId, then delegates with the ticket id", async () => {
+    portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
+    ticketChannelService.listMessagesForCustomer.mockResolvedValue([]);
+
+    const result = await service.getMessages("contact-1", "ticket-1");
+
+    expect(ticketChannelService.listMessagesForCustomer).toHaveBeenCalledWith(
+      "ticket-1",
+      "customer-1",
+    );
+    expect(result).toEqual([]);
   });
 });

@@ -313,4 +313,94 @@ describe("Customer Portal — Tickets (e2e)", () => {
         .expect(404);
     });
   });
+
+  // Story 77 — Customer Portal Live Chat (customer-facing half). Decided
+  // V1 scope: authenticated Customer Portal users only — enforced by the
+  // same `@PortalRoute()` every other route here already uses, no new
+  // authorization mechanism.
+  describe("Live Chat messages", () => {
+    it("rejects every route without a token", async () => {
+      await request(app.getHttpServer()).get(`/api/v1/portal/tickets/${ticketId}/messages`).expect(401);
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/messages`)
+        .send({ body: "Hi" })
+        .expect(401);
+    });
+
+    it("rejects an empty body with a validation error", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ body: "" })
+        .expect(400);
+    });
+
+    it("returns [] for a ticket with no messages yet", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(response.body).toEqual([]);
+    });
+
+    it("sends a message as INBOUND from the authenticated contact, then lists it", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const sent = await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ body: "Hi, I still need help with this" })
+        .expect(201);
+
+      expect(sent.body).toMatchObject({
+        ticketId,
+        channelType: "LIVE_CHAT",
+        direction: "INBOUND",
+        senderContactId: contactId,
+        senderUserId: null,
+        body: "Hi, I still need help with this",
+      });
+
+      const listed = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(listed.body.map((m: { id: string }) => m.id)).toContain(sent.body.id);
+    });
+
+    it("is visible to an agent via GET /tickets/:id/messages", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(response.body.length).toBeGreaterThan(0);
+    });
+
+    it("returns 404 for a ticket belonging to a different customer", async () => {
+      const otherToken = await loginAsPortalContact(otherContactEmail);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${otherToken}`)
+        .expect(404);
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${otherToken}`)
+        .send({ body: "Should not be created" })
+        .expect(404);
+    });
+
+    it("returns 404 for an unknown ticket id", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${randomUUID()}/messages`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(404);
+    });
+  });
 });

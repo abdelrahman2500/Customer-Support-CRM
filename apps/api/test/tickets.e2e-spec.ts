@@ -1006,4 +1006,99 @@ describe("Ticketing (e2e)", () => {
       await job?.remove();
     });
   });
+
+  // Story 77 — Customer Portal Live Chat (agent-facing half). Gated by
+  // `ticket:create`/`ticket:read` — mirrors the "ticket notes" describe
+  // block's exact permission-check pattern above.
+  describe("ticket messages / Live Chat (Story 77)", () => {
+    it("rejects an unauthenticated request for both routes", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/messages`)
+        .send({ body: "Should not be created" })
+        .expect(401);
+      await request(app.getHttpServer()).get(`/api/v1/tickets/${ticketId}/messages`).expect(401);
+    });
+
+    it("rejects an Agent-role user attempting to create or read messages (403)", async () => {
+      const agentEmail = `agent-messages-${randomUUID()}@example.com`;
+      const agentPassword = "agent-test-password-123";
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: agentPassword,
+          fullName: "Test Agent Messages",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+      const agentAccessToken = agentLogin.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .send({ body: "Should not be created" })
+        .expect(403);
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(403);
+    });
+
+    it("returns [] for a ticket with no messages yet", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(response.body).toEqual([]);
+    });
+
+    it("sends a message as OUTBOUND from the authenticated agent, then lists it", async () => {
+      const sent = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Thanks for reaching out — looking into this now." })
+        .expect(201);
+
+      expect(sent.body).toMatchObject({
+        ticketId,
+        channelType: "LIVE_CHAT",
+        direction: "OUTBOUND",
+        senderUserId: adminUserId,
+        senderContactId: null,
+        body: "Thanks for reaching out — looking into this now.",
+      });
+
+      const listed = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(listed.body.map((m: { id: string }) => m.id)).toContain(sent.body.id);
+    });
+
+    it("returns 404 for a ticket that doesn't exist", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${randomUUID()}/messages`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Should not be created" })
+        .expect(404);
+    });
+  });
 });

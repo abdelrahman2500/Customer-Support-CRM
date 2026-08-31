@@ -5,11 +5,13 @@ import type { JwtAccessTokenClaims } from "@crm/shared";
 import { PortalRoute } from "../../common/auth/portal-route.decorator";
 import { PortalCreateTicketDto } from "./dto/portal-create-ticket.dto";
 import { SubmitCsatDto } from "./dto/submit-csat.dto";
+import { CreateChannelMessageDto } from "../tickets/dto/create-channel-message.dto";
 import type {
   TicketCsatSummary,
   TicketHistoryEntrySummary,
   TicketSummary,
 } from "../tickets/tickets.service";
+import type { ChannelMessageSummary } from "../channels/channel-messages.service";
 import { PortalTicketsService } from "./portal-tickets.service";
 
 /**
@@ -97,5 +99,29 @@ export class PortalTicketsController {
       return;
     }
     response.status(200).json(result);
+  }
+
+  /**
+   * Story 77 — Customer Portal Live Chat. The decided V1 scope
+   * (authenticated Customer Portal users only, never anonymous visitors)
+   * is enforced structurally by `@PortalRoute()` itself, exactly like
+   * every other route here — no new authorization mechanism.
+   */
+  @PortalRoute()
+  @Post(":id/messages")
+  sendMessage(
+    @Req() request: Request,
+    @Param("id") id: string,
+    @Body() dto: CreateChannelMessageDto,
+  ): Promise<ChannelMessageSummary> {
+    const contact = request.user as JwtAccessTokenClaims;
+    return this.portalTicketsService.sendMessage(contact.sub, id, dto);
+  }
+
+  @PortalRoute()
+  @Get(":id/messages")
+  getMessages(@Req() request: Request, @Param("id") id: string): Promise<ChannelMessageSummary[]> {
+    const contact = request.user as JwtAccessTokenClaims;
+    return this.portalTicketsService.getMessages(contact.sub, id);
   }
 }

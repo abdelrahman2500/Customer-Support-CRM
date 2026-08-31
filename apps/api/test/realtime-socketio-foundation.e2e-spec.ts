@@ -13,6 +13,8 @@ import { AppModule } from "../src/app.module";
 import { RedisIoAdapter } from "../src/realtime/redis-io.adapter";
 import { TICKET_UPDATED_EVENT, TICKET_ESCALATED_EVENT } from "../src/modules/tickets/tickets.events";
 import type { TicketUpdatedEvent, TicketEscalatedEvent } from "../src/modules/tickets/tickets.events";
+import { CHANNEL_MESSAGE_CREATED_EVENT } from "../src/modules/channels/channel-messages.events";
+import type { ChannelMessageCreatedEvent } from "../src/modules/channels/channel-messages.events";
 
 /**
  * Integration suite for Story 20 — Realtime / Socket.IO Foundation.
@@ -370,4 +372,184 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
     },
     20_000,
   );
+
+  // ---------------------------------------------------------------------
+  // Story 77 — Customer Portal Live Chat. Decided V1 scope: authenticated
+  // Customer Portal users only. Reuses this file's own `connect`/`join`/
+  // `waitForEvent` helpers and the same real Postgres/Redis/Socket.IO
+  // infrastructure — no new gateway, no new namespace.
+  // ---------------------------------------------------------------------
+  describe("customer portal live chat", () => {
+    let customerId: string;
+    let contactId: string;
+    let contactAccessToken: string;
+    let otherCustomerContactAccessToken: string;
+    let ticketId: string;
+    const portalPassword = "a-strong-portal-password";
+
+    beforeAll(async () => {
+      const customer = await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName: `Realtime Live Chat Customer ${randomUUID()}` })
+        .expect(201);
+      customerId = customer.body.id;
+
+      const contactEmail = `realtime-live-chat-${randomUUID()}@example.com`;
+      const contact = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${customerId}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ fullName: "Realtime Live Chat Contact", email: contactEmail })
+        .expect(201);
+      contactId = contact.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${customerId}/contacts/${contactId}/portal-password`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ newPassword: portalPassword })
+        .expect(200);
+
+      const contactLogin = await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/login")
+        .send({ email: contactEmail, password: portalPassword })
+        .expect(200);
+      contactAccessToken = contactLogin.body.accessToken;
+
+      const ticket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, contactId, subject: "Realtime Live Chat ticket" })
+        .expect(201);
+      ticketId = ticket.body.id;
+
+      // A second, unrelated customer/contact — used only to prove
+      // cross-customer room-join denial.
+      const otherCustomer = await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName: `Realtime Live Chat Other Customer ${randomUUID()}` })
+        .expect(201);
+      const otherContactEmail = `realtime-live-chat-other-${randomUUID()}@example.com`;
+      const otherContact = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${otherCustomer.body.id}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ fullName: "Realtime Live Chat Other Contact", email: otherContactEmail })
+        .expect(201);
+      await request(app.getHttpServer())
+        .patch(
+          `/api/v1/customers/${otherCustomer.body.id}/contacts/${otherContact.body.id}/portal-password`,
+        )
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ newPassword: portalPassword })
+        .expect(200);
+      const otherContactLogin = await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/login")
+        .send({ email: otherContactEmail, password: portalPassword })
+        .expect(200);
+      otherCustomerContactAccessToken = otherContactLogin.body.accessToken;
+    });
+
+    it("accepts a customer-audience connection (rejected before Story 77)", async () => {
+      const client = connect(contactAccessToken);
+
+      await waitForConnect(client);
+
+      expect(client.connected).toBe(true);
+    });
+
+    it("allows the ticket's own customer to join ticket:{id}", async () => {
+      const client = connect(contactAccessToken);
+      await waitForConnect(client);
+
+      const ack = await join(client, `ticket:${ticketId}`);
+
+      expect(ack).toEqual({ ok: true });
+    });
+
+    it("denies a different customer joining ticket:{id}", async () => {
+      const client = connect(otherCustomerContactAccessToken);
+      await waitForConnect(client);
+
+      const ack = await join(client, `ticket:${ticketId}`);
+
+      expect(ack).toEqual({ ok: false });
+    });
+
+    it("denies a customer joining branch:{id}:notifications", async () => {
+      const client = connect(contactAccessToken);
+      await waitForConnect(client);
+
+      const ack = await join(client, `branch:${adminUserId}:notifications`);
+
+      expect(ack).toEqual({ ok: false });
+    });
+
+    it("denies a customer joining agent:{id}:presence", async () => {
+      const client = connect(contactAccessToken);
+      await waitForConnect(client);
+
+      const ack = await join(client, `agent:${adminUserId}:presence`);
+
+      expect(ack).toEqual({ ok: false });
+    });
+
+    it("relays a real channel.message.created event to both an agent and the ticket's own customer sharing ticket:{id}", async () => {
+      const agentClient = connect(adminAccessToken);
+      const customerClient = connect(contactAccessToken);
+      await Promise.all([waitForConnect(agentClient), waitForConnect(customerClient)]);
+      await join(agentClient, `ticket:${ticketId}`);
+      await join(customerClient, `ticket:${ticketId}`);
+
+      const agentReceived = waitForEvent<ChannelMessageCreatedEvent>(
+        agentClient,
+        CHANNEL_MESSAGE_CREATED_EVENT,
+      );
+      const customerReceived = waitForEvent<ChannelMessageCreatedEvent>(
+        customerClient,
+        CHANNEL_MESSAGE_CREATED_EVENT,
+      );
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${contactAccessToken}`)
+        .send({ body: "Hi, I need help with my order" })
+        .expect(201);
+
+      const [agentPayload, customerPayload] = await Promise.all([agentReceived, customerReceived]);
+      expect(agentPayload.message.body).toBe("Hi, I need help with my order");
+      expect(customerPayload.message.body).toBe("Hi, I need help with my order");
+    });
+
+    // The critical leak-prevention proof: an internal-only event (a Story
+    // 50 internal note) must reach an agent sharing ticket:{id} exactly as
+    // before, but must NEVER reach a customer sharing the same room.
+    it("relays ticket.note-added to an agent but never to a customer sharing the same ticket:{id} room", async () => {
+      const agentClient = connect(adminAccessToken);
+      const customerClient = connect(contactAccessToken);
+      await Promise.all([waitForConnect(agentClient), waitForConnect(customerClient)]);
+      await join(agentClient, `ticket:${ticketId}`);
+      await join(customerClient, `ticket:${ticketId}`);
+
+      let customerReceivedAnything = false;
+      customerClient.onAny(() => {
+        customerReceivedAnything = true;
+      });
+
+      const agentReceived = waitForEvent<{ ticketId: string }>(agentClient, "ticket.note-added");
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Internal note: verified customer identity." })
+        .expect(201);
+
+      const agentPayload = await agentReceived;
+      expect(agentPayload.ticketId).toBe(ticketId);
+
+      // Give any (incorrect) delivery to the customer socket a moment to
+      // arrive before asserting it never did.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(customerReceivedAnything).toBe(false);
+    });
+  });
 });

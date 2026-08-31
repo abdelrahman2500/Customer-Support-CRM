@@ -70,3 +70,5 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | _(unplanned)_ ticket-ai-categorization | Story 75 — implemented directly as an additive extension of Story 73's `TicketAiService` (`CLAUDE.md` §3.4); no formal `.squad` plan artifact | 75        |
 | _(unplanned)_ shared-ai-provider-boundary | Architecture-boundary refactor (`07f896a`) — extracted `packages/ai` (`@crm/ai`); committed as `refactor(ai): ...`, not assigned a story number (no product-facing behavior change) | —         |
 | ai-ticket-assist-async-processing | [ai-ticket-assist-async-processing/00-overview.md](./ai-ticket-assist-async-processing/00-overview.md) | 76–      |
+| _(unplanned)_ env-defaults-maintenance | `feat(env): add local MinIO defaults for S3 settings and corresponding tests` (`fbffaab`) — plain maintenance commit, not assigned a story number (no product-facing behavior change) | —         |
+| customer-portal-live-chat | [customer-portal-live-chat/00-overview.md](./customer-portal-live-chat/00-overview.md) | 77–      |

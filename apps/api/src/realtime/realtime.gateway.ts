@@ -17,9 +17,22 @@ import type { TenantClaims } from "../common/tenant/tenant-context";
 import type { EnvConfig } from "../common/config/env.validation";
 import { PresenceService } from "./presence.service";
 
+/** Story 77 — the per-socket claims bag now carries `audience` too:
+ * `authorizeRoom` (and `handleConnection`'s own presence-tracking guard)
+ * need to branch on it, and `TenantClaims` itself (shared with the
+ * HTTP-request `TenantContext` pipeline, which is always agent-only —
+ * portal routes derive scope from the JWT directly, never
+ * `TenantContext`) has no reason to carry it. For a `"customer"`-audience
+ * socket, `userId` holds the Contact's id (the JWT's own `sub`, exactly
+ * like every other `audience: "customer"` token in this codebase) —
+ * never a `User.id`. */
+export interface RealtimeClaims extends TenantClaims {
+  audience: "agent" | "customer";
+}
+
 /** Per-socket data bag — the Socket.IO analogue of `TenantContext`'s claims. */
 export interface RealtimeSocketData {
-  claims: TenantClaims;
+  claims: RealtimeClaims;
 }
 
 /** Story 71 — the room this event is emitted into is always
@@ -60,6 +73,21 @@ export interface AgentPresenceChangedPayload {
  * client's own shutdown — the in-flight `SREM` can lose, permanently
  * leaving a stale "online" entry behind (caught during this Story's own
  * e2e verification against real Redis, not a theoretical concern).
+ *
+ * Story 77 — Customer Portal Live Chat. `handleConnection` now accepts
+ * `audience: "customer"` alongside `"agent"` (per the resolved Architecture
+ * Decision Recon: authenticated Customer Portal users only, never
+ * anonymous — the token must still verify against the exact same
+ * `JWT_ACCESS_SECRET`/`JwtService`, nothing new to authenticate against).
+ * Presence tracking (`trackConnect`/`trackDisconnect`) stays agent-only —
+ * a Contact has no meaning in the `agent:{id}:presence` keyspace.
+ * `authorizeRoom`'s `ticket:(.+)$` case now branches by audience: an agent
+ * checks `ticket.branchId`, unchanged; a customer checks `ticket.customerId`
+ * against their own Contact's `customerId` (a DB lookup — `RealtimeClaims`
+ * carries no `customerId` field, mirroring `findTicketInCustomerScope`'s
+ * own two-step resolution). `branch:{id}:notifications` and
+ * `agent:{id}:presence` are now explicitly agent-only — neither was ever
+ * documented as customer-facing, and nothing about Live Chat requires it.
  */
 @Injectable()
 @WebSocketGateway()
@@ -104,7 +132,7 @@ export class RealtimeGateway
       return;
     }
 
-    if (claims.audience !== "agent") {
+    if (claims.audience !== "agent" && claims.audience !== "customer") {
       client.disconnect(true);
       return;
     }
@@ -114,16 +142,19 @@ export class RealtimeGateway
       branchId: claims.branchId,
       departmentId: claims.departmentId,
       roles: claims.roles,
+      audience: claims.audience,
     };
     this.connectedSockets.set(client.id, claims.sub);
-    void this.trackConnect(claims.sub, client.id);
+    if (claims.audience === "agent") {
+      void this.trackConnect(claims.sub, client.id);
+    }
   }
 
   handleDisconnect(client: Socket): void {
     this.logger.debug(`Socket disconnected: ${client.id}`);
     this.connectedSockets.delete(client.id);
     const claims = (client.data as Partial<RealtimeSocketData>).claims;
-    if (claims) {
+    if (claims && claims.audience === "agent") {
       void this.trackDisconnect(claims.userId, client.id);
     }
   }
@@ -143,14 +174,33 @@ export class RealtimeGateway
     return { ok: true };
   }
 
-  private async authorizeRoom(claims: TenantClaims, room: string): Promise<boolean> {
+  private async authorizeRoom(claims: RealtimeClaims, room: string): Promise<boolean> {
     const ticketMatch = /^ticket:(.+)$/.exec(room);
     if (ticketMatch) {
       const ticket = await this.prisma.ticket.findUnique({
         where: { id: ticketMatch[1] },
-        select: { branchId: true },
+        select: { branchId: true, customerId: true },
       });
-      return ticket !== null && ticket.branchId === claims.branchId;
+      if (!ticket) {
+        return false;
+      }
+      if (claims.audience === "agent") {
+        return ticket.branchId === claims.branchId;
+      }
+      // Story 77 — customer audience: `RealtimeClaims` carries only the
+      // Contact's id (`userId`), never `customerId` directly — resolved
+      // here exactly like `TicketsService.findTicketInCustomerScope` does.
+      const contact = await this.prisma.contact.findUnique({
+        where: { id: claims.userId },
+        select: { customerId: true },
+      });
+      return contact !== null && ticket.customerId === contact.customerId;
+    }
+
+    // Story 77 — explicitly agent-only: neither room was ever documented
+    // as customer-facing, and nothing about Live Chat needs them.
+    if (claims.audience !== "agent") {
+      return false;
     }
 
     const branchMatch = /^branch:(.+):notifications$/.exec(room);
@@ -223,5 +273,35 @@ export class RealtimeGateway
     this.server
       .to(`agent:${userId}:presence`)
       .emit(AGENT_PRESENCE_CHANGED_EVENT, { userId, status } satisfies AgentPresenceChangedPayload);
+  }
+
+  /**
+   * Story 77 — targeted delivery for ticket-room events that must stay
+   * agent-only even though a ticket's own customer may now share the same
+   * `ticket:{id}` room (`ticket.note-added` carries an internal-only
+   * `TicketNote`; `ticket.escalated`/`ai.prompt_completed` reveal internal
+   * SLA/AI-tooling state never exposed to the Portal's own REST surface).
+   * A plain `server.to(room).emit(...)` broadcasts to every socket in the
+   * room regardless of audience — Socket.IO has no per-recipient event
+   * filtering. `fetchSockets()` is the documented, Redis-adapter-safe way
+   * to enumerate a room's members (including ones connected to a
+   * different node) and their `client.data` — reused here, not a new
+   * trust mechanism, since `claims.audience` is already what
+   * `authorizeRoom` itself reads. `channel.message.created` (the one
+   * customer-and-agent event) is deliberately NOT routed through this —
+   * see `TicketRealtimeListener`.
+   */
+  async emitToAgentsInRoom(room: string, event: string, payload: unknown): Promise<void> {
+    try {
+      const sockets = await this.server.in(room).fetchSockets();
+      for (const socket of sockets) {
+        const claims = (socket.data as Partial<RealtimeSocketData>).claims;
+        if (claims?.audience === "agent") {
+          socket.emit(event, payload);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to emit ${event} to agents in ${room}`, error as Error);
+    }
   }
 }

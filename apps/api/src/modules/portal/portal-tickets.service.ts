@@ -5,9 +5,12 @@ import type {
   TicketHistoryEntrySummary,
   TicketSummary,
 } from "../tickets/tickets.service";
+import { TicketChannelService } from "../tickets/ticket-channel.service";
+import type { ChannelMessageSummary } from "../channels/channel-messages.service";
 import { PortalService } from "./portal.service";
 import type { PortalCreateTicketDto } from "./dto/portal-create-ticket.dto";
 import type { SubmitCsatDto } from "./dto/submit-csat.dto";
+import type { CreateChannelMessageDto } from "../tickets/dto/create-channel-message.dto";
 
 /**
  * Story 53 — composes `PortalService.getAuthenticatedContact` (resolves the
@@ -22,6 +25,7 @@ export class PortalTicketsService {
   constructor(
     private readonly portalService: PortalService,
     private readonly ticketsService: TicketsService,
+    private readonly ticketChannelService: TicketChannelService,
   ) {}
 
   /** `createTicketForContact` resolves the Contact (and its Customer/branch)
@@ -61,5 +65,26 @@ export class PortalTicketsService {
   async getCsat(contactId: string, ticketId: string): Promise<TicketCsatSummary | null> {
     const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
     return this.ticketsService.getCsatForCustomer(ticketId, customerId);
+  }
+
+  /**
+   * Story 77 — Customer Portal Live Chat, the customer-facing half.
+   * Composes `TicketChannelService`'s customer-scoped methods exactly the
+   * way every other method here composes `TicketsService`'s own
+   * customer-scoped ones — `contactId` doubles as the message's
+   * `senderContactId`, `customerId` scopes ticket-ownership authorization.
+   */
+  async sendMessage(
+    contactId: string,
+    ticketId: string,
+    dto: CreateChannelMessageDto,
+  ): Promise<ChannelMessageSummary> {
+    const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
+    return this.ticketChannelService.createCustomerMessage(ticketId, customerId, contactId, dto.body);
+  }
+
+  async getMessages(contactId: string, ticketId: string): Promise<ChannelMessageSummary[]> {
+    const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
+    return this.ticketChannelService.listMessagesForCustomer(ticketId, customerId);
   }
 }

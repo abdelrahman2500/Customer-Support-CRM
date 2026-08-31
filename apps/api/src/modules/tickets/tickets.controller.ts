@@ -6,8 +6,11 @@ import { CreateTicketDto } from "./dto/create-ticket.dto";
 import { UpdateTicketDto } from "./dto/update-ticket.dto";
 import { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
 import { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
+import { CreateChannelMessageDto } from "./dto/create-channel-message.dto";
 import { TicketAiService } from "./ticket-ai.service";
 import type { AiJobSubmittedResponse } from "./ticket-ai.service";
+import { TicketChannelService } from "./ticket-channel.service";
+import type { ChannelMessageSummary } from "../channels/channel-messages.service";
 import type {
   TicketCsatSummary,
   TicketHistoryEntrySummary,
@@ -24,6 +27,7 @@ export class TicketsController {
   constructor(
     private readonly ticketsService: TicketsService,
     private readonly ticketAiService: TicketAiService,
+    private readonly ticketChannelService: TicketChannelService,
   ) {}
 
   @Post()
@@ -123,5 +127,28 @@ export class TicketsController {
   @RequirePermissions("ticket:read")
   categorize(@Param("id") id: string): Promise<AiJobSubmittedResponse> {
     return this.ticketAiService.categorizeTicket(id);
+  }
+
+  /**
+   * Story 77 — Customer Portal Live Chat, the agent-facing half. Gated by
+   * `ticket:create` — mirrors `createNote`'s exact permission, since
+   * sending a chat message adds ticket-visible content the same way a
+   * note does. The created message is relayed into `ticket:{id}` by
+   * `TicketRealtimeListener` (unchanged flow: REST write, realtime
+   * fan-out) — this endpoint itself does not touch Socket.IO.
+   */
+  @Post(":id/messages")
+  @RequirePermissions("ticket:create")
+  sendMessage(
+    @Param("id") id: string,
+    @Body() dto: CreateChannelMessageDto,
+  ): Promise<ChannelMessageSummary> {
+    return this.ticketChannelService.createAgentMessage(id, dto.body);
+  }
+
+  @Get(":id/messages")
+  @RequirePermissions("ticket:read")
+  getMessages(@Param("id") id: string): Promise<ChannelMessageSummary[]> {
+    return this.ticketChannelService.listMessagesForAgent(id);
   }
 }

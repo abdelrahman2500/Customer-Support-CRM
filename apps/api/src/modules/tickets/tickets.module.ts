@@ -1,9 +1,11 @@
 import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { AiModule } from "../ai/ai.module";
+import { ChannelsModule } from "../channels/channels.module";
 import { QueuesModule } from "../../queues/queues.module";
 import { AutomationActionListener } from "./automation-action.listener";
 import { TicketAiService } from "./ticket-ai.service";
+import { TicketChannelService } from "./ticket-channel.service";
 import { TicketEscalationListener } from "./ticket-escalation.listener";
 import { TicketHistoryListener } from "./ticket-history.listener";
 import { TicketsController } from "./tickets.controller";
@@ -28,9 +30,17 @@ import { TicketsService } from "./tickets.service";
  *
  * Story 76 — `QueuesModule` imported the same way, so `TicketAiService`
  * can inject the already-exported `AiProcessingProducer` directly.
+ *
+ * Story 77 — `ChannelsModule` imported the same way, so
+ * `TicketChannelService` can inject the already-exported
+ * `ChannelMessagesService` directly. `TicketChannelService` is also
+ * exported (unlike `TicketAiService`, which has no cross-module caller
+ * yet) — `PortalModule`'s `PortalTicketsService` calls its customer-scoped
+ * methods directly, mirroring how it already calls `TicketsService`'s own
+ * customer-scoped methods.
  */
 @Module({
-  imports: [AiModule, QueuesModule],
+  imports: [AiModule, ChannelsModule, QueuesModule],
   controllers: [TicketsController],
   providers: [
     TicketsService,
@@ -39,7 +49,8 @@ import { TicketsService } from "./tickets.service";
     TicketEscalationListener,
     AutomationActionListener,
     TicketAiService,
+    TicketChannelService,
   ],
-  exports: [TicketsService],
+  exports: [TicketsService, TicketChannelService],
 })
 export class TicketsModule {}

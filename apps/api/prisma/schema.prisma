@@ -16,7 +16,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   extensions = [pgvector(map: "vector"), pg_trgm]
-  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base", "ai"]
+  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base", "ai", "channels"]
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +89,7 @@ model User {
   notificationPreferences     NotificationPreference[]
   uploadedAttachments         TicketAttachment[]
   uploadedCustomerAttachments CustomerAttachment[]
+  channelMessages             ChannelMessage[]
   createdAt                   DateTime                 @default(now()) @map("created_at")
   updatedAt                   DateTime                 @updatedAt @map("updated_at")
 
@@ -276,6 +277,7 @@ model Contact {
   tickets       Ticket[]
   refreshTokens ContactRefreshToken[]
   csatResponses TicketCsatResponse[]
+  channelMessages ChannelMessage[]
   createdAt     DateTime              @default(now()) @map("created_at")
 
   @@unique([customerId, email])
@@ -407,6 +409,7 @@ model Ticket {
   slaEscalations   SlaEscalation[]
   notificationLogs NotificationLog[]
   attachments      TicketAttachment[]
+  channelMessages  ChannelMessage[]
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
@@ -909,4 +912,68 @@ model AiPromptLog {
   @@index([feature])
   @@map("ai_prompt_logs")
   @@schema("ai")
+}
+
+// ---------------------------------------------------------------------------
+// channels schema
+// ---------------------------------------------------------------------------
+
+/// Story 77 — the five channel types docs/architecture/06-communication-
+/// and-realtime.md names as a fixed taxonomy ("email, WhatsApp, SMS, live
+/// chat, and web-form messages"). Only `LIVE_CHAT` has any producer in
+/// this story — the other four are documented scope, not speculative
+/// values, mirroring `AiFeature`'s own precedent (Story 72 declared all
+/// four AI methods even though only three had a producer until Story 76).
+enum ChannelType {
+  EMAIL
+  WHATSAPP
+  SMS
+  LIVE_CHAT
+  WEB_FORM
+
+  @@schema("channels")
+}
+
+/// Story 77 — mirrors 09-integrations.md's own inbound/outbound framing
+/// ("Inbound provider webhooks..."/"Outbound email, SMS, WhatsApp... work").
+enum ChannelMessageDirection {
+  INBOUND
+  OUTBOUND
+
+  @@schema("channels")
+}
+
+/// Story 77 — Customer Portal Live Chat, the first real `ChannelMessage`
+/// consumer (docs/architecture/06-*: "Live chat is a first-class Socket.IO
+/// flow between portal/widget and `apps/api`, normalized to
+/// `ChannelMessage`" — decided to mean the authenticated Customer Portal,
+/// not an anonymous public widget; see this story's own plan). One row
+/// per message, either direction. `externalThreadId` stays nullable and
+/// unused by `LIVE_CHAT` (a first-party socket flow, not an external
+/// provider thread) — it exists for the other four channel types' future
+/// stories, not invented use here. Exactly one of `senderContactId`/
+/// `senderUserId` is set, matching `direction` (`INBOUND` → contact,
+/// `OUTBOUND` → user) — an application-layer invariant
+/// (`ChannelMessagesService`), the same "app-layer invariant over a DB
+/// constraint" convention `Contact.email`'s own doc comment already
+/// established, since Prisma has no portable partial/conditional
+/// constraint for "exactly one of two nullable columns." No `attachments`
+/// field yet — out of scope for this story (see the plan's Non-goals).
+model ChannelMessage {
+  id              String                  @id @default(uuid())
+  ticketId        String                  @map("ticket_id")
+  ticket          Ticket                  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  channelType     ChannelType             @map("channel_type")
+  direction       ChannelMessageDirection
+  externalThreadId String?                @map("external_thread_id")
+  senderContactId String?                 @map("sender_contact_id")
+  senderContact   Contact?                @relation(fields: [senderContactId], references: [id])
+  senderUserId    String?                 @map("sender_user_id")
+  senderUser      User?                   @relation(fields: [senderUserId], references: [id])
+  body            String
+  createdAt       DateTime                @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@map("channel_messages")
+  @@schema("channels")
 }
