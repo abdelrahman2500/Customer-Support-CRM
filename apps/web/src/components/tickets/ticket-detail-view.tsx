@@ -19,6 +19,7 @@ import {
 } from "@/hooks/use-tickets";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
+import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
@@ -98,6 +99,12 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * state (the composer) and its own realtime-merge logic. Consumes the
  * `channel.message.created` handling already added to this view's existing
  * `useTicketRealtime()` call above — no second socket connection.
+ *
+ * Story 79 — a new "AI Assist" card (`TicketAiCard`), mounted immediately
+ * after `TicketChatCard`. Its "use as category" action reuses the same
+ * `mutation` (`useUpdateTicketMutation`) this view already instantiates
+ * for every other field — no second mutation instance, no new
+ * category-persistence mechanism.
  */
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -283,6 +290,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
       </div>
 
       <TicketChatCard ticketId={ticketId} />
+
+      <TicketAiCard
+        ticketId={ticketId}
+        onApplyCategory={(category) => mutation.mutate({ category })}
+      />
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.slaHeading")}</h2>

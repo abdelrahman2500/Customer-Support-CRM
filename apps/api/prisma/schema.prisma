@@ -410,6 +410,7 @@ model Ticket {
   notificationLogs NotificationLog[]
   attachments      TicketAttachment[]
   channelMessages  ChannelMessage[]
+  aiPromptLogs     AiPromptLog[]
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
@@ -896,6 +897,11 @@ model AiPromptLog {
   id           String    @id @default(uuid())
   branchId     String    @map("branch_id")
   branch       Branch    @relation(fields: [branchId], references: [id])
+  /// Story 79 — nullable: rows created by Stories 72-76 before this
+  /// column existed have none. Every row created after this story ships
+  /// always sets it (AiGatewayService.createPendingLog, Task 2).
+  ticketId     String?   @map("ticket_id")
+  ticket       Ticket?   @relation(fields: [ticketId], references: [id], onDelete: SetNull)
   feature      AiFeature
   model        String
   promptRef    String    @map("prompt_ref")
@@ -905,11 +911,18 @@ model AiPromptLog {
   /// `null` exactly when `outcome` is still `PENDING`.
   latencyMs    Int?      @map("latency_ms")
   outcome      AiOutcome
+  /// Story 79 — the actual generated text (summary / suggested reply /
+  /// suggested category). Null exactly when outcome is PENDING, ERROR,
+  /// or DISABLED (see packages/ai's AiCallResult.text: string | null).
+  /// Named outputText, not `output`, to stay unambiguous next to the
+  /// existing outputTokens field.
+  outputText   String?   @map("output_text")
   errorMessage String?   @map("error_message")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   @@index([branchId])
   @@index([feature])
+  @@index([ticketId])
   @@map("ai_prompt_logs")
   @@schema("ai")
 }

@@ -6,12 +6,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
 import { invalidateTicketQueries } from "./use-tickets";
 import { mergeChannelMessage, ticketMessagesQueryKey } from "./use-ticket-messages";
+import { ticketAiResultQueryKey } from "./use-ticket-ai";
 import type { ChannelMessageSummary } from "@/lib/ticket-messages-api";
 
 const TICKET_UPDATED_EVENT = "ticket.updated";
 const TICKET_ESCALATED_EVENT = "ticket.escalated";
 const TICKET_NOTE_ADDED_EVENT = "ticket.note-added";
 const CHANNEL_MESSAGE_CREATED_EVENT = "channel.message.created";
+const AI_PROMPT_COMPLETED_EVENT = "ai.prompt_completed";
 
 /**
  * Story 23, plan Design item 8 — Ticket Detail's *only* realtime
@@ -38,6 +40,11 @@ const CHANNEL_MESSAGE_CREATED_EVENT = "channel.message.created";
  * payload's own `ticketId` is checked against this hook's `ticketId` before
  * merging — belt-and-suspenders alongside the room-join itself already
  * guaranteeing this socket only ever receives this ticket's events.
+ *
+ * Story 79 — a fifth subscribed event, `ai.prompt_completed` (Story 76),
+ * handled with an exact-key invalidate of `["ticket", id, "ai", logId]`
+ * (`ticketAiResultQueryKey`) — see the handler's own comment below for why
+ * this is a cache-merge situation.
  */
 export function useTicketRealtime(ticketId: string): void {
   const queryClient = useQueryClient();
@@ -73,11 +80,32 @@ export function useTicketRealtime(ticketId: string): void {
     };
     socket.on(CHANNEL_MESSAGE_CREATED_EVENT, handleChannelMessage);
 
+    // Story 79 — an exact-key invalidate (matching `handleUpdate`'s
+    // original pattern above), not a cache-merge: an AI result is a
+    // one-shot value fetched by its own known `logId`, not a growing
+    // list, so invalidating and letting `useTicketAiResultQuery` refetch
+    // is the correct, simpler, precedented choice.
+    const handleAiPromptCompleted = (payload: {
+      aiPromptLogId: string;
+      ticketId: string;
+      feature: string;
+      outcome: string;
+    }) => {
+      if (payload.ticketId !== ticketId) {
+        return;
+      }
+      void queryClient.invalidateQueries({
+        queryKey: ticketAiResultQueryKey(ticketId, payload.aiPromptLogId),
+      });
+    };
+    socket.on(AI_PROMPT_COMPLETED_EVENT, handleAiPromptCompleted);
+
     return () => {
       socket.off(TICKET_UPDATED_EVENT, handleUpdate);
       socket.off(TICKET_ESCALATED_EVENT, handleUpdate);
       socket.off(TICKET_NOTE_ADDED_EVENT, handleUpdate);
       socket.off(CHANNEL_MESSAGE_CREATED_EVENT, handleChannelMessage);
+      socket.off(AI_PROMPT_COMPLETED_EVENT, handleAiPromptCompleted);
       socket.disconnect();
     };
   }, [ticketId, queryClient]);

@@ -3,6 +3,7 @@ import { TicketAiService } from "./ticket-ai.service";
 import type { AiGatewayService } from "../ai/ai-gateway.service";
 import type { AiProcessingProducer } from "../../queues/ai-processing.producer";
 import type { TenantContext } from "../../common/tenant/tenant-context";
+import type { PrismaService } from "../../prisma/prisma.service";
 import type { TicketsService } from "./tickets.service";
 
 function buildTicketsServiceMock() {
@@ -30,17 +31,27 @@ function buildTenantContextMock(branchId = "branch-1") {
   };
 }
 
+function buildPrismaMock() {
+  return {
+    aiPromptLog: {
+      findUnique: vi.fn(),
+    },
+  };
+}
+
 function createService(
   ticketsMock: ReturnType<typeof buildTicketsServiceMock>,
   aiGatewayMock: ReturnType<typeof buildAiGatewayMock>,
   producerMock: ReturnType<typeof buildAiProcessingProducerMock>,
   tenantMock: ReturnType<typeof buildTenantContextMock>,
+  prismaMock: ReturnType<typeof buildPrismaMock>,
 ): TicketAiService {
   return new TicketAiService(
     ticketsMock as unknown as TicketsService,
     aiGatewayMock as unknown as AiGatewayService,
     producerMock as unknown as AiProcessingProducer,
     tenantMock as unknown as TenantContext,
+    prismaMock as unknown as PrismaService,
   );
 }
 
@@ -49,6 +60,7 @@ describe("TicketAiService", () => {
   let aiGateway: ReturnType<typeof buildAiGatewayMock>;
   let producer: ReturnType<typeof buildAiProcessingProducerMock>;
   let tenantContext: ReturnType<typeof buildTenantContextMock>;
+  let prisma: ReturnType<typeof buildPrismaMock>;
   let service: TicketAiService;
 
   beforeEach(() => {
@@ -56,7 +68,8 @@ describe("TicketAiService", () => {
     aiGateway = buildAiGatewayMock();
     producer = buildAiProcessingProducerMock();
     tenantContext = buildTenantContextMock();
-    service = createService(ticketsService, aiGateway, producer, tenantContext);
+    prisma = buildPrismaMock();
+    service = createService(ticketsService, aiGateway, producer, tenantContext, prisma);
 
     ticketsService.getTicket.mockResolvedValue({ id: "ticket-1", subject: "Login issue" });
     ticketsService.getTicketNotes.mockResolvedValue([
@@ -76,6 +89,7 @@ describe("TicketAiService", () => {
       expect(aiGateway.createPendingLog).toHaveBeenCalledWith(
         "SUMMARIZE",
         "branch-1",
+        "ticket-1",
         expect.any(String),
       );
       expect(producer.enqueue).toHaveBeenCalledWith({
@@ -116,6 +130,7 @@ describe("TicketAiService", () => {
       expect(aiGateway.createPendingLog).toHaveBeenCalledWith(
         "SUGGEST_REPLY",
         "branch-1",
+        "ticket-1",
         expect.any(String),
       );
       expect(producer.enqueue).toHaveBeenCalledWith(
@@ -132,12 +147,73 @@ describe("TicketAiService", () => {
       expect(aiGateway.createPendingLog).toHaveBeenCalledWith(
         "CATEGORIZE",
         "branch-1",
+        "ticket-1",
         expect.any(String),
       );
       expect(producer.enqueue).toHaveBeenCalledWith(
         expect.objectContaining({ feature: "CATEGORIZE" }),
       );
       expect(result).toEqual({ id: "log-1", outcome: "PENDING" });
+    });
+  });
+
+  describe("getAiResult", () => {
+    it("returns the mapped result when the log exists and its ticketId matches", async () => {
+      const createdAt = new Date("2026-01-01T00:00:00.000Z");
+      prisma.aiPromptLog.findUnique.mockResolvedValue({
+        id: "log-1",
+        ticketId: "ticket-1",
+        feature: "SUMMARIZE",
+        outcome: "SUCCESS",
+        outputText: "A summary.",
+        errorMessage: null,
+        createdAt,
+      });
+
+      const result = await service.getAiResult("ticket-1", "log-1");
+
+      expect(ticketsService.getTicket).toHaveBeenCalledWith("ticket-1");
+      expect(prisma.aiPromptLog.findUnique).toHaveBeenCalledWith({ where: { id: "log-1" } });
+      expect(result).toEqual({
+        id: "log-1",
+        feature: "SUMMARIZE",
+        outcome: "SUCCESS",
+        outputText: "A summary.",
+        errorMessage: null,
+        createdAt,
+      });
+    });
+
+    it("throws when the log's ticketId doesn't match", async () => {
+      prisma.aiPromptLog.findUnique.mockResolvedValue({
+        id: "log-1",
+        ticketId: "ticket-2",
+        feature: "SUMMARIZE",
+        outcome: "SUCCESS",
+        outputText: "A summary.",
+        errorMessage: null,
+        createdAt: new Date(),
+      });
+
+      await expect(service.getAiResult("ticket-1", "log-1")).rejects.toThrow(
+        "AI result not found",
+      );
+    });
+
+    it("throws when no log with that id exists", async () => {
+      prisma.aiPromptLog.findUnique.mockResolvedValue(null);
+
+      await expect(service.getAiResult("ticket-1", "unknown-log")).rejects.toThrow(
+        "AI result not found",
+      );
+    });
+
+    it("never queries AiPromptLog if getTicket itself rejects", async () => {
+      const notFound = new Error("Ticket not found");
+      ticketsService.getTicket.mockRejectedValue(notFound);
+
+      await expect(service.getAiResult("unknown", "log-1")).rejects.toThrow(notFound);
+      expect(prisma.aiPromptLog.findUnique).not.toHaveBeenCalled();
     });
   });
 });

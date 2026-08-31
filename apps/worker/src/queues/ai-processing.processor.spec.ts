@@ -100,6 +100,7 @@ describe("AiProcessingProcessor", () => {
           outputTokens: 5,
           latencyMs: expect.any(Number),
           outcome: "SUCCESS",
+          outputText: "A summary.",
           errorMessage: null,
         },
       });
@@ -152,7 +153,9 @@ describe("AiProcessingProcessor", () => {
       await processor.process(job);
 
       expect(prisma.aiPromptLog.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ outcome: "DISABLED", model: "disabled" }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ outcome: "DISABLED", model: "disabled", outputText: null }),
+        }),
       );
       expect(handbackQueue.add).toHaveBeenCalledWith(
         "ai-completion",

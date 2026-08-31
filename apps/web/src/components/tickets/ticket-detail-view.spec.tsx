@@ -20,6 +20,7 @@ import {
   useCreateTicketMessageMutation,
   useTicketMessagesQuery,
 } from "@/hooks/use-ticket-messages";
+import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { ApiError } from "@/lib/api";
 
@@ -61,6 +62,15 @@ vi.mock("@/hooks/use-attachments", () => ({
 vi.mock("@/hooks/use-ticket-messages", () => ({
   useTicketMessagesQuery: vi.fn(),
   useCreateTicketMessageMutation: vi.fn(),
+}));
+
+// Story 79 — TicketAiCard's own hooks; its behavior is covered in its own
+// dedicated spec (mirrors TicketChatCard's own precedent above), so this
+// file only needs enough of a mock for TicketDetailView to render it
+// cleanly.
+vi.mock("@/hooks/use-ticket-ai", () => ({
+  useTicketAiResultQuery: vi.fn(),
+  useSubmitAiOperationMutation: vi.fn(),
 }));
 
 vi.mock("@/lib/attachments-api", () => ({
@@ -149,6 +159,13 @@ describe("TicketDetailView", () => {
       isPending: false,
       isError: false,
       error: null,
+    } as never);
+    vi.mocked(useTicketAiResultQuery).mockReturnValue(
+      queryResult({ data: undefined, isSuccess: false }) as never,
+    );
+    vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: "log-new", outcome: "PENDING" }),
+      isPending: false,
     } as never);
   });
 

@@ -1,9 +1,10 @@
-import { Injectable } from "@nestjs/common";
-import type { AiFeature } from "@prisma/client";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import type { AiFeature, AiOutcome } from "@prisma/client";
 import type { AiTicketInput } from "@crm/ai";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { AiGatewayService, promptRef } from "../ai/ai-gateway.service";
 import { AiProcessingProducer } from "../../queues/ai-processing.producer";
+import { PrismaService } from "../../prisma/prisma.service";
 import { TicketsService } from "./tickets.service";
 
 /** The immediate response every `/tickets/:id/ai/*` route now returns —
@@ -12,6 +13,19 @@ import { TicketsService } from "./tickets.service";
 export interface AiJobSubmittedResponse {
   id: string;
   outcome: "PENDING";
+}
+
+/** Story 79 — the durable `AiPromptLog` row's contents, retrieved once
+ * `apps/worker` has resolved it (or still `PENDING`). Returned by
+ * `getAiResult`, the read half of the `id`/`outcome` pair
+ * `AiJobSubmittedResponse` hands back at submission time. */
+export interface AiResultResponse {
+  id: string;
+  feature: AiFeature;
+  outcome: AiOutcome;
+  outputText: string | null;
+  errorMessage: string | null;
+  createdAt: Date;
 }
 
 /** The three ticket-scoped AI features this service submits — deliberately
@@ -65,6 +79,7 @@ export class TicketAiService {
     private readonly aiGatewayService: AiGatewayService,
     private readonly aiProcessingProducer: AiProcessingProducer,
     private readonly tenantContext: TenantContext,
+    private readonly prisma: PrismaService,
   ) {}
 
   async summarizeTicket(id: string): Promise<AiJobSubmittedResponse> {
@@ -79,6 +94,33 @@ export class TicketAiService {
     return this.submit(id, "CATEGORIZE");
   }
 
+  /**
+   * Story 79 — retrieves the durable `AiPromptLog` row a prior submit
+   * created, once `apps/worker` has resolved it (or still `PENDING`).
+   * `getTicket(ticketId)` throws `NotFoundException` first if the ticket
+   * is outside the caller's branch/department scope — the AI-result
+   * lookup is never reached in that case. `log.ticketId !== ticketId`
+   * (including the `null` case for pre-migration rows) masks "belongs to
+   * another ticket" and "row doesn't exist" identically, mirroring
+   * `TicketsService.findTicketInCustomerScope`'s own documented
+   * convention.
+   */
+  async getAiResult(ticketId: string, logId: string): Promise<AiResultResponse> {
+    await this.ticketsService.getTicket(ticketId);
+    const log = await this.prisma.aiPromptLog.findUnique({ where: { id: logId } });
+    if (!log || log.ticketId !== ticketId) {
+      throw new NotFoundException("AI result not found");
+    }
+    return {
+      id: log.id,
+      feature: log.feature,
+      outcome: log.outcome,
+      outputText: log.outputText,
+      errorMessage: log.errorMessage,
+      createdAt: log.createdAt,
+    };
+  }
+
   private async submit(id: string, feature: TicketAiFeature): Promise<AiJobSubmittedResponse> {
     const input = await this.loadAiTicketInput(id);
     const { branchId } = this.tenantContext.requireBranchScope();
@@ -86,6 +128,7 @@ export class TicketAiService {
     const log = await this.aiGatewayService.createPendingLog(
       feature as AiFeature,
       branchId,
+      id,
       promptRef(input.subject, input.body),
     );
 

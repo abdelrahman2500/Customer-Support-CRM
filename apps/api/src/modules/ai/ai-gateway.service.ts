@@ -31,11 +31,13 @@ export class AiGatewayService {
   async createPendingLog(
     feature: AiFeature,
     branchId: string,
+    ticketId: string,
     promptRefValue: string,
   ): Promise<{ id: string }> {
     const log = await this.prisma.aiPromptLog.create({
       data: {
         branchId,
+        ticketId,
         feature,
         model: "pending",
         promptRef: promptRefValue,

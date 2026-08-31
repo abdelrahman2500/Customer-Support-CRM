@@ -1007,6 +1007,154 @@ describe("Ticketing (e2e)", () => {
     });
   });
 
+  // Story 79 — AI Ticket-Assist Result Delivery. Same scope boundary as
+  // the summarize/suggest-reply/categorize describe blocks above:
+  // apps/worker is never booted by this suite, so a SUCCESS-outcome test
+  // simulates completion by updating the AiPromptLog row directly via
+  // Prisma (the existing pattern this file already uses at line ~799).
+  describe("ticket AI result retrieval (Story 79)", () => {
+    it("rejects an unauthenticated request", async () => {
+      const submitted = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/ai/${submitted.body.id}`)
+        .expect(401);
+    });
+
+    it("rejects an Agent-role user lacking ticket:read (403)", async () => {
+      const submitted = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      const agentEmail = `agent-ai-result-${randomUUID()}@example.com`;
+      const agentPassword = "agent-test-password-123";
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: agentPassword,
+          fullName: "Test Agent AI Result",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+      const agentAccessToken = agentLogin.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/ai/${submitted.body.id}`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(403);
+    });
+
+    it("returns 404 for a ticket that doesn't exist", async () => {
+      const submitted = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${randomUUID()}/ai/${submitted.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("returns 404 for a logId that doesn't exist", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/ai/${randomUUID()}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("returns 404 when the logId belongs to a different ticket", async () => {
+      const otherTicket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, contactId, subject: "Story 79 cross-ticket fixture" })
+        .expect(201);
+
+      const submittedOnOtherTicket = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${otherTicket.body.id}/ai/summarize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/ai/${submittedOnOtherTicket.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("returns 200 with outcome PENDING and outputText null immediately after submit", async () => {
+      const submitted = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/ai/${submitted.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        id: submitted.body.id,
+        feature: "SUMMARIZE",
+        outcome: "PENDING",
+        outputText: null,
+        errorMessage: null,
+      });
+    });
+
+    it("returns 200 with the real output once the row is resolved (apps/worker not booted)", async () => {
+      const submitted = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      await prisma.aiPromptLog.update({
+        where: { id: submitted.body.id },
+        data: {
+          model: "claude-test",
+          outcome: "SUCCESS",
+          outputText: "Customer reports being unable to log in.",
+          latencyMs: 42,
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/ai/${submitted.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        id: submitted.body.id,
+        feature: "SUMMARIZE",
+        outcome: "SUCCESS",
+        outputText: "Customer reports being unable to log in.",
+        errorMessage: null,
+      });
+    });
+  });
+
   // Story 77 — Customer Portal Live Chat (agent-facing half). Gated by
   // `ticket:create`/`ticket:read` — mirrors the "ticket notes" describe
   // block's exact permission-check pattern above.

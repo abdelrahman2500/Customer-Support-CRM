@@ -21,11 +21,12 @@ describe("AiGatewayService", () => {
       prisma.aiPromptLog.create.mockResolvedValue({ id: "log-1" });
       const service = createService(prisma);
 
-      const result = await service.createPendingLog("SUMMARIZE", "branch-1", "abc123");
+      const result = await service.createPendingLog("SUMMARIZE", "branch-1", "ticket-1", "abc123");
 
       expect(prisma.aiPromptLog.create).toHaveBeenCalledWith({
         data: {
           branchId: "branch-1",
+          ticketId: "ticket-1",
           feature: "SUMMARIZE",
           model: "pending",
           promptRef: "abc123",
@@ -44,8 +45,8 @@ describe("AiGatewayService", () => {
       prisma.aiPromptLog.create.mockResolvedValue({ id: "log-2" });
       const service = createService(prisma);
 
-      await service.createPendingLog("SUGGEST_REPLY", "branch-1", "ref");
-      await service.createPendingLog("CATEGORIZE", "branch-1", "ref");
+      await service.createPendingLog("SUGGEST_REPLY", "branch-1", "ticket-1", "ref");
+      await service.createPendingLog("CATEGORIZE", "branch-1", "ticket-1", "ref");
 
       expect(prisma.aiPromptLog.create).toHaveBeenNthCalledWith(1, expect.objectContaining({
         data: expect.objectContaining({ feature: "SUGGEST_REPLY" }),

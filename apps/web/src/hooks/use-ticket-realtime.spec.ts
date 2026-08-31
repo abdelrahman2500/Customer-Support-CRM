@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTicketRealtime } from "./use-ticket-realtime";
 import { invalidateTicketQueries } from "./use-tickets";
 import { mergeChannelMessage, ticketMessagesQueryKey } from "./use-ticket-messages";
+import { ticketAiResultQueryKey } from "./use-ticket-ai";
 import { getAccessToken } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
@@ -22,6 +23,14 @@ vi.mock("./use-ticket-messages", () => ({
     incoming,
   ]),
 }));
+vi.mock("./use-ticket-ai", () => ({
+  ticketAiResultQueryKey: vi.fn((ticketId: string, logId: string) => [
+    "ticket",
+    ticketId,
+    "ai",
+    logId,
+  ]),
+}));
 
 function buildSocketMock() {
   const handlers = new Map<string, (...args: unknown[]) => void>();
@@ -37,7 +46,7 @@ function buildSocketMock() {
 }
 
 function buildQueryClientMock() {
-  return { setQueryData: vi.fn() };
+  return { setQueryData: vi.fn(), invalidateQueries: vi.fn() };
 }
 
 describe("useTicketRealtime", () => {
@@ -134,6 +143,38 @@ describe("useTicketRealtime", () => {
     unmount();
 
     expect(socket.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("invalidates the exact AI result query key when ai.prompt_completed is received", () => {
+    const socket = buildSocketMock();
+    vi.mocked(io).mockReturnValue(socket as never);
+
+    renderHook(() => useTicketRealtime("ticket-1"));
+    socket._trigger("ai.prompt_completed", {
+      aiPromptLogId: "log-1",
+      ticketId: "ticket-1",
+      feature: "SUMMARIZE",
+      outcome: "SUCCESS",
+    });
+
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ticketAiResultQueryKey("ticket-1", "log-1"),
+    });
+  });
+
+  it("ignores an ai.prompt_completed event for a different ticket", () => {
+    const socket = buildSocketMock();
+    vi.mocked(io).mockReturnValue(socket as never);
+
+    renderHook(() => useTicketRealtime("ticket-1"));
+    socket._trigger("ai.prompt_completed", {
+      aiPromptLogId: "log-1",
+      ticketId: "some-other-ticket",
+      feature: "SUMMARIZE",
+      outcome: "SUCCESS",
+    });
+
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
   });
 
   it("does not connect when there is no access token", () => {

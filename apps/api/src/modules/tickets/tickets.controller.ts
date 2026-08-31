@@ -8,7 +8,7 @@ import { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
 import { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
 import { CreateChannelMessageDto } from "./dto/create-channel-message.dto";
 import { TicketAiService } from "./ticket-ai.service";
-import type { AiJobSubmittedResponse } from "./ticket-ai.service";
+import type { AiJobSubmittedResponse, AiResultResponse } from "./ticket-ai.service";
 import { TicketChannelService } from "./ticket-channel.service";
 import type { ChannelMessageSummary } from "../channels/channel-messages.service";
 import type {
@@ -127,6 +127,20 @@ export class TicketsController {
   @RequirePermissions("ticket:read")
   categorize(@Param("id") id: string): Promise<AiJobSubmittedResponse> {
     return this.ticketAiService.categorizeTicket(id);
+  }
+
+  /** Story 79 — retrieves the durable AiPromptLog row a prior
+   * summarize/suggest-reply/categorize submission created, once
+   * apps/worker has resolved it. ticket:read-gated, same as the three
+   * submit routes above; masks cross-ticket access as 404 (see
+   * TicketAiService.getAiResult's own doc comment). */
+  @Get(":id/ai/:logId")
+  @RequirePermissions("ticket:read")
+  getAiResult(
+    @Param("id") id: string,
+    @Param("logId") logId: string,
+  ): Promise<AiResultResponse> {
+    return this.ticketAiService.getAiResult(id, logId);
   }
 
   /**

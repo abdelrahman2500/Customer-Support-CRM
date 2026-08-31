@@ -91,6 +91,7 @@ export class AiProcessingProcessor extends WorkerHost {
         outputTokens: result.outputTokens,
         latencyMs,
         outcome: result.outcome,
+        outputText: result.text,
         errorMessage: result.errorMessage,
       },
     });
