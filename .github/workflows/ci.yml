@@ -84,6 +84,34 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Start MinIO
+        # apps/api's e2e suite boots the real AppModule, which includes
+        # S3StorageService (Story 66) — it needs a real S3-compatible
+        # endpoint at S3_ENDPOINT (defaults to http://localhost:9000, see
+        # apps/api/src/common/config/env.validation.ts) exactly like
+        # docker-compose.yml's local dev `minio` service provides. GitHub
+        # Actions' `services:` containers (postgres/redis above) can't take
+        # a custom command, and minio/minio requires one (`server /data`),
+        # so it's started as a plain step instead.
+        run: >-
+          docker run -d --name minio -p 9000:9000
+          -e MINIO_ROOT_USER=minioadmin
+          -e MINIO_ROOT_PASSWORD=minioadmin
+          minio/minio:latest server /data
+
+      - name: Wait for MinIO
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live > /dev/null; then
+              echo "MinIO is ready"
+              exit 0
+            fi
+            echo "Waiting for MinIO to become ready... ($i/30)"
+            sleep 1
+          done
+          echo "::error::MinIO did not become ready within 30 seconds"
+          exit 1
+
       - name: Integration tests
         run: pnpm --filter @crm/api test:e2e
 
