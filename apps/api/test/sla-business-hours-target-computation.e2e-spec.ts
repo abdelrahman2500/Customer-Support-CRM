@@ -72,6 +72,15 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
   }
 
   async function resetCalendarStateForCurrentBranch(): Promise<void> {
+    // `afterAll` always runs even when `beforeAll` failed/timed out before
+    // `adminAccessToken` was ever assigned (jest/vitest run cleanup hooks
+    // unconditionally) — skip rather than send a request built from an
+    // undefined token, which `/auth/me` would (correctly) reject with 401,
+    // masking the real failure with a confusing, unrelated one.
+    if (!adminAccessToken) {
+      return;
+    }
+
     const prisma = app.get(PrismaService);
     const me = await request(app.getHttpServer())
       .get("/api/v1/auth/me")
@@ -199,6 +208,17 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
     return lastResponse;
   }
 
+  // Both hooks below get a longer timeout than the project-wide 15s default
+  // (`vitest.config.mts`): each does a full Nest app boot plus several
+  // chained real HTTP/DB round trips (login, `/auth/me`, calendar
+  // reset, weekly-schedule write), which a loaded CI runner can push past
+  // 15s. Under that default, a `beforeAll` timeout was observed to fire
+  // *before* `adminAccessToken` got assigned; `afterAll` then still ran
+  // (jest/vitest always run cleanup hooks) and reused the unset token,
+  // producing a confusing secondary "expected 200, got 401" failure on
+  // `/auth/me` that looked like an auth bug but was actually this timing
+  // race — see `resetCalendarStateForCurrentBranch`'s own guard for the
+  // other half of this fix.
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
@@ -228,13 +248,13 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
 
     await resetCalendarStateForCurrentBranch();
     await setWeeklySchedule(continuousWeek());
-  });
+  }, 30_000);
 
   afterAll(async () => {
     await resetCalendarStateForCurrentBranch();
     await setWeeklySchedule(baselineWeek());
     await app.close();
-  });
+  }, 30_000);
 
   it("computes same-day, business-hours-aware targets under a fully open calendar", async () => {
     // Under this suite's fully open (continuous, 00:00-23:59) calendar, a
