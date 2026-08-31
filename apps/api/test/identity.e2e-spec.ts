@@ -5,6 +5,7 @@ import { Test } from "@nestjs/testing";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
+import { PrismaService } from "../src/prisma/prisma.service";
 
 /**
  * Integration suite for the `auth/*` and `identity/*` HTTP surface.
@@ -60,6 +61,11 @@ describe("Identity & Access (e2e)", () => {
   });
 
   afterAll(async () => {
+    const prisma = app.get(PrismaService);
+    const agentRole = await prisma.role.findUnique({ where: { name: "Agent" } });
+    if (agentRole) {
+      await prisma.rolePermission.deleteMany({ where: { roleId: agentRole.id } });
+    }
     await app.close();
   });
 
