@@ -72,11 +72,10 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
   }
 
   async function resetCalendarStateForCurrentBranch(): Promise<void> {
-    // `afterAll` always runs even when `beforeAll` failed/timed out before
-    // `adminAccessToken` was ever assigned (jest/vitest run cleanup hooks
-    // unconditionally) — skip rather than send a request built from an
-    // undefined token, which `/auth/me` would (correctly) reject with 401,
-    // masking the real failure with a confusing, unrelated one.
+    // Belt-and-suspenders alongside `afterAll`'s own top-level guard: skip
+    // rather than send a request built from an unset `adminAccessToken`
+    // (e.g. if this is ever called before `beforeAll` assigns it), which
+    // `/auth/me` would (correctly) reject with a confusing, unrelated 401.
     if (!adminAccessToken) {
       return;
     }
@@ -210,15 +209,15 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
 
   // Both hooks below get a longer timeout than the project-wide 15s default
   // (`vitest.config.mts`): each does a full Nest app boot plus several
-  // chained real HTTP/DB round trips (login, `/auth/me`, calendar
-  // reset, weekly-schedule write), which a loaded CI runner can push past
-  // 15s. Under that default, a `beforeAll` timeout was observed to fire
-  // *before* `adminAccessToken` got assigned; `afterAll` then still ran
-  // (jest/vitest always run cleanup hooks) and reused the unset token,
-  // producing a confusing secondary "expected 200, got 401" failure on
-  // `/auth/me` that looked like an auth bug but was actually this timing
-  // race — see `resetCalendarStateForCurrentBranch`'s own guard for the
-  // other half of this fix.
+  // chained real HTTP/DB round trips (login, `/auth/me`, calendar reset,
+  // weekly-schedule write), which a loaded CI runner can push past 15s.
+  // When `beforeAll` doesn't finish — a timeout, or any other failure —
+  // before `adminAccessToken` gets assigned, `afterAll` still runs
+  // (jest/vitest always run cleanup hooks) and every helper here builds its
+  // Authorization header unconditionally from that token, so reusing it
+  // unset sends a literal "Bearer undefined" request and fails with a
+  // confusing, unrelated 401 that looks like an auth bug. See `afterAll`'s
+  // own guard below for the fix.
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
@@ -251,9 +250,25 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
   }, 30_000);
 
   afterAll(async () => {
-    await resetCalendarStateForCurrentBranch();
-    await setWeeklySchedule(baselineWeek());
-    await app.close();
+    // Guard the whole cleanup body — not just `resetCalendarStateForCurrentBranch`
+    // — behind the same "did setup actually get a token" check: every helper
+    // here (`setWeeklySchedule` included) builds its Authorization header
+    // unconditionally from `adminAccessToken`, so skipping only the first
+    // call still let the very next one send a "Bearer undefined" request and
+    // fail with the same misleading 401 one line later. And `app.close()`
+    // moves into `finally` so a failed cleanup step here can never skip
+    // tearing down this suite's Nest app/DB connections, which would
+    // otherwise leak into every e2e file that runs after this one.
+    try {
+      if (adminAccessToken) {
+        await resetCalendarStateForCurrentBranch();
+        await setWeeklySchedule(baselineWeek());
+      }
+    } finally {
+      if (app) {
+        await app.close();
+      }
+    }
   }, 30_000);
 
   it("computes same-day, business-hours-aware targets under a fully open calendar", async () => {
