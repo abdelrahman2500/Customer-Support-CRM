@@ -97,3 +97,48 @@ export function submitMyTicketCsat(
     body: JSON.stringify(input),
   });
 }
+
+/**
+ * Story 78 — Live Chat UI. Mirrors the backend's `ChannelMessageSummary`
+ * exactly (`apps/api/src/modules/channels/channel-messages.service.ts`),
+ * same independent-per-app re-declaration convention as every other type in
+ * this file (`PortalTicketSummary`, `PortalTicketCsat`, etc.) — not a
+ * `@crm/shared` type, matching this codebase's existing precedent.
+ * `channelType` is typed loosely (`string`, not the backend's full 5-value
+ * enum): Story 77 only ever produces `"LIVE_CHAT"`, and this UI never
+ * branches on it.
+ */
+export interface ChannelMessageSummary {
+  id: string;
+  ticketId: string;
+  channelType: string;
+  direction: "INBOUND" | "OUTBOUND";
+  senderContactId: string | null;
+  senderUserId: string | null;
+  body: string;
+  createdAt: string;
+}
+
+/** Mirrors the existing `CreateChannelMessageDto` exactly
+ * (`apps/api/src/modules/tickets/dto/create-channel-message.dto.ts`). */
+export interface CreateChannelMessageInput {
+  body: string;
+}
+
+/** `GET /portal/tickets/:id/messages` — returns `[]` when the ticket has no
+ * messages yet (not a 404), mirroring `getMyTicketHistory`'s own list-read
+ * convention. */
+export function getMyTicketMessages(id: string): Promise<ChannelMessageSummary[]> {
+  return apiFetch<ChannelMessageSummary[]>(`/portal/tickets/${id}/messages`);
+}
+
+/** `POST /portal/tickets/:id/messages`. */
+export function sendMyTicketMessage(
+  id: string,
+  input: CreateChannelMessageInput,
+): Promise<ChannelMessageSummary> {
+  return apiFetch<ChannelMessageSummary>(`/portal/tickets/${id}/messages`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}

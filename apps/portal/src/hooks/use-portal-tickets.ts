@@ -4,10 +4,17 @@ import {
   getMyTicket,
   getMyTicketCsat,
   getMyTicketHistory,
+  getMyTicketMessages,
   listMyTickets,
+  sendMyTicketMessage,
   submitMyTicketCsat,
 } from "@/lib/tickets-api";
-import type { CreatePortalTicketInput, SubmitCsatInput } from "@/lib/tickets-api";
+import type {
+  ChannelMessageSummary,
+  CreateChannelMessageInput,
+  CreatePortalTicketInput,
+  SubmitCsatInput,
+} from "@/lib/tickets-api";
 
 /**
  * Story 53 — mirrors `apps/web/src/hooks/use-tickets.ts`'s never-optimistic
@@ -55,6 +62,55 @@ export function useSubmitMyTicketCsatMutation(id: string) {
     mutationFn: (input: SubmitCsatInput) => submitMyTicketCsat(id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: myTicketCsatQueryKey(id) });
+    },
+  });
+}
+
+/** Story 78 — mirrors `apps/web/src/hooks/use-ticket-messages.ts`'s own
+ * `mergeChannelMessage` exactly (own per-app copy, matching this file's
+ * existing independent-re-declaration convention): appends unless a message
+ * with the same `id` is already present, then keeps the list chronological.
+ * Shared by the send-mutation's own `onSuccess` below and
+ * `usePortalTicketRealtime`'s `channel.message.created` handler — the
+ * contact's own sent message arrives back over the socket a moment after
+ * the POST response already put it in the cache (Story 77 broadcasts to the
+ * whole `ticket:{id}` room, sender included), so this is what keeps it from
+ * appearing twice. */
+export function mergeChannelMessage(
+  existing: ChannelMessageSummary[] | undefined,
+  incoming: ChannelMessageSummary,
+): ChannelMessageSummary[] {
+  const current = existing ?? [];
+  if (current.some((message) => message.id === incoming.id)) {
+    return current;
+  }
+  return [...current, incoming].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+}
+
+export const myTicketMessagesQueryKey = (id: string) => ["portal-tickets", id, "messages"] as const;
+
+export function useMyTicketMessagesQuery(id: string) {
+  return useQuery({
+    queryKey: myTicketMessagesQueryKey(id),
+    queryFn: () => getMyTicketMessages(id),
+  });
+}
+
+/** Merges the server's own returned message into the cache on success
+ * (mirrors `apps/web`'s `useCreateTicketMessageMutation` exactly) instead of
+ * invalidating: the contact needs their own sent message to appear
+ * immediately, not after a full messages refetch. */
+export function useSendMyTicketMessageMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateChannelMessageInput) => sendMyTicketMessage(id, input),
+    onSuccess: (message) => {
+      queryClient.setQueryData(
+        myTicketMessagesQueryKey(id),
+        (current: ChannelMessageSummary[] | undefined) => mergeChannelMessage(current, message),
+      );
     },
   });
 }

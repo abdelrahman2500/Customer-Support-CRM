@@ -4,7 +4,9 @@ import { TicketDetailView } from "./ticket-detail-view";
 import {
   useMyTicketCsatQuery,
   useMyTicketHistoryQuery,
+  useMyTicketMessagesQuery,
   useMyTicketQuery,
+  useSendMyTicketMessageMutation,
   useSubmitMyTicketCsatMutation,
 } from "@/hooks/use-portal-tickets";
 import { ApiError } from "@/lib/api";
@@ -22,6 +24,14 @@ vi.mock("@/hooks/use-portal-tickets", () => ({
   useMyTicketHistoryQuery: vi.fn(),
   useMyTicketCsatQuery: vi.fn(),
   useSubmitMyTicketCsatMutation: vi.fn(),
+  useMyTicketMessagesQuery: vi.fn(),
+  useSendMyTicketMessageMutation: vi.fn(),
+}));
+
+// Story 78 — this app's first realtime subscription; its own behavior is
+// covered by its dedicated spec, so this file only needs a no-op mock.
+vi.mock("@/hooks/use-portal-ticket-realtime", () => ({
+  usePortalTicketRealtime: vi.fn(),
 }));
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -60,6 +70,13 @@ describe("TicketDetailView", () => {
     );
     vi.mocked(useSubmitMyTicketCsatMutation).mockReturnValue({
       mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
+    vi.mocked(useMyTicketMessagesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useSendMyTicketMessageMutation).mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: "message-new" }),
       isPending: false,
     } as never);
   });

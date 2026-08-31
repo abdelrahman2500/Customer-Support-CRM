@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AuthenticatedUser } from "@crm/shared";
+import { apiFetch } from "@/lib/api";
 import {
   createContact,
   createCustomer,
@@ -128,6 +130,22 @@ export function useCustomerQuery(id: string) {
 
 export function useUsersQuery() {
   return useQuery({ queryKey: ["users"], queryFn: listUsers, staleTime: 5 * 60_000 });
+}
+
+/** Story 78 — the signed-in agent's own id, needed by `TicketChatCard` to
+ * tell "my own message" apart from a colleague's `OUTBOUND` one (unlike a
+ * Portal contact, several different agents can send `OUTBOUND` messages on
+ * the same ticket). Client-side counterpart of `fetchCurrentUser` in
+ * `@/lib/auth-server` (server components can't be used inside a chat card
+ * mounted deep in a `"use client"` tree) — same `GET /auth/me`, no new auth
+ * mechanism. Long `staleTime`, mirrors `useUsersQuery`: "who am I" doesn't
+ * change mid-session. */
+export function useCurrentUserQuery() {
+  return useQuery({
+    queryKey: ["me"],
+    queryFn: () => apiFetch<AuthenticatedUser>("/auth/me"),
+    staleTime: 5 * 60_000,
+  });
 }
 
 /**

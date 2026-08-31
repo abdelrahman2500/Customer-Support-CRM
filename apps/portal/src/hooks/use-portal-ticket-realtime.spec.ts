@@ -2,9 +2,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { io } from "socket.io-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useTicketRealtime } from "./use-ticket-realtime";
-import { invalidateTicketQueries } from "./use-tickets";
-import { mergeChannelMessage, ticketMessagesQueryKey } from "./use-ticket-messages";
+import { usePortalTicketRealtime } from "./use-portal-ticket-realtime";
+import { mergeChannelMessage, myTicketMessagesQueryKey } from "./use-portal-tickets";
 import { getAccessToken } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
@@ -14,9 +13,8 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("socket.io-client", () => ({ io: vi.fn() }));
 vi.mock("@tanstack/react-query", () => ({ useQueryClient: vi.fn() }));
-vi.mock("./use-tickets", () => ({ invalidateTicketQueries: vi.fn() }));
-vi.mock("./use-ticket-messages", () => ({
-  ticketMessagesQueryKey: vi.fn((id: string) => ["ticket", id, "messages"]),
+vi.mock("./use-portal-tickets", () => ({
+  myTicketMessagesQueryKey: vi.fn((id: string) => ["portal-tickets", id, "messages"]),
   mergeChannelMessage: vi.fn((existing: unknown[] | undefined, incoming: unknown) => [
     ...(existing ?? []),
     incoming,
@@ -40,7 +38,7 @@ function buildQueryClientMock() {
   return { setQueryData: vi.fn() };
 }
 
-describe("useTicketRealtime", () => {
+describe("usePortalTicketRealtime", () => {
   let queryClient: ReturnType<typeof buildQueryClientMock>;
 
   beforeEach(() => {
@@ -53,7 +51,7 @@ describe("useTicketRealtime", () => {
     const socket = buildSocketMock();
     vi.mocked(io).mockReturnValue(socket as never);
 
-    renderHook(() => useTicketRealtime("ticket-1"));
+    renderHook(() => usePortalTicketRealtime("ticket-1"));
 
     expect(io).toHaveBeenCalledWith("http://localhost:3001", {
       auth: { token: "test-token" },
@@ -63,36 +61,16 @@ describe("useTicketRealtime", () => {
     expect(socket.emit).toHaveBeenCalledWith("join", { room: "ticket:ticket-1" });
   });
 
-  it("invalidates this ticket's queries when ticket.updated is received", () => {
-    const socket = buildSocketMock();
-    vi.mocked(io).mockReturnValue(socket as never);
-
-    renderHook(() => useTicketRealtime("ticket-1"));
-    socket._trigger("ticket.updated", { ticket: { id: "ticket-1" } });
-
-    expect(invalidateTicketQueries).toHaveBeenCalledWith(queryClient, "ticket-1");
-  });
-
-  it("invalidates this ticket's queries when ticket.escalated is received", () => {
-    const socket = buildSocketMock();
-    vi.mocked(io).mockReturnValue(socket as never);
-
-    renderHook(() => useTicketRealtime("ticket-1"));
-    socket._trigger("ticket.escalated", { ticket: { id: "ticket-1" } });
-
-    expect(invalidateTicketQueries).toHaveBeenCalledWith(queryClient, "ticket-1");
-  });
-
   it("merges an incoming channel.message.created into this ticket's messages cache", () => {
     const socket = buildSocketMock();
     vi.mocked(io).mockReturnValue(socket as never);
 
-    renderHook(() => useTicketRealtime("ticket-1"));
+    renderHook(() => usePortalTicketRealtime("ticket-1"));
     const message = { id: "message-1", ticketId: "ticket-1", body: "hi" };
     socket._trigger("channel.message.created", { ticketId: "ticket-1", message });
 
     expect(queryClient.setQueryData).toHaveBeenCalledWith(
-      ticketMessagesQueryKey("ticket-1"),
+      myTicketMessagesQueryKey("ticket-1"),
       expect.any(Function),
     );
     const updater = queryClient.setQueryData.mock.calls[0]?.[1] as (
@@ -106,7 +84,7 @@ describe("useTicketRealtime", () => {
     const socket = buildSocketMock();
     vi.mocked(io).mockReturnValue(socket as never);
 
-    renderHook(() => useTicketRealtime("ticket-1"));
+    renderHook(() => usePortalTicketRealtime("ticket-1"));
     socket._trigger("channel.message.created", {
       ticketId: "some-other-ticket",
       message: { id: "message-1" },
@@ -116,30 +94,21 @@ describe("useTicketRealtime", () => {
     expect(mergeChannelMessage).not.toHaveBeenCalled();
   });
 
-  it("stops listening for channel.message.created on unmount", () => {
+  it("stops listening and disconnects the socket on unmount", () => {
     const socket = buildSocketMock();
     vi.mocked(io).mockReturnValue(socket as never);
 
-    const { unmount } = renderHook(() => useTicketRealtime("ticket-1"));
+    const { unmount } = renderHook(() => usePortalTicketRealtime("ticket-1"));
     unmount();
 
     expect(socket.off).toHaveBeenCalledWith("channel.message.created", expect.any(Function));
-  });
-
-  it("disconnects the socket on unmount", () => {
-    const socket = buildSocketMock();
-    vi.mocked(io).mockReturnValue(socket as never);
-
-    const { unmount } = renderHook(() => useTicketRealtime("ticket-1"));
-    unmount();
-
     expect(socket.disconnect).toHaveBeenCalledOnce();
   });
 
   it("does not connect when there is no access token", () => {
     vi.mocked(getAccessToken).mockReturnValueOnce(null);
 
-    renderHook(() => useTicketRealtime("ticket-1"));
+    renderHook(() => usePortalTicketRealtime("ticket-1"));
 
     expect(io).not.toHaveBeenCalled();
   });

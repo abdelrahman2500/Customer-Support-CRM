@@ -4,6 +4,17 @@ export function getApiBaseUrl(): string {
 }
 
 /**
+ * Story 78 — the origin the Socket.IO client connects to (Story 20's
+ * `RealtimeGateway`, default namespace at the server's own origin, not
+ * under `/api/v1`). Mirrors `apps/web/src/lib/api.ts`'s own
+ * `getSocketBaseUrl` exactly, derived from the same `NEXT_PUBLIC_API_URL`
+ * the REST client already uses, not a second environment variable.
+ */
+export function getSocketBaseUrl(): string {
+  return getApiBaseUrl().replace(/\/api\/v1\/?$/, "");
+}
+
+/**
  * Story 52 — mirrors `apps/web/src/lib/api.ts` file-for-file, retargeted to
  * `/portal/auth/*` and a separate cookie name/path so an agent session and a
  * portal session in the same browser never collide.

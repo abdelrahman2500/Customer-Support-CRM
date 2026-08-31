@@ -9,6 +9,8 @@ import {
   useMyTicketQuery,
   useSubmitMyTicketCsatMutation,
 } from "@/hooks/use-portal-tickets";
+import { usePortalTicketRealtime } from "@/hooks/use-portal-ticket-realtime";
+import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import { ApiError } from "@/lib/api";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
 
@@ -18,10 +20,18 @@ const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
  * Story 53 — mirrors `apps/web`'s `TicketDetailView`'s loading/not-found/
  * generic-error convention and its History card's exact shape, read-only
  * (a portal Contact never edits a ticket — that's agent-only).
+ *
+ * Story 78 — a new "Live Chat" card (`TicketChatCard`), placed right after
+ * the ticket summary header: unlike History/CSAT below it, chat is a
+ * primary, frequently-used interaction surface. `usePortalTicketRealtime` is
+ * this app's first realtime subscription — joins `ticket:{id}` exactly like
+ * `apps/web`'s own `useTicketRealtime`, mirroring that hook's mount-once
+ * placement here at the top of the view.
  */
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
   const { locale } = useParams<{ locale: string }>();
+  usePortalTicketRealtime(ticketId);
   const ticketQuery = useMyTicketQuery(ticketId);
   const historyQuery = useMyTicketHistoryQuery(ticketId);
 
@@ -76,6 +86,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </div>
         </dl>
       </div>
+
+      <TicketChatCard ticketId={ticketId} />
 
       <div className="rounded-md border border-slate-200 bg-white p-6">
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.historyHeading")}</h2>

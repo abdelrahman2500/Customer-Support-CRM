@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { TicketDetailView } from "./ticket-detail-view";
 import {
   useCreateTicketNoteMutation,
+  useCurrentUserQuery,
   useCustomersQuery,
   useDepartmentsQuery,
   useTicketCsatQuery,
@@ -15,6 +16,10 @@ import {
   useUsersQuery,
 } from "@/hooks/use-tickets";
 import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
+import {
+  useCreateTicketMessageMutation,
+  useTicketMessagesQuery,
+} from "@/hooks/use-ticket-messages";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { ApiError } from "@/lib/api";
 
@@ -39,6 +44,7 @@ vi.mock("@/hooks/use-tickets", () => ({
   useTicketCsatQuery: vi.fn(),
   useCustomersQuery: vi.fn(),
   useUsersQuery: vi.fn(),
+  useCurrentUserQuery: vi.fn(),
   useDepartmentsQuery: vi.fn(),
   useUpdateTicketMutation: vi.fn(),
   useCreateTicketNoteMutation: vi.fn(),
@@ -47,6 +53,14 @@ vi.mock("@/hooks/use-tickets", () => ({
 vi.mock("@/hooks/use-attachments", () => ({
   useAttachmentsQuery: vi.fn(),
   useUploadAttachmentMutation: vi.fn(),
+}));
+
+// Story 78 — TicketChatCard's own hooks; its behavior is covered in its own
+// dedicated spec (mirrors AttachmentsCard's own precedent), so this file
+// only needs enough of a mock for TicketDetailView to render it cleanly.
+vi.mock("@/hooks/use-ticket-messages", () => ({
+  useTicketMessagesQuery: vi.fn(),
+  useCreateTicketMessageMutation: vi.fn(),
 }));
 
 vi.mock("@/lib/attachments-api", () => ({
@@ -119,6 +133,19 @@ describe("TicketDetailView", () => {
     vi.mocked(useUploadAttachmentMutation).mockReturnValue({
       mutate: vi.fn(),
       mutateAsync: vi.fn().mockResolvedValue({ id: "attachment-new" }),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(useCurrentUserQuery).mockReturnValue(
+      queryResult({ data: { id: "agent-1" }, isSuccess: true }) as never,
+    );
+    vi.mocked(useTicketMessagesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useCreateTicketMessageMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({ id: "message-new" }),
       isPending: false,
       isError: false,
       error: null,

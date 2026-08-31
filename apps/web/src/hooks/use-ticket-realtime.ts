@@ -5,10 +5,13 @@ import { io } from "socket.io-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
 import { invalidateTicketQueries } from "./use-tickets";
+import { mergeChannelMessage, ticketMessagesQueryKey } from "./use-ticket-messages";
+import type { ChannelMessageSummary } from "@/lib/ticket-messages-api";
 
 const TICKET_UPDATED_EVENT = "ticket.updated";
 const TICKET_ESCALATED_EVENT = "ticket.escalated";
 const TICKET_NOTE_ADDED_EVENT = "ticket.note-added";
+const CHANNEL_MESSAGE_CREATED_EVENT = "channel.message.created";
 
 /**
  * Story 23, plan Design item 8 — Ticket Detail's *only* realtime
@@ -23,6 +26,18 @@ const TICKET_NOTE_ADDED_EVENT = "ticket.note-added";
  *
  * Story 50 — `ticket.note-added` added as a third subscribed event, reusing
  * the same `handleUpdate` handler unchanged (Task 12).
+ *
+ * Story 78 — a fourth subscribed event, `channel.message.created`
+ * (Story 77), handled differently from the other three: rather than
+ * invalidating and re-fetching the whole messages list on every chat
+ * message (which would refetch on every keystroke-speed exchange), it merges
+ * the message straight into `["ticket", id, "messages"]`'s cache via
+ * `mergeChannelMessage` — the same merge the send-mutation's own `onSuccess`
+ * uses, so a message this socket echoes back to its own sender (Story 77
+ * broadcasts to the whole room, sender included) never appears twice. The
+ * payload's own `ticketId` is checked against this hook's `ticketId` before
+ * merging — belt-and-suspenders alongside the room-join itself already
+ * guaranteeing this socket only ever receives this ticket's events.
  */
 export function useTicketRealtime(ticketId: string): void {
   const queryClient = useQueryClient();
@@ -47,10 +62,22 @@ export function useTicketRealtime(ticketId: string): void {
     socket.on(TICKET_ESCALATED_EVENT, handleUpdate);
     socket.on(TICKET_NOTE_ADDED_EVENT, handleUpdate);
 
+    const handleChannelMessage = (payload: { ticketId: string; message: ChannelMessageSummary }) => {
+      if (payload.ticketId !== ticketId) {
+        return;
+      }
+      queryClient.setQueryData(
+        ticketMessagesQueryKey(ticketId),
+        (current: ChannelMessageSummary[] | undefined) => mergeChannelMessage(current, payload.message),
+      );
+    };
+    socket.on(CHANNEL_MESSAGE_CREATED_EVENT, handleChannelMessage);
+
     return () => {
       socket.off(TICKET_UPDATED_EVENT, handleUpdate);
       socket.off(TICKET_ESCALATED_EVENT, handleUpdate);
       socket.off(TICKET_NOTE_ADDED_EVENT, handleUpdate);
+      socket.off(CHANNEL_MESSAGE_CREATED_EVENT, handleChannelMessage);
       socket.disconnect();
     };
   }, [ticketId, queryClient]);

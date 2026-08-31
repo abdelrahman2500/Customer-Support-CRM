@@ -7,6 +7,7 @@ Entry point for the **customer-portal-live-chat** feature. Stories execute in or
 | NN  | File                                                                     | Title                             | Tracker id | Depends on                                                                 |
 | --- | --------------------------------------------------------------------------- | ------------------------------------ | ---------- | ------------------------------------------------------------------------------ |
 | 77  | [77-story-customer-portal-live-chat.md](./77-story-customer-portal-live-chat.md) | Customer Portal Live Chat | —          | `realtime-socketio-foundation` Story 20 (gateway, `ticket:{id}`), `customer-portal-authentication-foundation` Story 52 (Portal JWT), `agent-workspace-ticket-internal-notes` Story 50 (`ticket.note-added`, the event this story must not leak) |
+| 78  | [78-story-live-chat-ui.md](./78-story-live-chat-ui.md) | Live Chat UI (Agent Workspace + Customer Portal) | — | Story 77 (the complete backend/realtime contract this story builds the frontend for, unchanged) |
 
 ## Dependency notes
 

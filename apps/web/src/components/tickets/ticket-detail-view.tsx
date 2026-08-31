@@ -18,6 +18,7 @@ import {
   useUsersQuery,
 } from "@/hooks/use-tickets";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
+import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
@@ -88,6 +89,15 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * short-lived presigned S3 URL in a new tab (`getAttachmentDownloadUrl`) —
  * a plain top-level navigation, not a script-initiated fetch, so no CORS
  * configuration on the object-storage side is needed.
+ *
+ * Story 78 — a new "Live Chat" card (`TicketChatCard`), placed right after
+ * the status/priority/assignment grid: unlike the read-mostly cards below
+ * it, chat is a primary, frequently-used interaction surface. Extracted
+ * into its own file/component from the start (mirrors `AttachmentsCard`'s
+ * own precedent) rather than inlined here, since it owns real interactive
+ * state (the composer) and its own realtime-merge logic. Consumes the
+ * `channel.message.created` handling already added to this view's existing
+ * `useTicketRealtime()` call above — no second socket connection.
  */
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -271,6 +281,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           )}
         </Field>
       </div>
+
+      <TicketChatCard ticketId={ticketId} />
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.slaHeading")}</h2>
