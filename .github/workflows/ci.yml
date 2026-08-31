@@ -12,9 +12,12 @@ env:
   # production secrets: these only ever exist inside an ephemeral CI job.
   DATABASE_URL: "postgresql://crm:crm@localhost:5432/crm?schema=public"
   REDIS_URL: "redis://localhost:6379"
+  NODE_ENV: "test"
   JWT_ACCESS_SECRET: "ci-only-access-secret-not-a-real-secret-32chars"
+  JWT_ACCESS_TTL: "15m"
   JWT_REFRESH_SECRET: "ci-only-refresh-secret-not-a-real-secret-32chars"
   JWT_REFRESH_TTL_DAYS: "7"
+  CORS_ORIGINS: "http://localhost:3000"
   SEED_ADMIN_EMAIL: "ci-admin@example.com"
   SEED_ADMIN_PASSWORD: "ci-only-admin-password-not-a-real-secret-32ch"
 
