@@ -4,6 +4,7 @@ import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import cookieParser from "cookie-parser";
 import request from "supertest";
+import { PrismaService } from "../src/prisma/prisma.service";
 import { AppModule } from "../src/app.module";
 
 /**
@@ -48,7 +49,12 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
     startMinute?: number;
     endMinute?: number;
   }> {
-    return Array.from({ length: 7 }, (_, weekday) => ({ weekday, isOpen: true, startMinute: 0, endMinute: 1439 }));
+    return Array.from({ length: 7 }, (_, weekday) => ({
+      weekday,
+      isOpen: true,
+      startMinute: 0,
+      endMinute: 1439,
+    }));
   }
 
   function baselineWeek(): Array<{
@@ -63,6 +69,26 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
         ? { weekday, isOpen: false }
         : { weekday, isOpen: true, startMinute: 540, endMinute: 1020 };
     });
+  }
+
+  async function resetCalendarStateForCurrentBranch(): Promise<void> {
+    const prisma = app.get(PrismaService);
+    const me = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    const calendar = await prisma.businessHoursCalendar.findFirst({
+      where: { branchId: me.body.branchId },
+      include: { exceptions: true, days: true },
+    });
+
+    if (!calendar) {
+      return;
+    }
+
+    await prisma.businessHoursException.deleteMany({ where: { calendarId: calendar.id } });
+    await prisma.businessHoursDay.deleteMany({ where: { calendarId: calendar.id } });
   }
 
   async function setWeeklySchedule(
@@ -130,7 +156,7 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
   async function createTicketWithPolicy(
     responseTargetMinutes: number,
     resolutionTargetMinutes: number,
-  ): Promise<string> {
+  ): Promise<{ id: string; createdAt: Date }> {
     const category = `sla-bh-e2e-${randomUUID()}`;
     await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
@@ -149,7 +175,10 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({ customerId: customer.body.id, subject: "Business-hours e2e ticket", category })
       .expect(201);
-    return ticket.body.id as string;
+    return {
+      id: ticket.body.id as string,
+      createdAt: new Date(ticket.body.createdAt),
+    };
   }
 
   async function waitForSlaTarget(
@@ -197,10 +226,12 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
     tomorrowDate = isoDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
     dayAfterTomorrowDate = isoDate(new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000));
 
+    await resetCalendarStateForCurrentBranch();
     await setWeeklySchedule(continuousWeek());
   });
 
   afterAll(async () => {
+    await resetCalendarStateForCurrentBranch();
     await setWeeklySchedule(baselineWeek());
     await app.close();
   });
@@ -217,17 +248,16 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
     // creation instead of assuming same-day, keeping this assertion correct
     // no matter what time of day the suite runs, including near UTC
     // midnight.
-    const beforeCreate = new Date();
+    const ticket = await createTicketWithPolicy(30, 240);
     function expectedTargetDate(durationMinutes: number): string {
-      const minuteOfDay = beforeCreate.getUTCHours() * 60 + beforeCreate.getUTCMinutes();
+      const minuteOfDay = ticket.createdAt.getUTCHours() * 60 + ticket.createdAt.getUTCMinutes();
       const availableToday = 1439 - minuteOfDay;
       return availableToday >= durationMinutes
-        ? isoDate(beforeCreate)
-        : isoDate(new Date(beforeCreate.getTime() + 24 * 60 * 60 * 1000));
+        ? isoDate(ticket.createdAt)
+        : isoDate(new Date(ticket.createdAt.getTime() + 24 * 60 * 60 * 1000));
     }
 
-    const ticketId = await createTicketWithPolicy(30, 240);
-    const response = await waitForSlaTarget(ticketId);
+    const response = await waitForSlaTarget(ticket.id);
     expect(response.status).toBe(200);
 
     const responseTargetAt = new Date(response.body.responseTargetAt);
@@ -244,8 +274,8 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
     // minutes remain) AND past all of tomorrow (now fully closed, 0
     // minutes), landing on a later, still-continuously-open date —
     // regardless of what time "now" actually is.
-    const ticketId = await createTicketWithPolicy(2000, 2000);
-    const response = await waitForSlaTarget(ticketId);
+    const ticket = await createTicketWithPolicy(2000, 2000);
+    const response = await waitForSlaTarget(ticket.id);
     expect(response.status).toBe(200);
 
     expect(isoDate(new Date(response.body.responseTargetAt))).not.toBe(tomorrowDate);
@@ -267,8 +297,8 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
       overrideEndMinute: 760,
     });
 
-    const ticketId = await createTicketWithPolicy(3500, 3500);
-    const response = await waitForSlaTarget(ticketId);
+    const ticket = await createTicketWithPolicy(3500, 3500);
+    const response = await waitForSlaTarget(ticket.id);
     expect(response.status).toBe(200);
 
     expect(isoDate(new Date(response.body.responseTargetAt))).not.toBe(dayAfterTomorrowDate);
