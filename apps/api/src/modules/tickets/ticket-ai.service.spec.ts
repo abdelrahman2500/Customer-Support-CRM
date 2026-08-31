@@ -16,6 +16,7 @@ function buildAiGatewayMock() {
   return {
     summarize: vi.fn(),
     suggestReply: vi.fn(),
+    categorize: vi.fn(),
   };
 }
 
@@ -127,6 +128,36 @@ describe("TicketAiService", () => {
 
       await expect(service.suggestReplyForTicket("unknown")).rejects.toThrow(notFound);
       expect(aiGateway.suggestReply).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("categorizeTicket", () => {
+    it("loads the same ticket input as summarizeTicket and calls AiGatewayService.categorize", async () => {
+      ticketsService.getTicket.mockResolvedValue({ id: "ticket-1", subject: "Login issue" });
+      ticketsService.getTicketNotes.mockResolvedValue([
+        { id: "n1", body: "Checked logs.", createdAt: new Date() },
+      ]);
+      aiGateway.categorize.mockResolvedValue(SUCCESS_RESULT);
+
+      const result = await service.categorizeTicket("ticket-1");
+
+      expect(ticketsService.getTicket).toHaveBeenCalledWith("ticket-1");
+      expect(ticketsService.getTicketNotes).toHaveBeenCalledWith("ticket-1");
+      expect(aiGateway.categorize).toHaveBeenCalledWith(
+        { subject: "Login issue", body: "Checked logs." },
+        "branch-1",
+      );
+      expect(result).toBe(SUCCESS_RESULT);
+      expect(aiGateway.summarize).not.toHaveBeenCalled();
+      expect(aiGateway.suggestReply).not.toHaveBeenCalled();
+    });
+
+    it("propagates a NotFoundException from getTicket for an out-of-scope ticket, never calling the AI gateway", async () => {
+      const notFound = new Error("Ticket not found");
+      ticketsService.getTicket.mockRejectedValue(notFound);
+
+      await expect(service.categorizeTicket("unknown")).rejects.toThrow(notFound);
+      expect(aiGateway.categorize).not.toHaveBeenCalled();
     });
   });
 });

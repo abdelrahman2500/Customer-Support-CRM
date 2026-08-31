@@ -109,4 +109,14 @@ export class TicketsController {
   suggestReply(@Param("id") id: string): Promise<AiCallResult> {
     return this.ticketAiService.suggestReplyForTicket(id);
   }
+
+  /** Story 75 — same advisory-only, `ticket:read`-gated shape as
+   * `summarize`/`suggestReply` above. Returns a *suggested* category only
+   * — never writes `Ticket.category` (see `TicketAiService`'s own doc
+   * comment for why auto-applying it is out of scope). */
+  @Post(":id/ai/categorize")
+  @RequirePermissions("ticket:read")
+  categorize(@Param("id") id: string): Promise<AiCallResult> {
+    return this.ticketAiService.categorizeTicket(id);
+  }
 }

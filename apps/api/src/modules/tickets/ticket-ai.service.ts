@@ -28,6 +28,14 @@ import { TicketsService } from "./tickets.service";
  * Story 74 — `suggestReplyForTicket` added the same way, reusing
  * `loadAiTicketInput` unchanged (additive-only service extension, this
  * codebase's own established convention).
+ *
+ * Story 75 — `categorizeTicket` added the same way. It only ever returns
+ * a *suggested* category string in `AiCallResult.text` — nothing here
+ * writes to `Ticket.category`. Auto-applying it would be a real product
+ * decision (does it overwrite an agent's own choice? is it silently
+ * applied or does it need explicit confirmation?) this story does not
+ * make; an agent still applies it via the existing `PATCH /tickets/:id`
+ * exactly like any other manual edit.
  */
 @Injectable()
 export class TicketAiService {
@@ -47,6 +55,12 @@ export class TicketAiService {
     const input = await this.loadAiTicketInput(id);
     const { branchId } = this.tenantContext.requireBranchScope();
     return this.aiGatewayService.suggestReply(input, branchId);
+  }
+
+  async categorizeTicket(id: string): Promise<AiCallResult> {
+    const input = await this.loadAiTicketInput(id);
+    const { branchId } = this.tenantContext.requireBranchScope();
+    return this.aiGatewayService.categorize(input, branchId);
   }
 
   private async loadAiTicketInput(id: string): Promise<AiTicketInput> {
