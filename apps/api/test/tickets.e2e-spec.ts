@@ -795,4 +795,81 @@ describe("Ticketing (e2e)", () => {
       expect(after).toBe(before + 1);
     });
   });
+
+  // Story 74 — Suggested Reply, the second consumer of Story 72's
+  // AiGatewayService. Same environment limitation as Story 73's own tests
+  // above: no ANTHROPIC_API_KEY, so NullAiProvider is what actually runs.
+  describe("ticket AI suggested reply (Story 74)", () => {
+    it("rejects an unauthenticated request", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/suggest-reply`)
+        .expect(401);
+    });
+
+    it("rejects an Agent-role user lacking ticket:read (403)", async () => {
+      const agentEmail = `agent-ai-suggest-reply-${randomUUID()}@example.com`;
+      const agentPassword = "agent-test-password-123";
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: agentPassword,
+          fullName: "Test Agent AI Suggest Reply",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+      const agentAccessToken = agentLogin.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/suggest-reply`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(403);
+    });
+
+    it("returns 404 for a ticket that doesn't exist", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${randomUUID()}/ai/suggest-reply`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("returns a DISABLED outcome (no ANTHROPIC_API_KEY in this environment) and logs exactly one AiPromptLog row", async () => {
+      const before = await prisma.aiPromptLog.count({ where: { feature: "SUGGEST_REPLY" } });
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/suggest-reply`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      expect(response.body).toEqual({
+        outcome: "DISABLED",
+        text: null,
+        model: "disabled",
+        inputTokens: null,
+        outputTokens: null,
+        errorMessage: null,
+      });
+
+      const after = await prisma.aiPromptLog.count({ where: { feature: "SUGGEST_REPLY" } });
+      expect(after).toBe(before + 1);
+    });
+  });
 });

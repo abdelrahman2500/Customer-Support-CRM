@@ -65,3 +65,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | _(unplanned)_ realtime-agent-presence | Story 71 — implemented directly after an approved batching check; no formal `.squad` plan artifact (self-evidently small extension of `realtime-socketio-foundation`, `CLAUDE.md` §3.4) | 71        |
 | ai-services-foundation | [ai-services-foundation/00-overview.md](./ai-services-foundation/00-overview.md) | 72–      |
 | _(unplanned)_ ticket-ai-summarization | Story 73 — implemented directly as a self-evidently small first consumer of `ai-services-foundation`'s `AiGatewayService` (`CLAUDE.md` §3.4); no formal `.squad` plan artifact | 73        |
+| _(unplanned)_ ticket-ai-suggested-reply | Story 74 — implemented directly as an additive extension of Story 73's `TicketAiService` (`CLAUDE.md` §3.4); no formal `.squad` plan artifact | 74        |

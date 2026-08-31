@@ -101,4 +101,12 @@ export class TicketsController {
   summarize(@Param("id") id: string): Promise<AiCallResult> {
     return this.ticketAiService.summarizeTicket(id);
   }
+
+  /** Story 74 — same advisory-only, `ticket:read`-gated shape as
+   * `summarize` above. */
+  @Post(":id/ai/suggest-reply")
+  @RequirePermissions("ticket:read")
+  suggestReply(@Param("id") id: string): Promise<AiCallResult> {
+    return this.ticketAiService.suggestReplyForTicket(id);
+  }
 }

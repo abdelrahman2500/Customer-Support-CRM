@@ -22,8 +22,12 @@ import { TicketsService } from "./tickets.service";
  *
  * Every method here reuses `TicketsService.getTicket`/`getTicketNotes`,
  * so branch scope and Story 68's department-visibility filter apply
- * identically — a caller can never summarize a ticket they couldn't
- * otherwise read.
+ * identically — a caller can never summarize/get-a-suggested-reply-for a
+ * ticket they couldn't otherwise read.
+ *
+ * Story 74 — `suggestReplyForTicket` added the same way, reusing
+ * `loadAiTicketInput` unchanged (additive-only service extension, this
+ * codebase's own established convention).
  */
 @Injectable()
 export class TicketAiService {
@@ -37,6 +41,12 @@ export class TicketAiService {
     const input = await this.loadAiTicketInput(id);
     const { branchId } = this.tenantContext.requireBranchScope();
     return this.aiGatewayService.summarize(input, branchId);
+  }
+
+  async suggestReplyForTicket(id: string): Promise<AiCallResult> {
+    const input = await this.loadAiTicketInput(id);
+    const { branchId } = this.tenantContext.requireBranchScope();
+    return this.aiGatewayService.suggestReply(input, branchId);
   }
 
   private async loadAiTicketInput(id: string): Promise<AiTicketInput> {
