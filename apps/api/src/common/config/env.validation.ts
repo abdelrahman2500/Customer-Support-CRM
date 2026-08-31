@@ -25,13 +25,15 @@ export const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
   JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
-  /** Story 66 — Ticket Attachments is the first real consumer; these were
-   * scaffolded optional since project foundation and stay required now
-   * that `AttachmentsModule`'s `S3StorageService` actually reads them. */
-  S3_ENDPOINT: z.string().min(1, "S3_ENDPOINT is required"),
-  S3_ACCESS_KEY: z.string().min(1, "S3_ACCESS_KEY is required"),
-  S3_SECRET_KEY: z.string().min(1, "S3_SECRET_KEY is required"),
-  S3_BUCKET: z.string().min(1, "S3_BUCKET is required"),
+  /** Story 66 — Ticket Attachments is the first real consumer. Keep the
+   * local MinIO defaults here so test/CI bootstraps do not fail when the
+   * per-app `.env` file is not present yet; production and local overrides
+   * still win because `ConfigModule.forRoot()` reads the actual environment
+   * values before validation. */
+  S3_ENDPOINT: z.string().min(1, "S3_ENDPOINT is required").default("http://localhost:9000"),
+  S3_ACCESS_KEY: z.string().min(1, "S3_ACCESS_KEY is required").default("minioadmin"),
+  S3_SECRET_KEY: z.string().min(1, "S3_SECRET_KEY is required").default("minioadmin"),
+  S3_BUCKET: z.string().min(1, "S3_BUCKET is required").default("crm-attachments"),
 
   /**
    * Story 23 — comma-separated list of allowed browser origins for both the
