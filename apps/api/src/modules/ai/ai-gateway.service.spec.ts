@@ -21,12 +21,19 @@ describe("AiGatewayService", () => {
       prisma.aiPromptLog.create.mockResolvedValue({ id: "log-1" });
       const service = createService(prisma);
 
-      const result = await service.createPendingLog("SUMMARIZE", "branch-1", "ticket-1", "abc123");
+      const result = await service.createPendingLog(
+        "SUMMARIZE",
+        "branch-1",
+        "ticket-1",
+        null,
+        "abc123",
+      );
 
       expect(prisma.aiPromptLog.create).toHaveBeenCalledWith({
         data: {
           branchId: "branch-1",
           ticketId: "ticket-1",
+          chatSessionId: null,
           feature: "SUMMARIZE",
           model: "pending",
           promptRef: "abc123",
@@ -45,8 +52,8 @@ describe("AiGatewayService", () => {
       prisma.aiPromptLog.create.mockResolvedValue({ id: "log-2" });
       const service = createService(prisma);
 
-      await service.createPendingLog("SUGGEST_REPLY", "branch-1", "ticket-1", "ref");
-      await service.createPendingLog("CATEGORIZE", "branch-1", "ticket-1", "ref");
+      await service.createPendingLog("SUGGEST_REPLY", "branch-1", "ticket-1", null, "ref");
+      await service.createPendingLog("CATEGORIZE", "branch-1", "ticket-1", null, "ref");
 
       expect(prisma.aiPromptLog.create).toHaveBeenNthCalledWith(1, expect.objectContaining({
         data: expect.objectContaining({ feature: "SUGGEST_REPLY" }),
@@ -54,6 +61,24 @@ describe("AiGatewayService", () => {
       expect(prisma.aiPromptLog.create).toHaveBeenNthCalledWith(2, expect.objectContaining({
         data: expect.objectContaining({ feature: "CATEGORIZE" }),
       }));
+    });
+
+    it("writes ticketId: null and the real chatSessionId for a CHAT-shaped call", async () => {
+      const prisma = buildPrismaMock();
+      prisma.aiPromptLog.create.mockResolvedValue({ id: "log-3" });
+      const service = createService(prisma);
+
+      await service.createPendingLog("CHAT", "branch-1", null, "session-1", "ref");
+
+      expect(prisma.aiPromptLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            feature: "CHAT",
+            ticketId: null,
+            chatSessionId: "session-1",
+          }),
+        }),
+      );
     });
   });
 });

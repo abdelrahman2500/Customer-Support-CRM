@@ -129,6 +129,7 @@ export class TicketAiService {
       feature as AiFeature,
       branchId,
       id,
+      null,
       promptRef(input.subject, input.body),
     );
 

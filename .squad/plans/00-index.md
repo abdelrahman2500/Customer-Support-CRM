@@ -72,3 +72,5 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | ai-ticket-assist-async-processing | [ai-ticket-assist-async-processing/00-overview.md](./ai-ticket-assist-async-processing/00-overview.md) | 76–      |
 | _(unplanned)_ env-defaults-maintenance | `feat(env): add local MinIO defaults for S3 settings and corresponding tests` (`fbffaab`) — plain maintenance commit, not assigned a story number (no product-facing behavior change) | —         |
 | customer-portal-live-chat | [customer-portal-live-chat/00-overview.md](./customer-portal-live-chat/00-overview.md) | 77–      |
+| ai-ticket-assist-result-delivery | [ai-ticket-assist-async-processing/79-story-ai-ticket-assist-result-delivery.md](./ai-ticket-assist-async-processing/79-story-ai-ticket-assist-result-delivery.md) | 79–      |
+| ai-portal-chatbot | [ai-portal-chatbot/00-overview.md](./ai-portal-chatbot/00-overview.md) | 80–      |

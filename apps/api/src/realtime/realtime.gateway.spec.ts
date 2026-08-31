@@ -20,6 +20,7 @@ function buildPrismaMock() {
     ticket: { findUnique: vi.fn() },
     userBranchRole: { findFirst: vi.fn() },
     contact: { findUnique: vi.fn() },
+    chatSession: { findUnique: vi.fn() },
   };
 }
 
@@ -333,6 +334,50 @@ describe("RealtimeGateway", () => {
       const result = await gateway.onJoin(client as never, { room: "ticket:ticket-1" });
 
       expect(result).toEqual({ ok: false });
+    });
+
+    // Story 80 — chat-session:{id} is the inverse of the two rooms below:
+    // customer-only, never agent.
+    it("allows a customer to join chat-session:{id} for their own session", async () => {
+      const client = connectedCustomerClient();
+      prisma.chatSession.findUnique.mockResolvedValue({ contactId: "contact-1" });
+
+      const result = await gateway.onJoin(client as never, { room: "chat-session:session-1" });
+
+      expect(prisma.chatSession.findUnique).toHaveBeenCalledWith({
+        where: { id: "session-1" },
+        select: { contactId: true },
+      });
+      expect(result).toEqual({ ok: true });
+      expect(client.join).toHaveBeenCalledWith("chat-session:session-1");
+    });
+
+    it("denies a customer joining chat-session:{id} for another Contact's session", async () => {
+      const client = connectedCustomerClient();
+      prisma.chatSession.findUnique.mockResolvedValue({ contactId: "contact-2" });
+
+      const result = await gateway.onJoin(client as never, { room: "chat-session:session-1" });
+
+      expect(result).toEqual({ ok: false });
+      expect(client.join).not.toHaveBeenCalled();
+    });
+
+    it("denies joining chat-session:{id} when the session does not exist", async () => {
+      const client = connectedCustomerClient();
+      prisma.chatSession.findUnique.mockResolvedValue(null);
+
+      const result = await gateway.onJoin(client as never, { room: "chat-session:missing" });
+
+      expect(result).toEqual({ ok: false });
+    });
+
+    it("denies an agent joining chat-session:{id} outright — customer-only", async () => {
+      const client = connectedClient();
+
+      const result = await gateway.onJoin(client as never, { room: "chat-session:session-1" });
+
+      expect(result).toEqual({ ok: false });
+      expect(prisma.chatSession.findUnique).not.toHaveBeenCalled();
     });
 
     it("denies a customer joining branch:{id}:notifications — agent-only", async () => {

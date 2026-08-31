@@ -1,6 +1,6 @@
 import { InjectQueue, Processor, WorkerHost } from "@nestjs/bullmq";
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import type { AiCallResult, AiProvider, AiTicketInput } from "@crm/ai";
+import type { AiCallResult, AiProvider } from "@crm/ai";
 import type { Job, Queue } from "bullmq";
 import { PrismaService } from "../prisma/prisma.service";
 import { AI_PROVIDER } from "../ai/ai.constants";
@@ -14,14 +14,19 @@ import type { AiCompletionJobPayload } from "./ai-processing-events.types";
 export const AI_PROCESSING_QUEUE = "ai-processing";
 
 /** Must stay identical to `AiProcessingJobPayload` in
- * apps/api/src/queues/ai-processing.producer.ts. */
+ * apps/api/src/queues/ai-processing.producer.ts.
+ *
+ * Story 80 — `feature` now includes `CHAT`. `ticketId`/`subject` are
+ * ticket-scoped-only (optional); `chatSessionId` is `CHAT`-only
+ * (optional); `body` is always present. */
 export interface AiProcessingJobPayload {
   aiPromptLogId: string;
-  ticketId: string;
   branchId: string;
-  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE";
-  subject: string;
+  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT";
+  ticketId?: string;
+  subject?: string;
   body: string;
+  chatSessionId?: string;
 }
 
 /**
@@ -44,6 +49,17 @@ export interface AiProcessingJobPayload {
  * job was ever enqueued. This processor never re-derives or re-checks
  * ticket access, and never constructs its own `AiProvider` — only the
  * one `@crm/ai` implementation `AiProviderModule` already selected.
+ *
+ * Story 80 — `CHAT` added as a fourth feature (see
+ * `docs/architecture/06-communication-and-realtime.md`: "`ai-processing`
+ * for summaries, categorization, suggested replies, and chatbot work
+ * that need not block requests" — this story's own plan resolves the
+ * apparent tension with a more literal reading of a different doc in
+ * `ai-processing`'s favor). On a `SUCCESS` outcome only, the assistant's
+ * reply is additionally persisted as a `ChatMessage` row — the
+ * conversation history's own source of truth; a failed/disabled turn is
+ * never given a placeholder message (the caller learns of it via the
+ * same `AiPromptLog` result-polling endpoint every other feature uses).
  */
 @Injectable()
 @Processor(AI_PROCESSING_QUEUE)
@@ -60,13 +76,12 @@ export class AiProcessingProcessor extends WorkerHost {
   }
 
   async process(job: Job<AiProcessingJobPayload>): Promise<void> {
-    const { aiPromptLogId, ticketId, feature, subject, body } = job.data;
-    const input: AiTicketInput = { subject, body };
+    const { aiPromptLogId, ticketId, feature, chatSessionId } = job.data;
     const startedAt = Date.now();
 
     let result: AiCallResult;
     try {
-      result = await this.call(feature, input);
+      result = await this.call(job.data);
     } catch (error) {
       // The `AiProvider` contract says implementations never throw, but a
       // future/misbehaving provider still shouldn't leave the durable log
@@ -96,23 +111,31 @@ export class AiProcessingProcessor extends WorkerHost {
       },
     });
 
+    if (feature === "CHAT" && result.outcome === "SUCCESS" && chatSessionId) {
+      await this.prisma.chatMessage.create({
+        data: { sessionId: chatSessionId, role: "ASSISTANT", body: result.text ?? "" },
+      });
+    }
+
     await this.handbackQueue.add("ai-completion", {
       aiPromptLogId,
-      ticketId,
       feature,
       outcome: result.outcome,
+      ...(feature === "CHAT" ? { chatSessionId } : { ticketId }),
     });
-    this.logger.log(`Completed ${feature} (${result.outcome}) for ticket ${ticketId}`);
+    this.logger.log(`Completed ${feature} (${result.outcome}) for ${ticketId ?? chatSessionId}`);
   }
 
-  private call(feature: AiProcessingJobPayload["feature"], input: AiTicketInput): Promise<AiCallResult> {
-    switch (feature) {
+  private call(data: AiProcessingJobPayload): Promise<AiCallResult> {
+    switch (data.feature) {
       case "SUMMARIZE":
-        return this.provider.summarize(input);
+        return this.provider.summarize({ subject: data.subject ?? "", body: data.body });
       case "SUGGEST_REPLY":
-        return this.provider.suggestReply(input);
+        return this.provider.suggestReply({ subject: data.subject ?? "", body: data.body });
       case "CATEGORIZE":
-        return this.provider.categorize(input);
+        return this.provider.categorize({ subject: data.subject ?? "", body: data.body });
+      case "CHAT":
+        return this.provider.chat({ sessionId: data.chatSessionId ?? "", message: data.body });
     }
   }
 }

@@ -51,6 +51,7 @@ model Branch {
   notificationTemplates NotificationTemplate[]
   brandingConfig        BrandingConfig?
   aiPromptLogs          AiPromptLog[]
+  chatSessions          ChatSession[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -278,6 +279,7 @@ model Contact {
   refreshTokens ContactRefreshToken[]
   csatResponses TicketCsatResponse[]
   channelMessages ChannelMessage[]
+  chatSessions  ChatSession[]
   createdAt     DateTime              @default(now()) @map("created_at")
 
   @@unique([customerId, email])
@@ -902,6 +904,11 @@ model AiPromptLog {
   /// always sets it (AiGatewayService.createPendingLog, Task 2).
   ticketId     String?   @map("ticket_id")
   ticket       Ticket?   @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  /// Story 80 — nullable, mutually exclusive with `ticketId` by
+  /// `feature`: set only for `CHAT` operations (AiChatService.sendMessage),
+  /// never alongside a `ticketId`.
+  chatSessionId String?      @map("chat_session_id")
+  chatSession   ChatSession? @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
   feature      AiFeature
   model        String
   promptRef    String    @map("prompt_ref")
@@ -923,7 +930,53 @@ model AiPromptLog {
   @@index([branchId])
   @@index([feature])
   @@index([ticketId])
+  @@index([chatSessionId])
   @@map("ai_prompt_logs")
+  @@schema("ai")
+}
+
+enum ChatMessageRole {
+  CUSTOMER
+  ASSISTANT
+
+  @@schema("ai")
+}
+
+/// Story 80 — one portal self-service chat conversation. No
+/// `TicketVisibilityScope`/department scoping: a chat session belongs to
+/// exactly one Contact, checked directly (mirrors `ContactRefreshToken`'s
+/// own contact-scoping, not `Ticket`'s department-visibility mechanism).
+model ChatSession {
+  id           String        @id @default(uuid())
+  branchId     String        @map("branch_id")
+  branch       Branch        @relation(fields: [branchId], references: [id])
+  contactId    String        @map("contact_id")
+  contact      Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+  aiPromptLogs AiPromptLog[]
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  @@index([branchId])
+  @@index([contactId])
+  @@map("chat_sessions")
+  @@schema("ai")
+}
+
+/// Story 80 — one turn in a `ChatSession`. Only `ASSISTANT` messages with
+/// a real reply are ever inserted here (a failed/disabled turn is never
+/// persisted as a message — see `AiProcessingProcessor`'s own comment);
+/// `outcome`/`errorMessage` for that turn live on the `AiPromptLog` row
+/// instead, retrieved via `GET .../ai/:logId` exactly like ticket AI.
+model ChatMessage {
+  id        String          @id @default(uuid())
+  sessionId String          @map("session_id")
+  session   ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      ChatMessageRole
+  body      String
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  @@index([sessionId])
+  @@map("chat_messages")
   @@schema("ai")
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AiProcessingEventsBridgeProcessor } from "./ai-processing-events-bridge.processor";
 import type { AiCompletionJobPayload } from "./ai-processing-events-bridge.processor";
 import { AI_PROMPT_COMPLETED_EVENT } from "../modules/ai/ai.events";
+import { AI_CHAT_MESSAGE_COMPLETED_EVENT } from "../modules/ai/ai-chat.events";
 import type { EventEmitter2 } from "@nestjs/event-emitter";
 import type { Job } from "bullmq";
 
@@ -81,6 +82,28 @@ describe("AiProcessingEventsBridgeProcessor", () => {
         ticketId: "ticket-3",
         feature: "SUGGEST_REPLY",
         outcome: "DISABLED",
+      });
+    });
+
+    // Story 80 — a CHAT-feature job emits the separate, chat-scoped event
+    // instead, never ai.prompt_completed.
+    it("emits ai.chat_message_completed with chatSessionId for a CHAT-feature job", async () => {
+      const emitter = buildEventEmitterMock();
+      const processor = createProcessor(emitter);
+      const job = buildJob({
+        aiPromptLogId: "log-4",
+        chatSessionId: "session-1",
+        feature: "CHAT",
+        outcome: "SUCCESS",
+      });
+
+      await processor.process(job);
+
+      expect(emitter.emit).toHaveBeenCalledOnce();
+      expect(emitter.emit).toHaveBeenCalledWith(AI_CHAT_MESSAGE_COMPLETED_EVENT, {
+        aiPromptLogId: "log-4",
+        chatSessionId: "session-1",
+        outcome: "SUCCESS",
       });
     });
   });

@@ -80,5 +80,21 @@
       "loadError": "Couldn't load this article.",
       "backToList": "Back to Knowledge Base"
     }
+  },
+  "chat": {
+    "nav": "AI Chat",
+    "heading": "Chat with our AI assistant",
+    "startFailed": "Couldn't start a chat session. Please try again.",
+    "loadError": "Couldn't load this conversation.",
+    "empty": "Send a message to get started.",
+    "youLabel": "You",
+    "assistantLabel": "Assistant",
+    "typing": "Thinking...",
+    "replyFailed": "Couldn't get a reply. Please try again.",
+    "disabled": "AI chat isn't available right now.",
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "sending": "Sending...",
+    "sendFailed": "Couldn't send the message. Please try again."
   }
 }

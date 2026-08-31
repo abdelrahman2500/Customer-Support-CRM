@@ -197,6 +197,22 @@ export class RealtimeGateway
       return contact !== null && ticket.customerId === contact.customerId;
     }
 
+    // Story 80 — the inverse of the two rooms below: customer-only,
+    // never agent. Autonomous chat is portal self-service only (see
+    // `docs/architecture/07-sla-automation-and-ai.md`) — no agent-facing
+    // surface exists to justify agent access to this room.
+    const chatSessionMatch = /^chat-session:(.+)$/.exec(room);
+    if (chatSessionMatch) {
+      if (claims.audience !== "customer") {
+        return false;
+      }
+      const session = await this.prisma.chatSession.findUnique({
+        where: { id: chatSessionMatch[1] },
+        select: { contactId: true },
+      });
+      return session !== null && session.contactId === claims.userId;
+    }
+
     // Story 77 — explicitly agent-only: neither room was ever documented
     // as customer-facing, and nothing about Live Chat needs them.
     if (claims.audience !== "agent") {

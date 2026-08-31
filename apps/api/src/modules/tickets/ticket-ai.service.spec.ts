@@ -90,6 +90,7 @@ describe("TicketAiService", () => {
         "SUMMARIZE",
         "branch-1",
         "ticket-1",
+        null,
         expect.any(String),
       );
       expect(producer.enqueue).toHaveBeenCalledWith({
@@ -131,6 +132,7 @@ describe("TicketAiService", () => {
         "SUGGEST_REPLY",
         "branch-1",
         "ticket-1",
+        null,
         expect.any(String),
       );
       expect(producer.enqueue).toHaveBeenCalledWith(
@@ -148,6 +150,7 @@ describe("TicketAiService", () => {
         "CATEGORIZE",
         "branch-1",
         "ticket-1",
+        null,
         expect.any(String),
       );
       expect(producer.enqueue).toHaveBeenCalledWith(

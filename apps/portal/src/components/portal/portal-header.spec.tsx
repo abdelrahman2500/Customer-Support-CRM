@@ -44,15 +44,16 @@ describe("PortalHeader", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders a nav link to the tickets screen (Story 53) and to Knowledge Base (Story 54)", () => {
+  it("renders a nav link to the tickets screen (Story 53), Knowledge Base (Story 54), and AI Chat (Story 80)", () => {
     render(<PortalHeader contact={contact} />);
 
-    // The mocked `useTranslations` ignores its namespace argument, so both
-    // links render the same "nav" text — assert by href instead of name.
+    // The mocked `useTranslations` ignores its namespace argument, so all
+    // three links render the same "nav" text — assert by href instead of name.
     const navLinks = screen.getAllByRole("link", { name: "nav" });
     const hrefs = navLinks.map((link) => link.getAttribute("href"));
     expect(hrefs).toContain("/en/tickets");
     expect(hrefs).toContain("/en/knowledge-base");
+    expect(hrefs).toContain("/en/chat");
   });
 
   it("calls the real logout, then clears the local token and redirects to login, on sign-out", async () => {

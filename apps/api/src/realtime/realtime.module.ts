@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "../common/auth/auth.module";
 import { RealtimeGateway } from "./realtime.gateway";
 import { TicketRealtimeListener } from "./ticket-realtime.listener";
+import { ChatRealtimeListener } from "./chat-realtime.listener";
 import { BranchNotificationRealtimeListener } from "./branch-notification-realtime.listener";
 import { PresenceService } from "./presence.service";
 
@@ -21,12 +22,18 @@ import { PresenceService } from "./presence.service";
  * `RedisIoAdapter`'s construction) is a plain provider `RealtimeGateway`
  * injects; no new module import needed since it reads `REDIS_URL` from the
  * already-global `ConfigModule`.
+ *
+ * Story 80 — `ChatRealtimeListener` registered the same way, reacting to
+ * `ai.chat_message_completed` and relaying into `chat-session:{id}`
+ * (`RealtimeGateway.authorizeRoom`'s own new customer-only branch) —
+ * fully independent of `TicketRealtimeListener`/`ticket:{id}`.
  */
 @Module({
   imports: [AuthModule],
   providers: [
     RealtimeGateway,
     TicketRealtimeListener,
+    ChatRealtimeListener,
     BranchNotificationRealtimeListener,
     PresenceService,
   ],

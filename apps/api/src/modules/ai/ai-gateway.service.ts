@@ -27,17 +27,25 @@ export class AiGatewayService {
   /** `model` is written as the placeholder `"pending"` — `apps/api`
    * cannot know in advance which provider the worker's own,
    * independent `AI_PROVIDER` resolution will select; the worker
-   * overwrites it with the real value once resolved. */
+   * overwrites it with the real value once resolved.
+   *
+   * Story 80 — `ticketId`/`chatSessionId` are mutually exclusive by
+   * `feature`: a ticket-scoped operation (`TicketAiService.submit`)
+   * passes its real `ticketId` and `null` for `chatSessionId`; a `CHAT`
+   * operation (`AiChatService.sendMessage`) passes `null` for `ticketId`
+   * and its real `chatSessionId`. */
   async createPendingLog(
     feature: AiFeature,
     branchId: string,
-    ticketId: string,
+    ticketId: string | null,
+    chatSessionId: string | null,
     promptRefValue: string,
   ): Promise<{ id: string }> {
     const log = await this.prisma.aiPromptLog.create({
       data: {
         branchId,
         ticketId,
+        chatSessionId,
         feature,
         model: "pending",
         promptRef: promptRefValue,

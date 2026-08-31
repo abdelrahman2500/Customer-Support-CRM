@@ -11,16 +11,19 @@ import type { Job, Queue } from "bullmq";
  */
 export const AI_PROCESSING_QUEUE = "ai-processing";
 
-/** `feature` is deliberately narrower than the full `AiFeature` Prisma
- * enum — `CHAT` has no producer yet (chatbot is out of scope for this
- * story, see the plan's own Non-goals). */
+/** Story 80 — `feature` now includes `CHAT` alongside the three
+ * ticket-scoped features. `ticketId`/`subject` are ticket-scoped-only
+ * (optional); `chatSessionId` is `CHAT`-only (optional); `body` is always
+ * present — the joined note text for ticket features, the customer's raw
+ * chat message for `CHAT`. */
 export interface AiProcessingJobPayload {
   aiPromptLogId: string;
-  ticketId: string;
   branchId: string;
-  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE";
-  subject: string;
+  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT";
+  ticketId?: string;
+  subject?: string;
   body: string;
+  chatSessionId?: string;
 }
 
 /**

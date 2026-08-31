@@ -19,6 +19,9 @@ function buildPrismaMock() {
     aiPromptLog: {
       update: vi.fn().mockResolvedValue({}),
     },
+    chatMessage: {
+      create: vi.fn().mockResolvedValue({}),
+    },
   };
 }
 
@@ -178,6 +181,82 @@ describe("AiProcessingProcessor", () => {
         "ai-completion",
         expect.objectContaining({ outcome: "ERROR" }),
       );
+    });
+
+    // Story 80 — AI Portal Chatbot.
+    describe("CHAT feature", () => {
+      const CHAT_PAYLOAD: AiProcessingJobPayload = {
+        aiPromptLogId: "log-1",
+        branchId: "branch-1",
+        feature: "CHAT",
+        body: "Hi, I need help",
+        chatSessionId: "session-1",
+      };
+
+      it("calls provider.chat with { sessionId, message } and never the ticket-scoped methods", async () => {
+        provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+        const job = buildJob(CHAT_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(provider.chat).toHaveBeenCalledWith({
+          sessionId: "session-1",
+          message: "Hi, I need help",
+        });
+        expect(provider.summarize).not.toHaveBeenCalled();
+        expect(provider.suggestReply).not.toHaveBeenCalled();
+        expect(provider.categorize).not.toHaveBeenCalled();
+      });
+
+      it("on SUCCESS, persists the reply as a ChatMessage(ASSISTANT) row", async () => {
+        provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+        const job = buildJob(CHAT_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(prisma.chatMessage.create).toHaveBeenCalledWith({
+          data: { sessionId: "session-1", role: "ASSISTANT", body: "How can I help?" },
+        });
+      });
+
+      it("on ERROR, never creates a ChatMessage row", async () => {
+        provider.chat.mockRejectedValue(new Error("rate limited"));
+        const job = buildJob(CHAT_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(prisma.chatMessage.create).not.toHaveBeenCalled();
+      });
+
+      it("on DISABLED, never creates a ChatMessage row", async () => {
+        provider.chat.mockResolvedValue({
+          outcome: "DISABLED",
+          text: null,
+          model: "disabled",
+          inputTokens: null,
+          outputTokens: null,
+          errorMessage: null,
+        });
+        const job = buildJob(CHAT_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(prisma.chatMessage.create).not.toHaveBeenCalled();
+      });
+
+      it("hands back chatSessionId, never ticketId", async () => {
+        provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+        const job = buildJob(CHAT_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(handbackQueue.add).toHaveBeenCalledWith("ai-completion", {
+          aiPromptLogId: "log-1",
+          feature: "CHAT",
+          outcome: "SUCCESS",
+          chatSessionId: "session-1",
+        });
+      });
     });
   });
 });
