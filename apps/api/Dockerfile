@@ -7,13 +7,14 @@ FROM base AS deps
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY packages/config/package.json packages/config/
 COPY packages/shared/package.json packages/shared/
+COPY packages/ai/package.json packages/ai/
 COPY apps/api/package.json apps/api/
 RUN pnpm install --frozen-lockfile --filter @crm/api...
 
 FROM deps AS build
 COPY . .
 RUN pnpm --filter @crm/api prisma:generate
-RUN pnpm --filter @crm/shared build && pnpm --filter @crm/api build
+RUN pnpm --filter @crm/shared build && pnpm --filter @crm/ai build && pnpm --filter @crm/api build
 
 FROM base AS runtime
 ENV NODE_ENV=production

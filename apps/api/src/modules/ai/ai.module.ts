@@ -1,10 +1,10 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { AnthropicAiProvider, NullAiProvider } from "@crm/ai";
+import type { AiProvider } from "@crm/ai";
 import type { EnvConfig } from "../../common/config/env.validation";
 import { AiGatewayService } from "./ai-gateway.service";
 import { AI_PROVIDER } from "./ai.constants";
-import { AnthropicAiProvider } from "./anthropic-ai-provider";
-import { NullAiProvider } from "./null-ai-provider";
 
 /**
  * Owns the `ai` schema — see docs/architecture/03-domain-boundaries.md
@@ -15,19 +15,29 @@ import { NullAiProvider } from "./null-ai-provider";
  * otherwise" pattern — here "failing closed" means falling back to
  * `NullAiProvider` rather than crashing the whole application over an
  * optional feature.
+ *
+ * Architecture-boundary refactor — `AnthropicAiProvider`/`NullAiProvider`
+ * now live in the framework-neutral `@crm/ai` package (no `@Injectable()`
+ * of their own), so the factory constructs the right one directly with
+ * this app's own validated `ConfigService` values, rather than injecting
+ * them as separate Nest providers the way Story 72 originally did.
+ * `apps/worker` mirrors this same factory shape with its own env values
+ * (`apps/worker/src/ai/ai-provider.factory.ts`) — see that file's own
+ * doc comment.
  */
 @Module({
   providers: [
-    AnthropicAiProvider,
-    NullAiProvider,
     {
       provide: AI_PROVIDER,
-      useFactory: (
-        configService: ConfigService<EnvConfig, true>,
-        anthropicProvider: AnthropicAiProvider,
-        nullProvider: NullAiProvider,
-      ) => (configService.get("ANTHROPIC_API_KEY", { infer: true }) ? anthropicProvider : nullProvider),
-      inject: [ConfigService, AnthropicAiProvider, NullAiProvider],
+      useFactory: (configService: ConfigService<EnvConfig, true>): AiProvider => {
+        const apiKey = configService.get("ANTHROPIC_API_KEY", { infer: true });
+        if (!apiKey) {
+          return new NullAiProvider();
+        }
+        const model = configService.get("ANTHROPIC_MODEL", { infer: true });
+        return new AnthropicAiProvider({ apiKey, model });
+      },
+      inject: [ConfigService],
     },
     AiGatewayService,
   ],

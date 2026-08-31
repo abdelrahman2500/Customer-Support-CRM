@@ -7,12 +7,13 @@ FROM base AS deps
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY packages/config/package.json packages/config/
 COPY packages/shared/package.json packages/shared/
+COPY packages/ai/package.json packages/ai/
 COPY apps/worker/package.json apps/worker/
 RUN pnpm install --frozen-lockfile --filter @crm/worker...
 
 FROM deps AS build
 COPY . .
-RUN pnpm --filter @crm/shared build && pnpm --filter @crm/worker build
+RUN pnpm --filter @crm/shared build && pnpm --filter @crm/ai build && pnpm --filter @crm/worker build
 
 FROM base AS runtime
 ENV NODE_ENV=production

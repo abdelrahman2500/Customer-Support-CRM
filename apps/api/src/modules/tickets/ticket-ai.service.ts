@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { AiGatewayService } from "../ai/ai-gateway.service";
-import type { AiCallResult, AiTicketInput } from "../ai/ai-provider.interface";
+import type { AiCallResult, AiTicketInput } from "@crm/ai";
 import { TicketsService } from "./tickets.service";
 
 /**

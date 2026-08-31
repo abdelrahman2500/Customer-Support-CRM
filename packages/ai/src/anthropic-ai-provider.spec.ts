@@ -1,31 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ConfigService } from "@nestjs/config";
 import { AnthropicAiProvider } from "./anthropic-ai-provider";
-import type { EnvConfig } from "../../common/config/env.validation";
 
 const createMock = vi.fn();
 
 // A real `function` declaration, not an arrow function — `new Anthropic(...)`
 // requires a constructor, and `vi.fn().mockImplementation(() => ({...}))`
-// throws "is not a constructor" (the exact same gotcha `presence.service.
-// spec.ts`'s `ioredis` mock already hit and documents).
+// throws "is not a constructor".
 vi.mock("@anthropic-ai/sdk", () => ({
   default: vi.fn().mockImplementation(function AnthropicMock(this: Record<string, unknown>) {
     this.messages = { create: createMock };
   }),
 }));
 
-function buildConfigServiceMock(overrides: Partial<Record<string, string>> = {}) {
-  const values: Record<string, string> = {
-    ANTHROPIC_API_KEY: "test-key",
-    ANTHROPIC_MODEL: "claude-test-model",
-    ...overrides,
-  };
-  return { get: vi.fn((key: string) => values[key]) };
-}
-
-function createProvider(config = buildConfigServiceMock()): AnthropicAiProvider {
-  return new AnthropicAiProvider(config as unknown as ConfigService<EnvConfig, true>);
+function createProvider(config = { apiKey: "test-key", model: "claude-test-model" }): AnthropicAiProvider {
+  return new AnthropicAiProvider(config);
 }
 
 describe("AnthropicAiProvider", () => {
@@ -131,6 +119,15 @@ describe("AnthropicAiProvider", () => {
           messages: [expect.objectContaining({ content: "hello" })],
         }),
       );
+    });
+  });
+
+  describe("construction", () => {
+    it("constructs the Anthropic client with the plain apiKey passed in — no ConfigService, no env lookup", async () => {
+      createProvider({ apiKey: "a-specific-key", model: "a-specific-model" });
+
+      const Anthropic = (await import("@anthropic-ai/sdk")).default;
+      expect(Anthropic).toHaveBeenCalledWith({ apiKey: "a-specific-key" });
     });
   });
 });

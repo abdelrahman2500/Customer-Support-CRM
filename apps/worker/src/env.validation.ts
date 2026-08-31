@@ -14,6 +14,17 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   REDIS_URL: z.string().min(1, "REDIS_URL is required"),
+
+  /**
+   * Architecture-boundary refactor — mirrors `apps/api`'s own optional
+   * `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL` exactly (same default model,
+   * same "unset is a valid, expected state" semantics). Added only so
+   * `apps/worker` can construct the shared `@crm/ai` provider
+   * (`src/ai/ai-provider.factory.ts`) from its own validated env — no
+   * `ai-processing` queue/consumer exists yet (a separate future story).
+   */
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5-20250929"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

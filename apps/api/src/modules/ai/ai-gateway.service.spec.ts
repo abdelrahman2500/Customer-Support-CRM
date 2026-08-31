@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AiCallResult, AiProvider } from "@crm/ai";
 import { AiGatewayService } from "./ai-gateway.service";
-import type { AiCallResult, AiProvider } from "./ai-provider.interface";
 import type { PrismaService } from "../../prisma/prisma.service";
 
 function buildProviderMock() {

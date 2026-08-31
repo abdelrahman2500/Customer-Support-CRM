@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TicketAiService } from "./ticket-ai.service";
 import type { AiGatewayService } from "../ai/ai-gateway.service";
-import type { AiCallResult } from "../ai/ai-provider.interface";
+import type { AiCallResult } from "@crm/ai";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 import type { TicketsService } from "./tickets.service";
 

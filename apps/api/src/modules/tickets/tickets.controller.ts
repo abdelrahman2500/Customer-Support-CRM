@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Res } from "@nestjs/c
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
-import type { AiCallResult } from "../ai/ai-provider.interface";
+import type { AiCallResult } from "@crm/ai";
 import { CreateTicketDto } from "./dto/create-ticket.dto";
 import { UpdateTicketDto } from "./dto/update-ticket.dto";
 import { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";

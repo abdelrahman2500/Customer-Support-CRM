@@ -1,12 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { createHash } from "node:crypto";
+import type { AiCallResult, AiChatMessageInput, AiProvider, AiTicketInput } from "@crm/ai";
 import { PrismaService } from "../../prisma/prisma.service";
-import type {
-  AiCallResult,
-  AiChatMessageInput,
-  AiProvider,
-  AiTicketInput,
-} from "./ai-provider.interface";
 import { AI_PROVIDER } from "./ai.constants";
 
 /**
@@ -14,6 +9,13 @@ import { AI_PROVIDER } from "./ai.constants";
  * nothing outside `AiModule` ever touches `AnthropicAiProvider`/
  * `NullAiProvider` directly (docs/architecture/07-sla-automation-and-ai.md:
  * "Provider swaps implement the interface without changing call sites").
+ *
+ * Architecture-boundary refactor — the `AiProvider` interface/types and
+ * both implementations now live in `@crm/ai` (a framework-neutral
+ * workspace package `apps/worker` can depend on too), not in this
+ * module. This service, the `AI_PROVIDER` DI token, and `AiPromptLog`
+ * persistence deliberately stay here — see `@crm/ai`'s own `index.ts`
+ * doc comment for the exact boundary.
  *
  * Every call unconditionally writes exactly one `AiPromptLog` row — success,
  * error, or disabled — before returning, so "log outcomes for retry and

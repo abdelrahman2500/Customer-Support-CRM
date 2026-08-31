@@ -1,39 +1,53 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import Anthropic from "@anthropic-ai/sdk";
-import type { EnvConfig } from "../../common/config/env.validation";
-import type {
-  AiCallResult,
-  AiChatMessageInput,
-  AiProvider,
-  AiTicketInput,
-} from "./ai-provider.interface";
+import type { AiProvider } from "./ai-provider.interface";
+import type { AiCallResult, AiChatMessageInput, AiTicketInput } from "./types";
 
 const MAX_TOKENS = 1024;
 
 /**
- * Story 72 — the real Anthropic-backed implementation named by
+ * Plain configuration `AnthropicAiProvider` is constructed with — no
+ * `ConfigService`, no env validation, no `@nestjs/*` import anywhere in
+ * this package. Each consuming app (`apps/api`, `apps/worker`) owns and
+ * validates its own environment, then passes the two resolved values
+ * straight through — this is the architecture-boundary refactor's whole
+ * point (see this package's own `README`-equivalent doc comment in
+ * `index.ts`).
+ */
+export interface AnthropicAiProviderConfig {
+  apiKey: string;
+  model: string;
+}
+
+/**
+ * The real Anthropic-backed implementation named by
  * docs/architecture/07-sla-automation-and-ai.md ("The initial
- * implementation calls Anthropic Claude"). Only constructed by
- * `AiModule`'s factory provider when `ANTHROPIC_API_KEY` is present —
- * `NullAiProvider` is used otherwise, see that file's own doc comment.
+ * implementation calls Anthropic Claude"). Framework-neutral by design —
+ * moved out of `apps/api/src/modules/ai/anthropic-ai-provider.ts`
+ * (Story 72) into this package specifically so `apps/worker` can
+ * construct the identical class from its own already-validated config,
+ * with the actual `@anthropic-ai/sdk` usage living in exactly one place
+ * (docs/architecture/02-system-architecture-overview.md: "Shares
+ * domain/service code with apps/api via internal packages so business
+ * logic is not duplicated").
  *
  * Every method reports failure through `AiCallResult.outcome`, never a
- * thrown error past this class — mirrors `AiProvider`'s own contract, and
- * matches how a caller wanting best-effort AI assistance should never
- * crash because a third-party API had a transient failure.
+ * thrown error past this class — mirrors `AiProvider`'s own contract,
+ * unchanged from Story 72.
+ *
+ * Logging note: the pre-refactor `apps/api`-only version logged a
+ * failed call via Nest's `Logger` — this package must not import
+ * `@nestjs/common`, so a plain `console.error` is the framework-neutral
+ * equivalent. The actual error is still always captured in
+ * `AiCallResult.errorMessage` regardless (and, in `apps/api`, in
+ * `AiPromptLog` via `AiGatewayService` — unchanged).
  */
-@Injectable()
 export class AnthropicAiProvider implements AiProvider {
-  private readonly logger = new Logger(AnthropicAiProvider.name);
   private readonly client: Anthropic;
   private readonly model: string;
 
-  constructor(configService: ConfigService<EnvConfig, true>) {
-    this.model = configService.get("ANTHROPIC_MODEL", { infer: true });
-    this.client = new Anthropic({
-      apiKey: configService.get("ANTHROPIC_API_KEY", { infer: true }),
-    });
+  constructor(config: AnthropicAiProviderConfig) {
+    this.model = config.model;
+    this.client = new Anthropic({ apiKey: config.apiKey });
   }
 
   async summarize(ticket: AiTicketInput): Promise<AiCallResult> {
@@ -78,7 +92,7 @@ export class AnthropicAiProvider implements AiProvider {
         errorMessage: null,
       };
     } catch (error) {
-      this.logger.error("Anthropic API call failed", error as Error);
+      console.error("Anthropic API call failed", error);
       return {
         outcome: "ERROR",
         text: null,

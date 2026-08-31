@@ -13,6 +13,7 @@
     "test:e2e": "vitest run e2e-spec"
   },
   "dependencies": {
+    "@crm/ai": "workspace:*",
     "@crm/shared": "workspace:*",
     "@nestjs/bullmq": "^11.0.5",
     "@nestjs/common": "^11.2.1",
