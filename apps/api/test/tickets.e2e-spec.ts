@@ -6,6 +6,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
+import { PrismaService } from "../src/prisma/prisma.service";
 import { TICKET_ESCALATED_EVENT } from "../src/modules/tickets/tickets.events";
 import type {
   TicketCreatedEvent,
@@ -52,6 +53,7 @@ describe("Ticketing (e2e)", () => {
   let contactId: string;
   let ticketId: string;
   let eventEmitter: EventEmitter2;
+  let prisma: PrismaService;
   const createdEvents: TicketCreatedEvent[] = [];
   const updatedEvents: TicketUpdatedEvent[] = [];
 
@@ -68,6 +70,7 @@ describe("Ticketing (e2e)", () => {
     await app.init();
 
     eventEmitter = moduleRef.get(EventEmitter2);
+    prisma = moduleRef.get(PrismaService);
     eventEmitter.on("ticket.created", (payload: TicketCreatedEvent) => createdEvents.push(payload));
     eventEmitter.on("ticket.updated", (payload: TicketUpdatedEvent) => updatedEvents.push(payload));
 
@@ -712,6 +715,84 @@ describe("Ticketing (e2e)", () => {
 
       const ids = response.body.map((entry: { id: string }) => entry.id);
       expect(ids.indexOf(first.body.id)).toBeLessThan(ids.indexOf(second.body.id));
+    });
+  });
+
+  // Story 73 — Ticket Summarization, the first real consumer of Story 72's
+  // AiGatewayService. No ANTHROPIC_API_KEY exists in this environment, so
+  // NullAiProvider is what actually runs here — the endpoint is exercised
+  // end to end, but a real Anthropic call is never made or claimed.
+  describe("ticket AI summarization (Story 73)", () => {
+    it("rejects an unauthenticated request", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+        .expect(401);
+    });
+
+    it("rejects an Agent-role user lacking ticket:read (403)", async () => {
+      const agentEmail = `agent-ai-summarize-${randomUUID()}@example.com`;
+      const agentPassword = "agent-test-password-123";
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: agentPassword,
+          fullName: "Test Agent AI Summarize",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+      const agentAccessToken = agentLogin.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(403);
+    });
+
+    it("returns 404 for a ticket that doesn't exist", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${randomUUID()}/ai/summarize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("returns a DISABLED outcome (no ANTHROPIC_API_KEY in this environment) and logs exactly one AiPromptLog row", async () => {
+      const before = await prisma.aiPromptLog.count({ where: { feature: "SUMMARIZE" } });
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      expect(response.body).toEqual({
+        outcome: "DISABLED",
+        text: null,
+        model: "disabled",
+        inputTokens: null,
+        outputTokens: null,
+        errorMessage: null,
+      });
+
+      const after = await prisma.aiPromptLog.count({ where: { feature: "SUMMARIZE" } });
+      expect(after).toBe(before + 1);
     });
   });
 });

@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
+import { AiModule } from "../ai/ai.module";
 import { AutomationActionListener } from "./automation-action.listener";
+import { TicketAiService } from "./ticket-ai.service";
 import { TicketEscalationListener } from "./ticket-escalation.listener";
 import { TicketHistoryListener } from "./ticket-history.listener";
 import { TicketsController } from "./tickets.controller";
@@ -17,8 +19,14 @@ import { TicketsService } from "./tickets.service";
  * Story 57 — `AutomationActionListener` added the same way: it reacts to
  * the SLA & Automation domain's `automation.rule_matched` but writes only
  * to this module's own `Ticket` table (mirrors `TicketEscalationListener`).
+ *
+ * Story 73 — `AiModule` imported so `TicketAiService` can inject the
+ * already-exported `AiGatewayService` directly, mirroring exactly how
+ * `PortalModule` imports `TicketsModule`/`KnowledgeBaseModule` for its own
+ * composing services.
  */
 @Module({
+  imports: [AiModule],
   controllers: [TicketsController],
   providers: [
     TicketsService,
@@ -26,6 +34,7 @@ import { TicketsService } from "./tickets.service";
     TicketHistoryListener,
     TicketEscalationListener,
     AutomationActionListener,
+    TicketAiService,
   ],
   exports: [TicketsService],
 })

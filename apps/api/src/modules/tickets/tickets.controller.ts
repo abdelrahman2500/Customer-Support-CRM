@@ -2,10 +2,12 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Res } from "@nestjs/c
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
+import type { AiCallResult } from "../ai/ai-provider.interface";
 import { CreateTicketDto } from "./dto/create-ticket.dto";
 import { UpdateTicketDto } from "./dto/update-ticket.dto";
 import { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
 import { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
+import { TicketAiService } from "./ticket-ai.service";
 import type {
   TicketCsatSummary,
   TicketHistoryEntrySummary,
@@ -19,7 +21,10 @@ import { TicketsService } from "./tickets.service";
 @ApiBearerAuth()
 @Controller("tickets")
 export class TicketsController {
-  constructor(private readonly ticketsService: TicketsService) {}
+  constructor(
+    private readonly ticketsService: TicketsService,
+    private readonly ticketAiService: TicketAiService,
+  ) {}
 
   @Post()
   @RequirePermissions("ticket:create")
@@ -81,5 +86,19 @@ export class TicketsController {
       return;
     }
     response.status(200).json(result);
+  }
+
+  /**
+   * Story 73 — advisory only: the response is never auto-applied to the
+   * ticket (docs/architecture/07-sla-automation-and-ai.md: "Human review
+   * is the default for agent-facing output"). Gated by `ticket:read`, not
+   * a new permission — this reads the ticket's own content, it never
+   * mutates it, so no caller gains anything beyond what `GET
+   * /tickets/:id` already grants them.
+   */
+  @Post(":id/ai/summarize")
+  @RequirePermissions("ticket:read")
+  summarize(@Param("id") id: string): Promise<AiCallResult> {
+    return this.ticketAiService.summarizeTicket(id);
   }
 }
