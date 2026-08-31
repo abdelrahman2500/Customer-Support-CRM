@@ -2,12 +2,12 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Res } from "@nestjs/c
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
-import type { AiCallResult } from "@crm/ai";
 import { CreateTicketDto } from "./dto/create-ticket.dto";
 import { UpdateTicketDto } from "./dto/update-ticket.dto";
 import { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
 import { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
 import { TicketAiService } from "./ticket-ai.service";
+import type { AiJobSubmittedResponse } from "./ticket-ai.service";
 import type {
   TicketCsatSummary,
   TicketHistoryEntrySummary,
@@ -95,28 +95,33 @@ export class TicketsController {
    * a new permission — this reads the ticket's own content, it never
    * mutates it, so no caller gains anything beyond what `GET
    * /tickets/:id` already grants them.
+   *
+   * Story 76 — no longer executes the AI call synchronously: submits the
+   * operation to `ai-processing` and returns the durable `AiPromptLog.id`
+   * immediately (`{ id, outcome: "PENDING" }`) — see `TicketAiService`'s
+   * own doc comment for the full architecture correction.
    */
   @Post(":id/ai/summarize")
   @RequirePermissions("ticket:read")
-  summarize(@Param("id") id: string): Promise<AiCallResult> {
+  summarize(@Param("id") id: string): Promise<AiJobSubmittedResponse> {
     return this.ticketAiService.summarizeTicket(id);
   }
 
-  /** Story 74 — same advisory-only, `ticket:read`-gated shape as
-   * `summarize` above. */
+  /** Story 74/76 — same advisory-only, `ticket:read`-gated, asynchronous
+   * shape as `summarize` above. */
   @Post(":id/ai/suggest-reply")
   @RequirePermissions("ticket:read")
-  suggestReply(@Param("id") id: string): Promise<AiCallResult> {
+  suggestReply(@Param("id") id: string): Promise<AiJobSubmittedResponse> {
     return this.ticketAiService.suggestReplyForTicket(id);
   }
 
-  /** Story 75 — same advisory-only, `ticket:read`-gated shape as
-   * `summarize`/`suggestReply` above. Returns a *suggested* category only
-   * — never writes `Ticket.category` (see `TicketAiService`'s own doc
-   * comment for why auto-applying it is out of scope). */
+  /** Story 75/76 — same advisory-only, `ticket:read`-gated, asynchronous
+   * shape as `summarize`/`suggestReply` above. Still only a *suggested*
+   * category — never writes `Ticket.category` (see `TicketAiService`'s
+   * own doc comment for why auto-applying it is out of scope). */
   @Post(":id/ai/categorize")
   @RequirePermissions("ticket:read")
-  categorize(@Param("id") id: string): Promise<AiCallResult> {
+  categorize(@Param("id") id: string): Promise<AiJobSubmittedResponse> {
     return this.ticketAiService.categorizeTicket(id);
   }
 }

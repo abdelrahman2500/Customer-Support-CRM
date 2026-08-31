@@ -860,7 +860,13 @@ enum AiFeature {
 /// `ANTHROPIC_API_KEY` configured), never conflated with `ERROR` (a real
 /// provider failure) — a caller or operator reading this log must be able
 /// to tell "AI is off" from "AI is broken" at a glance.
+///
+/// Story 76 — `PENDING` added: the row's state from the moment `apps/api`
+/// creates it (before enqueueing `ai-processing`) until `apps/worker`
+/// resolves it to one of the other three outcomes. Never set again once
+/// left — this is a one-way transition, not a status that toggles back.
 enum AiOutcome {
+  PENDING
   SUCCESS
   ERROR
   DISABLED
@@ -871,15 +877,18 @@ enum AiOutcome {
 /// Story 72 — AI Services Foundation. See
 /// docs/architecture/03-domain-boundaries.md ("AI Services") and
 /// docs/architecture/07-sla-automation-and-ai.md ("Every call logs prompt
-/// reference, model, token usage, latency, and outcome"). Append-only,
-/// mirrors `NotificationLog`'s own flat shape — never mutated after
-/// creation. `promptRef` is a short opaque reference/hash, never the raw
-/// prompt body: this table has no retention story of its own yet, and
-/// logging full ticket/customer content here would silently duplicate
-/// Ticketing's own data under a different (undecided) retention policy.
-/// No `AiGatewayService` caller exists yet (Stories 80-84) — every row
-/// written by this foundation slice's own tests comes from direct calls
-/// against the service, not a live feature.
+/// reference, model, token usage, latency, and outcome"). Mirrors
+/// `NotificationLog`'s own flat shape.
+///
+/// Story 76 — no longer strictly append-only: `apps/api`'s
+/// `AiGatewayService.createPendingLog` creates the row (`outcome:
+/// PENDING`, `model: "pending"`, `latencyMs: null`) *before* the AI
+/// provider is ever called (docs/architecture/02-system-architecture-
+/// overview.md: "apps/api never blocks a request on slow external
+/// work... calling the AI provider... always enqueued to BullMQ"); this
+/// is the one durable handle returned to the HTTP caller. `apps/worker`'s
+/// `AiProcessingProcessor` performs exactly one `update` on that same row
+/// once the call resolves — never a second row for the same operation.
 model AiPromptLog {
   id           String    @id @default(uuid())
   branchId     String    @map("branch_id")
@@ -889,7 +898,9 @@ model AiPromptLog {
   promptRef    String    @map("prompt_ref")
   inputTokens  Int?      @map("input_tokens")
   outputTokens Int?      @map("output_tokens")
-  latencyMs    Int       @map("latency_ms")
+  /// Story 76 — nullable: unknown until `apps/worker` finishes the call;
+  /// `null` exactly when `outcome` is still `PENDING`.
+  latencyMs    Int?      @map("latency_ms")
   outcome      AiOutcome
   errorMessage String?   @map("error_message")
   createdAt    DateTime  @default(now()) @map("created_at")

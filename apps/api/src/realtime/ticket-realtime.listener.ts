@@ -11,6 +11,8 @@ import type {
   TicketEscalatedEvent,
   TicketNoteAddedEvent,
 } from "../modules/tickets/tickets.events";
+import { AI_PROMPT_COMPLETED_EVENT } from "../modules/ai/ai.events";
+import type { AiPromptCompletedEvent } from "../modules/ai/ai.events";
 
 /**
  * Relays already-existing domain events into the `ticket:{id}` room —
@@ -26,6 +28,12 @@ import type {
  * shared `{ ticket, actorUserId }` shape (see that event's own doc comment)
  * — `relay()` itself is unchanged, since it was already event-name/payload-
  * agnostic.
+ *
+ * Story 76 — a fourth handler for `ai.prompt_completed`
+ * (apps/api/src/modules/ai/ai.events.ts), emitted by
+ * `AiProcessingEventsBridgeProcessor` once `apps/worker` resolves an AI
+ * ticket-assist operation. Same `relay()` path, same room — no new
+ * realtime room/gateway/authorization mechanism.
  */
 @Injectable()
 export class TicketRealtimeListener {
@@ -46,6 +54,11 @@ export class TicketRealtimeListener {
   @OnEvent(TICKET_NOTE_ADDED_EVENT)
   onTicketNoteAdded(event: TicketNoteAddedEvent): void {
     this.relay(TICKET_NOTE_ADDED_EVENT, event.ticketId, event);
+  }
+
+  @OnEvent(AI_PROMPT_COMPLETED_EVENT)
+  onAiPromptCompleted(event: AiPromptCompletedEvent): void {
+    this.relay(AI_PROMPT_COMPLETED_EVENT, event.ticketId, event);
   }
 
   private relay(eventName: string, ticketId: string, payload: unknown): void {

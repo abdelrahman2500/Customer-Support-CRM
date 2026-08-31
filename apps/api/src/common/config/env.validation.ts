@@ -7,6 +7,11 @@ import { z } from "zod";
  *
  * A missing/malformed value fails startup immediately instead of the app
  * running with an undefined secret.
+ *
+ * Story 76 — `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL` (added by Story 72)
+ * were removed from here: `apps/api` no longer constructs an `AiProvider`
+ * at all (see `AiModule`'s own doc comment) — only `apps/worker`'s own
+ * `env.validation.ts` reads them now.
  */
 export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -37,20 +42,6 @@ export const envSchema = z.object({
    * `http://localhost:3000`. No production origin is hard-coded here.
    */
   CORS_ORIGINS: z.string().optional(),
-
-  /**
-   * Story 72 — AI Services Foundation. Optional: no real caller requires a
-   * working key yet (Stories 80-84 are the first consumers). When unset,
-   * `AiModule` falls back to `NullAiProvider` rather than throwing at
-   * boot — mirrors `CORS_ORIGINS`'s own "unset by default, feature simply
-   * stays off" precedent, not `S3_*`'s "required once a real consumer
-   * exists" one, since this foundation slice still has no real consumer.
-   */
-  ANTHROPIC_API_KEY: z.string().optional(),
-  /** Overridable so a future story never needs a code change to pick up a
-   * new Claude model — the default is only ever exercised once a real
-   * `ANTHROPIC_API_KEY` is configured. */
-  ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5-20250929"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

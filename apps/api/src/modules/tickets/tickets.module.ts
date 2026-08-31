@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { AiModule } from "../ai/ai.module";
+import { QueuesModule } from "../../queues/queues.module";
 import { AutomationActionListener } from "./automation-action.listener";
 import { TicketAiService } from "./ticket-ai.service";
 import { TicketEscalationListener } from "./ticket-escalation.listener";
@@ -24,9 +25,12 @@ import { TicketsService } from "./tickets.service";
  * already-exported `AiGatewayService` directly, mirroring exactly how
  * `PortalModule` imports `TicketsModule`/`KnowledgeBaseModule` for its own
  * composing services.
+ *
+ * Story 76 — `QueuesModule` imported the same way, so `TicketAiService`
+ * can inject the already-exported `AiProcessingProducer` directly.
  */
 @Module({
-  imports: [AiModule],
+  imports: [AiModule, QueuesModule],
   controllers: [TicketsController],
   providers: [
     TicketsService,

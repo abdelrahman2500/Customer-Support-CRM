@@ -3,10 +3,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { EventEmitter2 } from "@nestjs/event-emitter";
+import { getQueueToken } from "@nestjs/bullmq";
+import type { Queue } from "bullmq";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { AI_PROCESSING_QUEUE } from "../src/queues/ai-processing.producer";
 import { TICKET_ESCALATED_EVENT } from "../src/modules/tickets/tickets.events";
 import type {
   TicketCreatedEvent,
@@ -718,11 +721,14 @@ describe("Ticketing (e2e)", () => {
     });
   });
 
-  // Story 73 — Ticket Summarization, the first real consumer of Story 72's
-  // AiGatewayService. No ANTHROPIC_API_KEY exists in this environment, so
-  // NullAiProvider is what actually runs here — the endpoint is exercised
-  // end to end, but a real Anthropic call is never made or claimed.
-  describe("ticket AI summarization (Story 73)", () => {
+  // Story 73/76 — Ticket Summarization, the first real consumer of Story
+  // 72's AiGatewayService, routed through the real ai-processing queue
+  // since Story 76's architecture correction. apps/worker is never
+  // booted by this suite (mirrors health-check-producer.e2e-spec.ts's own
+  // documented scope boundary), so these tests verify the synchronous
+  // half only: the HTTP response and the AiPromptLog row's PENDING
+  // creation — never that a real Anthropic call completes.
+  describe("ticket AI summarization (Story 73/76)", () => {
     it("rejects an unauthenticated request", async () => {
       await request(app.getHttpServer())
         .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
@@ -774,7 +780,7 @@ describe("Ticketing (e2e)", () => {
         .expect(404);
     });
 
-    it("returns a DISABLED outcome (no ANTHROPIC_API_KEY in this environment) and logs exactly one AiPromptLog row", async () => {
+    it("returns { id, outcome: PENDING } immediately and creates exactly one PENDING AiPromptLog row", async () => {
       const before = await prisma.aiPromptLog.count({ where: { feature: "SUMMARIZE" } });
 
       const response = await request(app.getHttpServer())
@@ -783,23 +789,31 @@ describe("Ticketing (e2e)", () => {
         .expect(201);
 
       expect(response.body).toEqual({
-        outcome: "DISABLED",
-        text: null,
-        model: "disabled",
-        inputTokens: null,
-        outputTokens: null,
-        errorMessage: null,
+        id: expect.any(String),
+        outcome: "PENDING",
       });
 
       const after = await prisma.aiPromptLog.count({ where: { feature: "SUMMARIZE" } });
       expect(after).toBe(before + 1);
+
+      const log = await prisma.aiPromptLog.findUnique({ where: { id: response.body.id } });
+      expect(log).toMatchObject({
+        feature: "SUMMARIZE",
+        outcome: "PENDING",
+        model: "pending",
+        latencyMs: null,
+        inputTokens: null,
+        outputTokens: null,
+        errorMessage: null,
+      });
     });
   });
 
-  // Story 74 — Suggested Reply, the second consumer of Story 72's
-  // AiGatewayService. Same environment limitation as Story 73's own tests
-  // above: no ANTHROPIC_API_KEY, so NullAiProvider is what actually runs.
-  describe("ticket AI suggested reply (Story 74)", () => {
+  // Story 74/76 — Suggested Reply, the second consumer of Story 72's
+  // AiGatewayService, routed through ai-processing since Story 76. Same
+  // scope boundary as Story 73's own tests above: apps/worker is never
+  // booted by this suite.
+  describe("ticket AI suggested reply (Story 74/76)", () => {
     it("rejects an unauthenticated request", async () => {
       await request(app.getHttpServer())
         .post(`/api/v1/tickets/${ticketId}/ai/suggest-reply`)
@@ -851,7 +865,7 @@ describe("Ticketing (e2e)", () => {
         .expect(404);
     });
 
-    it("returns a DISABLED outcome (no ANTHROPIC_API_KEY in this environment) and logs exactly one AiPromptLog row", async () => {
+    it("returns { id, outcome: PENDING } immediately and creates exactly one PENDING AiPromptLog row", async () => {
       const before = await prisma.aiPromptLog.count({ where: { feature: "SUGGEST_REPLY" } });
 
       const response = await request(app.getHttpServer())
@@ -860,24 +874,23 @@ describe("Ticketing (e2e)", () => {
         .expect(201);
 
       expect(response.body).toEqual({
-        outcome: "DISABLED",
-        text: null,
-        model: "disabled",
-        inputTokens: null,
-        outputTokens: null,
-        errorMessage: null,
+        id: expect.any(String),
+        outcome: "PENDING",
       });
 
       const after = await prisma.aiPromptLog.count({ where: { feature: "SUGGEST_REPLY" } });
       expect(after).toBe(before + 1);
+
+      const log = await prisma.aiPromptLog.findUnique({ where: { id: response.body.id } });
+      expect(log).toMatchObject({ feature: "SUGGEST_REPLY", outcome: "PENDING", model: "pending" });
     });
   });
 
-  // Story 75 — Ticket Categorization, the third consumer of Story 72's
-  // AiGatewayService. Same environment limitation as Stories 73/74's own
-  // tests above: no ANTHROPIC_API_KEY, so NullAiProvider is what actually
-  // runs. Never mutates Ticket.category — advisory only.
-  describe("ticket AI categorization (Story 75)", () => {
+  // Story 75/76 — Ticket Categorization, the third consumer of Story 72's
+  // AiGatewayService, routed through ai-processing since Story 76. Same
+  // scope boundary as Stories 73/74's own tests above. Never mutates
+  // Ticket.category — advisory only, unchanged.
+  describe("ticket AI categorization (Story 75/76)", () => {
     it("rejects an unauthenticated request", async () => {
       await request(app.getHttpServer())
         .post(`/api/v1/tickets/${ticketId}/ai/categorize`)
@@ -929,7 +942,7 @@ describe("Ticketing (e2e)", () => {
         .expect(404);
     });
 
-    it("returns a DISABLED outcome, never mutates Ticket.category, and logs exactly one AiPromptLog row", async () => {
+    it("returns { id, outcome: PENDING } immediately, creates exactly one PENDING AiPromptLog row, and never mutates Ticket.category", async () => {
       const before = await prisma.aiPromptLog.count({ where: { feature: "CATEGORIZE" } });
       const ticketBefore = await request(app.getHttpServer())
         .get(`/api/v1/tickets/${ticketId}`)
@@ -942,22 +955,55 @@ describe("Ticketing (e2e)", () => {
         .expect(201);
 
       expect(response.body).toEqual({
-        outcome: "DISABLED",
-        text: null,
-        model: "disabled",
-        inputTokens: null,
-        outputTokens: null,
-        errorMessage: null,
+        id: expect.any(String),
+        outcome: "PENDING",
       });
 
       const after = await prisma.aiPromptLog.count({ where: { feature: "CATEGORIZE" } });
       expect(after).toBe(before + 1);
+
+      const log = await prisma.aiPromptLog.findUnique({ where: { id: response.body.id } });
+      expect(log).toMatchObject({ feature: "CATEGORIZE", outcome: "PENDING", model: "pending" });
 
       const ticketAfter = await request(app.getHttpServer())
         .get(`/api/v1/tickets/${ticketId}`)
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
       expect(ticketAfter.body.category).toBe(ticketBefore.body.category);
+    });
+  });
+
+  // Story 76 — proves apps/api actually enqueues a real, Redis-backed
+  // ai-processing job for a submitted operation (not just that the HTTP
+  // response looks right) — mirrors ai-processing-producer.e2e-spec.ts's
+  // own, more focused producer-level proof, but exercised through the
+  // real HTTP endpoint end to end.
+  describe("ticket AI enqueues a real ai-processing job (Story 76)", () => {
+    it("enqueues a job on the real ai-processing queue with the AiPromptLog id and ticket data", async () => {
+      const queue: Queue<{
+        aiPromptLogId: string;
+        ticketId: string;
+        branchId: string;
+        feature: string;
+        subject: string;
+        body: string;
+      }> = app.get(getQueueToken(AI_PROCESSING_QUEUE));
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      const waitingJobs = await queue.getJobs(["waiting", "active", "completed"]);
+      const job = waitingJobs.find((candidate) => candidate.data.aiPromptLogId === response.body.id);
+      expect(job).toBeDefined();
+      expect(job?.data).toMatchObject({
+        aiPromptLogId: response.body.id,
+        ticketId,
+        feature: "SUMMARIZE",
+      });
+
+      await job?.remove();
     });
   });
 });

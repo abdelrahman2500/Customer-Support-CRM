@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TicketAiService } from "./ticket-ai.service";
 import type { AiGatewayService } from "../ai/ai-gateway.service";
-import type { AiCallResult } from "@crm/ai";
+import type { AiProcessingProducer } from "../../queues/ai-processing.producer";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 import type { TicketsService } from "./tickets.service";
 
@@ -14,9 +14,13 @@ function buildTicketsServiceMock() {
 
 function buildAiGatewayMock() {
   return {
-    summarize: vi.fn(),
-    suggestReply: vi.fn(),
-    categorize: vi.fn(),
+    createPendingLog: vi.fn(),
+  };
+}
+
+function buildAiProcessingProducerMock() {
+  return {
+    enqueue: vi.fn(),
   };
 }
 
@@ -29,135 +33,111 @@ function buildTenantContextMock(branchId = "branch-1") {
 function createService(
   ticketsMock: ReturnType<typeof buildTicketsServiceMock>,
   aiGatewayMock: ReturnType<typeof buildAiGatewayMock>,
+  producerMock: ReturnType<typeof buildAiProcessingProducerMock>,
   tenantMock: ReturnType<typeof buildTenantContextMock>,
 ): TicketAiService {
   return new TicketAiService(
     ticketsMock as unknown as TicketsService,
     aiGatewayMock as unknown as AiGatewayService,
+    producerMock as unknown as AiProcessingProducer,
     tenantMock as unknown as TenantContext,
   );
 }
 
-const SUCCESS_RESULT: AiCallResult = {
-  outcome: "SUCCESS",
-  text: "A summary.",
-  model: "claude-test",
-  inputTokens: 10,
-  outputTokens: 5,
-  errorMessage: null,
-};
-
 describe("TicketAiService", () => {
   let ticketsService: ReturnType<typeof buildTicketsServiceMock>;
   let aiGateway: ReturnType<typeof buildAiGatewayMock>;
+  let producer: ReturnType<typeof buildAiProcessingProducerMock>;
   let tenantContext: ReturnType<typeof buildTenantContextMock>;
   let service: TicketAiService;
 
   beforeEach(() => {
     ticketsService = buildTicketsServiceMock();
     aiGateway = buildAiGatewayMock();
+    producer = buildAiProcessingProducerMock();
     tenantContext = buildTenantContextMock();
-    service = createService(ticketsService, aiGateway, tenantContext);
+    service = createService(ticketsService, aiGateway, producer, tenantContext);
+
+    ticketsService.getTicket.mockResolvedValue({ id: "ticket-1", subject: "Login issue" });
+    ticketsService.getTicketNotes.mockResolvedValue([
+      { id: "n1", body: "Checked logs.", createdAt: new Date() },
+      { id: "n2", body: "Reset password.", createdAt: new Date() },
+    ]);
+    aiGateway.createPendingLog.mockResolvedValue({ id: "log-1" });
+    producer.enqueue.mockResolvedValue({ id: "job-1" });
   });
 
   describe("summarizeTicket", () => {
-    it("loads the ticket (enforcing branch/department scope via getTicket) and its notes, then calls AiGatewayService.summarize", async () => {
-      ticketsService.getTicket.mockResolvedValue({ id: "ticket-1", subject: "Login issue" });
-      ticketsService.getTicketNotes.mockResolvedValue([
-        { id: "n1", body: "Checked logs.", createdAt: new Date() },
-        { id: "n2", body: "Reset password.", createdAt: new Date() },
-      ]);
-      aiGateway.summarize.mockResolvedValue(SUCCESS_RESULT);
-
+    it("loads the ticket (enforcing branch/department scope via getTicket) and its notes, creates a pending log, enqueues ai-processing, and returns the PENDING response", async () => {
       const result = await service.summarizeTicket("ticket-1");
 
       expect(ticketsService.getTicket).toHaveBeenCalledWith("ticket-1");
       expect(ticketsService.getTicketNotes).toHaveBeenCalledWith("ticket-1");
-      expect(aiGateway.summarize).toHaveBeenCalledWith(
-        { subject: "Login issue", body: "Checked logs.\n\nReset password." },
+      expect(aiGateway.createPendingLog).toHaveBeenCalledWith(
+        "SUMMARIZE",
         "branch-1",
+        expect.any(String),
       );
-      expect(result).toBe(SUCCESS_RESULT);
+      expect(producer.enqueue).toHaveBeenCalledWith({
+        aiPromptLogId: "log-1",
+        ticketId: "ticket-1",
+        branchId: "branch-1",
+        feature: "SUMMARIZE",
+        subject: "Login issue",
+        body: "Checked logs.\n\nReset password.",
+      });
+      expect(result).toEqual({ id: "log-1", outcome: "PENDING" });
     });
 
     it("passes an empty body when the ticket has no notes yet", async () => {
-      ticketsService.getTicket.mockResolvedValue({ id: "ticket-1", subject: "No notes yet" });
       ticketsService.getTicketNotes.mockResolvedValue([]);
-      aiGateway.summarize.mockResolvedValue(SUCCESS_RESULT);
 
       await service.summarizeTicket("ticket-1");
 
-      expect(aiGateway.summarize).toHaveBeenCalledWith(
-        { subject: "No notes yet", body: "" },
-        "branch-1",
+      expect(producer.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ body: "" }),
       );
     });
 
-    it("propagates a NotFoundException from getTicket for an out-of-scope ticket, never calling the AI gateway", async () => {
+    it("never calls the AI producer if loading the ticket fails (out-of-scope ticket)", async () => {
       const notFound = new Error("Ticket not found");
       ticketsService.getTicket.mockRejectedValue(notFound);
 
       await expect(service.summarizeTicket("unknown")).rejects.toThrow(notFound);
-      expect(aiGateway.summarize).not.toHaveBeenCalled();
+      expect(aiGateway.createPendingLog).not.toHaveBeenCalled();
+      expect(producer.enqueue).not.toHaveBeenCalled();
     });
   });
 
   describe("suggestReplyForTicket", () => {
-    it("loads the same ticket input as summarizeTicket and calls AiGatewayService.suggestReply", async () => {
-      ticketsService.getTicket.mockResolvedValue({ id: "ticket-1", subject: "Login issue" });
-      ticketsService.getTicketNotes.mockResolvedValue([
-        { id: "n1", body: "Checked logs.", createdAt: new Date() },
-      ]);
-      aiGateway.suggestReply.mockResolvedValue(SUCCESS_RESULT);
-
+    it("submits with feature SUGGEST_REPLY", async () => {
       const result = await service.suggestReplyForTicket("ticket-1");
 
-      expect(ticketsService.getTicket).toHaveBeenCalledWith("ticket-1");
-      expect(ticketsService.getTicketNotes).toHaveBeenCalledWith("ticket-1");
-      expect(aiGateway.suggestReply).toHaveBeenCalledWith(
-        { subject: "Login issue", body: "Checked logs." },
+      expect(aiGateway.createPendingLog).toHaveBeenCalledWith(
+        "SUGGEST_REPLY",
         "branch-1",
+        expect.any(String),
       );
-      expect(result).toBe(SUCCESS_RESULT);
-      expect(aiGateway.summarize).not.toHaveBeenCalled();
-    });
-
-    it("propagates a NotFoundException from getTicket for an out-of-scope ticket, never calling the AI gateway", async () => {
-      const notFound = new Error("Ticket not found");
-      ticketsService.getTicket.mockRejectedValue(notFound);
-
-      await expect(service.suggestReplyForTicket("unknown")).rejects.toThrow(notFound);
-      expect(aiGateway.suggestReply).not.toHaveBeenCalled();
+      expect(producer.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ feature: "SUGGEST_REPLY" }),
+      );
+      expect(result).toEqual({ id: "log-1", outcome: "PENDING" });
     });
   });
 
   describe("categorizeTicket", () => {
-    it("loads the same ticket input as summarizeTicket and calls AiGatewayService.categorize", async () => {
-      ticketsService.getTicket.mockResolvedValue({ id: "ticket-1", subject: "Login issue" });
-      ticketsService.getTicketNotes.mockResolvedValue([
-        { id: "n1", body: "Checked logs.", createdAt: new Date() },
-      ]);
-      aiGateway.categorize.mockResolvedValue(SUCCESS_RESULT);
-
+    it("submits with feature CATEGORIZE", async () => {
       const result = await service.categorizeTicket("ticket-1");
 
-      expect(ticketsService.getTicket).toHaveBeenCalledWith("ticket-1");
-      expect(ticketsService.getTicketNotes).toHaveBeenCalledWith("ticket-1");
-      expect(aiGateway.categorize).toHaveBeenCalledWith(
-        { subject: "Login issue", body: "Checked logs." },
+      expect(aiGateway.createPendingLog).toHaveBeenCalledWith(
+        "CATEGORIZE",
         "branch-1",
+        expect.any(String),
       );
-      expect(result).toBe(SUCCESS_RESULT);
-      expect(aiGateway.summarize).not.toHaveBeenCalled();
-      expect(aiGateway.suggestReply).not.toHaveBeenCalled();
-    });
-
-    it("propagates a NotFoundException from getTicket for an out-of-scope ticket, never calling the AI gateway", async () => {
-      const notFound = new Error("Ticket not found");
-      ticketsService.getTicket.mockRejectedValue(notFound);
-
-      await expect(service.categorizeTicket("unknown")).rejects.toThrow(notFound);
-      expect(aiGateway.categorize).not.toHaveBeenCalled();
+      expect(producer.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ feature: "CATEGORIZE" }),
+      );
+      expect(result).toEqual({ id: "log-1", outcome: "PENDING" });
     });
   });
 });

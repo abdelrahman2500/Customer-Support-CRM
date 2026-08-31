@@ -68,3 +68,5 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | _(unplanned)_ ticket-ai-summarization | Story 73 — implemented directly as a self-evidently small first consumer of `ai-services-foundation`'s `AiGatewayService` (`CLAUDE.md` §3.4); no formal `.squad` plan artifact | 73        |
 | _(unplanned)_ ticket-ai-suggested-reply | Story 74 — implemented directly as an additive extension of Story 73's `TicketAiService` (`CLAUDE.md` §3.4); no formal `.squad` plan artifact | 74        |
 | _(unplanned)_ ticket-ai-categorization | Story 75 — implemented directly as an additive extension of Story 73's `TicketAiService` (`CLAUDE.md` §3.4); no formal `.squad` plan artifact | 75        |
+| _(unplanned)_ shared-ai-provider-boundary | Architecture-boundary refactor (`07f896a`) — extracted `packages/ai` (`@crm/ai`); committed as `refactor(ai): ...`, not assigned a story number (no product-facing behavior change) | —         |
+| ai-ticket-assist-async-processing | [ai-ticket-assist-async-processing/00-overview.md](./ai-ticket-assist-async-processing/00-overview.md) | 76–      |

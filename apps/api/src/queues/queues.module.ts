@@ -5,6 +5,8 @@ import type { EnvConfig } from "../common/config/env.validation";
 import { HealthCheckProducer, HEALTH_CHECK_QUEUE } from "./health-check.producer";
 import { SlaTimersProducer, SLA_TIMERS_QUEUE } from "./sla-timers.producer";
 import { SlaTimerEventsBridgeProcessor, SLA_TIMER_EVENTS_QUEUE } from "./sla-timer-events-bridge.processor";
+import { AiProcessingProducer, AI_PROCESSING_QUEUE } from "./ai-processing.producer";
+import { AiProcessingEventsBridgeProcessor, AI_PROCESSING_EVENTS_QUEUE } from "./ai-processing-events-bridge.processor";
 
 /**
  * Owns `apps/api`'s BullMQ producer connection — one place all of
@@ -12,6 +14,10 @@ import { SlaTimerEventsBridgeProcessor, SLA_TIMER_EVENTS_QUEUE } from "./sla-tim
  * `health-check` is unchanged. `sla-timers` (produced here, consumed by
  * `apps/worker`) and `sla-timer-events` (consumed here, produced by
  * `apps/worker`) are Story 15's narrow SLA hand-back bridge.
+ *
+ * Story 76 — `ai-processing` (produced here, consumed by `apps/worker`)
+ * and `ai-processing-events` (consumed here, produced by `apps/worker`)
+ * are the identically-shaped AI hand-back bridge.
  */
 @Module({
   imports: [
@@ -25,8 +31,16 @@ import { SlaTimerEventsBridgeProcessor, SLA_TIMER_EVENTS_QUEUE } from "./sla-tim
     BullModule.registerQueue({ name: HEALTH_CHECK_QUEUE }),
     BullModule.registerQueue({ name: SLA_TIMERS_QUEUE }),
     BullModule.registerQueue({ name: SLA_TIMER_EVENTS_QUEUE }),
+    BullModule.registerQueue({ name: AI_PROCESSING_QUEUE }),
+    BullModule.registerQueue({ name: AI_PROCESSING_EVENTS_QUEUE }),
   ],
-  providers: [HealthCheckProducer, SlaTimersProducer, SlaTimerEventsBridgeProcessor],
-  exports: [HealthCheckProducer, SlaTimersProducer],
+  providers: [
+    HealthCheckProducer,
+    SlaTimersProducer,
+    SlaTimerEventsBridgeProcessor,
+    AiProcessingProducer,
+    AiProcessingEventsBridgeProcessor,
+  ],
+  exports: [HealthCheckProducer, SlaTimersProducer, AiProcessingProducer],
 })
 export class QueuesModule {}
