@@ -141,7 +141,7 @@ describe("In-App Notification Delivery (e2e)", () => {
     return client;
   }
 
-  async function createTicket(): Promise<{ id: string }> {
+  async function createTicket(): Promise<{ id: string; customerId: string }> {
     const customer = await request(app.getHttpServer())
       .post("/api/v1/customers")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -154,7 +154,7 @@ describe("In-App Notification Delivery (e2e)", () => {
       .send({ customerId: customer.body.id, subject: "Notification delivery e2e ticket" })
       .expect(201);
 
-    return { id: created.body.id as string };
+    return { id: created.body.id as string, customerId: customer.body.id as string };
   }
 
   it("relays a real sla.at_risk event into the caller's own branch:{id}:notifications room", async () => {
@@ -212,7 +212,7 @@ describe("In-App Notification Delivery (e2e)", () => {
         category: null,
         priority: "MEDIUM",
         status: "OPEN",
-        customerId: "unused-in-this-assertion",
+        customerId: ticket.customerId,
         contactId: null,
         departmentId: null,
         assignedToUserId: null,

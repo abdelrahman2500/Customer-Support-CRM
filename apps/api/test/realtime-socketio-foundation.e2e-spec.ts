@@ -132,7 +132,7 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
     });
   }
 
-  async function createTicket(): Promise<{ id: string }> {
+  async function createTicket(): Promise<{ id: string; customerId: string }> {
     const customer = await request(app.getHttpServer())
       .post("/api/v1/customers")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -145,7 +145,7 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
       .send({ customerId: customer.body.id, subject: "Realtime e2e ticket" })
       .expect(201);
 
-    return { id: created.body.id as string };
+    return { id: created.body.id as string, customerId: customer.body.id as string };
   }
 
   it("disconnects a connection with no token before any join is possible", async () => {
@@ -201,7 +201,7 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
         category: null,
         priority: "MEDIUM",
         status: "OPEN",
-        customerId: "unused-in-this-assertion",
+        customerId: ticket.customerId,
         contactId: null,
         departmentId: null,
         assignedToUserId: null,
@@ -353,7 +353,7 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
             category: null,
             priority: "MEDIUM",
             status: "OPEN",
-            customerId: "unused-in-this-assertion",
+            customerId: ticket.customerId,
             contactId: null,
             departmentId: null,
             assignedToUserId: null,
