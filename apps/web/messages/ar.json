@@ -148,7 +148,8 @@
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
       "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
       "statusUpdateSuccess": "تم تحديث الحالة إلى {status}.",
-      "priorityUpdateSuccess": "تم تحديث الأولوية إلى {priority}."
+      "priorityUpdateSuccess": "تم تحديث الأولوية إلى {priority}.",
+      "optionsLoading": "جارٍ التحميل…"
     },
     "sla": {
       "none": "لا يوجد هدف اتفاقية مستوى خدمة",
@@ -184,7 +185,8 @@
       "submitting": "جارٍ الإنشاء...",
       "createFailed": "تعذّر إنشاء التذكرة. حاول مرة أخرى.",
       "createSuccess": "تم إنشاء التذكرة.",
-      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء."
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "optionsLoading": "جارٍ التحميل…"
     }
   },
   "customers": {
@@ -275,7 +277,8 @@
       "passwordResetPlaceholder": "كلمة مرور جديدة (8 أحرف على الأقل)",
       "passwordResetSubmit": "إعادة تعيين كلمة المرور",
       "passwordResetSubmitting": "جارٍ إعادة التعيين...",
-      "passwordResetSuccess": "تمت إعادة تعيين كلمة المرور."
+      "passwordResetSuccess": "تمت إعادة تعيين كلمة المرور.",
+      "optionsLoading": "جارٍ التحميل…"
     },
     "create": {
       "title": "مستخدم جديد",

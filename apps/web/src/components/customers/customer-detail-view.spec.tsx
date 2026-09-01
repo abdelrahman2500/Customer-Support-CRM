@@ -566,4 +566,15 @@ describe("CustomerDetailView", () => {
       });
     });
   });
+
+  // Story 97 — Loading & Skeleton UX.
+  describe("loading & skeleton UX (Story 97)", () => {
+    it("renders a shaped skeleton — not the customer content — while the customer itself is loading", () => {
+      mockedUseCustomerQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      const { container } = render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(3);
+    });
+  });
 });

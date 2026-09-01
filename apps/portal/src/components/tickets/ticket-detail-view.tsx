@@ -14,6 +14,7 @@ import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
+import { Skeleton } from "@/components/portal/skeleton";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
@@ -29,6 +30,40 @@ const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
  * `apps/web`'s own `useTicketRealtime`, mirroring that hook's mount-once
  * placement here at the top of the view.
  */
+/**
+ * Story 97 — Loading & Skeleton UX. Replaces the previous generic
+ * two-block skeleton with one shaped to match the real layout: the header
+ * card's 3-field grid, the chat card, and the history card. Exported so
+ * `app/[locale]/(customer)/tickets/[id]/loading.tsx` can render the
+ * identical shape during the route transition itself.
+ */
+export function TicketDetailSkeleton() {
+  return (
+    <section className="flex flex-col gap-6" aria-hidden="true">
+      <Skeleton className="h-4 w-32" />
+
+      <div className="rounded-md border border-slate-200 bg-white p-6">
+        <Skeleton className="h-6 w-1/2" />
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="flex flex-col gap-1">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Skeleton className="h-40 w-full" />
+
+      <div className="rounded-md border border-slate-200 bg-white p-6">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="mt-2 h-24 w-full" />
+      </div>
+    </section>
+  );
+}
+
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
   const { locale } = useParams<{ locale: string }>();
@@ -37,12 +72,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const historyQuery = useMyTicketHistoryQuery(ticketId);
 
   if (ticketQuery.isLoading) {
-    return (
-      <div className="flex flex-col gap-3">
-        <div className="h-8 w-1/2 animate-pulse rounded-md bg-slate-100" />
-        <div className="h-32 w-full animate-pulse rounded-md bg-slate-100" />
-      </div>
-    );
+    return <TicketDetailSkeleton />;
   }
 
   if (ticketQuery.isError) {
@@ -92,9 +122,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
       <div className="rounded-md border border-slate-200 bg-white p-6">
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.historyHeading")}</h2>
-        {historyQuery.isLoading && (
-          <div className="mt-2 h-24 w-full animate-pulse rounded-md bg-slate-100" />
-        )}
+        {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {historyQuery.isError && (
           <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {t("detail.historyError")}
@@ -138,9 +166,7 @@ function CsatSection({ ticketId }: { ticketId: string }) {
     <div className="rounded-md border border-slate-200 bg-white p-6">
       <h2 className="text-sm font-semibold text-slate-900">{t("detail.csatHeading")}</h2>
 
-      {csatQuery.isLoading && (
-        <div className="mt-2 h-16 w-full animate-pulse rounded-md bg-slate-100" />
-      )}
+      {csatQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
 
       {csatQuery.isError && (
         <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

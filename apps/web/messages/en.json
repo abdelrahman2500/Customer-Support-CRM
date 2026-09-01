@@ -148,7 +148,8 @@
       "actionForbidden": "You don't have permission to perform that action.",
       "actionFailed": "That change couldn't be saved. Please try again.",
       "statusUpdateSuccess": "Status updated to {status}.",
-      "priorityUpdateSuccess": "Priority updated to {priority}."
+      "priorityUpdateSuccess": "Priority updated to {priority}.",
+      "optionsLoading": "Loading…"
     },
     "sla": {
       "none": "No SLA target",
@@ -184,7 +185,8 @@
       "submitting": "Creating...",
       "createFailed": "Couldn't create the ticket. Please try again.",
       "createSuccess": "Ticket created.",
-      "actionForbidden": "You don't have permission to perform that action."
+      "actionForbidden": "You don't have permission to perform that action.",
+      "optionsLoading": "Loading…"
     }
   },
   "customers": {
@@ -279,7 +281,8 @@
       "passwordResetPlaceholder": "New password (min. 8 characters)",
       "passwordResetSubmit": "Reset password",
       "passwordResetSubmitting": "Resetting...",
-      "passwordResetSuccess": "Password reset."
+      "passwordResetSuccess": "Password reset.",
+      "optionsLoading": "Loading…"
     },
     "create": {
       "title": "New user",

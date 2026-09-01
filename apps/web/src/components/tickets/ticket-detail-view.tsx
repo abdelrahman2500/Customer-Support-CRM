@@ -108,6 +108,46 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * for every other field — no second mutation instance, no new
  * category-persistence mechanism.
  */
+/**
+ * Story 97 — Loading & Skeleton UX. Replaces the previous generic
+ * two-block skeleton (a heading bar + one body block, unrelated to this
+ * page's actual shape) with one shaped to match the real, loaded layout:
+ * the editable-subject header, the 5-field status/priority/category/
+ * assignee/department grid, the chat card, and the run of bordered
+ * sections below it (SLA/Escalations/History/CSAT/Notes/Attachments).
+ * Exported so `app/[locale]/(agent)/tickets/[id]/loading.tsx` can render
+ * the identical shape during the route transition itself, before this
+ * component has even mounted — one skeleton definition, two call sites.
+ */
+export function TicketDetailSkeleton() {
+  return (
+    <section className="flex flex-col gap-6" aria-hidden="true">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-7 w-1/2" />
+        <Skeleton className="h-4 w-40" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 rounded-md border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="flex flex-col gap-1">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        ))}
+      </div>
+
+      <Skeleton className="h-40 w-full rounded-md" />
+
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="rounded-md border border-slate-200 bg-white p-4">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="mt-2 h-16 w-full" />
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
   const { locale } = useParams<{ locale: string }>();
@@ -147,12 +187,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   }, [usersQuery.data]);
 
   if (ticketQuery.isLoading) {
-    return (
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-8 w-1/2" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
+    return <TicketDetailSkeleton />;
   }
 
   if (ticketQuery.isError) {
@@ -271,11 +306,13 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <Field label={t("detail.assignedAgent")}>
           <Select
             value={ticket.assignedToUserId ?? undefined}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || usersQuery.isLoading}
             onValueChange={(value) => mutation.mutate({ assignedToUserId: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder={t("list.unassigned")} />
+              <SelectValue
+                placeholder={usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")}
+              />
             </SelectTrigger>
             <SelectContent>
               {(usersQuery.data ?? []).map((user) => (
@@ -290,11 +327,15 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <Field label={t("detail.department")}>
           <Select
             value={ticket.departmentId ?? undefined}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || departmentsQuery.isLoading}
             onValueChange={(value) => mutation.mutate({ departmentId: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder={t("detail.noDepartment")} />
+              <SelectValue
+                placeholder={
+                  departmentsQuery.isLoading ? t("detail.optionsLoading") : t("detail.noDepartment")
+                }
+              />
             </SelectTrigger>
             <SelectContent>
               {(departmentsQuery.data ?? []).map((department) => (

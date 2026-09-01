@@ -89,6 +89,7 @@ export function ReportsView() {
           heading={t("ticketVolume.heading")}
           query={ticketVolumeQuery}
           t={t}
+          skeleton="list"
         >
           {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length === 0 && (
             <p className="text-sm text-slate-500">{t("ticketVolume.empty")}</p>
@@ -109,6 +110,7 @@ export function ReportsView() {
           heading={t("slaCompliance.heading")}
           query={slaComplianceQuery}
           t={t}
+          skeleton="stat"
         >
           {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget === 0 && (
             <p className="text-sm text-slate-500">{t("slaCompliance.empty")}</p>
@@ -128,7 +130,7 @@ export function ReportsView() {
           )}
         </ReportCard>
 
-        <ReportCard heading={t("csat.heading")} query={csatQuery} t={t}>
+        <ReportCard heading={t("csat.heading")} query={csatQuery} t={t} skeleton="stat">
           {csatQuery.isSuccess && csatQuery.data.responseCount === 0 && (
             <p className="text-sm text-slate-500">{t("csat.empty")}</p>
           )}
@@ -144,7 +146,12 @@ export function ReportsView() {
           )}
         </ReportCard>
 
-        <ReportCard heading={t("agentPerformance.heading")} query={agentPerformanceQuery} t={t}>
+        <ReportCard
+          heading={t("agentPerformance.heading")}
+          query={agentPerformanceQuery}
+          t={t}
+          skeleton="list"
+        >
           {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length === 0 && (
             <p className="text-sm text-slate-500">{t("agentPerformance.empty")}</p>
           )}
@@ -165,7 +172,7 @@ export function ReportsView() {
           )}
         </ReportCard>
 
-        <ReportCard heading={t("ticketAging.heading")} query={ticketAgingQuery} t={t}>
+        <ReportCard heading={t("ticketAging.heading")} query={ticketAgingQuery} t={t} skeleton="list">
           {ticketAgingQuery.isSuccess && (
             <ul className="flex flex-col gap-1 text-sm">
               {ticketAgingQuery.data.map((row) => (
@@ -190,6 +197,31 @@ interface QueryLike {
   refetch: () => void;
 }
 
+/**
+ * Story 97 — Loading & Skeleton UX. Every card previously rendered the
+ * identical `h-16` bar while loading, regardless of whether its eventual
+ * content is a short list of rows (Ticket Volume, Agent Performance,
+ * Ticket Aging) or one big stat number plus a caption line (SLA
+ * Compliance, CSAT). `skeleton` shapes it per card instead.
+ */
+function ReportCardSkeleton({ variant }: { variant: "list" | "stat" }) {
+  if (variant === "stat") {
+    return (
+      <div className="mt-2 flex flex-col gap-1">
+        <Skeleton className="h-8 w-16" />
+        <Skeleton className="h-4 w-32" />
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 flex flex-col gap-1">
+      <Skeleton className="h-5 w-full" />
+      <Skeleton className="h-5 w-full" />
+      <Skeleton className="h-5 w-full" />
+    </div>
+  );
+}
+
 /** Shared card shell — loading/forbidden/generic-error states are identical
  * across all three cards; only the populated body differs (passed as
  * `children`, rendered only once `query.isSuccess`). */
@@ -197,11 +229,13 @@ function ReportCard({
   heading,
   query,
   t,
+  skeleton = "list",
   children,
 }: {
   heading: string;
   query: QueryLike;
   t: ReturnType<typeof useTranslations>;
+  skeleton?: "list" | "stat";
   children: ReactNode;
 }) {
   const forbidden = query.isError && query.error instanceof ApiError && query.error.status === 403;
@@ -215,7 +249,7 @@ function ReportCard({
   return (
     <div className="rounded-md border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-slate-900">{heading}</h2>
-      {query.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
+      {query.isLoading && <ReportCardSkeleton variant={skeleton} />}
       {query.isError && forbidden && (
         <Alert variant="destructive" className="mt-2">
           {t("forbidden")}

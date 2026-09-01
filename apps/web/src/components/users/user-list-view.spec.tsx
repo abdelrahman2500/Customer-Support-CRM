@@ -423,6 +423,23 @@ describe("UserListView", () => {
     expect(screen.getByText("Couldn't load departments.")).toBeInTheDocument();
   });
 
+  // Story 97 — Loading & Skeleton UX.
+  it("disables the Role and Department pickers, and shows a loading indicator, while their own options queries are loading", () => {
+    mockedUseUsersQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [baseUser] }) as never,
+    );
+    mockedUseRolesQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+    mockedUseDepartmentsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    renderView();
+
+    const roleCombobox = screen.getAllByRole("combobox")[0] as HTMLElement;
+    const departmentCombobox = screen.getAllByRole("combobox")[1] as HTMLElement;
+    expect(roleCombobox).toBeDisabled();
+    expect(departmentCombobox).toBeDisabled();
+    expect(screen.getAllByText("Loading…")).toHaveLength(2);
+  });
+
   describe("3-way error handling on the rename/activate mutation", () => {
     it("renders the forbidden message when rejected with 403", () => {
       mockedUseUsersQuery.mockReturnValue(

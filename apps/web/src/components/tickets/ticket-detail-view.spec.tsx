@@ -989,4 +989,56 @@ describe("TicketDetailView", () => {
       expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
   });
+
+  // Story 97 — Loading & Skeleton UX.
+  describe("loading & skeleton UX (Story 97)", () => {
+    it("renders a shaped skeleton — not the ticket content — while the ticket itself is loading", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      const { container } = render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(5);
+      expect(screen.queryByDisplayValue("Cannot log in")).not.toBeInTheDocument();
+    });
+
+    it("disables the assignee select and shows a loading placeholder while its own options query is loading", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useUsersQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      // The trigger has no accessible name distinct from its wrapping
+      // `Field` label (the accname spec excludes a nested labelable
+      // control's own content from its wrapping label's computed name —
+      // see `user-list-view.spec.tsx`'s own established convention for
+      // this exact same constraint) — found by its rendered placeholder
+      // text and asserted via the DOM instead.
+      const combobox = screen.getByText("detail.optionsLoading").closest('[role="combobox"]');
+      expect(combobox).toBeDisabled();
+    });
+
+    it("disables the department select and shows a loading placeholder while its own options query is loading", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useDepartmentsQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const combobox = screen.getByText("detail.optionsLoading").closest('[role="combobox"]');
+      expect(combobox).toBeDisabled();
+    });
+
+    it("does not disable the assignee/department selects once their options queries resolve", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.queryByText("detail.optionsLoading")).not.toBeInTheDocument();
+    });
+  });
 });

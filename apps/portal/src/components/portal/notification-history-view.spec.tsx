@@ -115,6 +115,24 @@ describe("NotificationHistoryView", () => {
     expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
+  // Story 97 — Loading & Skeleton UX.
+  it("shapes the loading state as the real 3-column table, not generic row bars", () => {
+    mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = render(<NotificationHistoryView />);
+
+    // The real headers stay in the accessibility tree (they're the same
+    // headers the populated table uses); only the placeholder rows below
+    // them are `aria-hidden`, so those are asserted via the DOM directly.
+    expect(screen.getByRole("columnheader", { name: "history.columns.event" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "history.columns.ticket" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "history.columns.loggedAt" }),
+    ).toBeInTheDocument();
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(5);
+    expect(container.querySelectorAll("tbody .animate-pulse")).toHaveLength(15); // 5 rows × 3 cells
+  });
+
   it("shows the empty state when the query succeeds with zero notifications", () => {
     mockedUseMyNotificationsQuery.mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,

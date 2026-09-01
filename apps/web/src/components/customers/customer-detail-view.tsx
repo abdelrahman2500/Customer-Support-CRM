@@ -292,6 +292,38 @@ function AddContactForm({ customerId }: { customerId: string }) {
  * — the same shared list-plus-upload-form shape, parametrized to
  * `{ type: "customer", id: customerId }`.
  */
+/**
+ * Story 97 — Loading & Skeleton UX. Replaces the previous generic
+ * two-block skeleton with one shaped to match the real layout: the
+ * editable display-name/status header, the Contacts card, the Related
+ * Tickets card, and the Attachments card. Exported so
+ * `app/[locale]/(agent)/customers/[id]/loading.tsx` can render the
+ * identical shape during the route transition itself.
+ */
+export function CustomerDetailSkeleton() {
+  return (
+    <section className="flex flex-col gap-6" aria-hidden="true">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-56" />
+          <Skeleton className="h-9 w-32" />
+        </div>
+        <Skeleton className="h-8 w-28" />
+      </div>
+
+      {["contacts", "tickets", "attachments"].map((section) => (
+        <div key={section} className="rounded-md border border-slate-200 bg-white p-4">
+          <Skeleton className="h-4 w-32" />
+          <div className="mt-2 flex flex-col gap-2">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export function CustomerDetailView({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");
   const errorMessage = useErrorMessage();
@@ -306,12 +338,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
   const [displayNameDraft, setDisplayNameDraft] = useState<string | null>(null);
 
   if (customerQuery.isLoading) {
-    return (
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-8 w-1/2" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
+    return <CustomerDetailSkeleton />;
   }
 
   if (customerQuery.isError) {

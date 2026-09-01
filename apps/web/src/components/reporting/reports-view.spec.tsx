@@ -258,4 +258,30 @@ describe("ReportsView", () => {
       expect(screen.getByText("dateRange.clear")).toBeDisabled();
     });
   });
+
+  // Story 97 — Loading & Skeleton UX.
+  describe("per-card skeleton shape (Story 97)", () => {
+    it("renders a compact stat-shaped skeleton for the stat cards (SLA Compliance, CSAT)", () => {
+      mockedUseSlaComplianceQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+      mockedUseCsatSummaryQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<ReportsView />);
+
+      const slaHeading = screen.getByText("slaCompliance.heading");
+      const slaCard = slaHeading.closest("div")!;
+      // A stat skeleton is exactly two blocks (a big-number placeholder plus
+      // a caption line) — not the three-row list shape used elsewhere.
+      expect(slaCard.querySelectorAll(".animate-pulse")).toHaveLength(2);
+    });
+
+    it("renders a multi-row list-shaped skeleton for the list cards (Ticket Volume, Agent Performance, Ticket Aging)", () => {
+      mockedUseTicketVolumeQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<ReportsView />);
+
+      const heading = screen.getByText("ticketVolume.heading");
+      const card = heading.closest("div")!;
+      expect(card.querySelectorAll(".animate-pulse")).toHaveLength(3);
+    });
+  });
 });

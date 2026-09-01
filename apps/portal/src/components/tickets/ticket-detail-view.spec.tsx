@@ -89,6 +89,15 @@ describe("TicketDetailView", () => {
     expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
+  // Story 97 — Loading & Skeleton UX.
+  it("shapes the loading skeleton to the real header/chat/history layout, not two generic blocks", () => {
+    vi.mocked(useMyTicketQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = render(<TicketDetailView ticketId="ticket-1" />);
+
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(5);
+  });
+
   it("renders a not-found message when the ticket lookup 404s", () => {
     vi.mocked(useMyTicketQuery).mockReturnValue(
       queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,

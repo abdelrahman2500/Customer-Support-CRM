@@ -402,4 +402,67 @@ describe("CreateTicketView", () => {
       expect(screen.getByText("Couldn't load agents.")).toBeInTheDocument();
     });
   });
+
+  // Story 97 — Loading & Skeleton UX.
+  //
+  // A `Select` trigger has no accessible name distinct from its wrapping
+  // `<label>` — the accname spec excludes a nested labelable control's own
+  // content from its wrapping label's computed name (the same constraint
+  // `user-list-view.spec.tsx`'s own established convention documents) — so
+  // these tests locate a combobox via its wrapping `<label>` rather than
+  // `getByRole("combobox", { name })`.
+  describe("dependent-select loading states (Story 97)", () => {
+    it("disables the customer select and shows a loading placeholder while the customer list is loading", () => {
+      mockedUseCustomersQuery.mockReturnValue({ data: undefined, isLoading: true } as never);
+
+      renderWithLocale("en");
+
+      const combobox = screen.getByText("Loading…").closest('[role="combobox"]');
+      expect(combobox).toBeDisabled();
+    });
+
+    it("disables the department select and shows a loading indicator while departments are loading", () => {
+      mockedUseDepartmentsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      renderWithLocale("en");
+
+      const label = screen.getByText("Loading…").closest("label")!;
+      expect(within(label).getByRole("combobox")).toBeDisabled();
+    });
+
+    it("disables the assigned-agent select and shows a loading indicator while agents are loading", () => {
+      mockedUseUsersQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      renderWithLocale("en");
+
+      const label = screen.getByText("Loading…").closest("label")!;
+      expect(within(label).getByRole("combobox")).toBeDisabled();
+    });
+
+    it("disables the contact select and shows a loading indicator while the selected customer's contacts are loading", async () => {
+      mockedUseCustomersQuery.mockReturnValue({
+        data: [{ id: "customer-1", displayName: "Acme Inc." }],
+        isLoading: false,
+      } as never);
+      mockedUseCustomerQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      renderWithLocale("en");
+      fireEvent.click(screen.getByText("Select a customer"));
+      fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
+
+      const label = screen.getByText("Loading…").closest("label")!;
+      expect(within(label).getByRole("combobox")).toBeDisabled();
+    });
+
+    it("does not disable any dependent select once its options query resolves", () => {
+      renderWithLocale("en");
+
+      expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+      // Comboboxes, in DOM order, with no customer selected yet (so no
+      // Contact picker rendered): customer, priority, department, assignee.
+      const comboboxes = screen.getAllByRole("combobox");
+      expect(comboboxes[2]).not.toBeDisabled();
+      expect(comboboxes[3]).not.toBeDisabled();
+    });
+  });
 });

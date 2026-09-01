@@ -128,9 +128,17 @@ export function CreateTicketView() {
       <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.customer")}
-          <Select value={customerId} onValueChange={handleCustomerChange}>
+          <Select
+            value={customerId}
+            onValueChange={handleCustomerChange}
+            disabled={customersQuery.isLoading}
+          >
             <SelectTrigger>
-              <SelectValue placeholder={t("create.selectCustomer")} />
+              <SelectValue
+                placeholder={
+                  customersQuery.isLoading ? t("create.optionsLoading") : t("create.selectCustomer")
+                }
+              />
             </SelectTrigger>
             <SelectContent>
               {(customersQuery.data ?? []).map((customer) => (
@@ -148,7 +156,11 @@ export function CreateTicketView() {
         {customerId && (
           <label className="flex flex-col gap-1 text-sm text-slate-700">
             {t("create.contact")}
-            <Select value={contactId} onValueChange={setContactId}>
+            <Select
+              value={contactId}
+              onValueChange={setContactId}
+              disabled={customerDetailQuery.isLoading}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -161,6 +173,9 @@ export function CreateTicketView() {
                 ))}
               </SelectContent>
             </Select>
+            {customerDetailQuery.isLoading && (
+              <span className="text-xs text-slate-500">{t("create.optionsLoading")}</span>
+            )}
             {customerDetailQuery.isError && (
               <span className="text-xs text-red-600">{t("create.contactsLoadError")}</span>
             )}
@@ -201,7 +216,11 @@ export function CreateTicketView() {
 
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.department")}
-          <Select value={departmentId} onValueChange={setDepartmentId}>
+          <Select
+            value={departmentId}
+            onValueChange={setDepartmentId}
+            disabled={departmentsQuery.isLoading}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -214,6 +233,9 @@ export function CreateTicketView() {
               ))}
             </SelectContent>
           </Select>
+          {departmentsQuery.isLoading && (
+            <span className="text-xs text-slate-500">{t("create.optionsLoading")}</span>
+          )}
           {departmentsQuery.isError && (
             <span className="text-xs text-red-600">{t("create.departmentLoadError")}</span>
           )}
@@ -221,7 +243,11 @@ export function CreateTicketView() {
 
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.assignedAgent")}
-          <Select value={assignedToUserId} onValueChange={setAssignedToUserId}>
+          <Select
+            value={assignedToUserId}
+            onValueChange={setAssignedToUserId}
+            disabled={usersQuery.isLoading}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -234,6 +260,9 @@ export function CreateTicketView() {
               ))}
             </SelectContent>
           </Select>
+          {usersQuery.isLoading && (
+            <span className="text-xs text-slate-500">{t("create.optionsLoading")}</span>
+          )}
           {usersQuery.isError && (
             <span className="text-xs text-red-600">{t("create.assignedAgentLoadError")}</span>
           )}

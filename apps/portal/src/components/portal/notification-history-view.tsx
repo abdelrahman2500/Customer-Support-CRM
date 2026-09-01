@@ -10,6 +10,7 @@ import {
 import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import type { PortalNotificationSummary } from "@/lib/notifications-api";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
+import { Skeleton } from "./skeleton";
 
 const TICKET_UPDATED_EVENT = "ticket.updated";
 
@@ -89,11 +90,39 @@ export function NotificationHistoryView() {
 
       <NotificationPreferencesSection />
 
+      {/* Story 97 — Loading & Skeleton UX. A real, column-shaped table
+          (matching the eventual populated table's own headers/columns
+          exactly) rather than the previous generic full-width row bars,
+          which gave no hint of the 3-column structure about to appear. */}
       {notificationsQuery.isLoading && (
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2, 3, 4].map((row) => (
-            <div key={row} className="h-10 w-full animate-pulse rounded-md bg-slate-100" />
-          ))}
+        <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-500">
+                <th className="px-4 py-2 font-medium">{t("history.columns.event")}</th>
+                <th className="px-4 py-2 font-medium">{t("history.columns.ticket")}</th>
+                <th className="px-4 py-2 font-medium">{t("history.columns.loggedAt")}</th>
+              </tr>
+            </thead>
+            {/* Only the placeholder rows themselves are hidden from
+                assistive tech — the headers above are the same real
+                headers the populated table uses and stay announced. */}
+            <tbody aria-hidden="true">
+              {[0, 1, 2, 3, 4].map((row) => (
+                <tr key={row} className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-2">
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </td>
+                  <td className="px-4 py-2">
+                    <Skeleton className="h-4 w-32" />
+                  </td>
+                  <td className="px-4 py-2">
+                    <Skeleton className="h-4 w-24" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

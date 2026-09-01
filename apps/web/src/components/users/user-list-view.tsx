@@ -291,7 +291,7 @@ function UserRow({ user }: { user: UserSummary }) {
             <span className="text-xs text-slate-500">{t("list.roleLabel")}</span>
             <Select
               value={user.roleId}
-              disabled={assignmentMutation.isPending}
+              disabled={assignmentMutation.isPending || rolesQuery.isLoading}
               onValueChange={(value) => assignmentMutation.mutate({ roleId: value })}
             >
               <SelectTrigger className="min-w-[10rem]">
@@ -305,6 +305,9 @@ function UserRow({ user }: { user: UserSummary }) {
                 ))}
               </SelectContent>
             </Select>
+            {rolesQuery.isLoading && (
+              <span className="text-xs text-slate-500">{t("list.optionsLoading")}</span>
+            )}
             {rolesQuery.isError && (
               <span className="text-xs text-red-600">{t("list.roleLoadError")}</span>
             )}
@@ -314,7 +317,7 @@ function UserRow({ user }: { user: UserSummary }) {
             <span className="text-xs text-slate-500">{t("list.departmentLabel")}</span>
             <Select
               value={user.departmentId ?? UNSET_DEPARTMENT}
-              disabled={assignmentMutation.isPending}
+              disabled={assignmentMutation.isPending || departmentsQuery.isLoading}
               onValueChange={(value) =>
                 assignmentMutation.mutate({
                   departmentId: value === UNSET_DEPARTMENT ? null : value,
@@ -333,6 +336,9 @@ function UserRow({ user }: { user: UserSummary }) {
                 ))}
               </SelectContent>
             </Select>
+            {departmentsQuery.isLoading && (
+              <span className="text-xs text-slate-500">{t("list.optionsLoading")}</span>
+            )}
             {departmentsQuery.isError && (
               <span className="text-xs text-red-600">{t("list.departmentLoadError")}</span>
             )}
