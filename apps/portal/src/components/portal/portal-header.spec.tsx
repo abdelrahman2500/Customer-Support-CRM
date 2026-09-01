@@ -7,10 +7,12 @@ import { clearAccessToken, logout } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
 const push = vi.fn();
+let pathname = "/en/home";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
   useRouter: () => ({ push }),
+  usePathname: () => pathname,
 }));
 
 vi.mock("next-intl", () => ({
@@ -54,6 +56,7 @@ const contact = {
 describe("PortalHeader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    pathname = "/en/home";
     mockedLogout.mockResolvedValue(undefined);
     mockedUseBrandingQuery.mockReturnValue({ data: undefined } as never);
     mockedUseUnreadNotificationCountQuery.mockReturnValue({
@@ -188,6 +191,38 @@ describe("PortalHeader", () => {
 
       const badge = screen.getByLabelText(/unreadNotificationsLabel/);
       expect(badge).toHaveTextContent("5");
+    });
+  });
+
+  // Story 96 — Navigation & Route Robustness.
+  describe("accessibility and active-route indication (Story 96)", () => {
+    it("labels the nav landmark with an accessible name", () => {
+      render(<PortalHeader contact={contact} />);
+
+      expect(screen.getByRole("navigation", { name: "nav.label" })).toBeInTheDocument();
+    });
+
+    it("marks the current top-level route's link as the current page", () => {
+      pathname = "/en/tickets";
+      render(<PortalHeader contact={contact} />);
+
+      // The mocked `useTranslations` ignores namespace, so every nav link
+      // shares the accessible name "nav" — distinguish by href instead.
+      const links = screen.getAllByRole("link", { name: "nav" });
+      const ticketsLink = links.find((link) => link.getAttribute("href") === "/en/tickets")!;
+      const chatLink = links.find((link) => link.getAttribute("href") === "/en/chat")!;
+
+      expect(ticketsLink).toHaveAttribute("aria-current", "page");
+      expect(chatLink).not.toHaveAttribute("aria-current");
+    });
+
+    it("still marks the top-level link current from a nested detail route", () => {
+      pathname = "/en/tickets/ticket-1";
+      render(<PortalHeader contact={contact} />);
+
+      const links = screen.getAllByRole("link", { name: "nav" });
+      const ticketsLink = links.find((link) => link.getAttribute("href") === "/en/tickets")!;
+      expect(ticketsLink).toHaveAttribute("aria-current", "page");
     });
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedUser } from "@crm/shared";
@@ -79,6 +79,7 @@ const NAV_ITEMS = [
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
   const t = useTranslations("workspace");
   const router = useRouter();
+  const pathname = usePathname();
   const { locale } = useParams<{ locale: string }>();
   const brandingQuery = useBrandingQuery();
   const unreadCountQuery = useUnreadNotificationCountQuery();
@@ -132,25 +133,35 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
         aria-label={t("nav.label")}
         className="flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-6 py-2 text-sm text-slate-600"
       >
-        {NAV_ITEMS.map((item) => (
-          <a
-            key={item.href}
-            href={`/${locale}/${item.href}`}
-            className="flex items-center gap-1.5 hover:text-slate-900 hover:underline"
-          >
-            {t(item.labelKey)}
-            {item.href === "notifications" &&
-              unreadCountQuery.isSuccess &&
-              unreadCount > 0 && (
-                <Badge
-                  variant="destructive"
-                  aria-label={t("nav.unreadNotificationsLabel", { count: unreadCount })}
-                >
-                  {unreadCount}
-                </Badge>
-              )}
-          </a>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const href = `/${locale}/${item.href}`;
+          // Story 96 — Navigation & Route Robustness. A nested route (e.g.
+          // `/en/tickets/ticket-1`) still marks its own top-level `Tickets`
+          // link current, so it doesn't just match on exact equality.
+          const isActive = pathname === href || pathname?.startsWith(`${href}/`);
+          return (
+            <a
+              key={item.href}
+              href={href}
+              aria-current={isActive ? "page" : undefined}
+              className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${
+                isActive ? "bg-slate-100 font-medium text-slate-900" : ""
+              }`}
+            >
+              {t(item.labelKey)}
+              {item.href === "notifications" &&
+                unreadCountQuery.isSuccess &&
+                unreadCount > 0 && (
+                  <Badge
+                    variant="destructive"
+                    aria-label={t("nav.unreadNotificationsLabel", { count: unreadCount })}
+                  >
+                    {unreadCount}
+                  </Badge>
+                )}
+            </a>
+          );
+        })}
       </nav>
     </>
   );

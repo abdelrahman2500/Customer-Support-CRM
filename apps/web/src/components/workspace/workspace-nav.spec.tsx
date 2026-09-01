@@ -7,10 +7,12 @@ import { clearAccessToken, logout } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
 const push = vi.fn();
+let pathname = "/en/tickets";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
   useRouter: () => ({ push }),
+  usePathname: () => pathname,
 }));
 
 vi.mock("next-intl", () => ({
@@ -56,6 +58,7 @@ const user = {
 describe("WorkspaceNav", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    pathname = "/en/tickets";
     mockedLogout.mockResolvedValue(undefined);
     mockedUseBrandingQuery.mockReturnValue({ data: undefined } as never);
     mockedUseUnreadNotificationCountQuery.mockReturnValue({
@@ -243,6 +246,43 @@ describe("WorkspaceNav", () => {
 
       const badge = screen.getByLabelText(/unreadNotificationsLabel/);
       expect(badge).toHaveTextContent("3");
+    });
+  });
+
+  // Story 96 — Navigation & Route Robustness.
+  describe("active-route indication (Story 96)", () => {
+    it("marks the current top-level route's link as the current page", () => {
+      pathname = "/en/tickets";
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.getByRole("link", { name: "nav.tickets" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(screen.getByRole("link", { name: "nav.dashboard" })).not.toHaveAttribute(
+        "aria-current",
+      );
+    });
+
+    it("still marks the top-level link current from a nested detail route", () => {
+      pathname = "/en/tickets/ticket-1";
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.getByRole("link", { name: "nav.tickets" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+
+    it("marks no link current on a route no nav item matches", () => {
+      pathname = "/en/dashboard";
+      render(<WorkspaceNav user={user} />);
+
+      for (const link of screen.getAllByRole("link")) {
+        if (link.getAttribute("href") !== "/en/dashboard") {
+          expect(link).not.toHaveAttribute("aria-current");
+        }
+      }
     });
   });
 });

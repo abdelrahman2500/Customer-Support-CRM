@@ -14,7 +14,17 @@
     "errors": {
       "network": "Couldn't reach the server. Check your connection and try again.",
       "unauthorized": "Your session has expired. Please sign in again."
-    }
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "The page you're looking for doesn't exist or may have been moved."
+    },
+    "errorBoundary": {
+      "title": "Something went wrong",
+      "description": "An unexpected error occurred. You can try again.",
+      "retry": "Try again"
+    },
+    "backLinkLabel": "Go back home"
   },
   "auth": {
     "title": "Sign in",

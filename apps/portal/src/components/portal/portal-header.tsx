@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedContact } from "@crm/shared";
@@ -32,6 +32,13 @@ import { clearQueryCache } from "@/lib/query-client-registry";
  * treatment exactly: rendered only for a real, positive count; a loading
  * or errored query (or a `0` count) renders no badge, and the link itself
  * is never affected.
+ *
+ * Story 96 — Navigation & Route Robustness. Recon confirmed this header's
+ * `<nav>` had no `aria-label`, no active-route indication, undersized
+ * touch targets, and — critically — no `flex-wrap` on either the header or
+ * the nav, so it genuinely overflowed the viewport at mobile widths with no
+ * visible scroll affordance. All four are fixed here, mirroring
+ * `WorkspaceNav`'s own equivalent Story 96 treatment.
  */
 export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const t = useTranslations("home");
@@ -40,6 +47,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const tChat = useTranslations("chat");
   const tNotifications = useTranslations("notifications");
   const router = useRouter();
+  const pathname = usePathname();
   const { locale } = useParams<{ locale: string }>();
   const brandingQuery = useBrandingQuery();
   const unreadCountQuery = useUnreadNotificationCountQuery();
@@ -58,34 +66,53 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
     router.push(`/${locale}/login`);
   }
 
+  // Story 96 — Navigation & Route Robustness. A plain object keyed by
+  // route (rather than four separate isActive expressions) so the active
+  // check and the nested-route rule live in one place, mirroring
+  // WorkspaceNav's own `isActive` treatment.
+  function isActiveHref(href: string): boolean {
+    return pathname === href || pathname?.startsWith(`${href}/`) === true;
+  }
+
+  const ticketsHref = `/${locale}/tickets`;
+  const knowledgeBaseHref = `/${locale}/knowledge-base`;
+  const chatHref = `/${locale}/chat`;
+  const notificationsHref = `/${locale}/notifications`;
+  const linkClassName = (href: string) =>
+    `flex items-center gap-1.5 rounded-md px-2 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${
+      isActiveHref(href) ? "bg-slate-100 font-medium text-slate-900" : ""
+    }`;
+
   return (
     <header
       style={{ "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties}
-      className="flex items-center justify-between border-b-2 border-[var(--brand-primary,theme(colors.slate.200))] bg-white px-6 py-3"
+      className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-[var(--brand-primary,theme(colors.slate.200))] bg-white px-6 py-3"
     >
-      <nav className="flex items-center gap-4 text-sm">
+      <nav aria-label={t("nav.label")} className="flex flex-wrap items-center gap-4 text-sm">
         {brandingQuery.data?.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto" />
         )}
-        <a href={`/${locale}/home`} className="font-semibold text-slate-900">
+        <a href={`/${locale}/home`} className="rounded-md px-2 py-1.5 font-semibold text-slate-900">
           {t("signedInAs", { name: contact.fullName })}
         </a>
-        <a href={`/${locale}/tickets`} className="text-slate-600 hover:text-slate-900 hover:underline">
+        <a href={ticketsHref} aria-current={isActiveHref(ticketsHref) ? "page" : undefined} className={linkClassName(ticketsHref)}>
           {tTickets("nav")}
         </a>
         <a
-          href={`/${locale}/knowledge-base`}
-          className="text-slate-600 hover:text-slate-900 hover:underline"
+          href={knowledgeBaseHref}
+          aria-current={isActiveHref(knowledgeBaseHref) ? "page" : undefined}
+          className={linkClassName(knowledgeBaseHref)}
         >
           {tKnowledgeBase("nav")}
         </a>
-        <a href={`/${locale}/chat`} className="text-slate-600 hover:text-slate-900 hover:underline">
+        <a href={chatHref} aria-current={isActiveHref(chatHref) ? "page" : undefined} className={linkClassName(chatHref)}>
           {tChat("nav")}
         </a>
         <a
-          href={`/${locale}/notifications`}
-          className="flex items-center gap-1.5 text-slate-600 hover:text-slate-900 hover:underline"
+          href={notificationsHref}
+          aria-current={isActiveHref(notificationsHref) ? "page" : undefined}
+          className={linkClassName(notificationsHref)}
         >
           {tNotifications("nav")}
           {unreadCountQuery.isSuccess && unreadCount > 0 && (
@@ -101,7 +128,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
       <button
         type="button"
         onClick={handleSignOut}
-        className="inline-flex h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
       >
         {t("signOut")}
       </button>
