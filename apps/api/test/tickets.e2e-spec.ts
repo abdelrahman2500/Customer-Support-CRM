@@ -415,7 +415,7 @@ describe("Ticketing (e2e)", () => {
     // order). Only `ticket.created` (the sole entry from a prior,
     // already-completed request) has a guaranteed position.
     expect(history).toHaveLength(3);
-    expect(history[0].eventType).toBe("ticket.created");
+    expect(history[0]?.eventType).toBe("ticket.created");
 
     const updatedEntry = history.find(
       (entry) => entry.eventType === "ticket.updated",
