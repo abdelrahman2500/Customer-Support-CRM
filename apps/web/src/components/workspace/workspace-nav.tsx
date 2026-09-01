@@ -9,6 +9,7 @@ import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { clearAccessToken, logout } from "@/lib/api";
+import { clearQueryCache } from "@/lib/query-client-registry";
 
 /**
  * Story 44 — the top-level Agent Workspace screens, in a fixed,
@@ -90,6 +91,10 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
    * defense-in-depth guarantee at this call site: local cleanup — cookie
    * cleared, redirected — always runs, even if `logout()` were to reject,
    * so the user's intent to leave is never blocked on a round-trip.
+   *
+   * Story 95 — also clears every cached query, so a different user signing
+   * in next, in the same tab, never sees a flash of this session's cached
+   * data before their own queries refetch.
    */
   async function handleSignOut() {
     try {
@@ -98,6 +103,7 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
       // Best-effort — local sign-out below always proceeds regardless.
     }
     clearAccessToken();
+    clearQueryCache();
     router.push(`/${locale}/login`);
   }
 

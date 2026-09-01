@@ -7,6 +7,7 @@ import type { AuthenticatedContact } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
 import { clearAccessToken, logout } from "@/lib/api";
+import { clearQueryCache } from "@/lib/query-client-registry";
 
 /**
  * Story 52 — the Customer Portal's minimal authenticated header, mirroring
@@ -44,6 +45,8 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const unreadCountQuery = useUnreadNotificationCountQuery();
   const unreadCount = unreadCountQuery.data?.unreadCount ?? 0;
 
+  // Story 95 — also clears every cached query; see WorkspaceNav's own
+  // handleSignOut doc comment for why.
   async function handleSignOut() {
     try {
       await logout();
@@ -51,6 +54,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
       // Best-effort — local sign-out below always proceeds regardless.
     }
     clearAccessToken();
+    clearQueryCache();
     router.push(`/${locale}/login`);
   }
 

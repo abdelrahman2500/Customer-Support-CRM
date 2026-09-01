@@ -24,7 +24,7 @@ vi.mock("@/lib/api", async () => {
   };
 });
 
-describe("LoginPage (portal)", () => {
+describe("LoginPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("fetch", vi.fn());
@@ -36,6 +36,64 @@ describe("LoginPage (portal)", () => {
 
     expect(screen.getByText("title")).toBeInTheDocument();
     expect(screen.getByText("signIn")).toBeInTheDocument();
+  });
+
+  it("posts to /auth/login with credentials included, sets the access token, and navigates to tickets on success", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ accessToken: "signed.access.token" }),
+    } as Response);
+
+    render(<LoginPage />);
+    fireEvent.change(screen.getByText("email").querySelector("input")!, {
+      target: { value: "ada@example.com" },
+    });
+    fireEvent.change(screen.getByText("password").querySelector("input")!, {
+      target: { value: "correct-password" },
+    });
+    fireEvent.click(screen.getByText("signIn"));
+
+    await waitFor(() => expect(setAccessToken).toHaveBeenCalledWith("signed.access.token"));
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/login"),
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ email: "ada@example.com", password: "correct-password" }),
+      }),
+    );
+    expect(push).toHaveBeenCalledWith("/en/tickets");
+  });
+
+  it("shows a generic sign-in-failed message on a non-2xx response, without navigating", async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
+
+    render(<LoginPage />);
+    fireEvent.change(screen.getByText("email").querySelector("input")!, {
+      target: { value: "ada@example.com" },
+    });
+    fireEvent.change(screen.getByText("password").querySelector("input")!, {
+      target: { value: "wrong-password" },
+    });
+    fireEvent.click(screen.getByText("signIn"));
+
+    expect(await screen.findByText("loginFailed")).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("shows a generic sign-in-failed message when the request itself throws (network error)", async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error("network down"));
+
+    render(<LoginPage />);
+    fireEvent.change(screen.getByText("email").querySelector("input")!, {
+      target: { value: "ada@example.com" },
+    });
+    fireEvent.change(screen.getByText("password").querySelector("input")!, {
+      target: { value: "whatever" },
+    });
+    fireEvent.click(screen.getByText("signIn"));
+
+    expect(await screen.findByText("loginFailed")).toBeInTheDocument();
   });
 
   // Story 95 — Authentication Recovery.
@@ -62,7 +120,7 @@ describe("LoginPage (portal)", () => {
       expect(screen.getByText("errors.unauthorized")).toBeInTheDocument();
 
       fireEvent.change(screen.getByText("email").querySelector("input")!, {
-        target: { value: "jane@example.com" },
+        target: { value: "ada@example.com" },
       });
       fireEvent.change(screen.getByText("password").querySelector("input")!, {
         target: { value: "wrong-password" },
@@ -72,63 +130,5 @@ describe("LoginPage (portal)", () => {
       expect(await screen.findByText("loginFailed")).toBeInTheDocument();
       expect(screen.queryByText("errors.unauthorized")).not.toBeInTheDocument();
     });
-  });
-
-  it("posts to /portal/auth/login with credentials included, sets the access token, and navigates home on success", async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ accessToken: "signed.access.token" }),
-    } as Response);
-
-    render(<LoginPage />);
-    fireEvent.change(screen.getByText("email").querySelector("input")!, {
-      target: { value: "jane@example.com" },
-    });
-    fireEvent.change(screen.getByText("password").querySelector("input")!, {
-      target: { value: "correct-password" },
-    });
-    fireEvent.click(screen.getByText("signIn"));
-
-    await waitFor(() => expect(setAccessToken).toHaveBeenCalledWith("signed.access.token"));
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/portal/auth/login"),
-      expect.objectContaining({
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify({ email: "jane@example.com", password: "correct-password" }),
-      }),
-    );
-    expect(push).toHaveBeenCalledWith("/en/home");
-  });
-
-  it("shows a generic sign-in-failed message on a non-2xx response, without navigating", async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
-
-    render(<LoginPage />);
-    fireEvent.change(screen.getByText("email").querySelector("input")!, {
-      target: { value: "jane@example.com" },
-    });
-    fireEvent.change(screen.getByText("password").querySelector("input")!, {
-      target: { value: "wrong-password" },
-    });
-    fireEvent.click(screen.getByText("signIn"));
-
-    expect(await screen.findByText("loginFailed")).toBeInTheDocument();
-    expect(push).not.toHaveBeenCalled();
-  });
-
-  it("shows a generic sign-in-failed message when the request itself throws (network error)", async () => {
-    vi.mocked(fetch).mockRejectedValue(new Error("network down"));
-
-    render(<LoginPage />);
-    fireEvent.change(screen.getByText("email").querySelector("input")!, {
-      target: { value: "jane@example.com" },
-    });
-    fireEvent.change(screen.getByText("password").querySelector("input")!, {
-      target: { value: "whatever" },
-    });
-    fireEvent.click(screen.getByText("signIn"));
-
-    expect(await screen.findByText("loginFailed")).toBeInTheDocument();
   });
 });

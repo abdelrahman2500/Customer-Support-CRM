@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,11 +22,23 @@ import { getApiBaseUrl, setAccessToken } from "@/lib/api";
  * that cookie-string construction a second time now that the silent-refresh
  * success path also needs to write it. Same cookie, same shape, no behavior
  * change.
+ *
+ * Story 95 — Authentication Recovery. `AuthRecoveryListener` redirects here
+ * with `?reason=session-expired` after a confirmed-unrecoverable auth
+ * failure elsewhere in the app; this renders a neutral, non-error banner
+ * explaining why the visitor landed here rather than leaving them to guess.
+ * Reuses `common.errors.unauthorized` — the exact copy Story 94 already
+ * gives every `useErrorMessage()` caller for a 401 — rather than adding a
+ * second, near-duplicate string. A real login failure (wrong credentials)
+ * takes priority and replaces this banner once the user actually submits.
  */
 export default function LoginPage() {
   const t = useTranslations("auth");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
+  const searchParams = useSearchParams();
+  const sessionExpired = searchParams.get("reason") === "session-expired";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +76,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
       <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900">{t("title")}</h1>
+        {sessionExpired && !error && <Alert className="mt-4">{tCommon("errors.unauthorized")}</Alert>}
         <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-1 text-sm text-slate-700">
             {t("email")}

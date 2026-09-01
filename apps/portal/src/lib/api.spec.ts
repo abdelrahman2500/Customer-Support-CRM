@@ -10,6 +10,13 @@ import {
 } from "./api";
 import { emitAuthExpired } from "./auth-events";
 
+/**
+ * Story 95 — mirrors `apps/web/src/lib/api.spec.ts` exactly (retargeted to
+ * `/portal/auth/*`); `apps/portal`'s `apiFetch` never previously had its own
+ * dedicated spec file — its silent-refresh/logout behavior mirrors
+ * `apps/web`'s file-for-file, so this covers it directly for the first time
+ * alongside this story's new `emitAuthExpired` wiring.
+ */
 vi.mock("./auth-events", () => ({
   emitAuthExpired: vi.fn(),
 }));
@@ -23,7 +30,7 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-describe("api.ts — Story 41 silent refresh / logout", () => {
+describe("api.ts (portal) — silent refresh / logout", () => {
   beforeEach(() => {
     clearAccessToken();
     vi.restoreAllMocks();
@@ -41,7 +48,7 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
         jsonResponse(200, { ok: true }),
       );
 
-      await apiFetch("/tickets");
+      await apiFetch("/portal/tickets");
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [, init] = fetchMock.mock.calls[0]!;
@@ -54,7 +61,7 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(jsonResponse(403, { message: "Forbidden" }));
 
-      await expect(apiFetch("/tickets")).rejects.toMatchObject({ status: 403 });
+      await expect(apiFetch("/portal/tickets")).rejects.toMatchObject({ status: 403 });
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(mockedEmitAuthExpired).not.toHaveBeenCalled();
     });
@@ -64,7 +71,7 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
       let ticketCallCount = 0;
       const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes("/auth/refresh")) {
+        if (url.includes("/portal/auth/refresh")) {
           return Promise.resolve(jsonResponse(200, { accessToken: "fresh-token" }));
         }
         ticketCallCount += 1;
@@ -74,24 +81,24 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
         return Promise.resolve(jsonResponse(200, { id: "ticket-1" }));
       });
 
-      const result = await apiFetch<{ id: string }>("/tickets/ticket-1");
+      const result = await apiFetch<{ id: string }>("/portal/tickets/ticket-1");
 
       expect(result).toEqual({ id: "ticket-1" });
       expect(ticketCallCount).toBe(2);
       expect(getAccessToken()).toBe("fresh-token");
 
-      const refreshCall = fetchMock.mock.calls.find(([input]) => String(input).includes("/auth/refresh"));
+      const refreshCall = fetchMock.mock.calls.find(([input]) =>
+        String(input).includes("/portal/auth/refresh"),
+      );
       expect(refreshCall).toBeDefined();
       expect(refreshCall![1]).toMatchObject({ method: "POST", credentials: "include" });
 
-      // The retried request used the freshly refreshed token, not the stale one.
       const retriedCall = fetchMock.mock.calls.filter(
-        ([input]) => !String(input).includes("/auth/refresh"),
+        ([input]) => !String(input).includes("/portal/auth/refresh"),
       )[1]!;
       expect((retriedCall[1]?.headers as Record<string, string>).Authorization).toBe(
         "Bearer fresh-token",
       );
-      // A refresh actually succeeded — the session isn't dead.
       expect(mockedEmitAuthExpired).not.toHaveBeenCalled();
     });
 
@@ -99,13 +106,13 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
       setAccessToken("expired-token");
       vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes("/auth/refresh")) {
+        if (url.includes("/portal/auth/refresh")) {
           return Promise.resolve(jsonResponse(401, { message: "Refresh token is invalid or expired" }));
         }
         return Promise.resolve(jsonResponse(401, { message: "Unauthorized" }));
       });
 
-      await expect(apiFetch("/tickets")).rejects.toMatchObject({ status: 401 });
+      await expect(apiFetch("/portal/tickets")).rejects.toMatchObject({ status: 401 });
       expect(getAccessToken()).toBeNull();
       // Story 95 — a confirmed-dead session forces AuthRecoveryListener's redirect.
       expect(mockedEmitAuthExpired).toHaveBeenCalledOnce();
@@ -116,19 +123,18 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
       let ticketCallCount = 0;
       const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes("/auth/refresh")) {
+        if (url.includes("/portal/auth/refresh")) {
           return Promise.resolve(jsonResponse(200, { accessToken: "fresh-token" }));
         }
         ticketCallCount += 1;
         return Promise.resolve(jsonResponse(401, { message: "Unauthorized" }));
       });
 
-      await expect(apiFetch("/tickets")).rejects.toMatchObject({ status: 401 });
+      await expect(apiFetch("/portal/tickets")).rejects.toMatchObject({ status: 401 });
 
       expect(getAccessToken()).toBeNull();
-      // Exactly one refresh call and exactly one retry — no additional refresh/retry loop.
       expect(
-        fetchMock.mock.calls.filter(([input]) => String(input).includes("/auth/refresh")),
+        fetchMock.mock.calls.filter(([input]) => String(input).includes("/portal/auth/refresh")),
       ).toHaveLength(1);
       expect(ticketCallCount).toBe(2);
       expect(mockedEmitAuthExpired).toHaveBeenCalledOnce();
@@ -139,7 +145,7 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
       let ticketCallCount = 0;
       vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes("/auth/refresh")) {
+        if (url.includes("/portal/auth/refresh")) {
           return Promise.resolve(jsonResponse(200, { accessToken: "fresh-token" }));
         }
         ticketCallCount += 1;
@@ -149,10 +155,8 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
         return Promise.resolve(jsonResponse(403, { message: "Forbidden" }));
       });
 
-      await expect(apiFetch("/tickets")).rejects.toMatchObject({ status: 403 });
+      await expect(apiFetch("/portal/tickets")).rejects.toMatchObject({ status: 403 });
 
-      // A refresh succeeded — the session is fine, this specific action just
-      // isn't permitted — so the token must not be treated as dead.
       expect(mockedEmitAuthExpired).not.toHaveBeenCalled();
       expect(getAccessToken()).toBe("fresh-token");
     });
@@ -164,7 +168,7 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
         let ticketCallCount = 0;
         vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
           const url = String(input);
-          if (url.includes("/auth/refresh")) {
+          if (url.includes("/portal/auth/refresh")) {
             return Promise.resolve(jsonResponse(200, { accessToken: "fresh-token" }));
           }
           ticketCallCount += 1;
@@ -174,7 +178,7 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
           return Promise.resolve(jsonResponse(status, { message: "boom" }));
         });
 
-        await expect(apiFetch("/tickets")).rejects.toMatchObject({ status });
+        await expect(apiFetch("/portal/tickets")).rejects.toMatchObject({ status });
 
         expect(getAccessToken()).toBe("fresh-token");
       },
@@ -186,34 +190,37 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
       const requestCounts: Record<string, number> = {};
       vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes("/auth/refresh")) {
+        if (url.includes("/portal/auth/refresh")) {
           refreshCallCount += 1;
           return Promise.resolve(jsonResponse(200, { accessToken: "fresh-token" }));
         }
         const key = url;
         requestCounts[key] = (requestCounts[key] ?? 0) + 1;
-        // Each distinct endpoint 401s on its first call, then succeeds.
         if (requestCounts[key] === 1) {
           return Promise.resolve(jsonResponse(401, { message: "Unauthorized" }));
         }
         return Promise.resolve(jsonResponse(200, { ok: true }));
       });
 
-      await Promise.all([apiFetch("/tickets"), apiFetch("/customers"), apiFetch("/sla-policies")]);
+      await Promise.all([
+        apiFetch("/portal/tickets"),
+        apiFetch("/portal/knowledge-base"),
+        apiFetch("/portal/notifications"),
+      ]);
 
       expect(refreshCallCount).toBe(1);
     });
   });
 
   describe("logout", () => {
-    it("calls the real POST /auth/logout with credentials included", async () => {
+    it("calls the real POST /portal/auth/logout with credentials included", async () => {
       const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
 
       await logout();
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [url, init] = fetchMock.mock.calls[0]!;
-      expect(String(url)).toContain("/auth/logout");
+      expect(String(url)).toContain("/portal/auth/logout");
       expect(init).toMatchObject({ method: "POST", credentials: "include" });
     });
 
@@ -231,15 +238,16 @@ describe("api.ts — Story 41 silent refresh / logout", () => {
   });
 
   describe("setAccessToken / ACCESS_TOKEN_COOKIE", () => {
-    it("writes the same cookie shape the login page relies on", () => {
+    it("writes the same cookie shape the login page relies on, under the portal's own cookie name", () => {
       setAccessToken("a-token");
+      expect(ACCESS_TOKEN_COOKIE).toBe("crm_portal_access_token");
       expect(document.cookie).toContain(`${ACCESS_TOKEN_COOKIE}=a-token`);
       expect(getAccessToken()).toBe("a-token");
     });
   });
 });
 
-describe("api.ts — ApiError", () => {
+describe("api.ts (portal) — ApiError", () => {
   it("carries the real HTTP status", () => {
     const error = new ApiError("boom", 500);
     expect(error.status).toBe(500);

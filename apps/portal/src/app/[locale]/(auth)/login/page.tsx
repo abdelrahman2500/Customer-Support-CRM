@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { getApiBaseUrl, setAccessToken } from "@/lib/api";
 
@@ -13,11 +13,21 @@ import { getApiBaseUrl, setAccessToken } from "@/lib/api";
  * lands. Calls `POST /portal/auth/login`, not `/auth/login` — an entirely
  * separate cookie/session from any agent workspace session in the same
  * browser.
+ *
+ * Story 95 - Authentication Recovery. Mirrors apps/web's own login page:
+ * AuthRecoveryListener redirects here with ?reason=session-expired after a
+ * confirmed-unrecoverable auth failure elsewhere in the app; this renders a
+ * neutral, non-error banner reusing common.errors.unauthorized (the exact
+ * copy Story 94 already gives every useErrorMessage() caller for a 401). A
+ * real login failure takes priority and replaces it.
  */
 export default function LoginPage() {
   const t = useTranslations("auth");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
+  const searchParams = useSearchParams();
+  const sessionExpired = searchParams.get("reason") === "session-expired";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +65,11 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
       <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900">{t("title")}</h1>
+        {sessionExpired && !error && (
+          <p className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            {tCommon("errors.unauthorized")}
+          </p>
+        )}
         <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-1 text-sm text-slate-700">
             {t("email")}

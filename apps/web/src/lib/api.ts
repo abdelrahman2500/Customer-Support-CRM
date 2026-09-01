@@ -1,3 +1,5 @@
+import { emitAuthExpired } from "./auth-events";
+
 /** Base URL of `apps/api`, e.g. `http://localhost:3001/api/v1`. */
 export function getApiBaseUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
@@ -176,6 +178,11 @@ async function attempt<T>(path: string, init: RequestInit, token: string | null)
  * cookie is cleared and the original `ApiError(401, ...)` is thrown exactly
  * as an unrefreshed 401 always has — every existing caller's `isError`/
  * `mutation.isError` rendering is unaffected.
+ *
+ * Story 95 - both of those "session is genuinely dead" outcomes also call
+ * emitAuthExpired(), so AuthRecoveryListener can force a redirect to
+ * /login instead of leaving the caller stranded on the now-broken
+ * protected page (see ./auth-events's doc comment).
  */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
@@ -190,6 +197,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
       refreshedToken = await refreshAccessTokenOnce();
     } catch {
       clearAccessToken();
+      emitAuthExpired();
       throw error;
     }
 
@@ -198,6 +206,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     } catch (retryError) {
       if (retryError instanceof ApiError && retryError.status === 401) {
         clearAccessToken();
+        emitAuthExpired();
       }
       throw retryError;
     }

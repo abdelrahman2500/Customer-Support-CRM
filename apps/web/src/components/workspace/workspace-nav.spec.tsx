@@ -4,6 +4,7 @@ import { WorkspaceNav } from "./workspace-nav";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import { clearAccessToken, logout } from "@/lib/api";
+import { clearQueryCache } from "@/lib/query-client-registry";
 
 const push = vi.fn();
 
@@ -22,6 +23,11 @@ vi.mock("@/lib/api", () => ({
   clearAccessToken: vi.fn(),
 }));
 
+// Story 95 — Authentication Recovery.
+vi.mock("@/lib/query-client-registry", () => ({
+  clearQueryCache: vi.fn(),
+}));
+
 // Story 82 — Branding — Live Logo/Color Consumption.
 vi.mock("@/hooks/use-branding", () => ({
   useBrandingQuery: vi.fn(),
@@ -34,6 +40,7 @@ vi.mock("@/hooks/use-notifications", () => ({
 
 const mockedLogout = vi.mocked(logout);
 const mockedClearAccessToken = vi.mocked(clearAccessToken);
+const mockedClearQueryCache = vi.mocked(clearQueryCache);
 const mockedUseBrandingQuery = vi.mocked(useBrandingQuery);
 const mockedUseUnreadNotificationCountQuery = vi.mocked(useUnreadNotificationCountQuery);
 
@@ -64,13 +71,16 @@ describe("WorkspaceNav", () => {
     expect(screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`)).toBeInTheDocument();
   });
 
-  it("calls the real logout, then clears the local token and redirects to login, on sign-out", async () => {
+  it("calls the real logout, then clears the local token and query cache, and redirects to login, on sign-out", async () => {
     render(<WorkspaceNav user={user} />);
 
     fireEvent.click(screen.getByText("signOut"));
 
     await waitFor(() => expect(mockedLogout).toHaveBeenCalledOnce());
     expect(mockedClearAccessToken).toHaveBeenCalledOnce();
+    // Story 95 — a different user signing in next must never see this
+    // session's cached data flash before their own queries refetch.
+    expect(mockedClearQueryCache).toHaveBeenCalledOnce();
     expect(push).toHaveBeenCalledWith("/en/login");
   });
 
