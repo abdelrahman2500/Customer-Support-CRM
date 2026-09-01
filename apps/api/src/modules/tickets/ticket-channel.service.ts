@@ -20,8 +20,9 @@ import { TicketsService } from "./tickets.service";
  * methods directly, the same way it already calls `TicketsService`'s own
  * customer-scoped methods (Story 53's precedent).
  *
- * Only `LIVE_CHAT` is reachable from this service — the other four
- * `ChannelType` values have no producer yet (see the plan's Non-goals).
+ * `LIVE_CHAT` and (Story 85) `AI_CHAT` are the only two `ChannelType`
+ * values reachable from this service — the other three still have no
+ * producer (see Story 77's plan Non-goals).
  */
 @Injectable()
 export class TicketChannelService {
@@ -58,6 +59,38 @@ export class TicketChannelService {
   async listMessagesForCustomer(ticketId: string, customerId: string): Promise<ChannelMessageSummary[]> {
     await this.ticketsService.getTicketForCustomer(ticketId, customerId);
     return this.channelMessagesService.listForTicket(ticketId);
+  }
+
+  /**
+   * Story 85 — replays a just-escalated `ChatSession`'s transcript onto a
+   * brand-new ticket, in order. No authorization check of its own — the
+   * caller (`PortalTicketsService.escalateChatSession`) just created
+   * `ticketId` for this exact `contactId` a moment ago, mirroring
+   * `AiGatewayService`'s own "no ticket-authorization logic of its own"
+   * precedent (Story 73).
+   */
+  async recordAiChatTranscript(
+    ticketId: string,
+    contactId: string,
+    messages: { role: "CUSTOMER" | "ASSISTANT"; body: string }[],
+  ): Promise<void> {
+    for (const message of messages) {
+      if (message.role === "CUSTOMER") {
+        await this.channelMessagesService.createInboundFromContact(
+          ticketId,
+          "AI_CHAT",
+          contactId,
+          message.body,
+        );
+      } else {
+        await this.channelMessagesService.createSystemMessage(
+          ticketId,
+          "AI_CHAT",
+          "OUTBOUND",
+          message.body,
+        );
+      }
+    }
   }
 
   /** Mirrors `TicketsService`'s own private `requireAuthenticatedUserId`

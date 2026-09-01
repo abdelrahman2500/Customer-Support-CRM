@@ -116,12 +116,56 @@ export class AiChatService {
     };
   }
 
+  /**
+   * Story 85 — everything `PortalTicketsService.escalateChatSession`
+   * needs to create/replay a ticket: the session's `branchId` (for
+   * downstream ticket creation), whether it's already escalated
+   * (idempotency), and its full chronological transcript. `AiChatService`
+   * never learns about tickets itself — `AiModule` cannot import
+   * `TicketsModule` (already imports `AiModule`, so the reverse edge
+   * would be circular) — so the actual ticket-creation orchestration
+   * lives in `PortalTicketsService` instead (see that service's own doc
+   * comment).
+   */
+  async getEscalationContext(
+    contactId: string,
+    sessionId: string,
+  ): Promise<{
+    id: string;
+    branchId: string;
+    escalatedTicketId: string | null;
+    messages: ChatMessageSummary[];
+  }> {
+    const session = await this.getOwnedSession(contactId, sessionId);
+    const messages = await this.prisma.chatMessage.findMany({
+      where: { sessionId: session.id },
+      orderBy: { createdAt: "asc" },
+    });
+    return {
+      id: session.id,
+      branchId: session.branchId,
+      escalatedTicketId: session.escalatedTicketId,
+      messages,
+    };
+  }
+
+  /** Re-verifies ownership defensively (mirrors every other method here)
+   * even though `PortalTicketsService` will always have just called
+   * `getEscalationContext` for the same `contactId`/`sessionId` first. */
+  async recordEscalation(contactId: string, sessionId: string, ticketId: string): Promise<void> {
+    await this.getOwnedSession(contactId, sessionId);
+    await this.prisma.chatSession.update({
+      where: { id: sessionId },
+      data: { escalatedTicketId: ticketId },
+    });
+  }
+
   /** Masks "session doesn't exist" and "belongs to another Contact"
    * identically as 404. */
   private async getOwnedSession(
     contactId: string,
     sessionId: string,
-  ): Promise<{ id: string; branchId: string; contactId: string }> {
+  ): Promise<{ id: string; branchId: string; contactId: string; escalatedTicketId: string | null }> {
     const session = await this.prisma.chatSession.findUnique({ where: { id: sessionId } });
     if (!session || session.contactId !== contactId) {
       throw new NotFoundException("Chat session not found");

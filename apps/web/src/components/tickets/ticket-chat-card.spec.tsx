@@ -70,6 +70,29 @@ const colleagueMessage = {
   createdAt: "2024-01-01T09:02:00.000Z",
 };
 
+// Story 85 — replayed from a chat-escalation transcript.
+const aiCustomerMessage = {
+  id: "message-4",
+  ticketId: "ticket-1",
+  channelType: "AI_CHAT",
+  direction: "INBOUND" as const,
+  senderContactId: "contact-1",
+  senderUserId: null,
+  body: "Cannot log in to my account",
+  createdAt: "2024-01-01T08:59:00.000Z",
+};
+
+const aiAssistantMessage = {
+  id: "message-5",
+  ticketId: "ticket-1",
+  channelType: "AI_CHAT",
+  direction: "OUTBOUND" as const,
+  senderContactId: null,
+  senderUserId: null,
+  body: "Have you tried resetting your password?",
+  createdAt: "2024-01-01T08:59:30.000Z",
+};
+
 describe("TicketChatCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -135,6 +158,24 @@ describe("TicketChatCard", () => {
     expect(screen.getByText(/detail.chatCustomerLabel/)).toBeInTheDocument();
     expect(screen.getByText(/detail.chatYouLabel/)).toBeInTheDocument();
     expect(screen.getByText(/Sam Colleague/)).toBeInTheDocument();
+  });
+
+  // Story 85 — AI Chat: Escalate to a Human Ticket.
+  it("labels an AI_CHAT-channel assistant message as AI Assistant, not Agent, while its customer message still reads Customer", () => {
+    vi.mocked(useTicketMessagesQuery).mockReturnValue(
+      queryResult({
+        data: [aiCustomerMessage, aiAssistantMessage],
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<TicketChatCard ticketId="ticket-1" />);
+
+    expect(screen.getByText(aiCustomerMessage.body)).toBeInTheDocument();
+    expect(screen.getByText(aiAssistantMessage.body)).toBeInTheDocument();
+    expect(screen.getByText(/detail.chatCustomerLabel/)).toBeInTheDocument();
+    expect(screen.getByText(/detail.chatAiLabel/)).toBeInTheDocument();
+    expect(screen.queryByText(/detail.chatAgentLabel/)).not.toBeInTheDocument();
   });
 
   it("sends a message when the composer is submitted", async () => {

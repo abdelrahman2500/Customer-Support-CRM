@@ -301,6 +301,125 @@ describe("Customer Portal — AI Chatbot (e2e)", () => {
       .expect(404);
   });
 
+  // Story 85 — AI Chat: Escalate to a Human Ticket.
+  describe("escalate", () => {
+    it("creates a ticket, replays the transcript as AI_CHAT ChannelMessages, and is idempotent on a second call", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+      const sessionId = await startSession(token);
+
+      const sent = await request(app.getHttpServer())
+        .post(`/api/v1/portal/chat/sessions/${sessionId}/messages`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ body: "Cannot log in to my account" })
+        .expect(201);
+
+      await prisma.aiPromptLog.update({
+        where: { id: sent.body.id },
+        data: {
+          model: "claude-test",
+          outcome: "SUCCESS",
+          outputText: "Have you tried resetting your password?",
+        },
+      });
+      await prisma.chatMessage.create({
+        data: {
+          sessionId,
+          role: "ASSISTANT",
+          body: "Have you tried resetting your password?",
+        },
+      });
+
+      const escalated = await request(app.getHttpServer())
+        .post(`/api/v1/portal/chat/sessions/${sessionId}/escalate`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(201);
+      const ticketId = escalated.body.ticketId as string;
+      expect(ticketId).toEqual(expect.any(String));
+
+      const ticket = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(ticket.body.subject).toEqual("Cannot log in to my account");
+
+      const messages = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(messages.body).toEqual([
+        expect.objectContaining({
+          channelType: "AI_CHAT",
+          direction: "INBOUND",
+          senderContactId: contactId,
+          senderUserId: null,
+          body: "Cannot log in to my account",
+        }),
+        expect.objectContaining({
+          channelType: "AI_CHAT",
+          direction: "OUTBOUND",
+          senderContactId: null,
+          senderUserId: null,
+          body: "Have you tried resetting your password?",
+        }),
+      ]);
+
+      // Escalating again returns the same ticket, creates nothing new.
+      const escalatedAgain = await request(app.getHttpServer())
+        .post(`/api/v1/portal/chat/sessions/${sessionId}/escalate`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(201);
+      expect(escalatedAgain.body).toEqual({ ticketId });
+
+      const messagesAfterRetry = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/messages`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(messagesAfterRetry.body).toHaveLength(2);
+    });
+
+    it("returns 400 and creates nothing for a session with no messages", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+      const sessionId = await startSession(token);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/chat/sessions/${sessionId}/escalate`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(400);
+    });
+
+    it("returns 404 when escalating a different contact's session", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+      const otherToken = await loginAsPortalContact(otherContactEmail);
+      const sessionId = await startSession(token);
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/chat/sessions/${sessionId}/messages`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ body: "Private message" })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/chat/sessions/${sessionId}/escalate`)
+        .set("Authorization", `Bearer ${otherToken}`)
+        .expect(404);
+    });
+
+    it("rejects every request without a token", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/chat/sessions/${randomUUID()}/escalate`)
+        .expect(401);
+    });
+
+    it("rejects an agent-audience token", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+      const sessionId = await startSession(token);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/chat/sessions/${sessionId}/escalate`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(401);
+    });
+  });
+
   // Story 81 — AI Feature Flags per Branch.
   it("still persists the customer's own message but returns { id, outcome: DISABLED } and never an assistant reply when chat is disabled for the branch", async () => {
     const token = await loginAsPortalContact(contactEmail);

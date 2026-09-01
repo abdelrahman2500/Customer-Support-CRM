@@ -4,14 +4,22 @@ import { ChatWidget } from "./chat-widget";
 import {
   useChatAiResultQuery,
   useChatMessagesQuery,
+  useEscalateChatSessionMutation,
   useSendChatMessageMutation,
   useStartChatSessionMutation,
 } from "@/hooks/use-chat";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { ApiError } from "@/lib/api";
 
+const mockRouterPush = vi.fn();
+
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
+}));
+
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ locale: "en" }),
+  useRouter: () => ({ push: mockRouterPush }),
 }));
 
 vi.mock("@/hooks/use-chat", () => ({
@@ -19,6 +27,7 @@ vi.mock("@/hooks/use-chat", () => ({
   useChatMessagesQuery: vi.fn(),
   useChatAiResultQuery: vi.fn(),
   useSendChatMessageMutation: vi.fn(),
+  useEscalateChatSessionMutation: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-chat-realtime", () => ({
@@ -47,6 +56,10 @@ describe("ChatWidget", () => {
     vi.mocked(useChatAiResultQuery).mockReturnValue(queryResult({}) as never);
     vi.mocked(useSendChatMessageMutation).mockReturnValue({
       mutateAsync: vi.fn().mockResolvedValue({ id: "log-1", outcome: "PENDING" }),
+      isPending: false,
+    } as never);
+    vi.mocked(useEscalateChatSessionMutation).mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ ticketId: "ticket-1" }),
       isPending: false,
     } as never);
   });
@@ -183,5 +196,57 @@ describe("ChatWidget", () => {
     fireEvent.click(screen.getByText("send"));
 
     await screen.findByText("Session expired");
+  });
+
+  // Story 85 — AI Chat: Escalate to a Human Ticket.
+  it("hides the escalate action when there are no messages yet", () => {
+    vi.mocked(useChatMessagesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+
+    render(<ChatWidget />);
+
+    expect(screen.queryByText("escalate")).not.toBeInTheDocument();
+  });
+
+  it("shows the escalate action once messages exist and navigates to the new ticket on success", async () => {
+    vi.mocked(useChatMessagesQuery).mockReturnValue(
+      queryResult({
+        data: [{ id: "m1", role: "CUSTOMER", body: "Hi, I need help", createdAt: "2024-01-01T00:00:00.000Z" }],
+        isSuccess: true,
+      }) as never,
+    );
+    const mutateAsync = vi.fn().mockResolvedValue({ ticketId: "ticket-1" });
+    vi.mocked(useEscalateChatSessionMutation).mockReturnValue({
+      mutateAsync,
+      isPending: false,
+    } as never);
+
+    render(<ChatWidget />);
+    fireEvent.click(screen.getByText("escalate"));
+
+    await vi.waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledOnce();
+    });
+    expect(mockRouterPush).toHaveBeenCalledWith("/en/tickets/ticket-1");
+  });
+
+  it("shows an inline error when escalation fails", async () => {
+    vi.mocked(useChatMessagesQuery).mockReturnValue(
+      queryResult({
+        data: [{ id: "m1", role: "CUSTOMER", body: "Hi, I need help", createdAt: "2024-01-01T00:00:00.000Z" }],
+        isSuccess: true,
+      }) as never,
+    );
+    vi.mocked(useEscalateChatSessionMutation).mockReturnValue({
+      mutateAsync: vi.fn().mockRejectedValue(new ApiError("Nothing to escalate yet", 400)),
+      isPending: false,
+    } as never);
+
+    render(<ChatWidget />);
+    fireEvent.click(screen.getByText("escalate"));
+
+    await screen.findByText("Nothing to escalate yet");
+    expect(mockRouterPush).not.toHaveBeenCalled();
   });
 });

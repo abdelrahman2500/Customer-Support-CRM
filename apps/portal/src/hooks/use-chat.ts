@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  escalateChatSession,
   getChatAiResult,
   getChatMessages,
   sendChatMessage,
@@ -49,4 +50,11 @@ export function useSendChatMessageMutation(sessionId: string) {
       void queryClient.invalidateQueries({ queryKey: chatMessagesQueryKey(sessionId) });
     },
   });
+}
+
+/** Story 85 — AI Chat: Escalate to a Human Ticket. No cache invalidation
+ * on success: the widget navigates away to the new ticket immediately,
+ * so there is nothing left in this session's own queries to refresh. */
+export function useEscalateChatSessionMutation(sessionId: string) {
+  return useMutation({ mutationFn: () => escalateChatSession(sessionId) });
 }

@@ -78,3 +78,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | admin-branch-branding-live-consumption | [admin-branch-branding-live-consumption/00-overview.md](./admin-branch-branding-live-consumption/00-overview.md) | 82–      |
 | sla-automation-rules-category-department | [sla-automation-rules-category-department/00-overview.md](./sla-automation-rules-category-department/00-overview.md) | 83–      |
 | identity-audit-logging | [identity-audit-logging/00-overview.md](./identity-audit-logging/00-overview.md) | 84–      |
+| ai-chat-escalation-to-ticket | [ai-chat-escalation-to-ticket/00-overview.md](./ai-chat-escalation-to-ticket/00-overview.md) | 85–      |

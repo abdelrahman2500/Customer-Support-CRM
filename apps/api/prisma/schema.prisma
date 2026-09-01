@@ -391,32 +391,36 @@ enum TicketStatus {
 }
 
 model Ticket {
-  id               String               @id @default(uuid())
-  branchId         String               @map("branch_id")
-  branch           Branch               @relation(fields: [branchId], references: [id])
-  departmentId     String?              @map("department_id")
-  department       Department?          @relation(fields: [departmentId], references: [id])
-  customerId       String               @map("customer_id")
-  customer         Customer             @relation(fields: [customerId], references: [id])
-  contactId        String?              @map("contact_id")
-  contact          Contact?             @relation(fields: [contactId], references: [id])
-  assignedToUserId String?              @map("assigned_to_user_id")
-  assignedToUser   User?                @relation(fields: [assignedToUserId], references: [id])
-  subject          String
-  category         String?
-  priority         TicketPriority       @default(MEDIUM)
-  status           TicketStatus         @default(OPEN)
-  historyEntries   TicketHistoryEntry[]
-  notes            TicketNote[]
-  csatResponse     TicketCsatResponse?
-  slaTarget        SlaTicketTarget?
-  slaEscalations   SlaEscalation[]
-  notificationLogs NotificationLog[]
-  attachments      TicketAttachment[]
-  channelMessages  ChannelMessage[]
-  aiPromptLogs     AiPromptLog[]
-  createdAt        DateTime             @default(now()) @map("created_at")
-  updatedAt        DateTime             @updatedAt @map("updated_at")
+  id                String               @id @default(uuid())
+  branchId          String               @map("branch_id")
+  branch            Branch               @relation(fields: [branchId], references: [id])
+  departmentId      String?              @map("department_id")
+  department        Department?          @relation(fields: [departmentId], references: [id])
+  customerId        String               @map("customer_id")
+  customer          Customer             @relation(fields: [customerId], references: [id])
+  contactId         String?              @map("contact_id")
+  contact           Contact?             @relation(fields: [contactId], references: [id])
+  assignedToUserId  String?              @map("assigned_to_user_id")
+  assignedToUser    User?                @relation(fields: [assignedToUserId], references: [id])
+  subject           String
+  category          String?
+  priority          TicketPriority       @default(MEDIUM)
+  status            TicketStatus         @default(OPEN)
+  historyEntries    TicketHistoryEntry[]
+  notes             TicketNote[]
+  csatResponse      TicketCsatResponse?
+  slaTarget         SlaTicketTarget?
+  slaEscalations    SlaEscalation[]
+  notificationLogs  NotificationLog[]
+  attachments       TicketAttachment[]
+  channelMessages   ChannelMessage[]
+  aiPromptLogs      AiPromptLog[]
+  /// Story 85 — bare Prisma back-relation for `ChatSession.escalatedTicketId`;
+  /// carries no database column of its own (the FK/unique constraint lives
+  /// entirely on `ChatSession`).
+  chatSessionOrigin ChatSession?
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
 
   @@index([branchId])
   @@index([customerId])
@@ -985,6 +989,16 @@ model ChatSession {
   aiPromptLogs AiPromptLog[]
   createdAt    DateTime      @default(now()) @map("created_at")
 
+  /// Story 85 — set once this session has been escalated into a real
+  /// support ticket (`PortalTicketsService.escalateChatSession`). Mirrors
+  /// `AiPromptLog.ticketId`'s own cross-schema-FK precedent (the `ai`
+  /// schema already references `ticketing` there) rather than putting a
+  /// pointer on `Ticket` itself — a chat session is the thing that
+  /// "resolves into" a ticket, not the other way around. `@unique`
+  /// guarantees at most one session ever escalates into any given ticket.
+  escalatedTicketId String? @unique @map("escalated_ticket_id")
+  escalatedTicket   Ticket? @relation(fields: [escalatedTicketId], references: [id])
+
   @@index([branchId])
   @@index([contactId])
   @@map("chat_sessions")
@@ -1025,6 +1039,10 @@ enum ChannelType {
   SMS
   LIVE_CHAT
   WEB_FORM
+  /// Story 85 — a replayed AI chatbot transcript attached to a ticket
+  /// created via chat escalation. Distinct from `LIVE_CHAT`: the
+  /// conversation did not happen on the ticket's own live-chat channel.
+  AI_CHAT
 
   @@schema("channels")
 }

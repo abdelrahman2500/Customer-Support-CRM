@@ -37,6 +37,12 @@ import { PortalBrandingController } from "./portal-branding.controller";
  * `PortalBrandingController` can inject the now-exported
  * `BrandingService` directly (its own `getBrandingForBranch` method,
  * never `getBranding()`'s agent-only `TenantContext` path).
+ *
+ * Story 85 — no new import edge: `PortalTicketsService` now additionally
+ * injects the already-exported `AiChatService` (from the already-imported
+ * `AiModule`) to compose `escalateChatSession` — reading a `ChatSession`'s
+ * transcript, creating a ticket via `TicketsService`, and replaying the
+ * transcript via `TicketChannelService`, all three already available here.
  */
 @Module({
   imports: [AuthModule, TicketsModule, KnowledgeBaseModule, AiModule, AdminModule],

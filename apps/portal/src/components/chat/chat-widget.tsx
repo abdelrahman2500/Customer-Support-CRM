@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useChatAiResultQuery,
   useChatMessagesQuery,
+  useEscalateChatSessionMutation,
   useSendChatMessageMutation,
   useStartChatSessionMutation,
 } from "@/hooks/use-chat";
@@ -30,13 +32,34 @@ import { ApiError } from "@/lib/api";
  */
 export function ChatWidget() {
   const t = useTranslations("chat");
+  const { locale } = useParams<{ locale: string }>();
+  const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [pendingLogId, setPendingLogId] = useState<string | null>(null);
+  const [escalateError, setEscalateError] = useState<string | null>(null);
   const startSession = useStartChatSessionMutation();
   const messagesQuery = useChatMessagesQuery(sessionId);
   const resultQuery = useChatAiResultQuery(sessionId, pendingLogId);
+  const escalate = useEscalateChatSessionMutation(sessionId ?? "");
   useChatRealtime(sessionId);
   const listRef = useRef<HTMLOListElement>(null);
+
+  async function handleEscalate(): Promise<void> {
+    if (!sessionId || escalate.isPending) {
+      return;
+    }
+    setEscalateError(null);
+    try {
+      const result = await escalate.mutateAsync();
+      router.push(`/${locale}/tickets/${result.ticketId}`);
+    } catch (escalateSubmitError) {
+      setEscalateError(
+        escalateSubmitError instanceof ApiError
+          ? escalateSubmitError.message
+          : t("escalateFailed"),
+      );
+    }
+  }
 
   useEffect(() => {
     if (sessionId || startSession.isPending) {
@@ -128,6 +151,24 @@ export function ChatWidget() {
         <p className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
           {t("disabled")}
         </p>
+      )}
+
+      {messagesQuery.isSuccess && messagesQuery.data.length > 0 && (
+        <div className="mt-3 flex flex-col gap-2 border-t border-slate-200 pt-3">
+          <button
+            type="button"
+            onClick={() => void handleEscalate()}
+            disabled={escalate.isPending}
+            className="inline-flex h-9 w-fit items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {escalate.isPending ? t("escalating") : t("escalate")}
+          </button>
+          {escalateError && (
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {escalateError}
+            </p>
+          )}
+        </div>
       )}
 
       <ChatComposer sessionId={sessionId} onSent={setPendingLogId} />

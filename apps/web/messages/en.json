@@ -86,6 +86,7 @@
       "chatCustomerLabel": "Customer",
       "chatYouLabel": "You",
       "chatAgentLabel": "Agent",
+      "chatAiLabel": "AI Assistant",
       "chatPlaceholder": "Type a message...",
       "chatSend": "Send",
       "chatSending": "Sending...",

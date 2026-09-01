@@ -6,6 +6,7 @@ import { PortalRoute } from "../../common/auth/portal-route.decorator";
 import { CreateChannelMessageDto } from "../tickets/dto/create-channel-message.dto";
 import { AiChatService } from "../ai/ai-chat.service";
 import type { AiChatResultResponse, ChatMessageSummary } from "../ai/ai-chat.service";
+import { PortalTicketsService } from "./portal-tickets.service";
 
 /**
  * Story 80 — Customer Portal AI Chatbot (Foundation). Every route is
@@ -19,12 +20,21 @@ import type { AiChatResultResponse, ChatMessageSummary } from "../ai/ai-chat.ser
  * `CreateChannelMessageDto` (`{ body: string }`) is reused verbatim for
  * the chat-message body — identical shape/validation to
  * `PortalTicketsController.sendMessage`'s own reuse of it.
+ *
+ * Story 85 — `escalate` also injects `PortalTicketsService` (the only
+ * route here that does): the escalation orchestration composes
+ * `AiChatService` with `TicketsService`/`TicketChannelService`, and
+ * `PortalTicketsService` already does exactly that kind of composition
+ * (see its own doc comment).
  */
 @ApiTags("portal")
 @ApiBearerAuth()
 @Controller("portal/chat")
 export class PortalChatController {
-  constructor(private readonly aiChatService: AiChatService) {}
+  constructor(
+    private readonly aiChatService: AiChatService,
+    private readonly portalTicketsService: PortalTicketsService,
+  ) {}
 
   @PortalRoute()
   @Post("sessions")
@@ -60,6 +70,14 @@ export class PortalChatController {
   ): Promise<AiChatResultResponse> {
     const claims = request.user as JwtAccessTokenClaims;
     return this.aiChatService.getAiResult(claims.sub, id, logId);
+  }
+
+  /** Story 85 — AI Chat: Escalate to a Human Ticket. */
+  @PortalRoute()
+  @Post("sessions/:id/escalate")
+  escalate(@Req() request: Request, @Param("id") id: string): Promise<{ ticketId: string }> {
+    const claims = request.user as JwtAccessTokenClaims;
+    return this.portalTicketsService.escalateChatSession(claims.sub, id);
   }
 
   /** A portal-issued token always carries `branchId` — mirrors

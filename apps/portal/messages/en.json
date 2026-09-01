@@ -96,6 +96,9 @@
     "placeholder": "Type a message...",
     "send": "Send",
     "sending": "Sending...",
-    "sendFailed": "Couldn't send the message. Please try again."
+    "sendFailed": "Couldn't send the message. Please try again.",
+    "escalate": "Escalate to a human agent",
+    "escalating": "Escalating…",
+    "escalateFailed": "Couldn't escalate this conversation. Please try again."
   }
 }

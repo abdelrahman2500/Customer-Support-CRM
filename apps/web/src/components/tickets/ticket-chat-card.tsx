@@ -73,13 +73,23 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
           {messagesQuery.data.map((message) => {
             const isMine =
               message.direction === "OUTBOUND" && message.senderUserId === currentUserQuery.data?.id;
+            // Story 85 — an AI_CHAT-channel OUTBOUND message replayed from a
+            // chat escalation has no senderUserId at all (the AI wrote it,
+            // not a signed-in agent) — without this branch it would
+            // misleadingly fall through to the generic "Agent" label below.
+            const isAiAssistantMessage =
+              message.channelType === "AI_CHAT" &&
+              message.direction === "OUTBOUND" &&
+              !message.senderUserId;
             const senderLabel =
               message.direction === "INBOUND"
                 ? t("detail.chatCustomerLabel")
-                : isMine
-                  ? t("detail.chatYouLabel")
-                  : (message.senderUserId && userNameById.get(message.senderUserId)) ||
-                    t("detail.chatAgentLabel");
+                : isAiAssistantMessage
+                  ? t("detail.chatAiLabel")
+                  : isMine
+                    ? t("detail.chatYouLabel")
+                    : (message.senderUserId && userNameById.get(message.senderUserId)) ||
+                      t("detail.chatAgentLabel");
 
             return (
               <li

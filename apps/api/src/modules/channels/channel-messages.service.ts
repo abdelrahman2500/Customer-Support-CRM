@@ -58,6 +58,24 @@ export class ChannelMessagesService {
     return this.emitAndReturn(ticketId, message);
   }
 
+  /**
+   * Story 85 — a message with no `User`/`Contact` author at all (both
+   * `senderContactId`/`senderUserId` stay `null`). Used to replay a
+   * `ChatSession`'s `ASSISTANT`-role turns onto an escalated ticket: the
+   * AI wrote it, not a signed-in agent and not the Contact.
+   */
+  async createSystemMessage(
+    ticketId: string,
+    channelType: ChannelType,
+    direction: ChannelMessageDirection,
+    body: string,
+  ): Promise<ChannelMessageSummary> {
+    const message = await this.prisma.channelMessage.create({
+      data: { ticketId, channelType, direction, body },
+    });
+    return this.emitAndReturn(ticketId, message);
+  }
+
   async listForTicket(ticketId: string): Promise<ChannelMessageSummary[]> {
     const messages = await this.prisma.channelMessage.findMany({
       where: { ticketId },

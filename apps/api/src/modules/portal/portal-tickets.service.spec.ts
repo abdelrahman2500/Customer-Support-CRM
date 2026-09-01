@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { BadRequestException } from "@nestjs/common";
 import { PortalTicketsService } from "./portal-tickets.service";
 import type { PortalService } from "./portal.service";
 import type { TicketsService } from "../tickets/tickets.service";
 import type { TicketChannelService } from "../tickets/ticket-channel.service";
+import type { AiChatService } from "../ai/ai-chat.service";
 
 function buildPortalServiceMock() {
   return { getAuthenticatedContact: vi.fn() };
@@ -23,6 +25,14 @@ function buildTicketChannelServiceMock() {
   return {
     createCustomerMessage: vi.fn(),
     listMessagesForCustomer: vi.fn(),
+    recordAiChatTranscript: vi.fn(),
+  };
+}
+
+function buildAiChatServiceMock() {
+  return {
+    getEscalationContext: vi.fn(),
+    recordEscalation: vi.fn(),
   };
 }
 
@@ -30,6 +40,7 @@ describe("PortalTicketsService", () => {
   let portalService: ReturnType<typeof buildPortalServiceMock>;
   let ticketsService: ReturnType<typeof buildTicketsServiceMock>;
   let ticketChannelService: ReturnType<typeof buildTicketChannelServiceMock>;
+  let aiChatService: ReturnType<typeof buildAiChatServiceMock>;
   let service: PortalTicketsService;
 
   beforeEach(() => {
@@ -37,10 +48,12 @@ describe("PortalTicketsService", () => {
     portalService = buildPortalServiceMock();
     ticketsService = buildTicketsServiceMock();
     ticketChannelService = buildTicketChannelServiceMock();
+    aiChatService = buildAiChatServiceMock();
     service = new PortalTicketsService(
       portalService as unknown as PortalService,
       ticketsService as unknown as TicketsService,
       ticketChannelService as unknown as TicketChannelService,
+      aiChatService as unknown as AiChatService,
     );
   });
 
@@ -150,5 +163,96 @@ describe("PortalTicketsService", () => {
       "customer-1",
     );
     expect(result).toEqual([]);
+  });
+
+  // Story 85 — AI Chat: Escalate to a Human Ticket.
+  describe("escalateChatSession", () => {
+    it("creates a ticket with a subject derived from the first CUSTOMER message, replays the transcript, and records the escalation", async () => {
+      const messages = [
+        { id: "m1", role: "CUSTOMER", body: "Cannot log in to my account", createdAt: new Date() },
+        { id: "m2", role: "ASSISTANT", body: "Have you tried resetting your password?", createdAt: new Date() },
+      ];
+      aiChatService.getEscalationContext.mockResolvedValue({
+        id: "session-1",
+        branchId: "branch-1",
+        escalatedTicketId: null,
+        messages,
+      });
+      ticketsService.createTicketForContact.mockResolvedValue({ id: "ticket-1" });
+
+      const result = await service.escalateChatSession("contact-1", "session-1");
+
+      expect(aiChatService.getEscalationContext).toHaveBeenCalledWith("contact-1", "session-1");
+      expect(ticketsService.createTicketForContact).toHaveBeenCalledWith("contact-1", {
+        subject: "Cannot log in to my account",
+      });
+      expect(ticketChannelService.recordAiChatTranscript).toHaveBeenCalledWith(
+        "ticket-1",
+        "contact-1",
+        messages,
+      );
+      expect(aiChatService.recordEscalation).toHaveBeenCalledWith(
+        "contact-1",
+        "session-1",
+        "ticket-1",
+      );
+      expect(result).toEqual({ ticketId: "ticket-1" });
+    });
+
+    it("truncates a long first CUSTOMER message to 120 characters for the ticket subject", async () => {
+      const longBody = "a".repeat(200);
+      aiChatService.getEscalationContext.mockResolvedValue({
+        id: "session-1",
+        branchId: "branch-1",
+        escalatedTicketId: null,
+        messages: [{ id: "m1", role: "CUSTOMER", body: longBody, createdAt: new Date() }],
+      });
+      ticketsService.createTicketForContact.mockResolvedValue({ id: "ticket-1" });
+
+      await service.escalateChatSession("contact-1", "session-1");
+
+      expect(ticketsService.createTicketForContact).toHaveBeenCalledWith("contact-1", {
+        subject: "a".repeat(120),
+      });
+    });
+
+    it("is idempotent: returns the existing ticketId without creating anything when already escalated", async () => {
+      aiChatService.getEscalationContext.mockResolvedValue({
+        id: "session-1",
+        branchId: "branch-1",
+        escalatedTicketId: "ticket-existing",
+        messages: [{ id: "m1", role: "CUSTOMER", body: "Hi", createdAt: new Date() }],
+      });
+
+      const result = await service.escalateChatSession("contact-1", "session-1");
+
+      expect(result).toEqual({ ticketId: "ticket-existing" });
+      expect(ticketsService.createTicketForContact).not.toHaveBeenCalled();
+      expect(ticketChannelService.recordAiChatTranscript).not.toHaveBeenCalled();
+      expect(aiChatService.recordEscalation).not.toHaveBeenCalled();
+    });
+
+    it("throws BadRequestException and creates nothing for a session with no messages", async () => {
+      aiChatService.getEscalationContext.mockResolvedValue({
+        id: "session-1",
+        branchId: "branch-1",
+        escalatedTicketId: null,
+        messages: [],
+      });
+
+      await expect(service.escalateChatSession("contact-1", "session-1")).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(ticketsService.createTicketForContact).not.toHaveBeenCalled();
+    });
+
+    it("propagates the 404-equivalent rejection when the session belongs to a different contact", async () => {
+      aiChatService.getEscalationContext.mockRejectedValue(new Error("Chat session not found"));
+
+      await expect(service.escalateChatSession("contact-1", "session-1")).rejects.toThrow(
+        "Chat session not found",
+      );
+      expect(ticketsService.createTicketForContact).not.toHaveBeenCalled();
+    });
   });
 });

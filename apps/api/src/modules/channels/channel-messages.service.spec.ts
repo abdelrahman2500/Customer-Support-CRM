@@ -109,6 +109,40 @@ describe("ChannelMessagesService", () => {
     });
   });
 
+  // Story 85 — AI Chat: Escalate to a Human Ticket.
+  describe("createSystemMessage", () => {
+    it("creates a row with no senderContactId/senderUserId and emits CHANNEL_MESSAGE_CREATED_EVENT", async () => {
+      const row = {
+        ...CREATED_ROW,
+        channelType: "AI_CHAT" as const,
+        direction: "OUTBOUND" as const,
+        senderContactId: null,
+        senderUserId: null,
+        body: "Have you tried resetting your password?",
+      };
+      prisma.channelMessage.create.mockResolvedValue(row);
+
+      const result = await service.createSystemMessage(
+        "ticket-1",
+        "AI_CHAT",
+        "OUTBOUND",
+        "Have you tried resetting your password?",
+      );
+
+      expect(prisma.channelMessage.create).toHaveBeenCalledWith({
+        data: {
+          ticketId: "ticket-1",
+          channelType: "AI_CHAT",
+          direction: "OUTBOUND",
+          body: "Have you tried resetting your password?",
+        },
+      });
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(result.senderUserId).toBeNull();
+      expect(result.senderContactId).toBeNull();
+    });
+  });
+
   describe("listForTicket", () => {
     it("returns messages ordered chronologically ascending", async () => {
       prisma.channelMessage.findMany.mockResolvedValue([CREATED_ROW]);

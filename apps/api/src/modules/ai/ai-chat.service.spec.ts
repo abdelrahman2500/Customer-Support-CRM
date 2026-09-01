@@ -10,6 +10,7 @@ function buildPrismaMock() {
     chatSession: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      update: vi.fn(),
     },
     chatMessage: {
       create: vi.fn(),
@@ -252,6 +253,104 @@ describe("AiChatService", () => {
         "Chat session not found",
       );
       expect(prisma.aiPromptLog.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  // Story 85 — AI Chat: Escalate to a Human Ticket.
+  describe("getEscalationContext", () => {
+    it("returns the session's branchId, escalatedTicketId, and chronological messages", async () => {
+      prisma.chatSession.findUnique.mockResolvedValue({
+        id: "session-1",
+        contactId: "contact-1",
+        branchId: "branch-1",
+        escalatedTicketId: null,
+      });
+      const messages = [{ id: "m1", role: "CUSTOMER", body: "hi", createdAt: new Date() }];
+      prisma.chatMessage.findMany.mockResolvedValue(messages);
+
+      const result = await service.getEscalationContext("contact-1", "session-1");
+
+      expect(prisma.chatMessage.findMany).toHaveBeenCalledWith({
+        where: { sessionId: "session-1" },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(result).toEqual({
+        id: "session-1",
+        branchId: "branch-1",
+        escalatedTicketId: null,
+        messages,
+      });
+    });
+
+    it("reflects a previously-recorded escalatedTicketId", async () => {
+      prisma.chatSession.findUnique.mockResolvedValue({
+        id: "session-1",
+        contactId: "contact-1",
+        branchId: "branch-1",
+        escalatedTicketId: "ticket-1",
+      });
+      prisma.chatMessage.findMany.mockResolvedValue([]);
+
+      const result = await service.getEscalationContext("contact-1", "session-1");
+
+      expect(result.escalatedTicketId).toBe("ticket-1");
+    });
+
+    it("throws (404-equivalent) for a session belonging to a different contact", async () => {
+      prisma.chatSession.findUnique.mockResolvedValue({
+        id: "session-1",
+        contactId: "someone-else",
+        branchId: "branch-1",
+        escalatedTicketId: null,
+      });
+
+      await expect(service.getEscalationContext("contact-1", "session-1")).rejects.toThrow(
+        "Chat session not found",
+      );
+      expect(prisma.chatMessage.findMany).not.toHaveBeenCalled();
+    });
+
+    it("throws for a nonexistent session id", async () => {
+      prisma.chatSession.findUnique.mockResolvedValue(null);
+
+      await expect(service.getEscalationContext("contact-1", "unknown")).rejects.toThrow(
+        "Chat session not found",
+      );
+    });
+  });
+
+  describe("recordEscalation", () => {
+    beforeEach(() => {
+      prisma.chatSession.findUnique.mockResolvedValue({
+        id: "session-1",
+        contactId: "contact-1",
+        branchId: "branch-1",
+        escalatedTicketId: null,
+      });
+    });
+
+    it("re-verifies ownership, then sets escalatedTicketId", async () => {
+      await service.recordEscalation("contact-1", "session-1", "ticket-1");
+
+      expect(prisma.chatSession.findUnique).toHaveBeenCalledWith({ where: { id: "session-1" } });
+      expect(prisma.chatSession.update).toHaveBeenCalledWith({
+        where: { id: "session-1" },
+        data: { escalatedTicketId: "ticket-1" },
+      });
+    });
+
+    it("throws (404-equivalent) for a session belonging to a different contact, never updating", async () => {
+      prisma.chatSession.findUnique.mockResolvedValue({
+        id: "session-1",
+        contactId: "someone-else",
+        branchId: "branch-1",
+        escalatedTicketId: null,
+      });
+
+      await expect(service.recordEscalation("contact-1", "session-1", "ticket-1")).rejects.toThrow(
+        "Chat session not found",
+      );
+      expect(prisma.chatSession.update).not.toHaveBeenCalled();
     });
   });
 });

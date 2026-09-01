@@ -52,3 +52,9 @@ export function getChatMessages(sessionId: string): Promise<ChatMessageSummary[]
 export function getChatAiResult(sessionId: string, logId: string): Promise<ChatAiResult> {
   return apiFetch<ChatAiResult>(`/portal/chat/sessions/${sessionId}/ai/${logId}`);
 }
+
+/** `POST /portal/chat/sessions/:id/escalate`. Story 85 — idempotent: a
+ * session already escalated returns the same `ticketId` again. */
+export function escalateChatSession(sessionId: string): Promise<{ ticketId: string }> {
+  return apiFetch(`/portal/chat/sessions/${sessionId}/escalate`, { method: "POST" });
+}
