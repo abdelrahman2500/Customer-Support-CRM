@@ -386,10 +386,23 @@ describe("Ticketing (e2e)", () => {
   });
 
   it("records a second and third history entry — ticket.updated and ticket.recategorized — after a priority-changing update", async () => {
-    const response = await request(app.getHttpServer())
-      .get(`/api/v1/tickets/${ticketId}/history`)
-      .set("Authorization", `Bearer ${adminAccessToken}`)
-      .expect(200);
+    const deadline = Date.now() + 5000;
+    let history: Array<{
+      eventType: string;
+      actorUserId: string | null;
+      snapshot: { status?: string; priority?: string };
+    }> = [];
+    do {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/history`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      history = response.body;
+      if (history.length >= 3) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } while (Date.now() < deadline);
 
     // `TicketsService.updateTicket` emits `ticket.updated` and (since this
     // update changes `priority`) `ticket.recategorized` via two independent,
@@ -401,23 +414,23 @@ describe("Ticketing (e2e)", () => {
     // `ticket.updated` under the current listener set, not the emission
     // order). Only `ticket.created` (the sole entry from a prior,
     // already-completed request) has a guaranteed position.
-    expect(response.body).toHaveLength(3);
-    expect(response.body[0].eventType).toBe("ticket.created");
+    expect(history).toHaveLength(3);
+    expect(history[0].eventType).toBe("ticket.created");
 
-    const updatedEntry = response.body.find(
-      (entry: { eventType: string }) => entry.eventType === "ticket.updated",
+    const updatedEntry = history.find(
+      (entry) => entry.eventType === "ticket.updated",
     );
     expect(updatedEntry).toBeDefined();
-    expect(updatedEntry.actorUserId).toBe(adminUserId);
-    expect(updatedEntry.snapshot.status).toBe("IN_PROGRESS");
-    expect(updatedEntry.snapshot.priority).toBe("HIGH");
+    expect(updatedEntry?.actorUserId).toBe(adminUserId);
+    expect(updatedEntry?.snapshot.status).toBe("IN_PROGRESS");
+    expect(updatedEntry?.snapshot.priority).toBe("HIGH");
 
-    const recategorizedEntry = response.body.find(
-      (entry: { eventType: string }) => entry.eventType === "ticket.recategorized",
+    const recategorizedEntry = history.find(
+      (entry) => entry.eventType === "ticket.recategorized",
     );
     expect(recategorizedEntry).toBeDefined();
-    expect(recategorizedEntry.actorUserId).toBe(adminUserId);
-    expect(recategorizedEntry.snapshot.priority).toBe("HIGH");
+    expect(recategorizedEntry?.actorUserId).toBe(adminUserId);
+    expect(recategorizedEntry?.snapshot.priority).toBe("HIGH");
   });
 
   it("records a ticket.escalated history entry for a real, directly-emitted event", async () => {
