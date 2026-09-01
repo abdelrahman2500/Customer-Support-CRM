@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import type { AiOutcome, ChatMessageRole } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AiGatewayService, promptRef } from "./ai-gateway.service";
+import { AiSettingsService } from "./ai-settings.service";
 import { AiProcessingProducer } from "../../queues/ai-processing.producer";
 
 export interface ChatMessageSummary {
@@ -40,6 +41,7 @@ export class AiChatService {
     private readonly prisma: PrismaService,
     private readonly aiGatewayService: AiGatewayService,
     private readonly aiProcessingProducer: AiProcessingProducer,
+    private readonly aiSettingsService: AiSettingsService,
   ) {}
 
   async startSession(contactId: string, branchId: string): Promise<{ id: string }> {
@@ -51,11 +53,22 @@ export class AiChatService {
     contactId: string,
     sessionId: string,
     body: string,
-  ): Promise<{ id: string; outcome: "PENDING" }> {
+  ): Promise<{ id: string; outcome: "PENDING" | "DISABLED" }> {
     const session = await this.getOwnedSession(contactId, sessionId);
     await this.prisma.chatMessage.create({
       data: { sessionId: session.id, role: "CUSTOMER", body },
     });
+
+    if (!(await this.aiSettingsService.isFeatureEnabled(session.branchId, "CHAT"))) {
+      const disabledLog = await this.aiGatewayService.createDisabledLog(
+        "CHAT",
+        session.branchId,
+        null,
+        session.id,
+        promptRef(session.id, body),
+      );
+      return { id: disabledLog.id, outcome: "DISABLED" };
+    }
 
     const log = await this.aiGatewayService.createPendingLog(
       "CHAT",

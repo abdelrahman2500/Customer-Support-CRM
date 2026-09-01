@@ -28,6 +28,9 @@ import { clearAccessToken, logout } from "@/lib/api";
  * same convention.
  *
  * Story 62 — `branding` appended as the new last entry, same convention.
+ *
+ * Story 81 — `ai-settings` appended as the new last entry, same
+ * convention.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -45,6 +48,7 @@ const NAV_ITEMS = [
   { href: "automation-rules", labelKey: "nav.automationRules" },
   { href: "notification-templates", labelKey: "nav.notificationTemplates" },
   { href: "branding", labelKey: "nav.branding" },
+  { href: "ai-settings", labelKey: "nav.aiSettings" },
 ] as const;
 
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {

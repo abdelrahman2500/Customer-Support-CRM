@@ -104,6 +104,7 @@ describe("WorkspaceNav", () => {
       ["nav.auditLogs", "/en/audit-logs"],
       ["nav.notifications", "/en/notifications"],
       ["nav.knowledgeBase", "/en/knowledge-base"],
+      ["nav.aiSettings", "/en/ai-settings"],
     ];
 
     it("renders a link to every one of the eleven top-level Agent Workspace screens", () => {

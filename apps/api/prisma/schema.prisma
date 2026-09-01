@@ -52,6 +52,7 @@ model Branch {
   brandingConfig        BrandingConfig?
   aiPromptLogs          AiPromptLog[]
   chatSessions          ChatSession[]
+  aiSettings            AiSettings?
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -939,6 +940,25 @@ enum ChatMessageRole {
   CUSTOMER
   ASSISTANT
 
+  @@schema("ai")
+}
+
+/// Story 81 — one row per branch, mirrors `BrandingConfig`'s exact
+/// shape/conventions. Absence of a row means every feature is enabled
+/// (the pre-Story-81 behavior, unchanged) — see AiSettingsService's own
+/// DEFAULT_AI_SETTINGS.
+model AiSettings {
+  id                  String   @id @default(uuid())
+  branchId            String   @unique @map("branch_id")
+  branch              Branch   @relation(fields: [branchId], references: [id])
+  summarizeEnabled    Boolean  @default(true) @map("summarize_enabled")
+  suggestReplyEnabled Boolean  @default(true) @map("suggest_reply_enabled")
+  categorizeEnabled   Boolean  @default(true) @map("categorize_enabled")
+  chatEnabled         Boolean  @default(true) @map("chat_enabled")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_settings")
   @@schema("ai")
 }
 

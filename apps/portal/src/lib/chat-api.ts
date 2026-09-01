@@ -27,11 +27,15 @@ export function startChatSession(): Promise<{ id: string }> {
   return apiFetch<{ id: string }>("/portal/chat/sessions", { method: "POST" });
 }
 
-/** `POST /portal/chat/sessions/:id/messages`. */
+/** `POST /portal/chat/sessions/:id/messages`. Story 81 — `outcome` also
+ * includes `"DISABLED"`, returned synchronously when a branch admin has
+ * turned chat off; `ChatWidget` never branches on this field itself
+ * (only `result.id`), so this widening is type-honesty only, not a
+ * behavior change. */
 export function sendChatMessage(
   sessionId: string,
   body: string,
-): Promise<{ id: string; outcome: "PENDING" }> {
+): Promise<{ id: string; outcome: "PENDING" | "DISABLED" }> {
   return apiFetch(`/portal/chat/sessions/${sessionId}/messages`, {
     method: "POST",
     body: JSON.stringify({ body }),

@@ -74,3 +74,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | customer-portal-live-chat | [customer-portal-live-chat/00-overview.md](./customer-portal-live-chat/00-overview.md) | 77–      |
 | ai-ticket-assist-result-delivery | [ai-ticket-assist-async-processing/79-story-ai-ticket-assist-result-delivery.md](./ai-ticket-assist-async-processing/79-story-ai-ticket-assist-result-delivery.md) | 79–      |
 | ai-portal-chatbot | [ai-portal-chatbot/00-overview.md](./ai-portal-chatbot/00-overview.md) | 80–      |
+| ai-feature-flags | [ai-feature-flags/00-overview.md](./ai-feature-flags/00-overview.md) | 81–      |

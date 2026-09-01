@@ -3,16 +3,20 @@ import type { AiFeature, AiOutcome } from "@prisma/client";
 import type { AiTicketInput } from "@crm/ai";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { AiGatewayService, promptRef } from "../ai/ai-gateway.service";
+import { AiSettingsService } from "../ai/ai-settings.service";
 import { AiProcessingProducer } from "../../queues/ai-processing.producer";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TicketsService } from "./tickets.service";
 
 /** The immediate response every `/tickets/:id/ai/*` route now returns —
  * see this file's own Story 76 doc comment. Never a raw BullMQ job id:
- * the durable `AiPromptLog.id` is the one identifier a caller needs. */
+ * the durable `AiPromptLog.id` is the one identifier a caller needs.
+ * Story 81 — `outcome` also includes `"DISABLED"`: a branch admin having
+ * turned this feature off is now knowable synchronously, without ever
+ * enqueueing `ai-processing`. */
 export interface AiJobSubmittedResponse {
   id: string;
-  outcome: "PENDING";
+  outcome: "PENDING" | "DISABLED";
 }
 
 /** Story 79 — the durable `AiPromptLog` row's contents, retrieved once
@@ -80,6 +84,7 @@ export class TicketAiService {
     private readonly aiProcessingProducer: AiProcessingProducer,
     private readonly tenantContext: TenantContext,
     private readonly prisma: PrismaService,
+    private readonly aiSettingsService: AiSettingsService,
   ) {}
 
   async summarizeTicket(id: string): Promise<AiJobSubmittedResponse> {
@@ -124,6 +129,17 @@ export class TicketAiService {
   private async submit(id: string, feature: TicketAiFeature): Promise<AiJobSubmittedResponse> {
     const input = await this.loadAiTicketInput(id);
     const { branchId } = this.tenantContext.requireBranchScope();
+
+    if (!(await this.aiSettingsService.isFeatureEnabled(branchId, feature))) {
+      const disabledLog = await this.aiGatewayService.createDisabledLog(
+        feature as AiFeature,
+        branchId,
+        id,
+        null,
+        promptRef(input.subject, input.body),
+      );
+      return { id: disabledLog.id, outcome: "DISABLED" };
+    }
 
     const log = await this.aiGatewayService.createPendingLog(
       feature as AiFeature,

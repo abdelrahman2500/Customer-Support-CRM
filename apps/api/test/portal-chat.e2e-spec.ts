@@ -300,4 +300,47 @@ describe("Customer Portal — AI Chatbot (e2e)", () => {
       .set("Authorization", `Bearer ${token}`)
       .expect(404);
   });
+
+  // Story 81 — AI Feature Flags per Branch.
+  it("still persists the customer's own message but returns { id, outcome: DISABLED } and never an assistant reply when chat is disabled for the branch", async () => {
+    const token = await loginAsPortalContact(contactEmail);
+    const sessionId = await startSession(token);
+
+    await request(app.getHttpServer())
+      .patch("/api/v1/ai/settings")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ chatEnabled: false })
+      .expect(200);
+
+    try {
+      const sent = await request(app.getHttpServer())
+        .post(`/api/v1/portal/chat/sessions/${sessionId}/messages`)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ body: "Is anyone there?" })
+        .expect(201);
+      expect(sent.body).toEqual({ id: expect.any(String), outcome: "DISABLED" });
+
+      const result = await request(app.getHttpServer())
+        .get(`/api/v1/portal/chat/sessions/${sessionId}/ai/${sent.body.id}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(result.body).toMatchObject({ outcome: "DISABLED", outputText: null });
+
+      const messages = await request(app.getHttpServer())
+        .get(`/api/v1/portal/chat/sessions/${sessionId}/messages`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(messages.body).toEqual([
+        expect.objectContaining({ role: "CUSTOMER", body: "Is anyone there?" }),
+      ]);
+    } finally {
+      // Restore the seeded default — this branch is shared with every
+      // other e2e suite in this run.
+      await request(app.getHttpServer())
+        .patch("/api/v1/ai/settings")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ chatEnabled: true })
+        .expect(200);
+    }
+  });
 });

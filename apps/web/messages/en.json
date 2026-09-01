@@ -36,7 +36,8 @@
       "reports": "Reports",
       "automationRules": "Automation Rules",
       "notificationTemplates": "Notification Templates",
-      "branding": "Branding"
+      "branding": "Branding",
+      "aiSettings": "AI Settings"
     }
   },
   "tickets": {
@@ -645,5 +646,16 @@
     "previewHeading": "Preview",
     "logoPreviewAlt": "Logo preview",
     "noLogo": "No logo set"
+  },
+  "aiSettings": {
+    "title": "AI Settings",
+    "description": "Turn AI-assisted features on or off for your branch. Each change takes effect immediately.",
+    "error": "Couldn't load your AI settings.",
+    "retry": "Retry",
+    "summarizeLabel": "Summarize",
+    "suggestReplyLabel": "Suggest Reply",
+    "categorizeLabel": "Categorize",
+    "chatLabel": "Portal AI Chatbot",
+    "saveFailed": "Couldn't save this setting. Please try again."
   }
 }

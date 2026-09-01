@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TicketAiService } from "./ticket-ai.service";
 import type { AiGatewayService } from "../ai/ai-gateway.service";
+import type { AiSettingsService } from "../ai/ai-settings.service";
 import type { AiProcessingProducer } from "../../queues/ai-processing.producer";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 import type { PrismaService } from "../../prisma/prisma.service";
@@ -16,6 +17,7 @@ function buildTicketsServiceMock() {
 function buildAiGatewayMock() {
   return {
     createPendingLog: vi.fn(),
+    createDisabledLog: vi.fn(),
   };
 }
 
@@ -39,12 +41,17 @@ function buildPrismaMock() {
   };
 }
 
+function buildAiSettingsMock(enabled = true) {
+  return { isFeatureEnabled: vi.fn().mockResolvedValue(enabled) };
+}
+
 function createService(
   ticketsMock: ReturnType<typeof buildTicketsServiceMock>,
   aiGatewayMock: ReturnType<typeof buildAiGatewayMock>,
   producerMock: ReturnType<typeof buildAiProcessingProducerMock>,
   tenantMock: ReturnType<typeof buildTenantContextMock>,
   prismaMock: ReturnType<typeof buildPrismaMock>,
+  aiSettingsMock: ReturnType<typeof buildAiSettingsMock>,
 ): TicketAiService {
   return new TicketAiService(
     ticketsMock as unknown as TicketsService,
@@ -52,6 +59,7 @@ function createService(
     producerMock as unknown as AiProcessingProducer,
     tenantMock as unknown as TenantContext,
     prismaMock as unknown as PrismaService,
+    aiSettingsMock as unknown as AiSettingsService,
   );
 }
 
@@ -61,6 +69,7 @@ describe("TicketAiService", () => {
   let producer: ReturnType<typeof buildAiProcessingProducerMock>;
   let tenantContext: ReturnType<typeof buildTenantContextMock>;
   let prisma: ReturnType<typeof buildPrismaMock>;
+  let aiSettings: ReturnType<typeof buildAiSettingsMock>;
   let service: TicketAiService;
 
   beforeEach(() => {
@@ -69,7 +78,8 @@ describe("TicketAiService", () => {
     producer = buildAiProcessingProducerMock();
     tenantContext = buildTenantContextMock();
     prisma = buildPrismaMock();
-    service = createService(ticketsService, aiGateway, producer, tenantContext, prisma);
+    aiSettings = buildAiSettingsMock();
+    service = createService(ticketsService, aiGateway, producer, tenantContext, prisma, aiSettings);
 
     ticketsService.getTicket.mockResolvedValue({ id: "ticket-1", subject: "Login issue" });
     ticketsService.getTicketNotes.mockResolvedValue([
@@ -121,6 +131,26 @@ describe("TicketAiService", () => {
       await expect(service.summarizeTicket("unknown")).rejects.toThrow(notFound);
       expect(aiGateway.createPendingLog).not.toHaveBeenCalled();
       expect(producer.enqueue).not.toHaveBeenCalled();
+    });
+
+    // Story 81 — AI Feature Flags per Branch.
+    it("creates a DISABLED log and never enqueues when SUMMARIZE is disabled for the branch", async () => {
+      aiSettings.isFeatureEnabled.mockResolvedValue(false);
+      aiGateway.createDisabledLog.mockResolvedValue({ id: "log-disabled" });
+
+      const result = await service.summarizeTicket("ticket-1");
+
+      expect(aiSettings.isFeatureEnabled).toHaveBeenCalledWith("branch-1", "SUMMARIZE");
+      expect(aiGateway.createDisabledLog).toHaveBeenCalledWith(
+        "SUMMARIZE",
+        "branch-1",
+        "ticket-1",
+        null,
+        expect.any(String),
+      );
+      expect(aiGateway.createPendingLog).not.toHaveBeenCalled();
+      expect(producer.enqueue).not.toHaveBeenCalled();
+      expect(result).toEqual({ id: "log-disabled", outcome: "DISABLED" });
     });
   });
 

@@ -36,7 +36,8 @@
       "reports": "التقارير",
       "automationRules": "قواعد الأتمتة",
       "notificationTemplates": "قوالب الإشعارات",
-      "branding": "الهوية البصرية"
+      "branding": "الهوية البصرية",
+      "aiSettings": "إعدادات الذكاء الاصطناعي"
     }
   },
   "tickets": {
@@ -645,5 +646,16 @@
     "previewHeading": "المعاينة",
     "logoPreviewAlt": "معاينة الشعار",
     "noLogo": "لم يتم تعيين شعار"
+  },
+  "aiSettings": {
+    "title": "إعدادات الذكاء الاصطناعي",
+    "description": "فعّل أو عطّل ميزات الذكاء الاصطناعي لفرعك. يسري كل تغيير فورًا.",
+    "error": "تعذّر تحميل إعدادات الذكاء الاصطناعي.",
+    "retry": "إعادة المحاولة",
+    "summarizeLabel": "التلخيص",
+    "suggestReplyLabel": "اقتراح الرد",
+    "categorizeLabel": "التصنيف",
+    "chatLabel": "روبوت المحادثة في البوابة",
+    "saveFailed": "تعذّر حفظ هذا الإعداد. حاول مرة أخرى."
   }
 }

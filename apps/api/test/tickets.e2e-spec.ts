@@ -807,6 +807,47 @@ describe("Ticketing (e2e)", () => {
         errorMessage: null,
       });
     });
+
+    // Story 81 — AI Feature Flags per Branch.
+    it("returns { id, outcome: DISABLED } immediately and enqueues no job when SUMMARIZE is disabled for the branch", async () => {
+      await request(app.getHttpServer())
+        .patch("/api/v1/ai/settings")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ summarizeEnabled: false })
+        .expect(200);
+
+      try {
+        const queue: Queue<{ aiPromptLogId: string }> = app.get(getQueueToken(AI_PROCESSING_QUEUE));
+        const before = await queue.getJobs(["waiting", "active", "completed"]);
+
+        const response = await request(app.getHttpServer())
+          .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .expect(201);
+
+        expect(response.body).toEqual({ id: expect.any(String), outcome: "DISABLED" });
+
+        const log = await prisma.aiPromptLog.findUnique({ where: { id: response.body.id } });
+        expect(log).toMatchObject({
+          feature: "SUMMARIZE",
+          outcome: "DISABLED",
+          model: "disabled",
+          outputText: null,
+        });
+
+        const after = await queue.getJobs(["waiting", "active", "completed"]);
+        expect(after.filter((job) => job.data.aiPromptLogId === response.body.id)).toHaveLength(0);
+        expect(after.length).toBe(before.length);
+      } finally {
+        // Restore the seeded default — this branch is shared with every
+        // other e2e suite in this run.
+        await request(app.getHttpServer())
+          .patch("/api/v1/ai/settings")
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .send({ summarizeEnabled: true })
+          .expect(200);
+      }
+    });
   });
 
   // Story 74/76 — Suggested Reply, the second consumer of Story 72's

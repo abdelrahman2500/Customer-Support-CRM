@@ -28,11 +28,15 @@ const FEATURE_PATH: Record<TicketAiFeature, string> = {
 
 /** `POST /tickets/:id/ai/{summarize,suggest-reply,categorize}`
  * (`ticket:read`) — returns the durable `AiPromptLog.id` immediately;
- * the actual result is retrieved separately via `getAiResult`. */
+ * the actual result is retrieved separately via `getAiResult`. Story 81
+ * — `outcome` also includes `"DISABLED"`, returned synchronously when a
+ * branch admin has turned this feature off; `TicketAiCard` never
+ * branches on this field itself (only `result.id`), so this widening is
+ * type-honesty only, not a behavior change. */
 export function submitAiOperation(
   ticketId: string,
   feature: TicketAiFeature,
-): Promise<{ id: string; outcome: "PENDING" }> {
+): Promise<{ id: string; outcome: "PENDING" | "DISABLED" }> {
   return apiFetch(`/tickets/${ticketId}/ai/${FEATURE_PATH[feature]}`, { method: "POST" });
 }
 

@@ -81,6 +81,60 @@ describe("AiGatewayService", () => {
       );
     });
   });
+
+  // Story 81 — AI Feature Flags per Branch.
+  describe("createDisabledLog", () => {
+    it("creates a DISABLED AiPromptLog row with model: 'disabled' and null output/latency/token fields", async () => {
+      const prisma = buildPrismaMock();
+      prisma.aiPromptLog.create.mockResolvedValue({ id: "log-1" });
+      const service = createService(prisma);
+
+      const result = await service.createDisabledLog(
+        "SUMMARIZE",
+        "branch-1",
+        "ticket-1",
+        null,
+        "abc123",
+      );
+
+      expect(prisma.aiPromptLog.create).toHaveBeenCalledWith({
+        data: {
+          branchId: "branch-1",
+          ticketId: "ticket-1",
+          chatSessionId: null,
+          feature: "SUMMARIZE",
+          model: "disabled",
+          promptRef: "abc123",
+          inputTokens: null,
+          outputTokens: null,
+          latencyMs: null,
+          outcome: "DISABLED",
+          outputText: null,
+          errorMessage: null,
+        },
+      });
+      expect(result).toEqual({ id: "log-1" });
+    });
+
+    it("writes ticketId: null and the real chatSessionId for a CHAT-shaped call", async () => {
+      const prisma = buildPrismaMock();
+      prisma.aiPromptLog.create.mockResolvedValue({ id: "log-2" });
+      const service = createService(prisma);
+
+      await service.createDisabledLog("CHAT", "branch-1", null, "session-1", "ref");
+
+      expect(prisma.aiPromptLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            feature: "CHAT",
+            ticketId: null,
+            chatSessionId: "session-1",
+            outcome: "DISABLED",
+          }),
+        }),
+      );
+    });
+  });
 });
 
 describe("promptRef", () => {

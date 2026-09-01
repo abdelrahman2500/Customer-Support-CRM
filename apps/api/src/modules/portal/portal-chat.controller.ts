@@ -39,7 +39,7 @@ export class PortalChatController {
     @Req() request: Request,
     @Param("id") id: string,
     @Body() dto: CreateChannelMessageDto,
-  ): Promise<{ id: string; outcome: "PENDING" }> {
+  ): Promise<{ id: string; outcome: "PENDING" | "DISABLED" }> {
     const claims = request.user as JwtAccessTokenClaims;
     return this.aiChatService.sendMessage(claims.sub, id, dto.body);
   }

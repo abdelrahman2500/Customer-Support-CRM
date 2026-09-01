@@ -58,6 +58,43 @@ export class AiGatewayService {
     });
     return { id: log.id };
   }
+
+  /**
+   * Story 81 — used when `AiSettingsService` reports the feature
+   * disabled for this branch: creates the row already resolved to
+   * `DISABLED`, without ever enqueueing `ai-processing`. `model:
+   * "disabled"` matches `NullAiProvider`'s own convention exactly, so a
+   * caller reading the log cannot distinguish "no API key configured"
+   * from "a branch admin turned this feature off" — both are
+   * legitimately "AI is off" from the caller's perspective (see this
+   * story's own plan, "Design decision"). Same mutually-exclusive
+   * `ticketId`/`chatSessionId` pair as `createPendingLog`.
+   */
+  async createDisabledLog(
+    feature: AiFeature,
+    branchId: string,
+    ticketId: string | null,
+    chatSessionId: string | null,
+    promptRefValue: string,
+  ): Promise<{ id: string }> {
+    const log = await this.prisma.aiPromptLog.create({
+      data: {
+        branchId,
+        ticketId,
+        chatSessionId,
+        feature,
+        model: "disabled",
+        promptRef: promptRefValue,
+        inputTokens: null,
+        outputTokens: null,
+        latencyMs: null,
+        outcome: "DISABLED",
+        outputText: null,
+        errorMessage: null,
+      },
+    });
+    return { id: log.id };
+  }
 }
 
 /** A short opaque reference, never the raw prompt body — see

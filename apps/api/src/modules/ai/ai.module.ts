@@ -1,11 +1,14 @@
 import { Module } from "@nestjs/common";
+import { TenantContext } from "../../common/tenant/tenant-context";
 import { QueuesModule } from "../../queues/queues.module";
 import { AiGatewayService } from "./ai-gateway.service";
 import { AiChatService } from "./ai-chat.service";
+import { AiSettingsService } from "./ai-settings.service";
+import { AiSettingsController } from "./ai-settings.controller";
 
 /**
  * Owns the `ai` schema — see docs/architecture/03-domain-boundaries.md
- * ("AI Services"). Story 72 — foundation; no controller (still true).
+ * ("AI Services"). Story 72 — foundation.
  *
  * Story 76 — no longer constructs an `AiProvider`/`AI_PROVIDER` token
  * here: `apps/api` never calls the AI provider directly anymore (that
@@ -27,10 +30,21 @@ import { AiChatService } from "./ai-chat.service";
  * cross-module caller) — `PortalModule`'s `PortalChatController` calls
  * its Contact-scoped methods directly, mirroring how `PortalTicketsService`
  * already calls `TicketsService`'s own customer-scoped methods.
+ *
+ * Story 81 — `AiSettingsController`/`AiSettingsService` added: the "AI
+ * Gateway config" piece of this module's own domain-boundary description
+ * (`docs/architecture/03-domain-boundaries.md`'s AI Services row), not an
+ * Administration-schema config like `BrandingConfig` — see the plan's
+ * own dependency notes. `TenantContext` is provided here the same way
+ * every other feature module provides it (`TicketsModule`/
+ * `AdminModule`'s own doc comments). `AiSettingsService` is exported so
+ * `TicketAiService`/`AiChatService` (both already importing `AiModule`)
+ * can inject it directly to gate their own feature before enqueueing.
  */
 @Module({
   imports: [QueuesModule],
-  providers: [AiGatewayService, AiChatService],
-  exports: [AiGatewayService, AiChatService],
+  controllers: [AiSettingsController],
+  providers: [AiGatewayService, AiChatService, AiSettingsService, TenantContext],
+  exports: [AiGatewayService, AiChatService, AiSettingsService],
 })
 export class AiModule {}

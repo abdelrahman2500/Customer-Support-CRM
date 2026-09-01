@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AiChatService } from "./ai-chat.service";
 import type { AiGatewayService } from "./ai-gateway.service";
+import type { AiSettingsService } from "./ai-settings.service";
 import type { AiProcessingProducer } from "../../queues/ai-processing.producer";
 import type { PrismaService } from "../../prisma/prisma.service";
 
@@ -21,22 +22,28 @@ function buildPrismaMock() {
 }
 
 function buildAiGatewayMock() {
-  return { createPendingLog: vi.fn() };
+  return { createPendingLog: vi.fn(), createDisabledLog: vi.fn() };
 }
 
 function buildAiProcessingProducerMock() {
   return { enqueue: vi.fn() };
 }
 
+function buildAiSettingsMock(enabled = true) {
+  return { isFeatureEnabled: vi.fn().mockResolvedValue(enabled) };
+}
+
 function createService(
   prismaMock: ReturnType<typeof buildPrismaMock>,
   aiGatewayMock: ReturnType<typeof buildAiGatewayMock>,
   producerMock: ReturnType<typeof buildAiProcessingProducerMock>,
+  aiSettingsMock: ReturnType<typeof buildAiSettingsMock>,
 ): AiChatService {
   return new AiChatService(
     prismaMock as unknown as PrismaService,
     aiGatewayMock as unknown as AiGatewayService,
     producerMock as unknown as AiProcessingProducer,
+    aiSettingsMock as unknown as AiSettingsService,
   );
 }
 
@@ -44,13 +51,15 @@ describe("AiChatService", () => {
   let prisma: ReturnType<typeof buildPrismaMock>;
   let aiGateway: ReturnType<typeof buildAiGatewayMock>;
   let producer: ReturnType<typeof buildAiProcessingProducerMock>;
+  let aiSettings: ReturnType<typeof buildAiSettingsMock>;
   let service: AiChatService;
 
   beforeEach(() => {
     prisma = buildPrismaMock();
     aiGateway = buildAiGatewayMock();
     producer = buildAiProcessingProducerMock();
-    service = createService(prisma, aiGateway, producer);
+    aiSettings = buildAiSettingsMock();
+    service = createService(prisma, aiGateway, producer, aiSettings);
   });
 
   describe("startSession", () => {
@@ -119,6 +128,29 @@ describe("AiChatService", () => {
       await expect(service.sendMessage("contact-1", "unknown", "hi")).rejects.toThrow(
         "Chat session not found",
       );
+    });
+
+    // Story 81 — AI Feature Flags per Branch.
+    it("still persists the customer message but creates a DISABLED log and never enqueues when chat is disabled for the branch", async () => {
+      aiSettings.isFeatureEnabled.mockResolvedValue(false);
+      aiGateway.createDisabledLog.mockResolvedValue({ id: "log-disabled" });
+
+      const result = await service.sendMessage("contact-1", "session-1", "Hi, I need help");
+
+      expect(aiSettings.isFeatureEnabled).toHaveBeenCalledWith("branch-1", "CHAT");
+      expect(prisma.chatMessage.create).toHaveBeenCalledWith({
+        data: { sessionId: "session-1", role: "CUSTOMER", body: "Hi, I need help" },
+      });
+      expect(aiGateway.createDisabledLog).toHaveBeenCalledWith(
+        "CHAT",
+        "branch-1",
+        null,
+        "session-1",
+        expect.any(String),
+      );
+      expect(aiGateway.createPendingLog).not.toHaveBeenCalled();
+      expect(producer.enqueue).not.toHaveBeenCalled();
+      expect(result).toEqual({ id: "log-disabled", outcome: "DISABLED" });
     });
   });
 
