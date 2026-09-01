@@ -58,6 +58,33 @@ describe("Identity & Access (e2e)", () => {
     );
 
     await app.init();
+
+    const prisma = app.get(PrismaService);
+    const superAdminRole = await prisma.role.findUnique({ where: { name: "SuperAdmin" } });
+    if (superAdminRole) {
+      await prisma.user.updateMany({
+        where: {
+          email: { not: process.env.SEED_ADMIN_EMAIL },
+          branchRoles: { some: { roleId: superAdminRole.id } },
+        },
+        data: { isActive: false },
+      });
+      const seedAdmin = await prisma.user.findUnique({
+        where: { email: process.env.SEED_ADMIN_EMAIL },
+      });
+      if (seedAdmin) {
+        const seedAdminBranchRole = await prisma.userBranchRole.findFirst({
+          where: { userId: seedAdmin.id },
+          orderBy: { createdAt: "asc" },
+        });
+        if (seedAdminBranchRole && seedAdminBranchRole.roleId !== superAdminRole.id) {
+          await prisma.userBranchRole.update({
+            where: { id: seedAdminBranchRole.id },
+            data: { roleId: superAdminRole.id },
+          });
+        }
+      }
+    }
   });
 
   afterAll(async () => {
@@ -65,6 +92,42 @@ describe("Identity & Access (e2e)", () => {
     const agentRole = await prisma.role.findUnique({ where: { name: "Agent" } });
     if (agentRole) {
       await prisma.rolePermission.deleteMany({ where: { roleId: agentRole.id } });
+    }
+    const superAdminRole = await prisma.role.findUnique({ where: { name: "SuperAdmin" } });
+    if (superAdminRole) {
+      await prisma.user.updateMany({
+        where: {
+          email: { not: process.env.SEED_ADMIN_EMAIL },
+          branchRoles: { some: { roleId: superAdminRole.id } },
+        },
+        data: { isActive: false },
+      });
+      const seedAdmin = await prisma.user.findUnique({
+        where: { email: process.env.SEED_ADMIN_EMAIL },
+      });
+      if (seedAdmin) {
+        const seedAdminBranchRole = await prisma.userBranchRole.findFirst({
+          where: { userId: seedAdmin.id },
+          orderBy: { createdAt: "asc" },
+        });
+        if (seedAdminBranchRole && seedAdminBranchRole.roleId !== superAdminRole.id) {
+          await prisma.userBranchRole.update({
+            where: { id: seedAdminBranchRole.id },
+            data: { roleId: superAdminRole.id },
+          });
+        }
+      }
+    }
+    if (adminBranchId) {
+      const existingMainBranch = await prisma.branch.findFirst({
+        where: { name: "Main Branch" },
+      });
+      if (!existingMainBranch || existingMainBranch.id === adminBranchId) {
+        await prisma.branch.update({
+          where: { id: adminBranchId },
+          data: { name: "Main Branch", isActive: true },
+        });
+      }
     }
     await app.close();
   });
@@ -970,40 +1033,51 @@ describe("Identity & Access (e2e)", () => {
     );
     expect(superAdminRole).toBeTruthy();
 
-    const secondSuperAdminEmail = `super-admin-2-${randomUUID()}@example.com`;
-    await request(app.getHttpServer())
-      .post("/api/v1/identity/users")
-      .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({
-        email: secondSuperAdminEmail,
-        password: "second-super-admin-password-123",
-        fullName: "Second Super Admin",
-        branchId: adminBranchId,
-        departmentId: adminDepartmentId ?? undefined,
-        roleId: superAdminRole.id,
-      })
-      .expect(201);
+    let secondSuperAdminUserId: string | null = null;
+    try {
+      const secondSuperAdminEmail = `super-admin-2-${randomUUID()}@example.com`;
+      const createResponse = await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: secondSuperAdminEmail,
+          password: "second-super-admin-password-123",
+          fullName: "Second Super Admin",
+          branchId: adminBranchId,
+          departmentId: adminDepartmentId ?? undefined,
+          roleId: superAdminRole.id,
+        })
+        .expect(201);
+      secondSuperAdminUserId = createResponse.body.id as string;
 
-    // Now that a second active SuperAdmin exists, reassigning the FIRST
-    // admin away from SuperAdmin succeeds.
-    await request(app.getHttpServer())
-      .patch(`/api/v1/identity/users/${seededAdminId}/assignment`)
-      .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ roleId: agentRoleId })
-      .expect(200);
+      // Now that a second active SuperAdmin exists, reassigning the FIRST
+      // admin away from SuperAdmin succeeds.
+      await request(app.getHttpServer())
+        .patch(`/api/v1/identity/users/${seededAdminId}/assignment`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ roleId: agentRoleId })
+        .expect(200);
+    } finally {
+      // Restore the seeded bootstrap admin back to SuperAdmin — other e2e
+      // spec files (and any later test run) log in as `SEED_ADMIN_EMAIL` and
+      // expect it to remain SuperAdmin; this call's own JWT claims are
+      // unaffected either way (Design item 7: a reassignment only takes
+      // effect for a user's *next* token refresh/login, not their currently-
+      // live token), so it still succeeds with the same already-issued
+      // `adminAccessToken`.
+      await request(app.getHttpServer())
+        .patch(`/api/v1/identity/users/${seededAdminId}/assignment`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ roleId: superAdminRole.id });
 
-    // Restore the seeded bootstrap admin back to SuperAdmin — other e2e
-    // spec files (and any later test run) log in as `SEED_ADMIN_EMAIL` and
-    // expect it to remain SuperAdmin; this call's own JWT claims are
-    // unaffected either way (Design item 7: a reassignment only takes
-    // effect for a user's *next* token refresh/login, not their currently-
-    // live token), so it still succeeds with the same already-issued
-    // `adminAccessToken`.
-    await request(app.getHttpServer())
-      .patch(`/api/v1/identity/users/${seededAdminId}/assignment`)
-      .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ roleId: superAdminRole.id })
-      .expect(200);
+      // Deactivate the second SuperAdmin so subsequent tests/runs aren't affected.
+      if (secondSuperAdminUserId) {
+        await request(app.getHttpServer())
+          .patch(`/api/v1/identity/users/${secondSuperAdminUserId}`)
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .send({ isActive: false });
+      }
+    }
   });
 
   // ---------------------------------------------------------------------

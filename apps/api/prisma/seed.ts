@@ -166,21 +166,15 @@ async function main(): Promise<void> {
   const passwordHash = await hashPassword(adminPassword);
   const adminUser = await prisma.user.upsert({
     where: { email: adminEmail },
-    update: { passwordHash },
+    update: { passwordHash, isActive: true },
     create: { email: adminEmail, passwordHash, fullName: "Seed Administrator" },
   });
 
-  await prisma.userBranchRole.upsert({
-    where: {
-      userId_branchId_departmentId_roleId: {
-        userId: adminUser.id,
-        branchId: branch.id,
-        departmentId: department.id,
-        roleId: adminRole.id,
-      },
-    },
-    update: {},
-    create: {
+  await prisma.userBranchRole.deleteMany({
+    where: { userId: adminUser.id, branchId: branch.id },
+  });
+  await prisma.userBranchRole.create({
+    data: {
       userId: adminUser.id,
       branchId: branch.id,
       departmentId: department.id,
