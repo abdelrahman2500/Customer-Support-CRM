@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -98,6 +99,8 @@ export interface PermissionSummary {
  */
 @Injectable()
 export class IdentityService {
+  private readonly logger = new Logger(IdentityService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -110,24 +113,59 @@ export class IdentityService {
    * Throws `UnauthorizedException` on any failure — deliberately without
    * distinguishing "no such user" from "wrong password" in the response,
    * to avoid leaking which emails are registered.
+   *
+   * Story 84 — explicitly records `auth.login_failed`/`auth.login`: the
+   * global `AuditInterceptor` can never do this itself, since `/auth/
+   * login` is `@Public()` (`request.user` is never populated) and its
+   * `tap()` only fires on the success path anyway. `entityId` carries
+   * whatever identifies the attempt (the real user id once one is
+   * found, the raw attempted email otherwise) — never exposed via the
+   * HTTP response, only through the already `audit:read`-gated
+   * `GET /audit-logs`.
    */
-  async login(email: string, password: string): Promise<AuthTokenPair> {
+  async login(
+    email: string,
+    password: string,
+    ipAddress: string | null = null,
+  ): Promise<AuthTokenPair> {
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { branchRoles: { include: { role: true }, orderBy: { createdAt: "asc" } } },
     });
 
     if (!user || !user.isActive) {
+      await this.recordAuditLog({
+        actorId: null,
+        action: "auth.login_failed",
+        entityType: "user",
+        entityId: user?.id ?? email,
+        ipAddress,
+      });
       throw new UnauthorizedException("Invalid email or password");
     }
 
     const passwordMatches = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatches) {
+      await this.recordAuditLog({
+        actorId: null,
+        action: "auth.login_failed",
+        entityType: "user",
+        entityId: user.id,
+        ipAddress,
+      });
       throw new UnauthorizedException("Invalid email or password");
     }
 
     const accessToken = await this.issueAccessToken(user.id, user.branchRoles);
     const { raw: refreshToken } = await this.createRefreshTokenRecord(user.id);
+    await this.recordAuditLog({
+      actorId: user.id,
+      action: "auth.login",
+      entityType: "user",
+      entityId: user.id,
+      branchId: user.branchRoles[0]?.branchId ?? null,
+      ipAddress,
+    });
     return { accessToken, refreshToken };
   }
 
@@ -165,13 +203,29 @@ export class IdentityService {
     return { accessToken, refreshToken: newRawToken };
   }
 
-  /** Revokes a refresh token (logout). Silently no-ops if it's already gone. */
-  async revoke(presentedToken: string): Promise<void> {
+  /**
+   * Revokes a refresh token (logout). Silently no-ops if it's already
+   * gone — Story 84's `auth.logout` audit entry is written only when a
+   * still-active token was actually revoked, mirroring that same
+   * no-op-means-no-op convention (a repeated/replayed logout call is
+   * not itself an event worth auditing).
+   */
+  async revoke(presentedToken: string, ipAddress: string | null = null): Promise<void> {
     const tokenHash = this.hashRefreshToken(presentedToken);
+    const record = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
     await this.prisma.refreshToken.updateMany({
       where: { tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    if (record && !record.revokedAt) {
+      await this.recordAuditLog({
+        actorId: record.userId,
+        action: "auth.logout",
+        entityType: "user",
+        entityId: record.userId,
+        ipAddress,
+      });
+    }
   }
 
   /**
@@ -329,6 +383,12 @@ export class IdentityService {
     const passwordHash = await hashPassword(dto.newPassword);
     await this.prisma.user.update({ where: { id }, data: { passwordHash } });
     await this.revokeAllRefreshTokens(id);
+    await this.recordAuditLog({
+      actorId: this.tenantContext.userId,
+      action: "user.password_reset",
+      entityType: "user",
+      entityId: id,
+    });
 
     return { id };
   }
@@ -406,12 +466,30 @@ export class IdentityService {
       }
     }
 
+    const before = { roleId: membership.roleId, departmentId: membership.departmentId };
+
     try {
       await this.prisma.userBranchRole.update({
         where: { id: membership.id },
         data: {
           ...(dto.roleId !== undefined ? { roleId: dto.roleId } : {}),
           ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
+        },
+      });
+      // Story 84 — a real before/after diff; `AuditInterceptor`'s own
+      // coarse route-level log cannot express one.
+      await this.recordAuditLog({
+        actorId: this.tenantContext.userId,
+        action: "user.reassigned",
+        entityType: "user",
+        entityId: id,
+        branchId,
+        diff: {
+          before,
+          after: {
+            roleId: dto.roleId ?? before.roleId,
+            departmentId: dto.departmentId !== undefined ? dto.departmentId : before.departmentId,
+          },
         },
       });
       return { id };
@@ -574,6 +652,12 @@ export class IdentityService {
       throw new BadRequestException("Built-in roles cannot be renamed or deactivated");
     }
 
+    const before = {
+      name: role.name,
+      isActive: role.isActive,
+      ticketVisibilityScope: role.ticketVisibilityScope,
+    };
+
     try {
       await this.prisma.role.update({
         where: { id },
@@ -587,6 +671,21 @@ export class IdentityService {
           ...(dto.ticketVisibilityScope !== undefined
             ? { ticketVisibilityScope: dto.ticketVisibilityScope }
             : {}),
+        },
+      });
+      // Story 84 — a real before/after diff.
+      await this.recordAuditLog({
+        actorId: this.tenantContext.userId,
+        action: "role.updated",
+        entityType: "role",
+        entityId: id,
+        diff: {
+          before,
+          after: {
+            name: dto.name ?? before.name,
+            isActive: dto.isActive ?? before.isActive,
+            ticketVisibilityScope: dto.ticketVisibilityScope ?? before.ticketVisibilityScope,
+          },
         },
       });
       return { id };
@@ -607,6 +706,14 @@ export class IdentityService {
     if (!role) {
       throw new NotFoundException("Role not found");
     }
+
+    // Story 84 — read before the reconciliation so the audit entry below
+    // can carry a real before/after diff.
+    const existingPermissions = await this.prisma.rolePermission.findMany({
+      where: { roleId: id },
+      include: { permission: true },
+    });
+    const beforeKeys = existingPermissions.map((rp) => rp.permission.key).sort();
 
     const uniqueKeys = [...new Set(dto.permissionKeys)];
     const permissions = await this.prisma.permission.findMany({
@@ -630,12 +737,55 @@ export class IdentityService {
         : []),
     ]);
 
+    await this.recordAuditLog({
+      actorId: this.tenantContext.userId,
+      action: "role.permissions_updated",
+      entityType: "role",
+      entityId: id,
+      diff: { before: beforeKeys, after: [...uniqueKeys].sort() },
+    });
+
     return { id };
   }
 
   // ---------------------------------------------------------------------
   // internals
   // ---------------------------------------------------------------------
+
+  /**
+   * Story 84 — the explicit-write half of
+   * docs/architecture/05-auth-and-security.md's "services explicitly
+   * record permission changes, exports, bulk operations, login/logout,
+   * and failed authentication", mirroring `AuditInterceptor`'s own
+   * doc comment (which names exactly this pattern) and its
+   * catch-and-log-never-throw convention: an audit-log write failure
+   * must never break the request it's observing.
+   */
+  private async recordAuditLog(entry: {
+    actorId: string | null;
+    action: string;
+    entityType: string;
+    entityId?: string | null;
+    branchId?: string | null;
+    diff?: Prisma.InputJsonValue;
+    ipAddress?: string | null;
+  }): Promise<void> {
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: entry.actorId,
+          action: entry.action,
+          entityType: entry.entityType,
+          entityId: entry.entityId ?? null,
+          branchId: entry.branchId ?? null,
+          ...(entry.diff !== undefined ? { diff: entry.diff } : {}),
+          ipAddress: entry.ipAddress ?? null,
+        },
+      });
+    } catch (error) {
+      this.logger.error("Failed to write explicit audit log", error as Error);
+    }
+  }
 
   private async requireDepartmentInScope(id: string): Promise<void> {
     const { branchId } = this.tenantContext.requireBranchScope();

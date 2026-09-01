@@ -1150,3 +1150,149 @@ describe("Identity & Access (e2e)", () => {
       .expect(200);
   });
 });
+
+/**
+ * Story 84 — Explicit Audit Logging: Auth Events & Permission Diffs.
+ *
+ * Bootstraps its own `AppModule` instance (mirrors
+ * `audit-logs-read.e2e-spec.ts`) so these assertions don't depend on the
+ * ordering/state of the large describe block above. Requires the same
+ * seeded `DATABASE_URL`/`REDIS_URL` as the rest of this file.
+ */
+describe("Identity & Access — explicit audit logging (e2e)", () => {
+  let app: INestApplication;
+  let adminAccessToken: string;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = moduleRef.createNestApplication();
+
+    app.use(cookieParser());
+    app.setGlobalPrefix("api/v1", { exclude: ["health", "health/ready"] });
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
+
+    await app.init();
+
+    const email = process.env.SEED_ADMIN_EMAIL;
+    const password = process.env.SEED_ADMIN_PASSWORD;
+    if (!email || !password) {
+      throw new Error("SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD must be set for this suite to run");
+    }
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email, password })
+      .expect(200);
+    adminAccessToken = loginResponse.body.accessToken;
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  async function waitForAuditLogRow(
+    predicate: (log: { action: string; actorId: string | null; entityId: string | null; diff: unknown }) => boolean,
+    { timeoutMs = 5000, intervalMs = 100 }: { timeoutMs?: number; intervalMs?: number } = {},
+  ): Promise<{ action: string; actorId: string | null; entityId: string | null; diff: unknown }> {
+    const deadline = Date.now() + timeoutMs;
+    do {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/audit-logs")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const match = response.body.find(predicate);
+      if (match) {
+        return match;
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    } while (Date.now() < deadline);
+    throw new Error("Timed out waiting for a matching audit log row");
+  }
+
+  it("records auth.login_failed with actorId null for an unknown email", async () => {
+    const unknownEmail = `no-such-user-${randomUUID()}@example.com`;
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: unknownEmail, password: "whatever-password" })
+      .expect(401);
+
+    const failedLoginRow = await waitForAuditLogRow(
+      (log) => log.action === "auth.login_failed" && log.entityId === unknownEmail,
+    );
+    expect(failedLoginRow.actorId).toBeNull();
+  });
+
+  it("records auth.login_failed with actorId null (and the real user id as entityId) for a wrong password, then auth.login/auth.logout with the real actorId for a real login/logout pair", async () => {
+    const email = process.env.SEED_ADMIN_EMAIL;
+    const password = process.env.SEED_ADMIN_PASSWORD;
+
+    const preLogin = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email, password })
+      .expect(200);
+    const preMe = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${preLogin.body.accessToken}`)
+      .expect(200);
+    const adminUserId = preMe.body.id as string;
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email, password: "definitely-the-wrong-password" })
+      .expect(401);
+
+    const failedLoginRow = await waitForAuditLogRow(
+      (log) => log.action === "auth.login_failed" && log.entityId === adminUserId,
+    );
+    expect(failedLoginRow.actorId).toBeNull();
+
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email, password })
+      .expect(200);
+    const setCookieHeader = loginResponse.headers["set-cookie"] as unknown as string[];
+    const rawRefreshCookie = setCookieHeader?.find((cookie) => cookie.startsWith("refreshToken="));
+    const refreshCookie = rawRefreshCookie!.split(";")[0]!;
+
+    const loginRow = await waitForAuditLogRow(
+      (log) => log.action === "auth.login" && log.entityId === adminUserId,
+    );
+    expect(loginRow.actorId).toBe(adminUserId);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/auth/logout")
+      .set("Cookie", refreshCookie)
+      .expect(204);
+
+    const logoutRow = await waitForAuditLogRow(
+      (log) => log.action === "auth.logout" && log.entityId === adminUserId,
+    );
+    expect(logoutRow.actorId).toBe(adminUserId);
+  });
+
+  it("records role.permissions_updated with a diff.after matching the submitted permission keys", async () => {
+    const roleName = `Audit Diff Role ${randomUUID()}`;
+    const createResponse = await request(app.getHttpServer())
+      .post("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: roleName })
+      .expect(201);
+    const roleId = createResponse.body.id as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/roles/${roleId}/permissions`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ permissionKeys: ["ticket:read", "customer:read"] })
+      .expect(200);
+
+    const row = await waitForAuditLogRow(
+      (log) => log.action === "role.permissions_updated" && log.entityId === roleId,
+    );
+    expect(row.diff).toMatchObject({
+      before: [],
+      after: ["customer:read", "ticket:read"],
+    });
+  });
+});

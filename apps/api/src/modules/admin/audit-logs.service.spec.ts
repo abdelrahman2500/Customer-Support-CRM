@@ -44,14 +44,16 @@ describe("AuditLogsService", () => {
   });
 
   describe("listAuditLogs", () => {
-    it("scopes the query directly by AuditLog.branchId", async () => {
+    it("scopes the query to the caller's branch plus branch-less (null) rows", async () => {
       prisma.auditLog.findMany.mockResolvedValue([]);
 
       await service.listAuditLogs();
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
       expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { branchId: "branch-1" } }),
+        expect.objectContaining({
+          where: { OR: [{ branchId: "branch-1" }, { branchId: null }] },
+        }),
       );
     });
 
@@ -99,6 +101,39 @@ describe("AuditLogsService", () => {
           entityType: "http_request",
           entityId: null,
           branchId: "branch-1",
+          diff: null,
+          ipAddress: "127.0.0.1",
+          createdAt,
+        },
+      ]);
+    });
+
+    it("maps a branch-less (null branchId) row exactly, e.g. a failed-login event", async () => {
+      const createdAt = new Date("2026-06-01T12:00:00.000Z");
+      prisma.auditLog.findMany.mockResolvedValue([
+        {
+          id: "log-2",
+          actorId: null,
+          action: "auth.login_failed",
+          entityType: "user",
+          entityId: "unknown@example.com",
+          branchId: null,
+          diff: null,
+          ipAddress: "127.0.0.1",
+          createdAt,
+        },
+      ]);
+
+      const result = await service.listAuditLogs();
+
+      expect(result).toEqual([
+        {
+          id: "log-2",
+          actorId: null,
+          action: "auth.login_failed",
+          entityType: "user",
+          entityId: "unknown@example.com",
+          branchId: null,
           diff: null,
           ipAddress: "127.0.0.1",
           createdAt,

@@ -72,8 +72,12 @@ function buildPrismaMock() {
       findMany: vi.fn(),
     },
     rolePermission: {
+      findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn(),
       createMany: vi.fn(),
+    },
+    auditLog: {
+      create: vi.fn().mockResolvedValue({}),
     },
     // The real PrismaService's `$transaction` is used two ways in this
     // codebase: the interactive-callback form (`createUser`, via
@@ -105,8 +109,9 @@ function buildConfigServiceMock(overrides: Record<string, unknown> = {}) {
   return { get: vi.fn((key: string) => overrides[key] ?? defaults[key]) };
 }
 
-function buildTenantContextMock(branchId: string | null = "branch-1") {
+function buildTenantContextMock(branchId: string | null = "branch-1", userId: string | null = "actor-1") {
   return {
+    userId,
     requireBranchScope: vi.fn(() => {
       if (!branchId) {
         throw new Error("TenantContext: no active branch on this request");
@@ -209,6 +214,87 @@ describe("IdentityService", () => {
         UnauthorizedException,
       );
     });
+
+    // Story 84 — Explicit Audit Logging.
+    it("records auth.login_failed with actorId null and the attempted email when no such user exists", async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.login("nobody@example.com", "whatever")).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actorId: null,
+          action: "auth.login_failed",
+          entityType: "user",
+          entityId: "nobody@example.com",
+        }),
+      });
+    });
+
+    it("records auth.login_failed with the real user id when the password is wrong", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        isActive: true,
+        passwordHash: "hashed:correct-password",
+        branchRoles: [],
+      });
+      vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
+
+      await expect(service.login("admin@example.com", "wrong-password")).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actorId: null,
+          action: "auth.login_failed",
+          entityType: "user",
+          entityId: "user-1",
+        }),
+      });
+    });
+
+    it("records auth.login with the real actorId, branchId, and ipAddress on success", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        isActive: true,
+        passwordHash: "hashed:correct-password",
+        branchRoles: [activeBranchRole],
+      });
+      vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+      prisma.refreshToken.create.mockResolvedValue({ id: "rt-1" });
+
+      await service.login("admin@example.com", "correct-password", "203.0.113.1");
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actorId: "user-1",
+          action: "auth.login",
+          entityType: "user",
+          entityId: "user-1",
+          branchId: "branch-1",
+          ipAddress: "203.0.113.1",
+        }),
+      });
+    });
+
+    it("never throws when the audit write itself fails", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        isActive: true,
+        passwordHash: "hashed:correct-password",
+        branchRoles: [activeBranchRole],
+      });
+      vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+      prisma.refreshToken.create.mockResolvedValue({ id: "rt-1" });
+      prisma.auditLog.create.mockRejectedValue(new Error("db unavailable"));
+
+      await expect(
+        service.login("admin@example.com", "correct-password"),
+      ).resolves.toEqual(expect.objectContaining({ accessToken: "signed.access.token" }));
+    });
   });
 
   describe("refresh", () => {
@@ -278,6 +364,50 @@ describe("IdentityService", () => {
       prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(service.revoke("gone-token")).resolves.toBeUndefined();
+    });
+
+    // Story 84 — Explicit Audit Logging.
+    it("records auth.logout with the real actorId when a still-active token is revoked", async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        id: "rt-1",
+        userId: "user-1",
+        revokedAt: null,
+      });
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.revoke("some-raw-token", "203.0.113.1");
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actorId: "user-1",
+          action: "auth.logout",
+          entityType: "user",
+          entityId: "user-1",
+          ipAddress: "203.0.113.1",
+        }),
+      });
+    });
+
+    it("does not record an audit entry when the token no longer exists", async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue(null);
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.revoke("gone-token");
+
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("does not record a second audit entry for an already-revoked token", async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        id: "rt-1",
+        userId: "user-1",
+        revokedAt: new Date(),
+      });
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.revoke("already-revoked-token");
+
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
   });
 
@@ -488,6 +618,24 @@ describe("IdentityService", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.user.update).not.toHaveBeenCalled();
       expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    });
+
+    // Story 84 — Explicit Audit Logging.
+    it("records user.password_reset with the caller's actorId", async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+      prisma.user.update.mockResolvedValue({ id: "user-1" });
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.resetPassword("user-1", { newPassword: "brand-new-password" });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actorId: "actor-1",
+          action: "user.password_reset",
+          entityType: "user",
+          entityId: "user-1",
+        }),
+      });
     });
   });
 
@@ -749,6 +897,115 @@ describe("IdentityService", () => {
       await expect(service.updateUserAssignment("user-1", {})).rejects.toThrow(
         /no active branch/,
       );
+    });
+
+    it("records user.reassigned with a correct before/after diff for a role change", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-new",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateUserAssignment("user-1", { roleId: "role-new" });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actorId: "actor-1",
+          action: "user.reassigned",
+          entityType: "user",
+          entityId: "user-1",
+          branchId: "branch-1",
+          diff: {
+            before: { roleId: "role-old", departmentId: "dept-old" },
+            after: { roleId: "role-new", departmentId: "dept-old" },
+          },
+        }),
+      });
+    });
+
+    it("records user.reassigned with a correct before/after diff for a department change", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.department.findFirst.mockResolvedValue({
+        id: "dept-new",
+        branchId: "branch-1",
+        isActive: true,
+      });
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateUserAssignment("user-1", { departmentId: "dept-new" });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: "user.reassigned",
+          diff: {
+            before: { roleId: "role-old", departmentId: "dept-old" },
+            after: { roleId: "role-old", departmentId: "dept-new" },
+          },
+        }),
+      });
+    });
+
+    it("records user.reassigned with a correct before/after diff when both role and department change", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-new",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.department.findFirst.mockResolvedValue({
+        id: "dept-new",
+        branchId: "branch-1",
+        isActive: true,
+      });
+      prisma.userBranchRole.update.mockResolvedValue({ id: "ubr-1" });
+
+      await service.updateUserAssignment("user-1", {
+        roleId: "role-new",
+        departmentId: "dept-new",
+      });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: "user.reassigned",
+          diff: {
+            before: { roleId: "role-old", departmentId: "dept-old" },
+            after: { roleId: "role-new", departmentId: "dept-new" },
+          },
+        }),
+      });
+    });
+
+    it("does not record an audit entry when the target role doesn't exist", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(membership);
+      prisma.role.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateUserAssignment("user-1", { roleId: "missing-role" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("does not record an audit entry when blocked by the last-SuperAdmin guard", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue(superAdminMembership);
+      prisma.role.findUnique.mockImplementation(
+        async ({ where }: { where: { id?: string; name?: string } }) => {
+          if (where.id === "role-agent") {
+            return { id: "role-agent", name: "Agent", isActive: true };
+          }
+          if (where.name === "SuperAdmin") {
+            return { id: "role-super-admin", name: "SuperAdmin", isActive: true };
+          }
+          return null;
+        },
+      );
+      prisma.userBranchRole.count.mockResolvedValue(0);
+
+      await expect(
+        service.updateUserAssignment("user-1", { roleId: "role-agent" }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
   });
 
@@ -1140,6 +1397,97 @@ describe("IdentityService", () => {
         data: { ticketVisibilityScope: "DEPARTMENT" },
       });
     });
+
+    it("records role.updated with a correct before/after diff for a rename", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+        ticketVisibilityScope: "BRANCH",
+      });
+      prisma.role.update.mockResolvedValue({ id: "role-1" });
+
+      await service.updateRole("role-1", { name: "Renamed Custom Role" });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actorId: "actor-1",
+          action: "role.updated",
+          entityType: "role",
+          entityId: "role-1",
+          diff: {
+            before: { name: "Custom Role", isActive: true, ticketVisibilityScope: "BRANCH" },
+            after: { name: "Renamed Custom Role", isActive: true, ticketVisibilityScope: "BRANCH" },
+          },
+        }),
+      });
+    });
+
+    it("records role.updated with a correct before/after diff for an activate/deactivate change", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+        ticketVisibilityScope: "BRANCH",
+      });
+      prisma.role.update.mockResolvedValue({ id: "role-1" });
+
+      await service.updateRole("role-1", { isActive: false });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: "role.updated",
+          diff: {
+            before: { name: "Custom Role", isActive: true, ticketVisibilityScope: "BRANCH" },
+            after: { name: "Custom Role", isActive: false, ticketVisibilityScope: "BRANCH" },
+          },
+        }),
+      });
+    });
+
+    it("records role.updated with a correct before/after diff for a ticketVisibilityScope change", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-agent",
+        name: "Agent",
+        isActive: true,
+        ticketVisibilityScope: "BRANCH",
+      });
+      prisma.role.update.mockResolvedValue({ id: "role-agent" });
+
+      await service.updateRole("role-agent", { ticketVisibilityScope: "DEPARTMENT" });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: "role.updated",
+          diff: {
+            before: { name: "Agent", isActive: true, ticketVisibilityScope: "BRANCH" },
+            after: { name: "Agent", isActive: true, ticketVisibilityScope: "DEPARTMENT" },
+          },
+        }),
+      });
+    });
+
+    it("does not record an audit entry when blocked by the protected-role guard", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-super-admin",
+        name: "SuperAdmin",
+        isActive: true,
+      });
+
+      await expect(
+        service.updateRole("role-super-admin", { name: "Renamed Super Admin" }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("does not record an audit entry for an unknown role id", async () => {
+      prisma.role.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateRole("missing-role", { name: "Whatever" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
   });
 
   describe("setRolePermissions", () => {
@@ -1242,6 +1590,102 @@ describe("IdentityService", () => {
       expect(prisma.rolePermission.deleteMany).toHaveBeenCalledWith({
         where: { roleId: "role-agent" },
       });
+    });
+
+    it("records role.permissions_updated with correct before/after sorted key arrays", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.rolePermission.findMany.mockResolvedValue([
+        { permission: { key: "ticket:create" } },
+        { permission: { key: "ticket:read" } },
+      ]);
+      prisma.permission.findMany.mockResolvedValue([
+        { id: "perm-3", key: "user:read" },
+        { id: "perm-4", key: "ticket:read" },
+      ]);
+
+      await service.setRolePermissions("role-1", {
+        permissionKeys: ["user:read", "ticket:read"],
+      });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actorId: "actor-1",
+          action: "role.permissions_updated",
+          entityType: "role",
+          entityId: "role-1",
+          diff: {
+            before: ["ticket:create", "ticket:read"],
+            after: ["ticket:read", "user:read"],
+          },
+        }),
+      });
+    });
+
+    it("records role.permissions_updated with an empty before array when the role had no existing permissions", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.rolePermission.findMany.mockResolvedValue([]);
+      prisma.permission.findMany.mockResolvedValue([{ id: "perm-1", key: "ticket:read" }]);
+
+      await service.setRolePermissions("role-1", { permissionKeys: ["ticket:read"] });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: "role.permissions_updated",
+          diff: { before: [], after: ["ticket:read"] },
+        }),
+      });
+    });
+
+    it("records role.permissions_updated with an empty after array when permissionKeys is an empty array", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.rolePermission.findMany.mockResolvedValue([
+        { permission: { key: "ticket:read" } },
+      ]);
+      prisma.permission.findMany.mockResolvedValue([]);
+
+      await service.setRolePermissions("role-1", { permissionKeys: [] });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: "role.permissions_updated",
+          diff: { before: ["ticket:read"], after: [] },
+        }),
+      });
+    });
+
+    it("does not record an audit entry for an unknown role id", async () => {
+      prisma.role.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.setRolePermissions("missing-role", { permissionKeys: [] }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("does not record an audit entry when an unknown permission key is given", async () => {
+      prisma.role.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Custom Role",
+        isActive: true,
+      });
+      prisma.permission.findMany.mockResolvedValue([{ id: "perm-1", key: "ticket:read" }]);
+
+      await expect(
+        service.setRolePermissions("role-1", { permissionKeys: ["ticket:read", "bogus:key"] }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
   });
 

@@ -33,11 +33,13 @@ export class IdentityController {
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<{ accessToken: string }> {
     const { accessToken, refreshToken } = await this.identityService.login(
       dto.email,
       dto.password,
+      request.ip ?? null,
     );
     this.setRefreshCookie(response, refreshToken);
     return { accessToken };
@@ -68,7 +70,7 @@ export class IdentityController {
   ): Promise<void> {
     const presented = request.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
     if (presented) {
-      await this.identityService.revoke(presented);
+      await this.identityService.revoke(presented, request.ip ?? null);
     }
     response.clearCookie(REFRESH_COOKIE_NAME, { path: "/api/v1/auth" });
   }
