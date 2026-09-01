@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { WorkspaceNav } from "./workspace-nav";
+import { useBrandingQuery } from "@/hooks/use-branding";
 import { clearAccessToken, logout } from "@/lib/api";
 
 const push = vi.fn();
@@ -20,8 +21,14 @@ vi.mock("@/lib/api", () => ({
   clearAccessToken: vi.fn(),
 }));
 
+// Story 82 — Branding — Live Logo/Color Consumption.
+vi.mock("@/hooks/use-branding", () => ({
+  useBrandingQuery: vi.fn(),
+}));
+
 const mockedLogout = vi.mocked(logout);
 const mockedClearAccessToken = vi.mocked(clearAccessToken);
+const mockedUseBrandingQuery = vi.mocked(useBrandingQuery);
 
 const user = {
   id: "user-1",
@@ -36,6 +43,7 @@ describe("WorkspaceNav", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedLogout.mockResolvedValue(undefined);
+    mockedUseBrandingQuery.mockReturnValue({ data: undefined } as never);
   });
 
   it("renders the app name and the signed-in user's name", () => {
@@ -127,6 +135,56 @@ describe("WorkspaceNav", () => {
       expect(screen.getByRole("link", { name: "appName" })).toHaveAttribute("href", "/en/tickets");
       expect(screen.getByRole("button", { name: "signOut" })).toBeInTheDocument();
       expect(screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`)).toBeInTheDocument();
+    });
+  });
+
+  // Story 82 — Branding — Live Logo/Color Consumption.
+  describe("branding consumption (Story 82)", () => {
+    it("renders the plain app-name text link when no branding is configured", () => {
+      mockedUseBrandingQuery.mockReturnValue({
+        data: { logoUrl: null, primaryColor: null, secondaryColor: null },
+      } as never);
+
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.getByRole("link", { name: "appName" })).toHaveAttribute("href", "/en/tickets");
+      expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    });
+
+    it("renders the branch logo instead of the app-name text link once one is configured", () => {
+      mockedUseBrandingQuery.mockReturnValue({
+        data: {
+          logoUrl: "https://example.com/logo.png",
+          primaryColor: null,
+          secondaryColor: null,
+        },
+      } as never);
+
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.getByRole("img", { name: "appName" })).toHaveAttribute(
+        "src",
+        "https://example.com/logo.png",
+      );
+      expect(screen.queryByRole("link", { name: "appName" })).not.toBeInTheDocument();
+    });
+
+    it("leaves the header's brand-primary CSS variable unset when no branding is configured", () => {
+      render(<WorkspaceNav user={user} />);
+
+      const header = screen.getByRole("banner");
+      expect(header.style.getPropertyValue("--brand-primary")).toBe("");
+    });
+
+    it("sets the header's brand-primary CSS variable once a primaryColor is configured", () => {
+      mockedUseBrandingQuery.mockReturnValue({
+        data: { logoUrl: null, primaryColor: "#112233", secondaryColor: null },
+      } as never);
+
+      render(<WorkspaceNav user={user} />);
+
+      const header = screen.getByRole("banner");
+      expect(header.style.getPropertyValue("--brand-primary")).toBe("#112233");
     });
   });
 });

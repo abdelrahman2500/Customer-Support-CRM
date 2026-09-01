@@ -1,8 +1,10 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedContact } from "@crm/shared";
+import { useBrandingQuery } from "@/hooks/use-branding";
 import { clearAccessToken, logout } from "@/lib/api";
 
 /**
@@ -13,6 +15,14 @@ import { clearAccessToken, logout } from "@/lib/api";
  * Story 53 — gains the portal's first real nav link, to `/tickets`.
  * Story 54 — gains a second, to `/knowledge-base`.
  * Story 80 — gains a third, to `/chat` (AI Portal Chatbot).
+ *
+ * Story 82 — consumes `useBrandingQuery()` (`GET /portal/branding`):
+ * a configured logo renders immediately before the existing
+ * `signedInAs` link (never replacing it — unlike `WorkspaceNav`'s plain
+ * app-name text, this link also conveys which Contact is signed in), and
+ * `primaryColor` tints the header's own bottom border the same way
+ * `WorkspaceNav` does. An unconfigured branch (every branch today)
+ * renders pixel-identical to before this story.
  */
 export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const t = useTranslations("home");
@@ -21,6 +31,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const tChat = useTranslations("chat");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
+  const brandingQuery = useBrandingQuery();
 
   async function handleSignOut() {
     try {
@@ -33,8 +44,15 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   }
 
   return (
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+    <header
+      style={{ "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties}
+      className="flex items-center justify-between border-b-2 border-[var(--brand-primary,theme(colors.slate.200))] bg-white px-6 py-3"
+    >
       <nav className="flex items-center gap-4 text-sm">
+        {brandingQuery.data?.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto" />
+        )}
         <a href={`/${locale}/home`} className="font-semibold text-slate-900">
           {t("signedInAs", { name: contact.fullName })}
         </a>

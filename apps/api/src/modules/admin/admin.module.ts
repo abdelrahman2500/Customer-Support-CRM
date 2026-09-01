@@ -17,9 +17,14 @@ import { BrandingService } from "./branding.service";
  *
  * Story 62 — `Branding*` added the same way, growing this module's HTTP
  * surface for the "branding" piece of Administration's documented scope.
+ *
+ * Story 82 — `BrandingService` exported so `PortalModule`'s
+ * `PortalBrandingController` can inject it directly, mirroring how
+ * `AiModule` exports `AiChatService` for `PortalChatController`.
  */
 @Module({
   controllers: [AuditLogsController, BrandingController],
   providers: [AuditLogsService, BrandingService, TenantContext],
+  exports: [BrandingService],
 })
 export class AdminModule {}

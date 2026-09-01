@@ -24,6 +24,14 @@ const DEFAULT_BRANDING: BrandingSummary = {
  * stricter create/update-with-404 split — branding has no nested
  * sub-resources needing careful first-touch initialization. `PATCH` is
  * upsert for the same reason.
+ *
+ * Story 82 — `getBrandingForBranch` factored out so
+ * `PortalBrandingController` can read a branch's branding directly by
+ * id: a Contact has no `TenantContext` (portal requests derive scope
+ * from their own JWT's `branchId` claim instead — see
+ * `PortalKnowledgeBaseController`'s own precedent), so `getBranding()`'s
+ * `TenantContext.requireBranchScope()` call is agent-only and stays
+ * that way.
  */
 @Injectable()
 export class BrandingService {
@@ -34,6 +42,10 @@ export class BrandingService {
 
   async getBranding(): Promise<BrandingSummary> {
     const { branchId } = this.tenantContext.requireBranchScope();
+    return this.getBrandingForBranch(branchId);
+  }
+
+  async getBrandingForBranch(branchId: string): Promise<BrandingSummary> {
     const config = await this.prisma.brandingConfig.findUnique({ where: { branchId } });
     return config ? toSummary(config) : DEFAULT_BRANDING;
   }

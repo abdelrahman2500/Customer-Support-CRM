@@ -88,6 +88,44 @@ describe("BrandingService", () => {
     });
   });
 
+  // Story 82 — Branding — Live Logo/Color Consumption.
+  describe("getBrandingForBranch", () => {
+    it("scopes the lookup by the given branchId, never the ambient TenantContext", async () => {
+      prisma.brandingConfig.findUnique.mockResolvedValue(null);
+
+      await service.getBrandingForBranch("some-other-branch");
+
+      expect(prisma.brandingConfig.findUnique).toHaveBeenCalledWith({
+        where: { branchId: "some-other-branch" },
+      });
+      expect(tenantContext.requireBranchScope).not.toHaveBeenCalled();
+    });
+
+    it("returns all-null defaults when the branch has no config yet", async () => {
+      prisma.brandingConfig.findUnique.mockResolvedValue(null);
+
+      const result = await service.getBrandingForBranch("branch-1");
+
+      expect(result).toEqual({ logoUrl: null, primaryColor: null, secondaryColor: null });
+    });
+
+    it("returns the existing config when one exists", async () => {
+      prisma.brandingConfig.findUnique.mockResolvedValue({
+        logoUrl: "https://example.com/logo.png",
+        primaryColor: "#112233",
+        secondaryColor: "#445566",
+      });
+
+      const result = await service.getBrandingForBranch("branch-1");
+
+      expect(result).toEqual({
+        logoUrl: "https://example.com/logo.png",
+        primaryColor: "#112233",
+        secondaryColor: "#445566",
+      });
+    });
+  });
+
   describe("updateBranding", () => {
     it("upserts on the branch id, passing every field through on create", async () => {
       prisma.brandingConfig.upsert.mockResolvedValue({

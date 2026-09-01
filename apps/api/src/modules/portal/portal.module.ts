@@ -3,12 +3,14 @@ import { AuthModule } from "../../common/auth/auth.module";
 import { TicketsModule } from "../tickets/tickets.module";
 import { KnowledgeBaseModule } from "../knowledge-base/knowledge-base.module";
 import { AiModule } from "../ai/ai.module";
+import { AdminModule } from "../admin/admin.module";
 import { PortalController } from "./portal.controller";
 import { PortalService } from "./portal.service";
 import { PortalTicketsController } from "./portal-tickets.controller";
 import { PortalTicketsService } from "./portal-tickets.service";
 import { PortalKnowledgeBaseController } from "./portal-knowledge-base.controller";
 import { PortalChatController } from "./portal-chat.controller";
+import { PortalBrandingController } from "./portal-branding.controller";
 
 /**
  * Story 52 — the Customer Portal's first module. `AuthModule` provides the
@@ -30,14 +32,20 @@ import { PortalChatController } from "./portal-chat.controller";
  * Story 80 — `AiModule` imported the same way, so `PortalChatController`
  * can inject the already-exported `AiChatService` directly, mirroring
  * `PortalKnowledgeBaseController`'s own no-intermediate-service pattern.
+ *
+ * Story 82 — `AdminModule` imported the same way, so
+ * `PortalBrandingController` can inject the now-exported
+ * `BrandingService` directly (its own `getBrandingForBranch` method,
+ * never `getBranding()`'s agent-only `TenantContext` path).
  */
 @Module({
-  imports: [AuthModule, TicketsModule, KnowledgeBaseModule, AiModule],
+  imports: [AuthModule, TicketsModule, KnowledgeBaseModule, AiModule, AdminModule],
   controllers: [
     PortalController,
     PortalTicketsController,
     PortalKnowledgeBaseController,
     PortalChatController,
+    PortalBrandingController,
   ],
   providers: [PortalService, PortalTicketsService],
   exports: [PortalService],

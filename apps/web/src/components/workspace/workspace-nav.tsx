@@ -1,8 +1,10 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedUser } from "@crm/shared";
+import { useBrandingQuery } from "@/hooks/use-branding";
 import { Button } from "@/components/ui/button";
 import { clearAccessToken, logout } from "@/lib/api";
 
@@ -31,6 +33,15 @@ import { clearAccessToken, logout } from "@/lib/api";
  *
  * Story 81 — `ai-settings` appended as the new last entry, same
  * convention.
+ *
+ * Story 82 — the header consumes `useBrandingQuery()` (Story 62's own
+ * agent-facing query, unchanged): a configured logo replaces the plain
+ * app-name text link, and `primaryColor` tints the header's own bottom
+ * border via a CSS custom property + a Tailwind arbitrary-value class
+ * with a literal fallback — an unconfigured branch (every branch today)
+ * renders pixel-identical to before this story. See that story's own
+ * plan, "Design decision", for why this is safe relative to
+ * `docs/architecture/12-risks-tradeoffs-and-scope.md`'s RTL/i18n risk.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -55,6 +66,7 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
   const t = useTranslations("workspace");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
+  const brandingQuery = useBrandingQuery();
 
   /**
    * Story 41 — calls the real `POST /auth/logout` (revoking the refresh
@@ -76,10 +88,18 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
 
   return (
     <>
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
-        <a href={`/${locale}/tickets`} className="text-sm font-semibold text-slate-900">
-          {t("appName")}
-        </a>
+      <header
+        style={{ "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties}
+        className="flex items-center justify-between border-b-2 border-[var(--brand-primary,theme(colors.slate.200))] bg-white px-6 py-3"
+      >
+        {brandingQuery.data?.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brandingQuery.data.logoUrl} alt={t("appName")} className="h-8 w-auto" />
+        ) : (
+          <a href={`/${locale}/tickets`} className="text-sm font-semibold text-slate-900">
+            {t("appName")}
+          </a>
+        )}
         <div className="flex items-center gap-4 text-sm text-slate-600">
           <span>{t("signedInAs", { name: user.fullName })}</span>
           <Button variant="outline" size="sm" onClick={handleSignOut}>

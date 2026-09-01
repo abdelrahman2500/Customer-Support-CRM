@@ -15,7 +15,8 @@
     "signedInAs": "Signed in as {name}",
     "signOut": "Sign out",
     "myTicketsLink": "View my tickets",
-    "placeholder": "This page confirms you're securely signed in."
+    "placeholder": "This page confirms you're securely signed in.",
+    "logoAlt": "Company logo"
   },
   "tickets": {
     "nav": "My Tickets",
