@@ -45,14 +45,21 @@ describe("NotificationsService", () => {
   });
 
   describe("listNotifications", () => {
-    it("scopes the query through the ticket relation, not NotificationLog.branchId directly", async () => {
+    /** Story 88 — also asserts `customerId: null`, which excludes
+     * `PortalNotificationLogListener`'s rows (`ticket.updated`/agent-reply
+     * `channel.message.created`, scoped to a customer, not this endpoint's
+     * branch-wide agent audience) so this endpoint's result set is
+     * unchanged by that story — regression coverage. */
+    it("scopes the query through the ticket relation, not NotificationLog.branchId directly, and excludes customer-scoped rows", async () => {
       prisma.notificationLog.findMany.mockResolvedValue([]);
 
       await service.listNotifications();
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
       expect(prisma.notificationLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { ticket: { branchId: "branch-1" } } }),
+        expect.objectContaining({
+          where: { ticket: { branchId: "branch-1" }, customerId: null },
+        }),
       );
     });
 
@@ -140,6 +147,58 @@ describe("NotificationsService", () => {
       service = createService(prisma, tenantContext);
 
       await expect(service.listNotifications()).rejects.toThrow(/no active branch/);
+    });
+  });
+
+  describe("listNotificationsForCustomer", () => {
+    it("filters directly by customerId, orders by loggedAt descending, and never touches TenantContext", async () => {
+      prisma.notificationLog.findMany.mockResolvedValue([]);
+
+      await service.listNotificationsForCustomer("customer-1");
+
+      expect(tenantContext.requireBranchScope).not.toHaveBeenCalled();
+      expect(prisma.notificationLog.findMany).toHaveBeenCalledWith({
+        where: { customerId: "customer-1" },
+        orderBy: { loggedAt: "desc" },
+      });
+    });
+
+    it("returns an empty array when the customer has no notification history", async () => {
+      prisma.notificationLog.findMany.mockResolvedValue([]);
+
+      const result = await service.listNotificationsForCustomer("customer-1");
+
+      expect(result).toEqual([]);
+    });
+
+    it("maps rows to NotificationSummary, with branchId/targetType/targetAt as stored (always null for portal rows)", async () => {
+      const loggedAt = new Date("2026-09-01T10:00:00.000Z");
+      prisma.notificationLog.findMany.mockResolvedValue([
+        {
+          id: "notif-3",
+          eventType: "ticket.updated",
+          ticketId: "ticket-1",
+          branchId: null,
+          targetType: null,
+          targetAt: null,
+          loggedAt,
+          customerId: "customer-1",
+        },
+      ]);
+
+      const result = await service.listNotificationsForCustomer("customer-1");
+
+      expect(result).toEqual([
+        {
+          id: "notif-3",
+          eventType: "ticket.updated",
+          ticketId: "ticket-1",
+          branchId: null,
+          targetType: null,
+          targetAt: null,
+          loggedAt,
+        },
+      ]);
     });
   });
 });

@@ -240,16 +240,19 @@ model BrandingConfig {
 /// departmentId — departments route tickets, not customer identity, and no
 /// story has justified department-scoping a customer yet.
 model Customer {
-  id          String               @id @default(uuid())
-  branchId    String               @map("branch_id")
-  branch      Branch               @relation(fields: [branchId], references: [id])
-  displayName String               @map("display_name")
-  isActive    Boolean              @default(true) @map("is_active")
-  contacts    Contact[]
-  tickets     Ticket[]
-  attachments CustomerAttachment[]
-  createdAt   DateTime             @default(now()) @map("created_at")
-  updatedAt   DateTime             @updatedAt @map("updated_at")
+  id               String               @id @default(uuid())
+  branchId         String               @map("branch_id")
+  branch           Branch               @relation(fields: [branchId], references: [id])
+  displayName      String               @map("display_name")
+  isActive         Boolean              @default(true) @map("is_active")
+  contacts         Contact[]
+  tickets          Ticket[]
+  attachments      CustomerAttachment[]
+  /// Story 88 — the portal-scoped half of `NotificationLog`; see that
+  /// model's own `customerId` doc comment.
+  notificationLogs NotificationLog[]
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
 
   @@index([branchId])
   @@map("customers")
@@ -747,6 +750,16 @@ model NotificationLog {
   targetAt   DateTime? @map("target_at")
   dedupeKey  String?   @map("dedupe_key")
   loggedAt   DateTime  @default(now()) @map("logged_at")
+
+  /// Story 88 — set only by `PortalNotificationLogListener`, for a
+  /// customer-scoped (portal) notification row; every pre-existing writer
+  /// (`SlaAtRiskNotificationListener`/`TicketEscalatedNotificationListener`)
+  /// leaves this `null`. Lets the agent-facing `NotificationsService.
+  /// listNotifications()` exclude these rows with a plain `customerId: null`
+  /// filter, and lets the portal's `listNotificationsForCustomer` filter
+  /// directly without a `ticket` relation join.
+  customerId String?   @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@unique([eventType, ticketId, targetType, targetAt])
   @@unique([eventType, dedupeKey])

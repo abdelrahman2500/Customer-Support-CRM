@@ -45,7 +45,11 @@ export class NotificationsService {
     const { branchId } = this.tenantContext.requireBranchScope();
 
     const notifications = await this.prisma.notificationLog.findMany({
-      where: { ticket: { branchId } },
+      // Story 88 — `customerId: null` excludes `PortalNotificationLogListener`'s
+      // rows (`ticket.updated`/agent-reply `channel.message.created`, scoped
+      // to a customer, not this endpoint's branch-wide agent audience) so
+      // this endpoint's result set is unchanged by that story.
+      where: { ticket: { branchId }, customerId: null },
       include: { ticket: { select: { branchId: true } } },
       orderBy: { loggedAt: "desc" },
     });
@@ -55,6 +59,33 @@ export class NotificationsService {
       eventType: notification.eventType,
       ticketId: notification.ticketId,
       branchId: notification.branchId ?? notification.ticket.branchId,
+      targetType: notification.targetType,
+      targetAt: notification.targetAt,
+      loggedAt: notification.loggedAt,
+    }));
+  }
+
+  /**
+   * Story 88 — the Customer Portal's counterpart to `listNotifications()`.
+   * Reuses the exact same `NotificationSummary` shape — `branchId`/
+   * `targetType`/`targetAt` are simply always `null` for these rows,
+   * exactly as consistent as `ticket.escalated` rows already are for the
+   * agent-facing endpoint (see this file's own doc comment above). No
+   * `ticket` relation join needed (unlike `listNotifications`, which
+   * resolves `branchId` through it) since `customerId` is a first-class,
+   * directly-filterable column on rows this method returns.
+   */
+  async listNotificationsForCustomer(customerId: string): Promise<NotificationSummary[]> {
+    const notifications = await this.prisma.notificationLog.findMany({
+      where: { customerId },
+      orderBy: { loggedAt: "desc" },
+    });
+
+    return notifications.map((notification) => ({
+      id: notification.id,
+      eventType: notification.eventType,
+      ticketId: notification.ticketId,
+      branchId: notification.branchId,
       targetType: notification.targetType,
       targetAt: notification.targetAt,
       loggedAt: notification.loggedAt,

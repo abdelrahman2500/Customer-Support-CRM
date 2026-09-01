@@ -81,3 +81,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | ai-chat-escalation-to-ticket | [ai-chat-escalation-to-ticket/00-overview.md](./ai-chat-escalation-to-ticket/00-overview.md) | 85–      |
 | customer-portal-notification-delivery | [customer-portal-notification-delivery/00-overview.md](./customer-portal-notification-delivery/00-overview.md) | 86–      |
 | channels-web-form-intake | [channels-web-form-intake/00-overview.md](./channels-web-form-intake/00-overview.md) | 87–      |
+| customer-portal-notification-history | [customer-portal-notification-history/00-overview.md](./customer-portal-notification-history/00-overview.md) | 88–      |

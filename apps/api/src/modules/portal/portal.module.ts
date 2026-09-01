@@ -4,6 +4,7 @@ import { TicketsModule } from "../tickets/tickets.module";
 import { KnowledgeBaseModule } from "../knowledge-base/knowledge-base.module";
 import { AiModule } from "../ai/ai.module";
 import { AdminModule } from "../admin/admin.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { PortalController } from "./portal.controller";
 import { PortalService } from "./portal.service";
 import { PortalTicketsController } from "./portal-tickets.controller";
@@ -11,6 +12,7 @@ import { PortalTicketsService } from "./portal-tickets.service";
 import { PortalKnowledgeBaseController } from "./portal-knowledge-base.controller";
 import { PortalChatController } from "./portal-chat.controller";
 import { PortalBrandingController } from "./portal-branding.controller";
+import { PortalNotificationsController } from "./portal-notifications.controller";
 
 /**
  * Story 52 — the Customer Portal's first module. `AuthModule` provides the
@@ -43,15 +45,21 @@ import { PortalBrandingController } from "./portal-branding.controller";
  * `AiModule`) to compose `escalateChatSession` — reading a `ChatSession`'s
  * transcript, creating a ticket via `TicketsService`, and replaying the
  * transcript via `TicketChannelService`, all three already available here.
+ *
+ * Story 88 — `NotificationsModule` imported the same way, so
+ * `PortalNotificationsController` can inject the now-exported
+ * `NotificationsService` directly (no intermediate service — see that
+ * controller's own doc comment).
  */
 @Module({
-  imports: [AuthModule, TicketsModule, KnowledgeBaseModule, AiModule, AdminModule],
+  imports: [AuthModule, TicketsModule, KnowledgeBaseModule, AiModule, AdminModule, NotificationsModule],
   controllers: [
     PortalController,
     PortalTicketsController,
     PortalKnowledgeBaseController,
     PortalChatController,
     PortalBrandingController,
+    PortalNotificationsController,
   ],
   providers: [PortalService, PortalTicketsService],
   exports: [PortalService],

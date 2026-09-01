@@ -8,6 +8,7 @@ import { NotificationTemplatesController } from "./notification-templates.contro
 import { NotificationTemplatesService } from "./notification-templates.service";
 import { SlaAtRiskNotificationListener } from "./sla-at-risk-notification.listener";
 import { TicketEscalatedNotificationListener } from "./ticket-escalated-notification.listener";
+import { PortalNotificationLogListener } from "./portal-notification-log.listener";
 
 /**
  * Owns the `notifications` schema — see
@@ -34,6 +35,13 @@ import { TicketEscalatedNotificationListener } from "./ticket-escalated-notifica
  * (like `NotificationsController`), never self-scoped (unlike
  * `NotificationPreferencesController`) — a template is a branch-admin
  * resource.
+ *
+ * Story 88 — `PortalNotificationLogListener` added the same way as
+ * `SlaAtRiskNotificationListener`/`TicketEscalatedNotificationListener`
+ * (a record-only listener, no request scope needed). `NotificationsService`
+ * is now exported so `PortalModule` can inject it directly for the new
+ * `GET /portal/notifications` route — this module's first controller-
+ * external consumer.
  */
 @Module({
   controllers: [
@@ -48,6 +56,8 @@ import { TicketEscalatedNotificationListener } from "./ticket-escalated-notifica
     TenantContext,
     SlaAtRiskNotificationListener,
     TicketEscalatedNotificationListener,
+    PortalNotificationLogListener,
   ],
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}
