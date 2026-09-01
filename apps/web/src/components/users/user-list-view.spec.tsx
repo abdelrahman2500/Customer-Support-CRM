@@ -604,6 +604,20 @@ describe("UserListView", () => {
   });
 
   describe("password reset", () => {
+    // Story 98 — Design System & Visual Polish. This action is irreversible
+    // and its own ConfirmDialog already renders a destructive confirm
+    // button; the trigger must agree rather than looking like a routine
+    // secondary action.
+    it("styles the reset-password trigger as destructive, matching its own confirmation dialog", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+
+      renderView();
+
+      expect(screen.getByRole("button", { name: "Reset password" })).toHaveClass("bg-red-600");
+    });
+
     it("keeps the reset-password button disabled until the draft is at least 8 characters", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [baseUser] }) as never,

@@ -161,4 +161,22 @@ describe("TicketListView", () => {
 
     expect(await screen.findByText("Subject is required")).toBeInTheDocument();
   });
+
+  // Story 98 — Design System & Visual Polish.
+  it("gives each status a visually distinct pill, mirroring apps/web's own status color semantics", () => {
+    mockedUseMyTicketsQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: [
+          { ...baseTicket, id: "t-open", status: "OPEN" },
+          { ...baseTicket, id: "t-resolved", status: "RESOLVED" },
+        ],
+      }) as never,
+    );
+
+    render(<TicketListView />);
+
+    expect(screen.getByText("OPEN")).toHaveClass("bg-amber-100");
+    expect(screen.getByText("RESOLVED")).toHaveClass("bg-emerald-100");
+  });
 });

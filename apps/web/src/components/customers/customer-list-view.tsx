@@ -68,8 +68,15 @@ export function CustomerListView() {
             {customersQuery.data.map((customer) => (
               <TableRow
                 key={customer.id}
+                role="button"
+                tabIndex={0}
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/customers/${customer.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    router.push(`/${locale}/customers/${customer.id}`);
+                  }
+                }}
               >
                 <TableCell className="font-medium text-slate-900">{customer.displayName}</TableCell>
                 <TableCell>

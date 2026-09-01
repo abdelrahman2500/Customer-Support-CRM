@@ -35,6 +35,15 @@ function priorityBadgeVariant(priority: string) {
   return "secondary" as const;
 }
 
+/** Story 98 — Design System & Visual Polish. Mirrors `ticket-list-view.tsx`'s
+ * own `statusBadgeVariant` exactly — see that file's doc comment for why. */
+function statusBadgeVariant(status: string) {
+  if (status === "OPEN") return "warning" as const;
+  if (status === "RESOLVED") return "success" as const;
+  if (status === "CLOSED") return "outline" as const;
+  return "secondary" as const; // IN_PROGRESS
+}
+
 /**
  * Story 30 — one existing contact's inline-editable fields. A dedicated
  * component (not inline in a `.map()`) because `useUpdateContactMutation`
@@ -152,9 +161,13 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
               setPortalPasswordSuccess(false);
             }}
           />
+          {/* Story 98 — Design System & Visual Polish. Mirrors
+              UserRow's own password-reset button: this is genuinely
+              irreversible and its ConfirmDialog already renders a
+              destructive confirm button, so the trigger now agrees. */}
           <Button
             type="button"
-            variant="outline"
+            variant="destructive"
             size="sm"
             disabled={portalPasswordDraft.length < 8 || portalPasswordMutation.isPending}
             onClick={() => setConfirmPortalPasswordOpen(true)}
@@ -448,7 +461,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               >
                 <span className="font-medium text-slate-800">{ticket.subject}</span>
                 <span className="flex items-center gap-2">
-                  <Badge variant="outline">{ticket.status}</Badge>
+                  <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
                   <Badge variant={priorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
                   <span className="text-slate-500">
                     {new Date(ticket.createdAt).toLocaleDateString(locale)}

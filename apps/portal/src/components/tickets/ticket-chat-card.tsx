@@ -39,7 +39,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
   }, [messagesQuery.data]);
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-6">
+    <div className="rounded-md border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-slate-900">{t("detail.chatHeading")}</h2>
 
       {messagesQuery.isLoading && (
@@ -148,7 +148,7 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
         <button
           type="submit"
           disabled={mutation.isPending || !body.trim()}
-          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
         >
           {mutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
         </button>

@@ -223,6 +223,38 @@ describe("CustomerDetailView", () => {
       expect(screen.queryByText("Unrelated ticket")).not.toBeInTheDocument();
     });
 
+    // Story 98 — Design System & Visual Polish.
+    it("gives each related ticket's status badge a distinct visual treatment", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [
+            {
+              id: "ticket-1",
+              subject: "Open ticket",
+              status: "OPEN",
+              priority: "LOW",
+              customerId: "customer-1",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+            {
+              id: "ticket-2",
+              subject: "Resolved ticket",
+              status: "RESOLVED",
+              priority: "LOW",
+              customerId: "customer-1",
+              createdAt: "2026-01-02T00:00:00.000Z",
+            },
+          ],
+        }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("OPEN")).toHaveClass("bg-amber-100");
+      expect(screen.getByText("RESOLVED")).toHaveClass("bg-emerald-100");
+    });
+
     it("navigates to the ticket detail route when a related ticket row is clicked", () => {
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({
@@ -428,6 +460,16 @@ describe("CustomerDetailView", () => {
           },
         }) as never,
       );
+    });
+
+    // Story 98 — Design System & Visual Polish. This action is irreversible
+    // (it invalidates whatever the contact currently signs in with) and its
+    // own ConfirmDialog already renders a destructive confirm button; the
+    // trigger must agree rather than looking like a routine secondary action.
+    it("styles the submit trigger as destructive, matching its own confirmation dialog", () => {
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.portalPasswordSubmit")).toHaveClass("bg-red-600");
     });
 
     it("keeps the submit button disabled until the draft is at least 8 characters", () => {

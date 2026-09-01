@@ -29,6 +29,15 @@ function priorityBadgeVariant(priority: string) {
   return "secondary" as const;
 }
 
+/** Story 98 — Design System & Visual Polish. Mirrors `ticket-list-view.tsx`'s
+ * own `statusBadgeVariant` exactly — see that file's doc comment for why. */
+function statusBadgeVariant(status: string) {
+  if (status === "OPEN") return "warning" as const;
+  if (status === "RESOLVED") return "success" as const;
+  if (status === "CLOSED") return "outline" as const;
+  return "secondary" as const; // IN_PROGRESS
+}
+
 /**
  * SLA-urgency sort key: breached tickets first, then on-track tickets by
  * soonest remaining target, then tickets with no target last. This only
@@ -114,7 +123,7 @@ function UnclaimedTicketRow({
         <span className="font-medium text-slate-800">{ticket.subject}</span>
         <button
           type="button"
-          className="w-fit text-xs text-slate-500 hover:underline"
+          className="w-fit rounded-sm text-xs text-slate-500 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
           onClick={(event) => {
             event.stopPropagation();
             router.push(`/${locale}/customers/${ticket.customerId}`);
@@ -131,7 +140,7 @@ function UnclaimedTicketRow({
         )}
       </span>
       <span className="flex items-center gap-2">
-        <Badge variant="outline">{ticket.status}</Badge>
+        <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
         <Badge variant={priorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
         <SlaPresentation ticket={ticket} now={now} />
         <Button
@@ -233,10 +242,20 @@ export function DashboardView({ userId }: { userId: string }) {
           </Alert>
         )}
 
+        {/* Story 98 — Design System & Visual Polish. Recon flagged this as
+            the clearest missing next-action: previously static text with
+            no path forward when an agent has nothing open right now. */}
         {myTicketsQuery.isSuccess && openTickets.length === 0 && (
-          <p className="mt-2 rounded-md border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-            {t("empty")}
-          </p>
+          <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+            <p>{t("empty")}</p>
+            <button
+              type="button"
+              className="rounded-sm font-medium text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              onClick={() => router.push(`/${locale}/tickets`)}
+            >
+              {t("browseAllTicketsLink")}
+            </button>
+          </div>
         )}
 
         {myTicketsQuery.isSuccess && openTickets.length > 0 && (
@@ -258,7 +277,7 @@ export function DashboardView({ userId }: { userId: string }) {
                   <span className="font-medium text-slate-800">{ticket.subject}</span>
                   <button
                     type="button"
-                    className="w-fit text-xs text-slate-500 hover:underline"
+                    className="w-fit rounded-sm text-xs text-slate-500 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                     onClick={(event) => {
                       event.stopPropagation();
                       router.push(`/${locale}/customers/${ticket.customerId}`);
@@ -268,7 +287,7 @@ export function DashboardView({ userId }: { userId: string }) {
                   </button>
                 </span>
                 <span className="flex items-center gap-2">
-                  <Badge variant="outline">{ticket.status}</Badge>
+                  <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
                   <Badge variant={priorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
                   <SlaPresentation ticket={ticket} now={now} />
                 </span>

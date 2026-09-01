@@ -14,7 +14,7 @@ export default async function PortalHomePage() {
   const locale = await getLocale();
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-6">
+    <div className="rounded-md border border-slate-200 bg-white p-4">
       <p className="max-w-prose text-sm text-slate-600">{t("placeholder")}</p>
       <a
         href={`/${locale}/tickets`}

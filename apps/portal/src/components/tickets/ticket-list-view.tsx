@@ -8,6 +8,20 @@ import { useErrorMessage } from "@/hooks/use-error-message";
 import { showSuccessToast } from "@/lib/toast-store";
 
 /**
+ * Story 98 - Design System & Visual Polish. Mirrors apps/web's own
+ * statusBadgeVariant (ticket-list-view.tsx) translated to portal's plain-
+ * pill convention - status previously carried no color signal at all
+ * here, unlike everywhere else in the app that does.
+ */
+function statusPillClassName(status: string): string {
+  const base = "rounded-full border px-2 py-0.5 text-xs";
+  if (status === "OPEN") return `${base} border-transparent bg-amber-100 text-amber-800`;
+  if (status === "RESOLVED") return `${base} border-transparent bg-emerald-100 text-emerald-800`;
+  if (status === "CLOSED") return `${base} border-slate-300 text-slate-700`;
+  return `${base} border-transparent bg-slate-100 text-slate-900`; // IN_PROGRESS
+}
+
+/**
  * Story 53 — Customer Portal — Submit & Track Own Tickets. Mirrors
  * `apps/web`'s established loading/error/empty/populated card shape and
  * `AddDepartmentForm`'s "smallest UI surface for a one-field(ish) create"
@@ -22,7 +36,9 @@ export function TicketListView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <div className="rounded-md border border-slate-200 bg-white p-6">
+      {/* Story 98 — p-4, not p-6: matches apps/web's own dominant card
+          padding convention (see that app's data cards throughout). */}
+      <div className="rounded-md border border-slate-200 bg-white p-4">
         <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
 
         {ticketsQuery.isLoading && (
@@ -39,7 +55,7 @@ export function TicketListView() {
             <button
               type="button"
               onClick={() => ticketsQuery.refetch()}
-              className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50"
+              className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
             >
               {t("list.retry")}
             </button>
@@ -67,9 +83,7 @@ export function TicketListView() {
               >
                 <span className="font-medium text-slate-800">{ticket.subject}</span>
                 <span className="flex items-center gap-2 text-slate-500">
-                  <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs">
-                    {ticket.status}
-                  </span>
+                  <span className={statusPillClassName(ticket.status)}>{ticket.status}</span>
                   <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
                 </span>
               </li>
@@ -108,7 +122,7 @@ function CreateTicketForm() {
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-6">
+    <div className="rounded-md border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-slate-900">{t("list.createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-sm text-slate-700">
@@ -136,7 +150,7 @@ function CreateTicketForm() {
         <button
           type="submit"
           disabled={mutation.isPending || !subject.trim()}
-          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
         >
           {mutation.isPending ? t("list.createSubmitting") : t("list.createSubmit")}
         </button>

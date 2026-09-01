@@ -136,7 +136,7 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
       <TableCell>
         <button
           type="button"
-          className="text-start font-medium text-slate-800 hover:underline"
+          className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
           onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
         >
           {article.title}

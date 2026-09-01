@@ -86,7 +86,7 @@ function NotificationRow({
         <Badge variant="outline">{eventLabel}</Badge>
       </TableCell>
       <TableCell>
-        <button type="button" className="hover:underline" onClick={onOpenTicket}>
+        <button type="button" className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" onClick={onOpenTicket}>
           {ticketSubject ?? notification.ticketId}
         </button>
       </TableCell>

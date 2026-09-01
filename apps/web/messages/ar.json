@@ -491,7 +491,8 @@
     "claimButton": "استلام",
     "claiming": "جارٍ الاستلام...",
     "claimForbidden": "لا تملك صلاحية استلام هذه التذكرة.",
-    "claimFailed": "تعذّر استلام هذه التذكرة. حاول مرة أخرى."
+    "claimFailed": "تعذّر استلام هذه التذكرة. حاول مرة أخرى.",
+    "browseAllTicketsLink": "تصفّح كل التذاكر"
   },
   "notifications": {
     "regionLabel": "الإشعارات",

@@ -121,4 +121,84 @@ describe("TicketListView", () => {
       expect.not.objectContaining({ search: expect.anything() }),
     );
   });
+
+  // Story 98 — Design System & Visual Polish.
+  describe("status badge color semantics (Story 98)", () => {
+    function ticketWith(status: string) {
+      return {
+        id: `ticket-${status}`,
+        subject: `Ticket ${status}`,
+        category: null,
+        priority: "LOW",
+        status,
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-02T00:00:00.000Z",
+        slaTarget: null,
+      };
+    }
+
+    it.each([
+      ["OPEN", "bg-amber-100"],
+      ["IN_PROGRESS", "bg-slate-100"],
+      ["RESOLVED", "bg-emerald-100"],
+      ["CLOSED", "border-slate-300"],
+    ])("gives %s status a distinct visual treatment", (status, expectedClass) => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [ticketWith(status)] }) as never,
+      );
+
+      render(<TicketListView />);
+
+      expect(screen.getByText(status)).toHaveClass(expectedClass);
+    });
+
+    it("gives OPEN and RESOLVED visually distinct badge classes from one another", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [ticketWith("OPEN"), ticketWith("RESOLVED")],
+        }) as never,
+      );
+
+      render(<TicketListView />);
+
+      expect(screen.getByText("OPEN").className).not.toBe(screen.getByText("RESOLVED").className);
+    });
+  });
+
+  // Story 98 — Design System & Visual Polish.
+  it("marks each ticket row as a keyboard-accessible button, activated by Enter", () => {
+    mockedUseTicketsQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: [
+          {
+            id: "ticket-1",
+            subject: "Cannot log in",
+            category: null,
+            priority: "LOW",
+            status: "OPEN",
+            customerId: "customer-1",
+            contactId: null,
+            departmentId: null,
+            assignedToUserId: null,
+            createdAt: "2024-01-01T00:00:00.000Z",
+            updatedAt: "2024-01-02T00:00:00.000Z",
+            slaTarget: null,
+          },
+        ],
+      }) as never,
+    );
+
+    render(<TicketListView />);
+
+    const row = screen.getByText("Cannot log in").closest('[role="button"]');
+    expect(row).toHaveAttribute("tabIndex", "0");
+    // Must not throw when activated via keyboard, mirroring the click handler.
+    fireEvent.keyDown(row!, { key: "Enter" });
+  });
 });

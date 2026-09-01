@@ -69,7 +69,7 @@ export function AttachmentsCard({
             <li key={attachment.id} className="flex items-center justify-between border-b border-slate-100 pb-2">
               <button
                 type="button"
-                className="text-left font-medium text-slate-800 hover:underline"
+                className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                 onClick={() => void handleDownload(attachment.id)}
               >
                 {attachment.filename}

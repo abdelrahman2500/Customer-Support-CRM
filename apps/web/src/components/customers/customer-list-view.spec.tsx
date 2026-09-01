@@ -106,4 +106,22 @@ describe("CustomerListView", () => {
 
     expect(push).toHaveBeenCalledWith("/en/customers/new");
   });
+
+  // Story 98 — Design System & Visual Polish.
+  it("marks each customer row as a keyboard-accessible button, navigating on Enter", () => {
+    mockedUseCustomersQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: [{ id: "customer-1", displayName: "Acme Inc.", isActive: true }],
+      }) as never,
+    );
+
+    render(<CustomerListView />);
+    const row = screen.getByText("Acme Inc.").closest('[role="button"]');
+    expect(row).toHaveAttribute("tabIndex", "0");
+
+    fireEvent.keyDown(row!, { key: "Enter" });
+
+    expect(push).toHaveBeenCalledWith("/en/customers/customer-1");
+  });
 });

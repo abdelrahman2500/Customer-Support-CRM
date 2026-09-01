@@ -19,6 +19,18 @@ import { Skeleton } from "@/components/portal/skeleton";
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
 /**
+ * Story 98 - Design System & Visual Polish. Mirrors this same file's own
+ * ticket-list-view.tsx statusPillClassName exactly.
+ */
+function statusPillClassName(status: string): string {
+  const base = "rounded-full border px-2 py-0.5 text-xs";
+  if (status === "OPEN") return `${base} border-transparent bg-amber-100 text-amber-800`;
+  if (status === "RESOLVED") return `${base} border-transparent bg-emerald-100 text-emerald-800`;
+  if (status === "CLOSED") return `${base} border-slate-300 text-slate-700`;
+  return `${base} border-transparent bg-slate-100 text-slate-900`; // IN_PROGRESS
+}
+
+/**
  * Story 53 — mirrors `apps/web`'s `TicketDetailView`'s loading/not-found/
  * generic-error convention and its History card's exact shape, read-only
  * (a portal Contact never edits a ticket — that's agent-only).
@@ -42,7 +54,7 @@ export function TicketDetailSkeleton() {
     <section className="flex flex-col gap-6" aria-hidden="true">
       <Skeleton className="h-4 w-32" />
 
-      <div className="rounded-md border border-slate-200 bg-white p-6">
+      <div className="rounded-md border border-slate-200 bg-white p-4">
         <Skeleton className="h-6 w-1/2" />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -56,7 +68,7 @@ export function TicketDetailSkeleton() {
 
       <Skeleton className="h-40 w-full" />
 
-      <div className="rounded-md border border-slate-200 bg-white p-6">
+      <div className="rounded-md border border-slate-200 bg-white p-4">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-2 h-24 w-full" />
       </div>
@@ -98,12 +110,14 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         &larr; {t("detail.backToList")}
       </a>
 
-      <div className="rounded-md border border-slate-200 bg-white p-6">
+      <div className="rounded-md border border-slate-200 bg-white p-4">
         <h1 className="text-lg font-semibold text-slate-900">{ticket.subject}</h1>
         <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
           <div>
             <dt className="text-xs text-slate-500">{t("detail.status")}</dt>
-            <dd className="font-medium text-slate-800">{ticket.status}</dd>
+            <dd>
+              <span className={statusPillClassName(ticket.status)}>{ticket.status}</span>
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-slate-500">{t("detail.priority")}</dt>
@@ -120,7 +134,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
       <TicketChatCard ticketId={ticketId} />
 
-      <div className="rounded-md border border-slate-200 bg-white p-6">
+      <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.historyHeading")}</h2>
         {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {historyQuery.isError && (
@@ -163,7 +177,7 @@ function CsatSection({ ticketId }: { ticketId: string }) {
   const csatQuery = useMyTicketCsatQuery(ticketId);
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-6">
+    <div className="rounded-md border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-slate-900">{t("detail.csatHeading")}</h2>
 
       {csatQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
@@ -231,7 +245,7 @@ function CsatForm({ ticketId }: { ticketId: string }) {
             role="radio"
             aria-checked={rating === value}
             onClick={() => setRating(value)}
-            className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm font-medium ${
+            className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${
               rating === value
                 ? "border-slate-900 bg-slate-900 text-white"
                 : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
@@ -258,7 +272,7 @@ function CsatForm({ ticketId }: { ticketId: string }) {
       <button
         type="submit"
         disabled={mutation.isPending || !rating}
-        className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
       >
         {mutation.isPending ? t("detail.csatSubmitting") : t("detail.csatSubmit")}
       </button>

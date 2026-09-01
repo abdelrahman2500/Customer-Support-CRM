@@ -30,6 +30,20 @@ function priorityBadgeVariant(priority: string) {
   return "secondary" as const;
 }
 
+/**
+ * Story 98 — Design System & Visual Polish. Recon found ticket status
+ * rendered as the same neutral `outline` Badge everywhere, carrying no
+ * visual urgency signal at all (unlike priority, already color-coded via
+ * `priorityBadgeVariant` above). Duplicated per-file rather than shared,
+ * mirroring that exact same existing precedent/convention.
+ */
+function statusBadgeVariant(status: string) {
+  if (status === "OPEN") return "warning" as const;
+  if (status === "RESOLVED") return "success" as const;
+  if (status === "CLOSED") return "outline" as const;
+  return "secondary" as const; // IN_PROGRESS
+}
+
 function SlaCell({ ticket }: { ticket: TicketListItem }) {
   const t = useTranslations("tickets");
   const status = deriveSlaStatus(ticket.slaTarget);
@@ -181,13 +195,13 @@ export function TicketListView() {
               <TableHead>{t("list.columns.assignedAgent")}</TableHead>
               <TableHead>{t("list.columns.sla")}</TableHead>
               <TableHead>
-                <button type="button" className="hover:underline" onClick={() => toggleSort("createdAt")}>
+                <button type="button" className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" onClick={() => toggleSort("createdAt")}>
                   {t("list.columns.createdAt")}
                   {filters.sortBy === "createdAt" ? (filters.sortDir === "asc" ? " ▲" : " ▼") : ""}
                 </button>
               </TableHead>
               <TableHead>
-                <button type="button" className="hover:underline" onClick={() => toggleSort("updatedAt")}>
+                <button type="button" className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" onClick={() => toggleSort("updatedAt")}>
                   {t("list.columns.updatedAt")}
                   {filters.sortBy === "updatedAt" ? (filters.sortDir === "asc" ? " ▲" : " ▼") : ""}
                 </button>
@@ -198,8 +212,15 @@ export function TicketListView() {
             {ticketsQuery.data.map((ticket) => (
               <TableRow
                 key={ticket.id}
+                role="button"
+                tabIndex={0}
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    router.push(`/${locale}/tickets/${ticket.id}`);
+                  }
+                }}
               >
                 <TableCell className="font-mono text-xs text-slate-500">
                   {ticket.id.slice(0, 8)}
@@ -208,7 +229,7 @@ export function TicketListView() {
                 <TableCell>
                   <button
                     type="button"
-                    className="hover:underline"
+                    className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                     onClick={(event) => {
                       event.stopPropagation();
                       router.push(`/${locale}/customers/${ticket.customerId}`);
@@ -218,7 +239,7 @@ export function TicketListView() {
                   </button>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline">{ticket.status}</Badge>
+                  <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
                 </TableCell>
                 <TableCell>
                   <Badge variant={priorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>

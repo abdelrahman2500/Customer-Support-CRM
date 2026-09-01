@@ -98,7 +98,7 @@ export function NotificationHistoryView() {
         <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-slate-500">
+              <tr className="border-b border-slate-200 text-start text-slate-500">
                 <th className="px-4 py-2 font-medium">{t("history.columns.event")}</th>
                 <th className="px-4 py-2 font-medium">{t("history.columns.ticket")}</th>
                 <th className="px-4 py-2 font-medium">{t("history.columns.loggedAt")}</th>
@@ -132,7 +132,7 @@ export function NotificationHistoryView() {
           <button
             type="button"
             onClick={() => notificationsQuery.refetch()}
-            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50"
+            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
           >
             {t("history.retry")}
           </button>
@@ -149,7 +149,7 @@ export function NotificationHistoryView() {
         <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-slate-500">
+              <tr className="border-b border-slate-200 text-start text-slate-500">
                 <th className="px-4 py-2 font-medium">{t("history.columns.event")}</th>
                 <th className="px-4 py-2 font-medium">{t("history.columns.ticket")}</th>
                 <th className="px-4 py-2 font-medium">{t("history.columns.loggedAt")}</th>
@@ -166,7 +166,7 @@ export function NotificationHistoryView() {
                   <td className="px-4 py-2">
                     <button
                       type="button"
-                      className="hover:underline"
+                      className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
                       onClick={() => router.push(`/${locale}/tickets/${notification.ticketId}`)}
                     >
                       {ticketSubjectById.get(notification.ticketId) ?? notification.ticketId}

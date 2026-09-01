@@ -125,6 +125,15 @@ describe("DashboardView", () => {
       expect(screen.getByText("You have no open tickets assigned to you.")).toBeInTheDocument();
     });
 
+    // Story 98 — Design System & Visual Polish.
+    it("gives the empty state a next action, navigating to the full ticket list", () => {
+      renderWithLocale();
+
+      fireEvent.click(screen.getByRole("button", { name: "Browse all tickets" }));
+
+      expect(push).toHaveBeenCalledWith("/en/tickets");
+    });
+
     it("queries GET /tickets scoped to the authenticated agent, not the branch-wide list", () => {
       renderWithLocale("agent-42");
 
@@ -147,6 +156,25 @@ describe("DashboardView", () => {
       expect(screen.getByText("Open one")).toBeInTheDocument();
       expect(screen.queryByText("Resolved one")).not.toBeInTheDocument();
       expect(screen.queryByText("Closed one")).not.toBeInTheDocument();
+    });
+
+    // Story 98 — Design System & Visual Polish. Only OPEN/IN_PROGRESS ever
+    // reach this list (this view's own existing status filter, above) —
+    // confirming those two get visually distinct badge treatment.
+    it("gives OPEN and IN_PROGRESS status badges visually distinct treatment", () => {
+      mockTicketQueries({
+        mine: {
+          data: [
+            ticket({ id: "ticket-open", subject: "Open one", status: "OPEN" }),
+            ticket({ id: "ticket-in-progress", subject: "In-progress one", status: "IN_PROGRESS" }),
+          ],
+        },
+      });
+
+      renderWithLocale();
+
+      expect(screen.getByText("OPEN")).toHaveClass("bg-amber-100");
+      expect(screen.getByText("IN_PROGRESS")).toHaveClass("bg-slate-100");
     });
 
     it("orders tickets breached-first, then soonest-remaining, then no-target-last", () => {

@@ -499,7 +499,8 @@
     "claimButton": "Claim",
     "claiming": "Claiming...",
     "claimForbidden": "You don't have permission to claim this ticket.",
-    "claimFailed": "Couldn't claim this ticket. Please try again."
+    "claimFailed": "Couldn't claim this ticket. Please try again.",
+    "browseAllTicketsLink": "Browse all tickets"
   },
   "notifications": {
     "regionLabel": "Notifications",

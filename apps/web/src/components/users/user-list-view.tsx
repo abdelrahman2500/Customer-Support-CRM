@@ -236,8 +236,14 @@ function UserRow({ user }: { user: UserSummary }) {
                 setPasswordResetSuccess(false);
               }}
             />
+            {/* Story 98 — Design System & Visual Polish. Resetting a portal
+                password immediately invalidates whatever the user currently
+                signs in with — genuinely irreversible, and its own
+                ConfirmDialog below already renders a destructive (red)
+                confirm button; this trigger now agrees with it instead of
+                looking like a routine secondary action. */}
             <Button
-              variant="outline"
+              variant="destructive"
               size="sm"
               disabled={newPasswordDraft.length < 8 || resetPasswordMutation.isPending}
               onClick={() => setConfirmResetOpen(true)}

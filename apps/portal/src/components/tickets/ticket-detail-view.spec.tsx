@@ -131,6 +131,17 @@ describe("TicketDetailView", () => {
     expect(screen.getByText("account")).toBeInTheDocument();
   });
 
+  // Story 98 — Design System & Visual Polish.
+  it("gives the status pill a visually distinct color, mirroring apps/web's own status color semantics", () => {
+    vi.mocked(useMyTicketQuery).mockReturnValue(
+      queryResult({ data: baseTicket, isSuccess: true }) as never,
+    );
+
+    render(<TicketDetailView ticketId="ticket-1" />);
+
+    expect(screen.getByText("OPEN")).toHaveClass("bg-amber-100");
+  });
+
   it("renders the empty history message when there are no entries", () => {
     vi.mocked(useMyTicketQuery).mockReturnValue(
       queryResult({ data: baseTicket, isSuccess: true }) as never,

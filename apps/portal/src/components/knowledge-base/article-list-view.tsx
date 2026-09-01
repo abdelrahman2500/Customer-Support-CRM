@@ -23,7 +23,7 @@ export function ArticleListView() {
   const articlesQuery = usePublishedArticlesQuery(search);
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-6">
+    <section className="rounded-md border border-slate-200 bg-white p-4">
       <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
 
       <input
@@ -49,7 +49,7 @@ export function ArticleListView() {
           <button
             type="button"
             onClick={() => articlesQuery.refetch()}
-            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50"
+            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
           >
             {t("list.retry")}
           </button>

@@ -222,7 +222,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           {t("detail.customer")}:{" "}
           <button
             type="button"
-            className="hover:underline"
+            className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
             onClick={() => router.push(`/${locale}/customers/${ticket.customerId}`)}
           >
             {customerNameById.get(ticket.customerId) ?? ticket.customerId}
