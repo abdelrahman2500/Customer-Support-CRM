@@ -5,12 +5,14 @@ import { useTranslations } from "next-intl";
 import {
   useAgentPerformanceQuery,
   useCsatSummaryQuery,
+  useResolutionTimeQuery,
   useSlaComplianceQuery,
   useTicketAgingQuery,
   useTicketVolumeQuery,
 } from "@/hooks/use-reporting";
 import type { ReportDateRange } from "@/lib/reporting-api";
 import { ApiError } from "@/lib/api";
+import { formatRemaining } from "@/lib/sla";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +42,11 @@ import { Skeleton } from "@/components/ui/skeleton";
  * (mirrors `business-hours-view.tsx`'s own exact date-input pattern — no
  * new UI library) plus a Clear button resetting to `{}`, the exact
  * pre-Story-93 all-time default every hook already falls back to.
+ *
+ * Story 99 — a sixth card, `GET /reports/resolution-time`, added the same
+ * way; shares the same date-range state. Its populated body reuses
+ * `apps/web/src/lib/sla.ts`'s existing `formatRemaining(ms)` rather than a
+ * new duration formatter (see that card's own comment below for why).
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
@@ -49,6 +56,7 @@ export function ReportsView() {
   const slaComplianceQuery = useSlaComplianceQuery(range);
   const csatQuery = useCsatSummaryQuery(range);
   const agentPerformanceQuery = useAgentPerformanceQuery(range);
+  const resolutionTimeQuery = useResolutionTimeQuery(range);
   const ticketAgingQuery = useTicketAgingQuery(range);
 
   return (
@@ -84,7 +92,7 @@ export function ReportsView() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <ReportCard
           heading={t("ticketVolume.heading")}
           query={ticketVolumeQuery}
@@ -182,6 +190,35 @@ export function ReportsView() {
                 </li>
               ))}
             </ul>
+          )}
+        </ReportCard>
+
+        {/* Story 99 — reuses `formatRemaining(ms)` (`apps/web/src/lib/sla.ts`)
+            rather than a new duration formatter: its logic (floor to
+            minutes, split into hours/minutes) is generic duration
+            formatting, not inherently a countdown, despite the function's
+            name predating this use case. A multi-day resolution time
+            renders as e.g. "52h 30m" rather than "2d 4h 30m" — a minor,
+            accepted readability trade-off in exchange for zero new
+            formatting code. */}
+        <ReportCard
+          heading={t("resolutionTime.heading")}
+          query={resolutionTimeQuery}
+          t={t}
+          skeleton="stat"
+        >
+          {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount === 0 && (
+            <p className="text-sm text-slate-500">{t("resolutionTime.empty")}</p>
+          )}
+          {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount > 0 && (
+            <div className="flex flex-col gap-1 text-sm">
+              <span className="text-2xl font-semibold text-slate-900">
+                {formatRemaining(resolutionTimeQuery.data.averageResolutionMs ?? 0)}
+              </span>
+              <span className="text-slate-500">
+                {t("resolutionTime.detail", { count: resolutionTimeQuery.data.resolvedCount })}
+              </span>
+            </div>
           )}
         </ReportCard>
       </div>

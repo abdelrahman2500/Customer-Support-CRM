@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import type { EventEmitter2 } from "@nestjs/event-emitter";
@@ -914,6 +914,205 @@ describe("TicketsService", () => {
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
         ticket: expect.objectContaining({ id: "ticket-1", assignedToUserId: "user-1" }),
         actorUserId: "user-1",
+      });
+    });
+
+    // Story 99 — Ticket.resolvedAt transitions.
+    describe("resolvedAt transitions (Story 99)", () => {
+      const NOW = new Date("2026-01-08T12:00:00.000Z");
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(NOW);
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("sets resolvedAt to now when transitioning from OPEN to RESOLVED", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "OPEN",
+        });
+        prisma.ticket.update.mockResolvedValue({
+          id: "ticket-1",
+          subject: "Cannot log in",
+          category: null,
+          priority: "MEDIUM",
+          status: "RESOLVED",
+          customerId: "customer-1",
+          contactId: null,
+          departmentId: null,
+          assignedToUserId: null,
+        });
+
+        await service.updateTicket("ticket-1", { status: "RESOLVED" as never });
+
+        expect(prisma.ticket.update).toHaveBeenCalledWith({
+          where: { id: "ticket-1" },
+          data: { status: "RESOLVED", resolvedAt: NOW },
+        });
+      });
+
+      it("sets resolvedAt to now when transitioning from IN_PROGRESS to CLOSED", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "IN_PROGRESS",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", status: "CLOSED" });
+
+        await service.updateTicket("ticket-1", { status: "CLOSED" as never });
+
+        expect(prisma.ticket.update).toHaveBeenCalledWith({
+          where: { id: "ticket-1" },
+          data: { status: "CLOSED", resolvedAt: NOW },
+        });
+      });
+
+      it("clears resolvedAt to null when reopening a RESOLVED ticket back to IN_PROGRESS", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "RESOLVED",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", status: "IN_PROGRESS" });
+
+        await service.updateTicket("ticket-1", { status: "IN_PROGRESS" as never });
+
+        expect(prisma.ticket.update).toHaveBeenCalledWith({
+          where: { id: "ticket-1" },
+          data: { status: "IN_PROGRESS", resolvedAt: null },
+        });
+      });
+
+      it("clears resolvedAt to null when reopening a CLOSED ticket back to OPEN", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "CLOSED",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", status: "OPEN" });
+
+        await service.updateTicket("ticket-1", { status: "OPEN" as never });
+
+        expect(prisma.ticket.update).toHaveBeenCalledWith({
+          where: { id: "ticket-1" },
+          data: { status: "OPEN", resolvedAt: null },
+        });
+      });
+
+      it("leaves resolvedAt untouched when moving between RESOLVED and CLOSED (never actually reopened)", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "RESOLVED",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", status: "CLOSED" });
+
+        await service.updateTicket("ticket-1", { status: "CLOSED" as never });
+
+        expect(prisma.ticket.update).toHaveBeenCalledWith({
+          where: { id: "ticket-1" },
+          data: { status: "CLOSED" },
+        });
+      });
+
+      it("leaves resolvedAt untouched (no key in data at all) when the transition never crosses the resolved boundary", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "OPEN",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", status: "IN_PROGRESS" });
+
+        await service.updateTicket("ticket-1", { status: "IN_PROGRESS" as never });
+
+        expect(prisma.ticket.update).toHaveBeenCalledWith({
+          where: { id: "ticket-1" },
+          data: { status: "IN_PROGRESS" },
+        });
+      });
+
+      it("does not touch resolvedAt when status is absent from the DTO entirely, regardless of current status", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "RESOLVED",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", subject: "New subject" });
+
+        await service.updateTicket("ticket-1", { subject: "New subject" });
+
+        expect(prisma.ticket.update).toHaveBeenCalledWith({
+          where: { id: "ticket-1" },
+          data: { subject: "New subject" },
+        });
+      });
+
+      it("sets a fresh resolvedAt when resolving again after a reopen, not the original timestamp", async () => {
+        // First resolution.
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "OPEN",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", status: "RESOLVED" });
+        await service.updateTicket("ticket-1", { status: "RESOLVED" as never });
+        expect(prisma.ticket.update).toHaveBeenLastCalledWith({
+          where: { id: "ticket-1" },
+          data: { status: "RESOLVED", resolvedAt: NOW },
+        });
+
+        // Reopen.
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "RESOLVED",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", status: "OPEN" });
+        await service.updateTicket("ticket-1", { status: "OPEN" as never });
+        expect(prisma.ticket.update).toHaveBeenLastCalledWith({
+          where: { id: "ticket-1" },
+          data: { status: "OPEN", resolvedAt: null },
+        });
+
+        // Resolve again, later.
+        const LATER = new Date("2026-01-09T09:00:00.000Z");
+        vi.setSystemTime(LATER);
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          category: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "OPEN",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", status: "RESOLVED" });
+        await service.updateTicket("ticket-1", { status: "RESOLVED" as never });
+        expect(prisma.ticket.update).toHaveBeenLastCalledWith({
+          where: { id: "ticket-1" },
+          data: { status: "RESOLVED", resolvedAt: LATER },
+        });
       });
     });
   });

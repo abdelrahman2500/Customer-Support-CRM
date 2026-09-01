@@ -440,6 +440,15 @@ model Ticket {
   /// carries no database column of its own (the FK/unique constraint lives
   /// entirely on `ChatSession`).
   chatSessionOrigin ChatSession?
+  /// Story 99 — when this ticket most recently entered the RESOLVED/CLOSED
+  /// tier (TicketsService's own RESOLVED_STATUSES, mirroring the existing
+  /// submitCsat eligibility check). Null until first resolved; cleared back
+  /// to null if reopened (moved back to OPEN/IN_PROGRESS); left unchanged
+  /// by a RESOLVED<->CLOSED shuffle, since the ticket was never actually
+  /// reopened. Historical tickets resolved before this column existed are
+  /// never backfilled and stay null forever — see reporting.service.ts's
+  /// getResolutionTime, the only consumer.
+  resolvedAt        DateTime?            @map("resolved_at")
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
 

@@ -5,6 +5,7 @@ import { ReportDateRangeQueryDto } from "./dto/report-date-range-query.dto";
 import type {
   AgentPerformanceSummary,
   CsatSummary,
+  ResolutionTimeSummary,
   SlaComplianceSummary,
   TicketAgingBucket,
   TicketVolumeByStatus,
@@ -26,7 +27,10 @@ import { ReportingService } from "./reporting.service";
  *
  * Story 93 — every route gains optional `?from=&to=` (`ReportDateRangeQueryDto`),
  * forwarded straight to the corresponding `ReportingService` method. Both
- * omitted reproduces each route's exact pre-Story-93 response. */
+ * omitted reproduces each route's exact pre-Story-93 response.
+ *
+ * Story 99 — `GET /reports/resolution-time` added the same way; no new
+ * permission (reuses `report:read`). */
 @ApiTags("reporting")
 @ApiBearerAuth()
 @Controller("reports")
@@ -63,5 +67,13 @@ export class ReportingController {
   @RequirePermissions("report:read")
   getTicketAging(@Query() { from, to }: ReportDateRangeQueryDto): Promise<TicketAgingBucket[]> {
     return this.reportingService.getTicketAging(from, to);
+  }
+
+  @Get("resolution-time")
+  @RequirePermissions("report:read")
+  getResolutionTime(
+    @Query() { from, to }: ReportDateRangeQueryDto,
+  ): Promise<ResolutionTimeSummary> {
+    return this.reportingService.getResolutionTime(from, to);
   }
 }

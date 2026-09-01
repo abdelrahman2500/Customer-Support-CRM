@@ -523,4 +523,69 @@ describe("ReportingService", () => {
       expect(prisma.ticket.findMany).not.toHaveBeenCalled();
     });
   });
+
+  // Story 99 — Ticket Resolution-Time Metrics.
+  describe("getResolutionTime", () => {
+    it("returns a null averageResolutionMs when no ticket has ever resolved yet", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      const result = await service.getResolutionTime();
+
+      expect(result).toEqual({ resolvedCount: 0, averageResolutionMs: null });
+    });
+
+    it("computes the average resolution duration across resolved tickets", async () => {
+      prisma.ticket.findMany.mockResolvedValue([
+        { createdAt: new Date("2026-01-01T00:00:00.000Z"), resolvedAt: new Date("2026-01-01T02:00:00.000Z") }, // 2h
+        { createdAt: new Date("2026-01-01T00:00:00.000Z"), resolvedAt: new Date("2026-01-01T04:00:00.000Z") }, // 4h
+      ]);
+
+      const result = await service.getResolutionTime();
+
+      expect(result).toEqual({ resolvedCount: 2, averageResolutionMs: 3 * 60 * 60 * 1000 });
+    });
+
+    it("scopes the query by branch and excludes unresolved tickets", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.getResolutionTime();
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", resolvedAt: { not: null } },
+        select: { createdAt: true, resolvedAt: true },
+      });
+    });
+
+    it("filters by Ticket.resolvedAt (not createdAt) when a range is supplied", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.getResolutionTime("2026-01-01", "2026-01-31");
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith({
+        where: {
+          branchId: "branch-1",
+          resolvedAt: {
+            not: null,
+            gte: new Date("2026-01-01T00:00:00.000Z"),
+            lt: new Date("2026-02-01T00:00:00.000Z"),
+          },
+        },
+        select: { createdAt: true, resolvedAt: true },
+      });
+    });
+
+    it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
+      await expect(service.getResolutionTime("2026-02-01", "2026-01-01")).rejects.toThrow(
+        /from must not be after to/,
+      );
+      expect(prisma.ticket.findMany).not.toHaveBeenCalled();
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, tenantContext);
+
+      await expect(service.getResolutionTime()).rejects.toThrow(/no active branch/);
+    });
+  });
 });

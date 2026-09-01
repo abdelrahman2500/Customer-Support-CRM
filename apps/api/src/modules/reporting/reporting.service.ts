@@ -35,14 +35,23 @@ export interface CsatSummary {
  * the caller's branch (an agent with none does not appear — same
  * "only what exists" convention as `TicketVolumeByStatus`).
  * `openCount` is `OPEN`+`IN_PROGRESS`; `resolvedCount` is `RESOLVED`+`CLOSED`
- * — there is no `Ticket.resolvedAt` column, so a real time-to-resolution
- * measure is still not possible (same gap `SlaComplianceSummary` already
- * documents) and this is a count, not a duration. */
+ * — deliberately a per-agent count, not a duration; Story 99's
+ * `ResolutionTimeSummary`/`getResolutionTime` below is the branch-wide
+ * duration measure (`Ticket.resolvedAt` now exists), not extended here to
+ * a per-agent breakdown, since no story has disclosed a need for one. */
 export interface AgentPerformanceSummary {
   userId: string;
   fullName: string;
   openCount: number;
   resolvedCount: number;
+}
+
+/** `averageResolutionMs` is `null` (never `0`) when `resolvedCount` is `0`
+ * — no ticket has ever resolved yet for this branch (in this window),
+ * mirroring `CsatSummary`'s own "never a misleading default" convention. */
+export interface ResolutionTimeSummary {
+  resolvedCount: number;
+  averageResolutionMs: number | null;
 }
 
 /** Fixed age buckets for currently-open tickets, always returned in this
@@ -82,6 +91,10 @@ function bucketForAgeDays(ageDays: number): AgeBucketLabel {
  * doc comment. Omitting both produces a `where` textually identical to the
  * pre-Story-93 query (guarded by `hasDateRange`), so every existing
  * no-range caller/test is unaffected.
+ *
+ * Story 99 — a sixth method, `getResolutionTime`, over a sixth new column
+ * (`Ticket.resolvedAt`, added by this story) — still a direct Prisma read,
+ * no schema beyond that one nullable column, no materialized view.
  */
 @Injectable()
 export class ReportingService {
@@ -106,10 +119,12 @@ export class ReportingService {
 
   /**
    * "Compliant" means an `SlaTicketTarget` existed for the ticket and no
-   * `resolution`-type `SlaEscalation` was ever recorded for it — there is no
-   * `Ticket.resolvedAt` column in this schema (confirmed during Recon), so a
-   * real time-to-resolution measure is not yet possible and is explicitly
-   * deferred, not approximated here.
+   * `resolution`-type `SlaEscalation` was ever recorded for it — deliberately
+   * a target-vs-breach measure, not a duration; Story 99's
+   * `getResolutionTime` is the actual time-to-resolution measure, kept
+   * separate since "met the SLA target" and "how long resolution took" are
+   * two different questions with two different cohorts (SLA-targeted
+   * tickets vs. every resolved ticket).
    *
    * Story 93 — the reporting cohort is defined by `SlaTicketTarget.createdAt`
    * (when the ticket entered SLA tracking), not `SlaEscalation.escalatedAt`
@@ -245,9 +260,10 @@ export class ReportingService {
    * currently-open tickets only (`OPEN`+`IN_PROGRESS`) — a resolved/closed
    * ticket's age is no longer operationally actionable the way an open
    * one's is. Age is a plain wall-clock difference from `createdAt` to now
-   * — no business-hours awareness (unlike SLA target computation), and no
-   * `Ticket.resolvedAt` column exists, so this is age-since-creation, never
-   * a resolution-duration measure. Every bucket always appears, even at
+   * — no business-hours awareness (unlike SLA target computation) — and
+   * deliberately age-since-creation for *currently-open* tickets, never a
+   * resolution-duration measure: Story 99's `getResolutionTime` is that
+   * measure, scoped to resolved tickets instead. Every bucket always appears, even at
    * `0` (Design decision 1) — unlike `TicketVolumeByStatus`'s sparse
    * "only what exists" convention.
    *
@@ -283,5 +299,49 @@ export class ReportingService {
     }
 
     return AGE_BUCKET_LABELS.map((bucket) => ({ bucket, count: countsByBucket.get(bucket) ?? 0 }));
+  }
+
+  /**
+   * Story 99 — closes the gap every other method in this file's own doc
+   * comment names ("there is no `Ticket.resolvedAt` column, so a real
+   * time-to-resolution measure is ... not possible"). Filters the cohort
+   * by `Ticket.resolvedAt` (when the ticket *became* resolved) — the same
+   * "filter on whichever timestamp represents when this fact became true"
+   * rule `getCsatSummary` already applies to `TicketCsatResponse.createdAt`
+   * — not `Ticket.createdAt`: a ticket created months ago but resolved
+   * this week belongs in this week's resolution-time report.
+   *
+   * A plain `findMany` + JS reduction, not a Prisma `aggregate()`: the
+   * duration itself (`resolvedAt - createdAt` per row) is a computed value
+   * Postgres can't average directly without a raw/computed expression —
+   * the same reason `getTicketAging` also reduces in JS rather than
+   * aggregating in the query.
+   *
+   * Historical tickets resolved before this column existed stay
+   * `resolvedAt: null` forever (no backfill, by design — see this
+   * story's plan) and are excluded here by the same `not: null` guard
+   * that excludes every ticket that has simply never resolved.
+   */
+  async getResolutionTime(from?: string, to?: string): Promise<ResolutionTimeSummary> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const range = resolveReportDateRange(from, to);
+    const tickets = await this.prisma.ticket.findMany({
+      where: {
+        branchId,
+        resolvedAt: { not: null, ...(hasDateRange(range) ? range : {}) },
+      },
+      select: { createdAt: true, resolvedAt: true },
+    });
+
+    const resolvedCount = tickets.length;
+    if (resolvedCount === 0) {
+      return { resolvedCount: 0, averageResolutionMs: null };
+    }
+
+    const totalMs = tickets.reduce(
+      (sum, ticket) => sum + (ticket.resolvedAt!.getTime() - ticket.createdAt.getTime()),
+      0,
+    );
+    return { resolvedCount, averageResolutionMs: totalMs / resolvedCount };
   }
 }

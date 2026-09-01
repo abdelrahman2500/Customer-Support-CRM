@@ -61,6 +61,13 @@ export interface TicketAgingBucket {
   count: number;
 }
 
+/** Story 99 — mirrors the backend's own `ResolutionTimeSummary` exactly.
+ * `averageResolutionMs` is `null` (never `0`) when `resolvedCount` is `0`. */
+export interface ResolutionTimeSummary {
+  resolvedCount: number;
+  averageResolutionMs: number | null;
+}
+
 export function getTicketVolumeByStatus(range: ReportDateRange = {}): Promise<TicketVolumeByStatus[]> {
   return apiFetch<TicketVolumeByStatus[]>(`/reports/ticket-volume${toQueryString(range)}`);
 }
@@ -79,4 +86,8 @@ export function getAgentPerformance(range: ReportDateRange = {}): Promise<AgentP
 
 export function getTicketAging(range: ReportDateRange = {}): Promise<TicketAgingBucket[]> {
   return apiFetch<TicketAgingBucket[]>(`/reports/ticket-aging${toQueryString(range)}`);
+}
+
+export function getResolutionTime(range: ReportDateRange = {}): Promise<ResolutionTimeSummary> {
+  return apiFetch<ResolutionTimeSummary>(`/reports/resolution-time${toQueryString(range)}`);
 }

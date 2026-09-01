@@ -4,6 +4,7 @@ import { ReportsView } from "./reports-view";
 import {
   useAgentPerformanceQuery,
   useCsatSummaryQuery,
+  useResolutionTimeQuery,
   useSlaComplianceQuery,
   useTicketAgingQuery,
   useTicketVolumeQuery,
@@ -21,6 +22,7 @@ vi.mock("@/hooks/use-reporting", () => ({
   useCsatSummaryQuery: vi.fn(),
   useAgentPerformanceQuery: vi.fn(),
   useTicketAgingQuery: vi.fn(),
+  useResolutionTimeQuery: vi.fn(),
 }));
 
 const mockedUseTicketVolumeQuery = vi.mocked(useTicketVolumeQuery);
@@ -28,6 +30,7 @@ const mockedUseSlaComplianceQuery = vi.mocked(useSlaComplianceQuery);
 const mockedUseCsatSummaryQuery = vi.mocked(useCsatSummaryQuery);
 const mockedUseAgentPerformanceQuery = vi.mocked(useAgentPerformanceQuery);
 const mockedUseTicketAgingQuery = vi.mocked(useTicketAgingQuery);
+const mockedUseResolutionTimeQuery = vi.mocked(useResolutionTimeQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -68,6 +71,9 @@ describe("ReportsView", () => {
         isSuccess: true,
       }) as never,
     );
+    mockedUseResolutionTimeQuery.mockReturnValue(
+      queryResult({ data: { resolvedCount: 0, averageResolutionMs: null }, isSuccess: true }) as never,
+    );
   });
 
   it("renders each card's empty state when there is no data yet", () => {
@@ -77,6 +83,7 @@ describe("ReportsView", () => {
     expect(screen.getByText("slaCompliance.empty")).toBeInTheDocument();
     expect(screen.getByText("csat.empty")).toBeInTheDocument();
     expect(screen.getByText("agentPerformance.empty")).toBeInTheDocument();
+    expect(screen.getByText("resolutionTime.empty")).toBeInTheDocument();
   });
 
   it("renders the ticket-aging card's four buckets, even when all are zero", () => {
@@ -282,6 +289,49 @@ describe("ReportsView", () => {
       const heading = screen.getByText("ticketVolume.heading");
       const card = heading.closest("div")!;
       expect(card.querySelectorAll(".animate-pulse")).toHaveLength(3);
+    });
+  });
+
+  // Story 99 — Ticket Resolution-Time Metrics.
+  describe("resolution-time card (Story 99)", () => {
+    it("renders the average resolution time formatted as a duration, plus the resolved-ticket count", () => {
+      mockedUseResolutionTimeQuery.mockReturnValue(
+        queryResult({
+          data: { resolvedCount: 4, averageResolutionMs: 2 * 60 * 60 * 1000 + 15 * 60 * 1000 },
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+
+      expect(screen.getByText("2h 15m")).toBeInTheDocument();
+      expect(screen.getByText('resolutionTime.detail:{"count":4}')).toBeInTheDocument();
+    });
+
+    it("renders the empty state, not a duration, when no ticket has resolved yet", () => {
+      render(<ReportsView />);
+
+      expect(screen.getByText("resolutionTime.empty")).toBeInTheDocument();
+    });
+
+    it("uses the stat skeleton shape (two blocks), not the list shape, while loading", () => {
+      mockedUseResolutionTimeQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<ReportsView />);
+
+      const heading = screen.getByText("resolutionTime.heading");
+      const card = heading.closest("div")!;
+      expect(card.querySelectorAll(".animate-pulse")).toHaveLength(2);
+    });
+
+    it("shares the same date-range state as the other cards", () => {
+      render(<ReportsView />);
+
+      fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
+        target: { value: "2026-01-01" },
+      });
+
+      expect(mockedUseResolutionTimeQuery).toHaveBeenLastCalledWith({ from: "2026-01-01" });
     });
   });
 });

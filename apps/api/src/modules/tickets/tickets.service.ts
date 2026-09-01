@@ -23,6 +23,16 @@ import type {
   TicketNoteAddedEvent,
 } from "./tickets.events";
 
+/**
+ * Story 99 — mirrors `TicketsService.submitCsat`'s own existing eligibility
+ * check (`ticket.status !== "RESOLVED" && ticket.status !== "CLOSED"`) and
+ * the portal frontend's `CSAT_ELIGIBLE_STATUSES`: both already treat
+ * `RESOLVED` and `CLOSED` as the same "resolved" tier, not two separate
+ * states with two separate meanings. `updateTicket` reuses that exact
+ * tier boundary to decide when `Ticket.resolvedAt` changes.
+ */
+const RESOLVED_STATUSES = new Set<TicketStatus>(["RESOLVED", "CLOSED"]);
+
 export interface TicketSummary {
   id: string;
   subject: string;
@@ -227,6 +237,23 @@ export class TicketsService {
       (dto.priority !== undefined && dto.priority !== existing.priority) ||
       (dto.departmentId !== undefined && dto.departmentId !== existing.departmentId);
 
+    // Story 99 — `resolvedAt` tracks the resolved/not-resolved tier
+    // boundary, not the raw status value: RESOLVED<->CLOSED is not a
+    // reopen (the ticket was never actually unresolved), so it leaves the
+    // existing timestamp untouched. Only spread into `data` when the
+    // boundary actually changes, so a transition that never crosses it
+    // (the large majority of calls, including every `dto.status ===
+    // undefined` call) produces the exact same `data` object as before
+    // this story.
+    const wasResolved = RESOLVED_STATUSES.has(existing.status);
+    const isResolved = dto.status !== undefined ? RESOLVED_STATUSES.has(dto.status) : wasResolved;
+    let resolvedAtUpdate: Date | null | undefined;
+    if (!wasResolved && isResolved) {
+      resolvedAtUpdate = new Date();
+    } else if (wasResolved && !isResolved) {
+      resolvedAtUpdate = null;
+    }
+
     const updated = await this.prisma.ticket.update({
       where: { id },
       data: {
@@ -238,6 +265,7 @@ export class TicketsService {
         ...(dto.assignedToUserId !== undefined
           ? { assignedToUserId: dto.assignedToUserId }
           : {}),
+        ...(resolvedAtUpdate !== undefined ? { resolvedAt: resolvedAtUpdate } : {}),
       },
     });
     const summary = toTicketSummary(updated);

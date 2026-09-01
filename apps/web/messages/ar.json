@@ -634,6 +634,11 @@
     },
     "ticketAging": {
       "heading": "قِدَم التذاكر"
+    },
+    "resolutionTime": {
+      "heading": "متوسط وقت الحل",
+      "empty": "لم يتم حل أي تذاكر بعد.",
+      "detail": "استناداً إلى {count} تذكرة تم حلها"
     }
   },
   "automationRules": {

@@ -3,6 +3,7 @@ import type { ReportDateRange } from "@/lib/reporting-api";
 import {
   getAgentPerformance,
   getCsatSummary,
+  getResolutionTime,
   getSlaCompliance,
   getTicketAging,
   getTicketVolumeByStatus,
@@ -51,5 +52,13 @@ export function useTicketAgingQuery(range: ReportDateRange = {}) {
   return useQuery({
     queryKey: ["reports", "ticket-aging", range],
     queryFn: () => getTicketAging(range),
+  });
+}
+
+/** Story 99 — same parameterized-query-key pattern as every other hook here. */
+export function useResolutionTimeQuery(range: ReportDateRange = {}) {
+  return useQuery({
+    queryKey: ["reports", "resolution-time", range],
+    queryFn: () => getResolutionTime(range),
   });
 }

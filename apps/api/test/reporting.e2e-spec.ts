@@ -178,12 +178,24 @@ describe("Reporting & Analytics (e2e)", () => {
     return response.body;
   }
 
+  /** Story 99 — Ticket Resolution-Time Metrics. */
+  async function getResolutionTime(
+    range?: DateRange,
+  ): Promise<{ resolvedCount: number; averageResolutionMs: number | null }> {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/reports/resolution-time${toQueryString(range)}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    return response.body;
+  }
+
   it("rejects unauthenticated requests on every route", async () => {
     await request(app.getHttpServer()).get("/api/v1/reports/ticket-volume").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/sla-compliance").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/csat").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/agent-performance").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/ticket-aging").expect(401);
+    await request(app.getHttpServer()).get("/api/v1/reports/resolution-time").expect(401);
   });
 
   it("rejects an Agent-role user lacking report:read on every route (403)", async () => {
@@ -237,6 +249,10 @@ describe("Reporting & Analytics (e2e)", () => {
       .expect(403);
     await request(app.getHttpServer())
       .get("/api/v1/reports/ticket-aging")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get("/api/v1/reports/resolution-time")
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(403);
   });
@@ -457,6 +473,99 @@ describe("Reporting & Analytics (e2e)", () => {
     // the total drops by exactly one, even though other e2e activity may be
     // concurrently changing other tickets' ages between buckets.
     expect(totalAfter).toBe(totalBefore - 1);
+  });
+
+  // -------------------------------------------------------------------
+  // Story 99 — Ticket Resolution-Time Metrics.
+  // -------------------------------------------------------------------
+
+  it("reflects a real resolution in resolvedCount/averageResolutionMs", async () => {
+    const before = await getResolutionTime();
+
+    const ticketId = await createTicket();
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "RESOLVED" })
+      .expect(200);
+
+    const after = await getResolutionTime();
+    expect(after.resolvedCount).toBe(before.resolvedCount + 1);
+    expect(after.averageResolutionMs).not.toBeNull();
+  });
+
+  it("does not include a ticket that is still open", async () => {
+    const before = await getResolutionTime();
+
+    await createTicket();
+
+    const after = await getResolutionTime();
+    expect(after.resolvedCount).toBe(before.resolvedCount);
+  });
+
+  it("does not double-count a RESOLVED ticket moved to CLOSED (never actually reopened)", async () => {
+    const ticketId = await createTicket();
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "RESOLVED" })
+      .expect(200);
+
+    const afterResolved = await getResolutionTime();
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "CLOSED" })
+      .expect(200);
+
+    const afterClosed = await getResolutionTime();
+    expect(afterClosed.resolvedCount).toBe(afterResolved.resolvedCount);
+  });
+
+  it("excludes a ticket that was resolved and then reopened", async () => {
+    const ticketId = await createTicket();
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "RESOLVED" })
+      .expect(200);
+    const afterResolved = await getResolutionTime();
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "IN_PROGRESS" })
+      .expect(200);
+
+    const afterReopened = await getResolutionTime();
+    expect(afterReopened.resolvedCount).toBe(afterResolved.resolvedCount - 1);
+  });
+
+  it("resolution-time: a [today, today] range includes a freshly-resolved ticket; a [yesterday, yesterday] range excludes it", async () => {
+    const beforeToday = await getResolutionTime({ from: today(), to: today() });
+    const beforeYesterday = await getResolutionTime({ from: yesterday(), to: yesterday() });
+
+    const ticketId = await createTicket();
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "RESOLVED" })
+      .expect(200);
+
+    const afterToday = await getResolutionTime({ from: today(), to: today() });
+    expect(afterToday.resolvedCount).toBe(beforeToday.resolvedCount + 1);
+
+    // The ticket was just resolved "today," not "yesterday" — that range's
+    // own count (captured before this fixture existed) must be unchanged.
+    const afterYesterday = await getResolutionTime({ from: yesterday(), to: yesterday() });
+    expect(afterYesterday.resolvedCount).toBe(beforeYesterday.resolvedCount);
+  });
+
+  it("omitting from/to entirely reproduces the exact all-time response (backward compatibility)", async () => {
+    const allTime = await getResolutionTime();
+    const explicitlyUnfiltered = await getResolutionTime({});
+    expect(explicitlyUnfiltered).toEqual(allTime);
   });
 
   // -------------------------------------------------------------------
