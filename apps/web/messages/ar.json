@@ -37,7 +37,8 @@
       "automationRules": "قواعد الأتمتة",
       "notificationTemplates": "قوالب الإشعارات",
       "branding": "الهوية البصرية",
-      "aiSettings": "إعدادات الذكاء الاصطناعي"
+      "aiSettings": "إعدادات الذكاء الاصطناعي",
+      "quickReplies": "الردود السريعة"
     }
   },
   "tickets": {
@@ -87,6 +88,7 @@
       "chatYouLabel": "أنت",
       "chatAgentLabel": "الوكيل",
       "chatAiLabel": "المساعد الذكي",
+      "quickReplyPlaceholder": "إدراج رد سريع...",
       "chatPlaceholder": "اكتب رسالة...",
       "chatSend": "إرسال",
       "chatSending": "جارٍ الإرسال...",
@@ -619,6 +621,29 @@
     "createSubmit": "إنشاء القاعدة",
     "createSubmitting": "جارٍ الإنشاء...",
     "createFailed": "تعذّر إنشاء القاعدة. حاول مرة أخرى."
+  },
+  "quickReplies": {
+    "title": "الردود السريعة",
+    "error": "تعذّر تحميل الردود السريعة.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد ردود سريعة حتى الآن.",
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "activate": "تفعيل",
+    "deactivate": "إلغاء التفعيل",
+    "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+    "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+    "columns": {
+      "title": "العنوان",
+      "body": "النص",
+      "status": "الحالة"
+    },
+    "createHeading": "رد سريع جديد",
+    "titleLabel": "العنوان",
+    "bodyLabel": "النص",
+    "createSubmit": "إنشاء الرد السريع",
+    "createSubmitting": "جارٍ الإنشاء...",
+    "createFailed": "تعذّر إنشاء الرد السريع. حاول مرة أخرى."
   },
   "notificationTemplates": {
     "title": "قوالب الإشعارات",

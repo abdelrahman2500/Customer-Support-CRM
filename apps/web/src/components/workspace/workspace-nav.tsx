@@ -42,6 +42,9 @@ import { clearAccessToken, logout } from "@/lib/api";
  * renders pixel-identical to before this story. See that story's own
  * plan, "Design decision", for why this is safe relative to
  * `docs/architecture/12-risks-tradeoffs-and-scope.md`'s RTL/i18n risk.
+ *
+ * Story 91 — `quick-replies` appended as the new last entry, same
+ * convention.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -60,6 +63,7 @@ const NAV_ITEMS = [
   { href: "notification-templates", labelKey: "nav.notificationTemplates" },
   { href: "branding", labelKey: "nav.branding" },
   { href: "ai-settings", labelKey: "nav.aiSettings" },
+  { href: "quick-replies", labelKey: "nav.quickReplies" },
 ] as const;
 
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {

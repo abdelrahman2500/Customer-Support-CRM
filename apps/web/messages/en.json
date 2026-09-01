@@ -37,7 +37,8 @@
       "automationRules": "Automation Rules",
       "notificationTemplates": "Notification Templates",
       "branding": "Branding",
-      "aiSettings": "AI Settings"
+      "aiSettings": "AI Settings",
+      "quickReplies": "Quick Replies"
     }
   },
   "tickets": {
@@ -87,6 +88,7 @@
       "chatYouLabel": "You",
       "chatAgentLabel": "Agent",
       "chatAiLabel": "AI Assistant",
+      "quickReplyPlaceholder": "Insert a quick reply...",
       "chatPlaceholder": "Type a message...",
       "chatSend": "Send",
       "chatSending": "Sending...",
@@ -619,6 +621,29 @@
     "createSubmit": "Create rule",
     "createSubmitting": "Creating...",
     "createFailed": "Couldn't create the rule. Please try again."
+  },
+  "quickReplies": {
+    "title": "Quick Replies",
+    "error": "Couldn't load quick replies.",
+    "retry": "Retry",
+    "empty": "No quick replies yet.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "actionForbidden": "You don't have permission to perform that action.",
+    "actionFailed": "That change couldn't be saved. Please try again.",
+    "columns": {
+      "title": "Title",
+      "body": "Body",
+      "status": "Status"
+    },
+    "createHeading": "New quick reply",
+    "titleLabel": "Title",
+    "bodyLabel": "Body",
+    "createSubmit": "Create quick reply",
+    "createSubmitting": "Creating...",
+    "createFailed": "Couldn't create the quick reply. Please try again."
   },
   "notificationTemplates": {
     "title": "Notification Templates",

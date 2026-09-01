@@ -6,6 +6,7 @@ import {
   useTicketMessagesQuery,
 } from "@/hooks/use-ticket-messages";
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
+import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { ApiError } from "@/lib/api";
 
 vi.mock("next/navigation", () => ({
@@ -24,6 +25,10 @@ vi.mock("@/hooks/use-ticket-messages", () => ({
 vi.mock("@/hooks/use-tickets", () => ({
   useUsersQuery: vi.fn(),
   useCurrentUserQuery: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-quick-replies", () => ({
+  useQuickRepliesQuery: vi.fn(),
 }));
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -112,6 +117,9 @@ describe("TicketChatCard", () => {
       isError: false,
       error: null,
     } as never);
+    vi.mocked(useQuickRepliesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
   });
 
   it("shows a loading skeleton while messages are loading", () => {
@@ -284,5 +292,63 @@ describe("TicketChatCard", () => {
     fireEvent.click(screen.getByText("detail.chatSend"));
 
     await screen.findByText("detail.chatSendFailed");
+  });
+
+  // Story 91 — Communication/Channels: Quick Replies.
+  describe("quick-reply picker (Story 91)", () => {
+    const quickReply = {
+      id: "quick-reply-1",
+      title: "Password reset",
+      body: "You can reset your password from the login page.",
+      isActive: true,
+    };
+
+    it("does not render a picker when there are no active quick replies", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useQuickRepliesQuery).mockReturnValue(
+        queryResult({ data: [{ ...quickReply, isActive: false }], isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    });
+
+    it("inserts the selected quick reply's body into an empty draft", async () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useQuickRepliesQuery).mockReturnValue(
+        queryResult({ data: [quickReply], isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      fireEvent.click(screen.getByRole("combobox"));
+      fireEvent.click(await screen.findByRole("option", { name: "Password reset" }));
+
+      expect(screen.getByLabelText("detail.chatPlaceholder")).toHaveValue(quickReply.body);
+    });
+
+    it("appends the selected quick reply's body to existing draft text rather than overwriting it", async () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useQuickRepliesQuery).mockReturnValue(
+        queryResult({ data: [quickReply], isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      const textarea = screen.getByLabelText("detail.chatPlaceholder");
+      fireEvent.change(textarea, { target: { value: "Thanks for reaching out." } });
+
+      fireEvent.click(screen.getByRole("combobox"));
+      fireEvent.click(await screen.findByRole("option", { name: "Password reset" }));
+
+      expect(textarea).toHaveValue(`Thanks for reaching out.\n\n${quickReply.body}`);
+    });
   });
 });

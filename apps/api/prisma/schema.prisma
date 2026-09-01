@@ -53,6 +53,7 @@ model Branch {
   aiPromptLogs          AiPromptLog[]
   chatSessions          ChatSession[]
   aiSettings            AiSettings?
+  quickReplies          QuickReply[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -1128,5 +1129,29 @@ model ChannelMessage {
 
   @@index([ticketId])
   @@map("channel_messages")
+  @@schema("channels")
+}
+
+/// Story 91 — the Communication/Channels domain's last remaining,
+/// non-provider-blocked named noun (docs/architecture/03-domain-
+/// boundaries.md: "channel configuration, inbound/outbound messages,
+/// threads, quick replies"). A branch-admin-authored, reusable canned
+/// response an agent can insert into a ticket's chat composer
+/// (`ChatComposer`, Story 78) verbatim — no variable interpolation, no
+/// department scoping, mirrors `AutomationRule`'s exact "no unique
+/// constraint on the human-facing name, `isActive` soft-toggle only"
+/// shape.
+model QuickReply {
+  id        String   @id @default(uuid())
+  branchId  String   @map("branch_id")
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  title     String
+  body      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([branchId])
+  @@map("quick_replies")
   @@schema("channels")
 }

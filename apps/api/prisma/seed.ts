@@ -55,6 +55,9 @@ const PERMISSION_CATALOG = [
   "branding:update",
   "ai:read",
   "ai:update",
+  "quick-reply:create",
+  "quick-reply:read",
+  "quick-reply:update",
 ] as const;
 
 // No ticketing/customer/etc. permissions yet — those land with the stories

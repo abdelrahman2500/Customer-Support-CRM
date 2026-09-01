@@ -6,11 +6,19 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateTicketMessageMutation, useTicketMessagesQuery } from "@/hooks/use-ticket-messages";
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
+import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * Story 78 — Live Chat UI (agent side). Reads `GET /tickets/:id/messages`
@@ -125,12 +133,24 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
 /** Enter sends, Shift+Enter inserts a newline — the composer never assumes
  * a send succeeds (Design item 5's rule, unchanged): a rejected mutation
  * renders inline and leaves the draft in the textarea so nothing typed is
- * lost. */
+ * lost.
+ *
+ * Story 91 — gains a quick-reply picker above the textarea. Reads
+ * `useQuickRepliesQuery()` directly (no prop drilling, mirrors every other
+ * hook this component already calls); while the query is loading or has
+ * failed, the picker is simply omitted — it never blocks the composer's
+ * core send/receive flow (mirrors `BranchNotifications`/`PortalNotifications`'s
+ * own "never break the primary flow" resilience rule). Selecting a reply
+ * inserts its body into the draft — replaces it when empty, else appends
+ * with a blank-line separator so nothing already typed is discarded. */
 function ChatComposer({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [selectedQuickReplyId, setSelectedQuickReplyId] = useState("");
   const mutation = useCreateTicketMessageMutation(ticketId);
+  const quickRepliesQuery = useQuickRepliesQuery();
+  const activeQuickReplies = (quickRepliesQuery.data ?? []).filter((reply) => reply.isActive);
 
   async function send(): Promise<void> {
     const trimmed = body.trim();
@@ -158,8 +178,31 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
     }
   }
 
+  function insertQuickReply(quickReplyId: string): void {
+    const quickReply = activeQuickReplies.find((reply) => reply.id === quickReplyId);
+    setSelectedQuickReplyId("");
+    if (!quickReply) {
+      return;
+    }
+    setBody((current) => (current.trim() ? `${current}\n\n${quickReply.body}` : quickReply.body));
+  }
+
   return (
     <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+      {activeQuickReplies.length > 0 && (
+        <Select value={selectedQuickReplyId} onValueChange={insertQuickReply}>
+          <SelectTrigger className="w-64" aria-label={t("detail.quickReplyPlaceholder")}>
+            <SelectValue placeholder={t("detail.quickReplyPlaceholder")} />
+          </SelectTrigger>
+          <SelectContent>
+            {activeQuickReplies.map((reply) => (
+              <SelectItem key={reply.id} value={reply.id}>
+                {reply.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       <textarea
         className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
         rows={2}

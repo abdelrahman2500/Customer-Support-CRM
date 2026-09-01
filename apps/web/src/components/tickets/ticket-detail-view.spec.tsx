@@ -20,6 +20,7 @@ import {
   useCreateTicketMessageMutation,
   useTicketMessagesQuery,
 } from "@/hooks/use-ticket-messages";
+import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { ApiError } from "@/lib/api";
@@ -62,6 +63,12 @@ vi.mock("@/hooks/use-attachments", () => ({
 vi.mock("@/hooks/use-ticket-messages", () => ({
   useTicketMessagesQuery: vi.fn(),
   useCreateTicketMessageMutation: vi.fn(),
+}));
+
+// Story 91 — TicketChatCard's ChatComposer also reads this hook directly;
+// mirrors the `use-ticket-messages` mock above for the same reason.
+vi.mock("@/hooks/use-quick-replies", () => ({
+  useQuickRepliesQuery: vi.fn(),
 }));
 
 // Story 79 — TicketAiCard's own hooks; its behavior is covered in its own
@@ -160,6 +167,9 @@ describe("TicketDetailView", () => {
       isError: false,
       error: null,
     } as never);
+    vi.mocked(useQuickRepliesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
     vi.mocked(useTicketAiResultQuery).mockReturnValue(
       queryResult({ data: undefined, isSuccess: false }) as never,
     );
