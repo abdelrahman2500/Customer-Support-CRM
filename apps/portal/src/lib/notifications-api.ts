@@ -35,3 +35,22 @@ export interface PortalNotificationSummary {
 export function listMyNotifications(): Promise<PortalNotificationSummary[]> {
   return apiFetch<PortalNotificationSummary[]>("/portal/notifications");
 }
+
+/**
+ * Story 92 — `GET /portal/notifications/unread-count`. Same `@PortalRoute()`-only
+ * gate as `listMyNotifications()` (a dedicated endpoint, not a field folded
+ * into that list's existing raw-array response shape).
+ */
+export function getUnreadNotificationCount(): Promise<{ unreadCount: number }> {
+  return apiFetch<{ unreadCount: number }>("/portal/notifications/unread-count");
+}
+
+/**
+ * Story 92 — `PATCH /portal/notifications/read-state`. Advances the
+ * calling Contact's own read cursor to the server's current time; takes no
+ * request body — the caller's identity is resolved server-side from the
+ * portal JWT, never sent from here.
+ */
+export function markNotificationsRead(): Promise<{ readAt: string }> {
+  return apiFetch<{ readAt: string }>("/portal/notifications/read-state", { method: "PATCH" });
+}

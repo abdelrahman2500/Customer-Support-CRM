@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useMyNotificationsQuery } from "@/hooks/use-portal-notification-history";
+import {
+  useMarkNotificationsReadMutation,
+  useMyNotificationsQuery,
+} from "@/hooks/use-portal-notification-history";
 import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import type { PortalNotificationSummary } from "@/lib/notifications-api";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
@@ -49,6 +52,11 @@ function eventLabelKeyFor(eventType: string): string {
  * table (its own independent query/state, per that component's own doc
  * comment), giving the signed-in contact a place to mute either live toast
  * event type without leaving this page.
+ *
+ * Story 92 — marks the caller's notifications read exactly once per
+ * successful mount of this view (never on loading/error), mirroring
+ * `apps/web`'s `NotificationHistoryView` exactly (a `useRef` guard, not an
+ * effect dependency trick, is what makes this "once").
  */
 export function NotificationHistoryView() {
   const t = useTranslations("notifications");
@@ -57,6 +65,15 @@ export function NotificationHistoryView() {
 
   const notificationsQuery = useMyNotificationsQuery();
   const ticketsQuery = useMyTicketsQuery();
+  const markReadMutation = useMarkNotificationsReadMutation();
+
+  const hasMarkedReadRef = useRef(false);
+  useEffect(() => {
+    if (notificationsQuery.isSuccess && !hasMarkedReadRef.current) {
+      hasMarkedReadRef.current = true;
+      markReadMutation.mutate();
+    }
+  }, [notificationsQuery.isSuccess, markReadMutation]);
 
   const ticketSubjectById = useMemo(() => {
     const map = new Map<string, string>();

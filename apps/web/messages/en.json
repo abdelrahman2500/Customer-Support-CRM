@@ -38,7 +38,8 @@
       "notificationTemplates": "Notification Templates",
       "branding": "Branding",
       "aiSettings": "AI Settings",
-      "quickReplies": "Quick Replies"
+      "quickReplies": "Quick Replies",
+      "unreadNotificationsLabel": "{count} unread notifications"
     }
   },
   "tickets": {

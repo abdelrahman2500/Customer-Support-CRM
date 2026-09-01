@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useNotificationsQuery } from "@/hooks/use-notifications";
+import { useMarkNotificationsReadMutation, useNotificationsQuery } from "@/hooks/use-notifications";
 import { useNotificationTemplatesQuery } from "@/hooks/use-notification-templates";
 import { useCustomersQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import type { NotificationSummary } from "@/lib/notifications-api";
@@ -147,6 +147,13 @@ function NotificationRow({
  * (same independent-failure convention already established for
  * ticket/customer name resolution above) — every row simply falls back to
  * its default label until templates are available.
+ *
+ * Story 92 — marks the caller's notifications read exactly once per
+ * successful mount of this view (never on loading/error/403 — gated on
+ * `notificationsQuery.isSuccess`), via `useMarkNotificationsReadMutation()`.
+ * A `useRef` guard, not an effect dependency array trick, is what makes
+ * this "once" rather than "every time the query refetches/re-succeeds"
+ * (e.g. on window refocus).
  */
 export function NotificationHistoryView() {
   const t = useTranslations("notificationHistory");
@@ -157,6 +164,15 @@ export function NotificationHistoryView() {
   const ticketsQuery = useTicketsQuery({});
   const customersQuery = useCustomersQuery();
   const templatesQuery = useNotificationTemplatesQuery();
+  const markReadMutation = useMarkNotificationsReadMutation();
+
+  const hasMarkedReadRef = useRef(false);
+  useEffect(() => {
+    if (notificationsQuery.isSuccess && !hasMarkedReadRef.current) {
+      hasMarkedReadRef.current = true;
+      markReadMutation.mutate();
+    }
+  }, [notificationsQuery.isSuccess, markReadMutation]);
 
   const templateByEventType = useMemo(() => {
     const map = new Map<string, string>();

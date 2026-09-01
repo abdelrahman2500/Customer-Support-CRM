@@ -5,6 +5,8 @@ import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedUser } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
+import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { clearAccessToken, logout } from "@/lib/api";
 
@@ -45,6 +47,13 @@ import { clearAccessToken, logout } from "@/lib/api";
  *
  * Story 91 — `quick-replies` appended as the new last entry, same
  * convention.
+ *
+ * Story 92 — the `notifications` nav link gains an unread-count `Badge`
+ * from `useUnreadNotificationCountQuery()`. Rendered only when the count
+ * is a real, positive number; a loading or errored query (or a `0` count)
+ * renders no badge at all — the link itself is never affected, mirroring
+ * this codebase's own "a fetch hiccup never breaks the primary flow"
+ * convention (e.g. `ChatComposer`'s quick-reply picker, Story 91).
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -71,6 +80,8 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const brandingQuery = useBrandingQuery();
+  const unreadCountQuery = useUnreadNotificationCountQuery();
+  const unreadCount = unreadCountQuery.data?.unreadCount ?? 0;
 
   /**
    * Story 41 — calls the real `POST /auth/logout` (revoking the refresh
@@ -119,9 +130,19 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
           <a
             key={item.href}
             href={`/${locale}/${item.href}`}
-            className="hover:text-slate-900 hover:underline"
+            className="flex items-center gap-1.5 hover:text-slate-900 hover:underline"
           >
             {t(item.labelKey)}
+            {item.href === "notifications" &&
+              unreadCountQuery.isSuccess &&
+              unreadCount > 0 && (
+                <Badge
+                  variant="destructive"
+                  aria-label={t("nav.unreadNotificationsLabel", { count: unreadCount })}
+                >
+                  {unreadCount}
+                </Badge>
+              )}
           </a>
         ))}
       </nav>

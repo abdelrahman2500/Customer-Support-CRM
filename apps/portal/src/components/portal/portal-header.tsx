@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedContact } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
+import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
 import { clearAccessToken, logout } from "@/lib/api";
 
 /**
@@ -24,6 +25,12 @@ import { clearAccessToken, logout } from "@/lib/api";
  * `primaryColor` tints the header's own bottom border the same way
  * `WorkspaceNav` does. An unconfigured branch (every branch today)
  * renders pixel-identical to before this story.
+ *
+ * Story 92 — the `notifications` nav link gains an unread-count badge from
+ * `useUnreadNotificationCountQuery()`, mirroring `WorkspaceNav`'s own
+ * treatment exactly: rendered only for a real, positive count; a loading
+ * or errored query (or a `0` count) renders no badge, and the link itself
+ * is never affected.
  */
 export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const t = useTranslations("home");
@@ -34,6 +41,8 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const brandingQuery = useBrandingQuery();
+  const unreadCountQuery = useUnreadNotificationCountQuery();
+  const unreadCount = unreadCountQuery.data?.unreadCount ?? 0;
 
   async function handleSignOut() {
     try {
@@ -72,9 +81,17 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         </a>
         <a
           href={`/${locale}/notifications`}
-          className="text-slate-600 hover:text-slate-900 hover:underline"
+          className="flex items-center gap-1.5 text-slate-600 hover:text-slate-900 hover:underline"
         >
           {tNotifications("nav")}
+          {unreadCountQuery.isSuccess && unreadCount > 0 && (
+            <span
+              aria-label={tNotifications("unreadNotificationsLabel", { count: unreadCount })}
+              className="inline-flex items-center rounded-full border border-transparent bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800"
+            >
+              {unreadCount}
+            </span>
+          )}
         </a>
       </nav>
       <button

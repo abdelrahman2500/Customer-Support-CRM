@@ -66,6 +66,104 @@ export class NotificationsService {
   }
 
   /**
+   * Story 92 — the agent's own unread count, reusing `listNotifications()`'s
+   * exact scoping predicate (branch via the `ticket` relation,
+   * `customerId: null`) plus a `loggedAt` cursor filter. A `null`
+   * `notificationsReadAt` (never marked read) omits the cursor filter
+   * entirely, so every matching row counts as unread — never treated as
+   * "0 unread" or an error. `NotificationLog` itself carries no read state;
+   * the cursor lives on the caller's own `User` row precisely because these
+   * rows are shared by every agent in the branch (see this file's own
+   * `listNotifications` doc comment) — one agent's cursor can never affect
+   * another's count.
+   */
+  async getUnreadCount(): Promise<{ unreadCount: number }> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const userId = this.tenantContext.userId;
+    if (!userId) {
+      throw new Error("TenantContext: no active user on this request");
+    }
+
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { notificationsReadAt: true },
+    });
+
+    const unreadCount = await this.prisma.notificationLog.count({
+      where: {
+        ticket: { branchId },
+        customerId: null,
+        ...(user.notificationsReadAt ? { loggedAt: { gt: user.notificationsReadAt } } : {}),
+      },
+    });
+
+    return { unreadCount };
+  }
+
+  /**
+   * Story 92 — advances the calling agent's own cursor to the server's
+   * current time. No id is ever accepted from the caller: `userId` is
+   * resolved exclusively from `TenantContext` (validated token claims), so
+   * this can never update another agent's `notificationsReadAt`.
+   */
+  async markRead(): Promise<{ readAt: Date }> {
+    const userId = this.tenantContext.userId;
+    if (!userId) {
+      throw new Error("TenantContext: no active user on this request");
+    }
+
+    const readAt = new Date();
+    await this.prisma.user.update({ where: { id: userId }, data: { notificationsReadAt: readAt } });
+    return { readAt };
+  }
+
+  /**
+   * Story 92 — the Customer Portal's counterpart to `getUnreadCount()`.
+   * Scoped by `customerId` directly, mirroring `listNotificationsForCustomer`'s
+   * own simpler predicate (no `ticket` relation join needed). The cursor
+   * lives on the caller's own `Contact` row, not `Customer`: `contactId` is
+   * the portal JWT's `sub` (the actual per-login identity — see
+   * `PortalNotificationsController`), even though the notifications being
+   * counted are shared by every `Contact` of that `Customer`. This is what
+   * keeps two contacts under the same customer from ever affecting each
+   * other's unread count.
+   */
+  async getUnreadCountForCustomer(
+    contactId: string,
+    customerId: string,
+  ): Promise<{ unreadCount: number }> {
+    const contact = await this.prisma.contact.findUniqueOrThrow({
+      where: { id: contactId },
+      select: { notificationsReadAt: true },
+    });
+
+    const unreadCount = await this.prisma.notificationLog.count({
+      where: {
+        customerId,
+        ...(contact.notificationsReadAt ? { loggedAt: { gt: contact.notificationsReadAt } } : {}),
+      },
+    });
+
+    return { unreadCount };
+  }
+
+  /**
+   * Story 92 — advances the calling Contact's own cursor to the server's
+   * current time. `contactId` is resolved exclusively by the caller
+   * (`PortalNotificationsController`, from `getAuthenticatedContact(contact.sub)`),
+   * never from a request body/param, so this can never update another
+   * contact's `notificationsReadAt`.
+   */
+  async markReadForContact(contactId: string): Promise<{ readAt: Date }> {
+    const readAt = new Date();
+    await this.prisma.contact.update({
+      where: { id: contactId },
+      data: { notificationsReadAt: readAt },
+    });
+    return { readAt };
+  }
+
+  /**
    * Story 88 — the Customer Portal's counterpart to `listNotifications()`.
    * Reuses the exact same `NotificationSummary` shape — `branchId`/
    * `targetType`/`targetAt` are simply always `null` for these rows,

@@ -106,6 +106,7 @@
     "regionLabel": "Notifications",
     "dismiss": "Dismiss",
     "viewTicket": "View ticket",
+    "unreadNotificationsLabel": "{count} unread notifications",
     "eventLabel": {
       "ticketUpdated": "Ticket updated",
       "newReply": "New reply"

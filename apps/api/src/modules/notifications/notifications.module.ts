@@ -49,6 +49,15 @@ import { PortalNotificationLogListener } from "./portal-notification-log.listene
  * to inject directly (mirrors Story 88's `NotificationsService` export).
  * Self-scoped by the caller's own `contactId` (never `TenantContext`/a
  * permission) — see that service's own doc comment.
+ *
+ * Story 92 — `NotificationsController`/`PortalNotificationsController`
+ * (`PortalModule`) each gain two new routes (`GET .../unread-count`,
+ * `PATCH .../read-state`) served by new `NotificationsService` methods.
+ * No module wiring changes: `NotificationsService` is already exported
+ * (Story 88) and already has `TenantContext` available (Story 36); the new
+ * methods add a per-recipient read cursor on `User`/`Contact` themselves
+ * (not a new table, not a column on `NotificationLog` — see
+ * `NotificationsService.getUnreadCount`'s own doc comment for why).
  */
 @Module({
   controllers: [

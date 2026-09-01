@@ -106,6 +106,7 @@
     "regionLabel": "الإشعارات",
     "dismiss": "إغلاق",
     "viewTicket": "عرض التذكرة",
+    "unreadNotificationsLabel": "{count} إشعارات غير مقروءة",
     "eventLabel": {
       "ticketUpdated": "تم تحديث التذكرة",
       "newReply": "رد جديد"

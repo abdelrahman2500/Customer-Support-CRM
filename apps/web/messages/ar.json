@@ -38,7 +38,8 @@
       "notificationTemplates": "قوالب الإشعارات",
       "branding": "الهوية البصرية",
       "aiSettings": "إعدادات الذكاء الاصطناعي",
-      "quickReplies": "الردود السريعة"
+      "quickReplies": "الردود السريعة",
+      "unreadNotificationsLabel": "{count} إشعارات غير مقروءة"
     }
   },
   "tickets": {

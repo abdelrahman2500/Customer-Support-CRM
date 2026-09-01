@@ -1,7 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NotificationHistoryView } from "./notification-history-view";
-import { useMyNotificationsQuery } from "@/hooks/use-portal-notification-history";
+import {
+  useMarkNotificationsReadMutation,
+  useMyNotificationsQuery,
+} from "@/hooks/use-portal-notification-history";
 import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import {
   usePortalNotificationPreferencesQuery,
@@ -21,6 +24,7 @@ vi.mock("next-intl", () => ({
 
 vi.mock("@/hooks/use-portal-notification-history", () => ({
   useMyNotificationsQuery: vi.fn(),
+  useMarkNotificationsReadMutation: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-portal-tickets", () => ({
@@ -33,6 +37,7 @@ vi.mock("@/hooks/use-portal-notification-preferences", () => ({
 }));
 
 const mockedUseMyNotificationsQuery = vi.mocked(useMyNotificationsQuery);
+const mockedUseMarkNotificationsReadMutation = vi.mocked(useMarkNotificationsReadMutation);
 const mockedUseMyTicketsQuery = vi.mocked(useMyTicketsQuery);
 const mockedUsePortalNotificationPreferencesQuery = vi.mocked(usePortalNotificationPreferencesQuery);
 const mockedUseUpdatePortalNotificationPreferenceMutation = vi.mocked(
@@ -71,6 +76,8 @@ const newReplyNotification = {
 };
 
 describe("NotificationHistoryView", () => {
+  let markRead: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockedUseMyTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
@@ -79,6 +86,13 @@ describe("NotificationHistoryView", () => {
     );
     mockedUseUpdatePortalNotificationPreferenceMutation.mockReturnValue({
       mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+    markRead = vi.fn();
+    mockedUseMarkNotificationsReadMutation.mockReturnValue({
+      mutate: markRead,
       isPending: false,
       isError: false,
       error: null,
@@ -195,5 +209,36 @@ describe("NotificationHistoryView", () => {
     render(<NotificationHistoryView />);
 
     expect(screen.getByText("eventLabel.newReply")).toBeInTheDocument();
+  });
+
+  // Story 92 — mark-as-read on mount.
+  describe("mark-as-read on mount", () => {
+    it("triggers mark-as-read exactly once after the notifications query succeeds", async () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      await waitFor(() => expect(markRead).toHaveBeenCalledTimes(1));
+    });
+
+    it("never triggers mark-as-read while the query is loading", () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<NotificationHistoryView />);
+
+      expect(markRead).not.toHaveBeenCalled();
+    });
+
+    it("never triggers mark-as-read on failure", () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(
+        queryResult({ isError: true, refetch: vi.fn() }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(markRead).not.toHaveBeenCalled();
+    });
   });
 });

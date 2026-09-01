@@ -85,3 +85,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | customer-portal-notification-history-frontend | [customer-portal-notification-history-frontend/00-overview.md](./customer-portal-notification-history-frontend/00-overview.md) | 89–      |
 | customer-portal-notification-preferences | [customer-portal-notification-preferences/00-overview.md](./customer-portal-notification-preferences/00-overview.md) | 90–      |
 | channels-quick-replies | [channels-quick-replies/00-overview.md](./channels-quick-replies/00-overview.md) | 91–      |
+| notification-read-state | [notification-read-state/00-overview.md](./notification-read-state/00-overview.md) | 92–      |

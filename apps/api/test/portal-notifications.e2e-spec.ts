@@ -208,4 +208,106 @@ describe("Customer Portal — Notification History (e2e)", () => {
       .expect(200);
     expect(response.body).toEqual([]);
   });
+
+  // -------------------------------------------------------------------
+  // Story 92 — GET /portal/notifications/unread-count,
+  // PATCH /portal/notifications/read-state.
+  // -------------------------------------------------------------------
+
+  it("rejects an unauthenticated request on both new routes", async () => {
+    await request(app.getHttpServer())
+      .get("/api/v1/portal/notifications/unread-count")
+      .expect(401);
+    await request(app.getHttpServer())
+      .patch("/api/v1/portal/notifications/read-state")
+      .expect(401);
+  });
+
+  it("rejects an agent-audience token on both new routes", async () => {
+    await request(app.getHttpServer())
+      .get("/api/v1/portal/notifications/unread-count")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .patch("/api/v1/portal/notifications/read-state")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(401);
+  });
+
+  it("CRITICAL: two Contacts under the same Customer share the same unread count, and one marking read never changes the other's", async () => {
+    const readStatePortalPassword = "a-strong-portal-password-2";
+
+    const customer = await request(app.getHttpServer())
+      .post("/api/v1/customers")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ displayName: `Portal Read-State Fixture Customer ${randomUUID()}` })
+      .expect(201);
+    const readStateCustomerId = customer.body.id;
+
+    async function createReadStateContact(label: string): Promise<string> {
+      const email = `portal-read-state-${label}-${randomUUID()}@example.com`;
+      const contact = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${readStateCustomerId}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ fullName: `Portal Read-State Contact ${label}`, email })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${readStateCustomerId}/contacts/${contact.body.id}/portal-password`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ newPassword: readStatePortalPassword })
+        .expect(200);
+
+      const loginResponse = await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/login")
+        .send({ email, password: readStatePortalPassword })
+        .expect(200);
+      return loginResponse.body.accessToken as string;
+    }
+
+    async function getUnreadCount(token: string): Promise<number> {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/portal/notifications/unread-count")
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      return response.body.unreadCount as number;
+    }
+
+    const tokenA = await createReadStateContact("a");
+    const tokenB = await createReadStateContact("b");
+
+    // Contact A submits a ticket, then the admin updates it — triggers
+    // ticket.updated → PortalNotificationLogListener persists a
+    // customerId-scoped row, visible to every Contact of this Customer.
+    const ticket = await request(app.getHttpServer())
+      .post("/api/v1/portal/tickets")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ subject: "Portal read-state e2e ticket" })
+      .expect(201);
+    const readStateTicketId = ticket.body.id;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${readStateTicketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ priority: "URGENT" })
+      .expect(200);
+
+    await waitForNotificationLogRows(readStateCustomerId, 1);
+
+    const beforeA = await getUnreadCount(tokenA);
+    const beforeB = await getUnreadCount(tokenB);
+    expect(beforeA).toBeGreaterThan(0);
+    expect(beforeA).toBe(beforeB);
+
+    const markReadResponse = await request(app.getHttpServer())
+      .patch("/api/v1/portal/notifications/read-state")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .expect(200);
+    expect(typeof markReadResponse.body.readAt).toBe("string");
+
+    const afterA = await getUnreadCount(tokenA);
+    const afterB = await getUnreadCount(tokenB);
+    expect(afterA).toBe(0);
+    expect(afterB).toBe(beforeB);
+  });
 });

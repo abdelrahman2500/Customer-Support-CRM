@@ -8,12 +8,25 @@ function buildPrismaMock() {
   return {
     notificationLog: {
       findMany: vi.fn(),
+      count: vi.fn(),
+    },
+    user: {
+      findUniqueOrThrow: vi.fn(),
+      update: vi.fn(),
+    },
+    contact: {
+      findUniqueOrThrow: vi.fn(),
+      update: vi.fn(),
     },
   };
 }
 
-function buildTenantContextMock(branchId: string | null = "branch-1") {
+function buildTenantContextMock(
+  branchId: string | null = "branch-1",
+  userId: string | null = "user-1",
+) {
   return {
+    userId,
     requireBranchScope: vi.fn(() => {
       if (!branchId) {
         throw new Error("TenantContext: no active branch on this request");
@@ -199,6 +212,93 @@ describe("NotificationsService", () => {
           loggedAt,
         },
       ]);
+    });
+  });
+
+  describe("getUnreadCount", () => {
+    it("reuses listNotifications()'s exact scoping predicate, omitting the loggedAt filter when the caller's cursor is null", async () => {
+      prisma.user.findUniqueOrThrow.mockResolvedValue({ notificationsReadAt: null });
+      prisma.notificationLog.count.mockResolvedValue(3);
+
+      const result = await service.getUnreadCount();
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.user.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        select: { notificationsReadAt: true },
+      });
+      expect(prisma.notificationLog.count).toHaveBeenCalledWith({
+        where: { ticket: { branchId: "branch-1" }, customerId: null },
+      });
+      expect(result).toEqual({ unreadCount: 3 });
+    });
+
+    it("includes a loggedAt > cursor filter once the caller has a real cursor", async () => {
+      const readAt = new Date("2026-06-01T00:00:00.000Z");
+      prisma.user.findUniqueOrThrow.mockResolvedValue({ notificationsReadAt: readAt });
+      prisma.notificationLog.count.mockResolvedValue(0);
+
+      await service.getUnreadCount();
+
+      expect(prisma.notificationLog.count).toHaveBeenCalledWith({
+        where: { ticket: { branchId: "branch-1" }, customerId: null, loggedAt: { gt: readAt } },
+      });
+    });
+  });
+
+  describe("markRead", () => {
+    it("updates only the calling user's own row to the current time", async () => {
+      prisma.user.update.mockResolvedValue({});
+
+      const result = await service.markRead();
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { notificationsReadAt: result.readAt },
+      });
+    });
+  });
+
+  describe("getUnreadCountForCustomer", () => {
+    it("scopes by customerId directly and omits the loggedAt filter when the contact's cursor is null", async () => {
+      prisma.contact.findUniqueOrThrow.mockResolvedValue({ notificationsReadAt: null });
+      prisma.notificationLog.count.mockResolvedValue(2);
+
+      const result = await service.getUnreadCountForCustomer("contact-1", "customer-1");
+
+      expect(prisma.contact.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: "contact-1" },
+        select: { notificationsReadAt: true },
+      });
+      expect(prisma.notificationLog.count).toHaveBeenCalledWith({
+        where: { customerId: "customer-1" },
+      });
+      expect(result).toEqual({ unreadCount: 2 });
+    });
+
+    it("includes a loggedAt > cursor filter once the contact has a real cursor", async () => {
+      const readAt = new Date("2026-06-01T00:00:00.000Z");
+      prisma.contact.findUniqueOrThrow.mockResolvedValue({ notificationsReadAt: readAt });
+      prisma.notificationLog.count.mockResolvedValue(0);
+
+      await service.getUnreadCountForCustomer("contact-1", "customer-1");
+
+      expect(prisma.notificationLog.count).toHaveBeenCalledWith({
+        where: { customerId: "customer-1", loggedAt: { gt: readAt } },
+      });
+    });
+  });
+
+  describe("markReadForContact", () => {
+    it("updates only the given contact's own row to the current time", async () => {
+      prisma.contact.update.mockResolvedValue({});
+
+      const result = await service.markReadForContact("contact-1");
+
+      expect(prisma.contact.update).toHaveBeenCalledWith({
+        where: { id: "contact-1" },
+        data: { notificationsReadAt: result.readAt },
+      });
     });
   });
 });

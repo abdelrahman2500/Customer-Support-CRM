@@ -37,3 +37,21 @@ export interface NotificationSummary {
 export function listNotifications(): Promise<NotificationSummary[]> {
   return apiFetch<NotificationSummary[]>("/notifications");
 }
+
+/**
+ * Story 92 — `GET /notifications/unread-count`. Same `notification:read`
+ * gate as `listNotifications()` (a dedicated endpoint, not a field folded
+ * into that list's existing raw-array response shape).
+ */
+export function getUnreadNotificationCount(): Promise<{ unreadCount: number }> {
+  return apiFetch<{ unreadCount: number }>("/notifications/unread-count");
+}
+
+/**
+ * Story 92 — `PATCH /notifications/read-state`. Advances the caller's own
+ * read cursor to the server's current time; takes no request body — the
+ * caller's identity is resolved server-side, never sent from here.
+ */
+export function markNotificationsRead(): Promise<{ readAt: string }> {
+  return apiFetch<{ readAt: string }>("/notifications/read-state", { method: "PATCH" });
+}

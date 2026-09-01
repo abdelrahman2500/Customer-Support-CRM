@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { WorkspaceNav } from "./workspace-nav";
 import { useBrandingQuery } from "@/hooks/use-branding";
+import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import { clearAccessToken, logout } from "@/lib/api";
 
 const push = vi.fn();
@@ -26,9 +27,15 @@ vi.mock("@/hooks/use-branding", () => ({
   useBrandingQuery: vi.fn(),
 }));
 
+// Story 92 — Notification Read-State (unread-count badge).
+vi.mock("@/hooks/use-notifications", () => ({
+  useUnreadNotificationCountQuery: vi.fn(),
+}));
+
 const mockedLogout = vi.mocked(logout);
 const mockedClearAccessToken = vi.mocked(clearAccessToken);
 const mockedUseBrandingQuery = vi.mocked(useBrandingQuery);
+const mockedUseUnreadNotificationCountQuery = vi.mocked(useUnreadNotificationCountQuery);
 
 const user = {
   id: "user-1",
@@ -44,6 +51,10 @@ describe("WorkspaceNav", () => {
     vi.clearAllMocks();
     mockedLogout.mockResolvedValue(undefined);
     mockedUseBrandingQuery.mockReturnValue({ data: undefined } as never);
+    mockedUseUnreadNotificationCountQuery.mockReturnValue({
+      data: undefined,
+      isSuccess: false,
+    } as never);
   });
 
   it("renders the app name and the signed-in user's name", () => {
@@ -185,6 +196,43 @@ describe("WorkspaceNav", () => {
 
       const header = screen.getByRole("banner");
       expect(header.style.getPropertyValue("--brand-primary")).toBe("#112233");
+    });
+  });
+
+  // Story 92 — Notification Read-State (unread-count badge).
+  describe("unread-notification badge (Story 92)", () => {
+    it("renders no badge while the unread-count query is loading or erroring", () => {
+      mockedUseUnreadNotificationCountQuery.mockReturnValue({
+        data: undefined,
+        isSuccess: false,
+      } as never);
+
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
+    });
+
+    it("renders no badge when the unread count is 0", () => {
+      mockedUseUnreadNotificationCountQuery.mockReturnValue({
+        data: { unreadCount: 0 },
+        isSuccess: true,
+      } as never);
+
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
+    });
+
+    it("renders the unread count as a badge next to the notifications link once it is positive", () => {
+      mockedUseUnreadNotificationCountQuery.mockReturnValue({
+        data: { unreadCount: 3 },
+        isSuccess: true,
+      } as never);
+
+      render(<WorkspaceNav user={user} />);
+
+      const badge = screen.getByLabelText(/unreadNotificationsLabel/);
+      expect(badge).toHaveTextContent("3");
     });
   });
 });
