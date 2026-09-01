@@ -143,6 +143,8 @@ export class IdentityService {
       });
       throw new UnauthorizedException("Invalid email or password");
     }
+    // const passworde = await hashPassword("password");
+    // console.log(passworde);
 
     const passwordMatches = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatches) {
@@ -310,7 +312,11 @@ export class IdentityService {
     const users = await this.prisma.user.findMany({
       where: { branchRoles: { some: { branchId } } },
       include: {
-        branchRoles: { where: { branchId }, include: { role: true }, orderBy: { createdAt: "asc" } },
+        branchRoles: {
+          where: { branchId },
+          include: { role: true },
+          orderBy: { createdAt: "asc" },
+        },
       },
       orderBy: { createdAt: "asc" },
     });
