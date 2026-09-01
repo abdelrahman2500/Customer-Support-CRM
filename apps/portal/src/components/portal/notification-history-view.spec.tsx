@@ -1,0 +1,169 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { NotificationHistoryView } from "./notification-history-view";
+import { useMyNotificationsQuery } from "@/hooks/use-portal-notification-history";
+import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
+
+const push = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ locale: "en" }),
+  useRouter: () => ({ push }),
+}));
+
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => key,
+}));
+
+vi.mock("@/hooks/use-portal-notification-history", () => ({
+  useMyNotificationsQuery: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-portal-tickets", () => ({
+  useMyTicketsQuery: vi.fn(),
+}));
+
+const mockedUseMyNotificationsQuery = vi.mocked(useMyNotificationsQuery);
+const mockedUseMyTicketsQuery = vi.mocked(useMyTicketsQuery);
+
+function queryResult(overrides: Record<string, unknown>) {
+  return {
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    isSuccess: false,
+    refetch: vi.fn(),
+    ...overrides,
+  };
+}
+
+const ticketUpdatedNotification = {
+  id: "notif-1",
+  eventType: "ticket.updated",
+  ticketId: "ticket-1",
+  branchId: null,
+  targetType: null,
+  targetAt: null,
+  loggedAt: "2026-01-01T12:30:00.000Z",
+};
+
+const newReplyNotification = {
+  id: "notif-2",
+  eventType: "channel.message.created",
+  ticketId: "ticket-2",
+  branchId: null,
+  targetType: null,
+  targetAt: null,
+  loggedAt: "2026-01-01T09:00:00.000Z",
+};
+
+describe("NotificationHistoryView", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedUseMyTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+  });
+
+  it("shows a loading state while the notifications query is pending", () => {
+    mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = render(<NotificationHistoryView />);
+
+    expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+  });
+
+  it("shows the empty state when the query succeeds with zero notifications", () => {
+    mockedUseMyNotificationsQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("history.empty")).toBeInTheDocument();
+  });
+
+  it("shows an error state with a working retry action on failure", () => {
+    const refetch = vi.fn();
+    mockedUseMyNotificationsQuery.mockReturnValue(
+      queryResult({ isError: true, refetch }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("history.error")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("history.retry"));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("renders a row per notification, newest-first order preserved from the query", () => {
+    mockedUseMyNotificationsQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: [ticketUpdatedNotification, newReplyNotification],
+      }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    const rows = screen.getAllByRole("row");
+    // rows[0] is the header row; data rows follow in the order the query returned them.
+    expect(rows[1]).toHaveTextContent("ticket-1");
+    expect(rows[2]).toHaveTextContent("ticket-2");
+  });
+
+  it("resolves the ticket subject from the existing tickets query when present", () => {
+    mockedUseMyTicketsQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: [{ id: "ticket-1", subject: "Cannot log in" }],
+      }) as never,
+    );
+    mockedUseMyNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("Cannot log in")).toBeInTheDocument();
+  });
+
+  it("falls back to the raw ticketId when the ticket isn't in the resolved list", () => {
+    mockedUseMyNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("ticket-1")).toBeInTheDocument();
+  });
+
+  it("navigates to the ticket detail page when a notification's ticket link is clicked", () => {
+    mockedUseMyNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+    fireEvent.click(screen.getByText("ticket-1"));
+
+    expect(push).toHaveBeenCalledWith("/en/tickets/ticket-1");
+  });
+
+  it("maps a ticket.updated eventType to the existing eventLabel.ticketUpdated key", () => {
+    mockedUseMyNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("eventLabel.ticketUpdated")).toBeInTheDocument();
+  });
+
+  it("maps a channel.message.created eventType to the existing eventLabel.newReply key", () => {
+    mockedUseMyNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [newReplyNotification] }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("eventLabel.newReply")).toBeInTheDocument();
+  });
+});

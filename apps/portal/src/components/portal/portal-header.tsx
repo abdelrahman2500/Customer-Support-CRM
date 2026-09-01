@@ -15,6 +15,7 @@ import { clearAccessToken, logout } from "@/lib/api";
  * Story 53 — gains the portal's first real nav link, to `/tickets`.
  * Story 54 — gains a second, to `/knowledge-base`.
  * Story 80 — gains a third, to `/chat` (AI Portal Chatbot).
+ * Story 89 — gains a fourth, to `/notifications` (Notification History).
  *
  * Story 82 — consumes `useBrandingQuery()` (`GET /portal/branding`):
  * a configured logo renders immediately before the existing
@@ -29,6 +30,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const tTickets = useTranslations("tickets");
   const tKnowledgeBase = useTranslations("knowledgeBase");
   const tChat = useTranslations("chat");
+  const tNotifications = useTranslations("notifications");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const brandingQuery = useBrandingQuery();
@@ -67,6 +69,12 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         </a>
         <a href={`/${locale}/chat`} className="text-slate-600 hover:text-slate-900 hover:underline">
           {tChat("nav")}
+        </a>
+        <a
+          href={`/${locale}/notifications`}
+          className="text-slate-600 hover:text-slate-900 hover:underline"
+        >
+          {tNotifications("nav")}
         </a>
       </nav>
       <button

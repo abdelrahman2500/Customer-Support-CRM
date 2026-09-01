@@ -102,6 +102,7 @@
     "escalateFailed": "Couldn't escalate this conversation. Please try again."
   },
   "notifications": {
+    "nav": "Notifications",
     "regionLabel": "Notifications",
     "dismiss": "Dismiss",
     "viewTicket": "View ticket",
@@ -111,6 +112,17 @@
     },
     "ticketUpdated": "Your ticket \"{subject}\" was updated — status: {status}.",
     "newReply": "You have a new reply on your ticket.",
-    "generic": "New notification"
+    "generic": "New notification",
+    "history": {
+      "title": "Notification History",
+      "error": "Couldn't load your notifications.",
+      "retry": "Retry",
+      "empty": "You have no notifications yet.",
+      "columns": {
+        "event": "Event",
+        "ticket": "Ticket",
+        "loggedAt": "Date"
+      }
+    }
   }
 }
