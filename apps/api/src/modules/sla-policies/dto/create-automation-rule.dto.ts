@@ -15,4 +15,14 @@ export class CreateAutomationRuleDto {
   @ApiProperty()
   @IsUUID()
   actionAssignToUserId!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  actionSetCategory?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  actionSetDepartmentId?: string;
 }

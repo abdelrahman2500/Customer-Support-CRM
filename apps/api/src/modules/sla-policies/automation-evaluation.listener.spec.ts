@@ -108,7 +108,12 @@ describe("AutomationEvaluationListener", () => {
         OR: [{ conditionCategory: null }, { conditionCategory: "billing" }],
       },
       orderBy: { createdAt: "asc" },
-      select: { id: true, actionAssignToUserId: true },
+      select: {
+        id: true,
+        actionAssignToUserId: true,
+        actionSetCategory: true,
+        actionSetDepartmentId: true,
+      },
     });
   });
 
@@ -141,6 +146,8 @@ describe("AutomationEvaluationListener", () => {
     prisma.automationRule.findFirst.mockResolvedValue({
       id: "rule-1",
       actionAssignToUserId: "user-1",
+      actionSetCategory: null,
+      actionSetDepartmentId: null,
     });
 
     await listener.onTicketCreated({ ticket, actorUserId: null });
@@ -149,7 +156,31 @@ describe("AutomationEvaluationListener", () => {
       ticketId: "ticket-1",
       ruleId: "rule-1",
       assignToUserId: "user-1",
+      setCategory: null,
+      setDepartmentId: null,
     });
+  });
+
+  // Story 83 — Automation Rules — Category & Department Actions.
+  it("includes the matched rule's own setCategory/setDepartmentId in the emitted event", async () => {
+    prisma.ticket.findUnique.mockResolvedValue({
+      branchId: "branch-1",
+      category: "billing",
+      assignedToUserId: null,
+    });
+    prisma.automationRule.findFirst.mockResolvedValue({
+      id: "rule-1",
+      actionAssignToUserId: "user-1",
+      actionSetCategory: "billing",
+      actionSetDepartmentId: "dept-1",
+    });
+
+    await listener.onTicketCreated({ ticket, actorUserId: null });
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      AUTOMATION_RULE_MATCHED_EVENT,
+      expect.objectContaining({ setCategory: "billing", setDepartmentId: "dept-1" }),
+    );
   });
 
   it("catches and logs a Prisma failure without rethrowing", async () => {

@@ -14,6 +14,8 @@ export interface AutomationRuleSummary {
   isActive: boolean;
   conditionCategory: string | null;
   actionAssignToUserId: string;
+  actionSetCategory: string | null;
+  actionSetDepartmentId: string | null;
 }
 
 /** Mirrors the existing `CreateAutomationRuleDto` exactly. */
@@ -21,6 +23,8 @@ export interface CreateAutomationRuleInput {
   name: string;
   conditionCategory?: string;
   actionAssignToUserId: string;
+  actionSetCategory?: string;
+  actionSetDepartmentId?: string;
 }
 
 /** Mirrors the existing `UpdateAutomationRuleDto` exactly. */
@@ -29,6 +33,8 @@ export interface UpdateAutomationRuleInput {
   conditionCategory?: string;
   actionAssignToUserId?: string;
   isActive?: boolean;
+  actionSetCategory?: string;
+  actionSetDepartmentId?: string;
 }
 
 export function listAutomationRules(): Promise<AutomationRuleSummary[]> {

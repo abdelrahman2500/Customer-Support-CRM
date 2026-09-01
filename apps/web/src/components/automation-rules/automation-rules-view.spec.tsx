@@ -6,7 +6,7 @@ import {
   useCreateAutomationRuleMutation,
   useUpdateAutomationRuleMutation,
 } from "@/hooks/use-automation-rules";
-import { useUsersQuery } from "@/hooks/use-tickets";
+import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { ApiError } from "@/lib/api";
 
 vi.mock("next-intl", () => ({
@@ -22,12 +22,14 @@ vi.mock("@/hooks/use-automation-rules", () => ({
 
 vi.mock("@/hooks/use-tickets", () => ({
   useUsersQuery: vi.fn(),
+  useDepartmentsQuery: vi.fn(),
 }));
 
 const mockedUseAutomationRulesQuery = vi.mocked(useAutomationRulesQuery);
 const mockedUseCreateAutomationRuleMutation = vi.mocked(useCreateAutomationRuleMutation);
 const mockedUseUpdateAutomationRuleMutation = vi.mocked(useUpdateAutomationRuleMutation);
 const mockedUseUsersQuery = vi.mocked(useUsersQuery);
+const mockedUseDepartmentsQuery = vi.mocked(useDepartmentsQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -58,6 +60,8 @@ const baseRule = {
   isActive: true,
   conditionCategory: "billing",
   actionAssignToUserId: "user-1",
+  actionSetCategory: null,
+  actionSetDepartmentId: null,
 };
 
 describe("AutomationRulesView", () => {
@@ -67,6 +71,12 @@ describe("AutomationRulesView", () => {
     mockedUseCreateAutomationRuleMutation.mockReturnValue(mutationResult() as never);
     mockedUseUsersQuery.mockReturnValue(
       queryResult({ data: [{ id: "user-1", fullName: "Jane Agent" }], isSuccess: true }) as never,
+    );
+    mockedUseDepartmentsQuery.mockReturnValue(
+      queryResult({
+        data: [{ id: "dept-1", branchId: "branch-1", name: "Billing Dept" }],
+        isSuccess: true,
+      }) as never,
     );
   });
 
@@ -179,5 +189,80 @@ describe("AutomationRulesView", () => {
 
     // Still disabled: no assignee has been chosen yet.
     expect(screen.getByText("createSubmit").closest("button")).toBeDisabled();
+  });
+
+  // Story 83 — Automation Rules — Category & Department Actions.
+  describe("category/department actions (Story 83)", () => {
+    it("shows 'no action' placeholders when neither is set", () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [baseRule], isSuccess: true }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      // Two row cells (set-category, set-department) plus the create
+      // form's own department-select placeholder, which also reads
+      // "noAction" — assert at least the two row cells are present.
+      expect(screen.getAllByText("noAction").length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("resolves actionSetDepartmentId through the departments list", () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({
+          data: [{ ...baseRule, actionSetCategory: "billing", actionSetDepartmentId: "dept-1" }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      expect(screen.getAllByText("billing").length).toBeGreaterThan(0);
+      // "Billing Dept" also appears in the create-form's hidden native
+      // <select> option Radix's Select renders for accessibility — at
+      // least one visible occurrence (the row's own cell) is what this
+      // asserts.
+      expect(screen.getAllByText("Billing Dept").length).toBeGreaterThan(0);
+    });
+
+    it("falls back to the raw department id when it isn't found in the departments list", () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({
+          data: [{ ...baseRule, actionSetDepartmentId: "dept-unknown" }],
+          isSuccess: true,
+        }) as never,
+      );
+      mockedUseDepartmentsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+      render(<AutomationRulesView />);
+
+      expect(screen.getByText("dept-unknown")).toBeInTheDocument();
+    });
+
+    it("submits actionSetCategory/actionSetDepartmentId only when filled in", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({});
+      mockedUseAutomationRulesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+      mockedUseCreateAutomationRuleMutation.mockReturnValue(
+        mutationResult({ mutateAsync }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      fireEvent.change(screen.getByLabelText("nameLabel"), {
+        target: { value: "Auto-categorize" },
+      });
+      fireEvent.change(screen.getByLabelText("actionSetCategoryLabel"), {
+        target: { value: "sales" },
+      });
+
+      const form = screen.getByText("createSubmit").closest("form") as HTMLFormElement;
+      fireEvent.submit(form);
+
+      await vi.waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "Auto-categorize", actionSetCategory: "sales" }),
+        );
+      });
+      expect(mutateAsync.mock.calls[0]?.[0]).not.toHaveProperty("actionSetDepartmentId");
+    });
   });
 });

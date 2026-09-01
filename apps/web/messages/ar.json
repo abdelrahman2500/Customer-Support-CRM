@@ -603,6 +603,8 @@
       "name": "الاسم",
       "condition": "الشرط",
       "assignTo": "التعيين إلى",
+      "setCategory": "تعيين الفئة",
+      "setDepartment": "تعيين القسم",
       "status": "الحالة"
     },
     "createHeading": "قاعدة أتمتة جديدة",
@@ -610,6 +612,9 @@
     "conditionCategoryLabel": "الفئة (اختياري)",
     "actionAssignToLabel": "التعيين إلى",
     "actionAssignToPlaceholder": "اختر وكيلاً",
+    "actionSetCategoryLabel": "تعيين الفئة (اختياري)",
+    "actionSetDepartmentLabel": "تعيين القسم (اختياري)",
+    "noAction": "—",
     "createSubmit": "إنشاء القاعدة",
     "createSubmitting": "جارٍ الإنشاء...",
     "createFailed": "تعذّر إنشاء القاعدة. حاول مرة أخرى."

@@ -10,6 +10,8 @@ export interface AutomationRuleSummary {
   isActive: boolean;
   conditionCategory: string | null;
   actionAssignToUserId: string;
+  actionSetCategory: string | null;
+  actionSetDepartmentId: string | null;
 }
 
 /**
@@ -32,6 +34,9 @@ export class AutomationRulesService {
   async createAutomationRule(dto: CreateAutomationRuleDto): Promise<AutomationRuleSummary> {
     const { branchId } = this.tenantContext.requireBranchScope();
     await this.requireUserInScope(dto.actionAssignToUserId, branchId);
+    if (dto.actionSetDepartmentId !== undefined) {
+      await this.requireDepartmentInScope(dto.actionSetDepartmentId, branchId);
+    }
 
     const rule = await this.prisma.automationRule.create({
       data: {
@@ -39,6 +44,8 @@ export class AutomationRulesService {
         name: dto.name,
         conditionCategory: dto.conditionCategory ?? null,
         actionAssignToUserId: dto.actionAssignToUserId,
+        actionSetCategory: dto.actionSetCategory ?? null,
+        actionSetDepartmentId: dto.actionSetDepartmentId ?? null,
       },
     });
     return toAutomationRuleSummary(rule);
@@ -65,6 +72,9 @@ export class AutomationRulesService {
     if (dto.actionAssignToUserId !== undefined) {
       await this.requireUserInScope(dto.actionAssignToUserId, branchId);
     }
+    if (dto.actionSetDepartmentId !== undefined) {
+      await this.requireDepartmentInScope(dto.actionSetDepartmentId, branchId);
+    }
 
     await this.prisma.automationRule.update({
       where: { id },
@@ -75,6 +85,10 @@ export class AutomationRulesService {
           ? { actionAssignToUserId: dto.actionAssignToUserId }
           : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.actionSetCategory !== undefined ? { actionSetCategory: dto.actionSetCategory } : {}),
+        ...(dto.actionSetDepartmentId !== undefined
+          ? { actionSetDepartmentId: dto.actionSetDepartmentId }
+          : {}),
       },
     });
     return { id };
@@ -90,6 +104,8 @@ export class AutomationRulesService {
     isActive: boolean;
     conditionCategory: string | null;
     actionAssignToUserId: string;
+    actionSetCategory: string | null;
+    actionSetDepartmentId: string | null;
   }> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const rule = await this.prisma.automationRule.findFirst({ where: { id, branchId } });
@@ -107,6 +123,19 @@ export class AutomationRulesService {
       throw new NotFoundException("User not found in this branch");
     }
   }
+
+  /** Story 83 — mirrors `requireUserInScope`'s exact shape: validated
+   * once, here, at create/update time; never re-validated at
+   * automation-match time (`AutomationActionListener` trusts the stored
+   * value, mirroring `actionAssignToUserId`'s own convention). */
+  private async requireDepartmentInScope(departmentId: string, branchId: string): Promise<void> {
+    const department = await this.prisma.department.findFirst({
+      where: { id: departmentId, branchId },
+    });
+    if (!department) {
+      throw new NotFoundException("Department not found in this branch");
+    }
+  }
 }
 
 function toAutomationRuleSummary(rule: {
@@ -115,6 +144,8 @@ function toAutomationRuleSummary(rule: {
   isActive: boolean;
   conditionCategory: string | null;
   actionAssignToUserId: string;
+  actionSetCategory: string | null;
+  actionSetDepartmentId: string | null;
 }): AutomationRuleSummary {
   return {
     id: rule.id,
@@ -122,5 +153,7 @@ function toAutomationRuleSummary(rule: {
     isActive: rule.isActive,
     conditionCategory: rule.conditionCategory,
     actionAssignToUserId: rule.actionAssignToUserId,
+    actionSetCategory: rule.actionSetCategory,
+    actionSetDepartmentId: rule.actionSetDepartmentId,
   };
 }

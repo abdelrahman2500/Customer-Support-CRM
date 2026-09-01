@@ -61,15 +61,16 @@ model Branch {
 }
 
 model Department {
-  id          String           @id @default(uuid())
-  branchId    String           @map("branch_id")
-  branch      Branch           @relation(fields: [branchId], references: [id])
-  name        String
-  isActive    Boolean          @default(true) @map("is_active")
-  userRoles   UserBranchRole[]
-  tickets     Ticket[]
-  slaPolicies SlaPolicy[]
-  createdAt   DateTime         @default(now()) @map("created_at")
+  id              String           @id @default(uuid())
+  branchId        String           @map("branch_id")
+  branch          Branch           @relation(fields: [branchId], references: [id])
+  name            String
+  isActive        Boolean          @default(true) @map("is_active")
+  userRoles       UserBranchRole[]
+  tickets         Ticket[]
+  slaPolicies     SlaPolicy[]
+  automationRules AutomationRule[]
+  createdAt       DateTime         @default(now()) @map("created_at")
 
   @@unique([branchId, name])
   @@map("departments")
@@ -261,13 +262,13 @@ model Customer {
 /// Email is unique per Customer, never globally — the same real person's
 /// email may legitimately appear under a different Customer.
 model Contact {
-  id            String                @id @default(uuid())
-  customerId    String                @map("customer_id")
-  customer      Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  fullName      String                @map("full_name")
-  email         String?
-  phone         String?
-  isPrimary     Boolean               @default(false) @map("is_primary")
+  id              String                @id @default(uuid())
+  customerId      String                @map("customer_id")
+  customer        Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  fullName        String                @map("full_name")
+  email           String?
+  phone           String?
+  isPrimary       Boolean               @default(false) @map("is_primary")
   /// Story 52 — nullable: a Contact has no portal access until an agent
   /// explicitly sets one (`CustomersService.setContactPortalPassword`, no
   /// self-registration — see docs/architecture/05-auth-and-security.md).
@@ -275,13 +276,13 @@ model Contact {
   /// above), so login-lookup safety for portal-enabled contacts is enforced
   /// at the application layer, not by a DB constraint — see
   /// `setContactPortalPassword`'s own doc comment.
-  passwordHash  String?               @map("password_hash")
-  tickets       Ticket[]
-  refreshTokens ContactRefreshToken[]
-  csatResponses TicketCsatResponse[]
+  passwordHash    String?               @map("password_hash")
+  tickets         Ticket[]
+  refreshTokens   ContactRefreshToken[]
+  csatResponses   TicketCsatResponse[]
   channelMessages ChannelMessage[]
-  chatSessions  ChatSession[]
-  createdAt     DateTime              @default(now()) @map("created_at")
+  chatSessions    ChatSession[]
+  createdAt       DateTime              @default(now()) @map("created_at")
 
   @@unique([customerId, email])
   @@index([customerId])
@@ -535,16 +536,24 @@ model SlaPolicy {
 /// any of them would risk desyncing a ticket's SLA target with no existing
 /// reconciliation mechanism, unlike a real agent's `ticket.recategorized`).
 model AutomationRule {
-  id                   String   @id @default(uuid())
-  branchId             String   @map("branch_id")
-  branch               Branch   @relation(fields: [branchId], references: [id])
-  name                 String
-  isActive             Boolean  @default(true) @map("is_active")
-  conditionCategory    String?  @map("condition_category")
-  actionAssignToUserId String   @map("action_assign_to_user_id")
-  actionAssignToUser   User     @relation(fields: [actionAssignToUserId], references: [id])
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                    String      @id @default(uuid())
+  branchId              String      @map("branch_id")
+  branch                Branch      @relation(fields: [branchId], references: [id])
+  name                  String
+  isActive              Boolean     @default(true) @map("is_active")
+  conditionCategory     String?     @map("condition_category")
+  actionAssignToUserId  String      @map("action_assign_to_user_id")
+  actionAssignToUser    User        @relation(fields: [actionAssignToUserId], references: [id])
+  /// Story 83 — both nullable/independent: a rule may set neither, one,
+  /// or both, alongside its always-required assignment action. Applied
+  /// only when the matched ticket's own current value is still `null`
+  /// (never overrides an explicit human choice) — mirrors
+  /// `AutomationActionListener`'s existing `assignedToUserId` guard.
+  actionSetCategory     String?     @map("action_set_category")
+  actionSetDepartmentId String?     @map("action_set_department_id")
+  actionSetDepartment   Department? @relation(fields: [actionSetDepartmentId], references: [id])
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
 
   @@index([branchId])
   @@map("automation_rules")
@@ -897,36 +906,36 @@ enum AiOutcome {
 /// `AiProcessingProcessor` performs exactly one `update` on that same row
 /// once the call resolves — never a second row for the same operation.
 model AiPromptLog {
-  id           String    @id @default(uuid())
-  branchId     String    @map("branch_id")
-  branch       Branch    @relation(fields: [branchId], references: [id])
+  id            String       @id @default(uuid())
+  branchId      String       @map("branch_id")
+  branch        Branch       @relation(fields: [branchId], references: [id])
   /// Story 79 — nullable: rows created by Stories 72-76 before this
   /// column existed have none. Every row created after this story ships
   /// always sets it (AiGatewayService.createPendingLog, Task 2).
-  ticketId     String?   @map("ticket_id")
-  ticket       Ticket?   @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  ticketId      String?      @map("ticket_id")
+  ticket        Ticket?      @relation(fields: [ticketId], references: [id], onDelete: SetNull)
   /// Story 80 — nullable, mutually exclusive with `ticketId` by
   /// `feature`: set only for `CHAT` operations (AiChatService.sendMessage),
   /// never alongside a `ticketId`.
   chatSessionId String?      @map("chat_session_id")
   chatSession   ChatSession? @relation(fields: [chatSessionId], references: [id], onDelete: SetNull)
-  feature      AiFeature
-  model        String
-  promptRef    String    @map("prompt_ref")
-  inputTokens  Int?      @map("input_tokens")
-  outputTokens Int?      @map("output_tokens")
+  feature       AiFeature
+  model         String
+  promptRef     String       @map("prompt_ref")
+  inputTokens   Int?         @map("input_tokens")
+  outputTokens  Int?         @map("output_tokens")
   /// Story 76 — nullable: unknown until `apps/worker` finishes the call;
   /// `null` exactly when `outcome` is still `PENDING`.
-  latencyMs    Int?      @map("latency_ms")
-  outcome      AiOutcome
+  latencyMs     Int?         @map("latency_ms")
+  outcome       AiOutcome
   /// Story 79 — the actual generated text (summary / suggested reply /
   /// suggested category). Null exactly when outcome is PENDING, ERROR,
   /// or DISABLED (see packages/ai's AiCallResult.text: string | null).
   /// Named outputText, not `output`, to stay unambiguous next to the
   /// existing outputTokens field.
-  outputText   String?   @map("output_text")
-  errorMessage String?   @map("error_message")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  outputText    String?      @map("output_text")
+  errorMessage  String?      @map("error_message")
+  createdAt     DateTime     @default(now()) @map("created_at")
 
   @@index([branchId])
   @@index([feature])
@@ -1046,18 +1055,18 @@ enum ChannelMessageDirection {
 /// constraint for "exactly one of two nullable columns." No `attachments`
 /// field yet — out of scope for this story (see the plan's Non-goals).
 model ChannelMessage {
-  id              String                  @id @default(uuid())
-  ticketId        String                  @map("ticket_id")
-  ticket          Ticket                  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  channelType     ChannelType             @map("channel_type")
-  direction       ChannelMessageDirection
-  externalThreadId String?                @map("external_thread_id")
-  senderContactId String?                 @map("sender_contact_id")
-  senderContact   Contact?                @relation(fields: [senderContactId], references: [id])
-  senderUserId    String?                 @map("sender_user_id")
-  senderUser      User?                   @relation(fields: [senderUserId], references: [id])
-  body            String
-  createdAt       DateTime                @default(now()) @map("created_at")
+  id               String                  @id @default(uuid())
+  ticketId         String                  @map("ticket_id")
+  ticket           Ticket                  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  channelType      ChannelType             @map("channel_type")
+  direction        ChannelMessageDirection
+  externalThreadId String?                 @map("external_thread_id")
+  senderContactId  String?                 @map("sender_contact_id")
+  senderContact    Contact?                @relation(fields: [senderContactId], references: [id])
+  senderUserId     String?                 @map("sender_user_id")
+  senderUser       User?                   @relation(fields: [senderUserId], references: [id])
+  body             String
+  createdAt        DateTime                @default(now()) @map("created_at")
 
   @@index([ticketId])
   @@map("channel_messages")

@@ -22,4 +22,14 @@ export class UpdateAutomationRuleDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  actionSetCategory?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  actionSetDepartmentId?: string;
 }

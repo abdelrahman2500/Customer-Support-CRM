@@ -76,3 +76,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | ai-portal-chatbot | [ai-portal-chatbot/00-overview.md](./ai-portal-chatbot/00-overview.md) | 80–      |
 | ai-feature-flags | [ai-feature-flags/00-overview.md](./ai-feature-flags/00-overview.md) | 81–      |
 | admin-branch-branding-live-consumption | [admin-branch-branding-live-consumption/00-overview.md](./admin-branch-branding-live-consumption/00-overview.md) | 82–      |
+| sla-automation-rules-category-department | [sla-automation-rules-category-department/00-overview.md](./sla-automation-rules-category-department/00-overview.md) | 83–      |

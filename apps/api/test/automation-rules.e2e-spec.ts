@@ -147,6 +147,19 @@ describe("Automation Rules (e2e)", () => {
       .expect(404);
   });
 
+  // Story 83 — Automation Rules — Category & Department Actions.
+  it("rejects an unknown actionSetDepartmentId with 404", async () => {
+    await request(app.getHttpServer())
+      .post("/api/v1/automation-rules")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        name: "Bad department rule",
+        actionAssignToUserId: adminUserId,
+        actionSetDepartmentId: randomUUID(),
+      })
+      .expect(404);
+  });
+
   it("creates, lists, gets, and updates a rule", async () => {
     const createResponse = await request(app.getHttpServer())
       .post("/api/v1/automation-rules")
@@ -310,5 +323,58 @@ describe("Automation Rules (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     expect(response.body.assignedToUserId).toBe(explicitAgentId);
+  });
+
+  // Story 83 — Automation Rules — Category & Department Actions.
+  it("auto-sets category and department on a newly-created ticket, and logs a ticket.recategorized history entry", async () => {
+    const department = await request(app.getHttpServer())
+      .post("/api/v1/identity/departments")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `Automation Category Dept ${randomUUID()}` })
+      .expect(201);
+    const departmentId = department.body.id;
+
+    // A ticket must have no category of its own for actionSetCategory to
+    // apply (never overriding an explicit choice) — matching such a
+    // ticket requires a wildcard (no conditionCategory) rule, which (like
+    // the "auto-assigns via a wildcard" test above) matches every
+    // uncategorized ticket in this shared branch and so must be
+    // deactivated afterward.
+    const createResponse = await request(app.getHttpServer())
+      .post("/api/v1/automation-rules")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        name: "Auto-categorize and route",
+        actionAssignToUserId: adminUserId,
+        actionSetCategory: "billing",
+        actionSetDepartmentId: departmentId,
+      })
+      .expect(201);
+    const wildcardRuleId = createResponse.body.id;
+
+    try {
+      const ticket = await createTicket();
+      expect(ticket.assignedToUserId).toBeNull();
+
+      const response = await waitForAssignment(ticket.id);
+      expect(response.body.assignedToUserId).toBe(adminUserId);
+      expect(response.body.category).toBe("billing");
+      expect(response.body.departmentId).toBe(departmentId);
+
+      const history = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticket.id}/history`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(
+        history.body.some(
+          (entry: { eventType: string }) => entry.eventType === "ticket.recategorized",
+        ),
+      ).toBe(true);
+    } finally {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/automation-rules/${wildcardRuleId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ isActive: false });
+    }
   });
 });

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventEmitter2 } from "@nestjs/event-emitter";
 import { AutomationActionListener } from "./automation-action.listener";
 import { AUTOMATION_RULE_MATCHED_EVENT } from "../sla-policies/automation.events";
-import { TICKET_UPDATED_EVENT } from "./tickets.events";
+import type { AutomationRuleMatchedEvent } from "../sla-policies/automation.events";
+import { TICKET_UPDATED_EVENT, TICKET_RECATEGORIZED_EVENT } from "./tickets.events";
 import type { PrismaService } from "../../prisma/prisma.service";
 
 function buildPrismaMock() {
@@ -28,10 +29,12 @@ function createListener(
   );
 }
 
-const matchedEvent = {
+const matchedEvent: AutomationRuleMatchedEvent = {
   ticketId: "ticket-1",
   ruleId: "rule-1",
   assignToUserId: "user-1",
+  setCategory: null,
+  setDepartmentId: null,
 };
 
 const ticketRow = {
@@ -69,10 +72,19 @@ describe("AutomationActionListener", () => {
     expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 
-  it("skips when the ticket became assigned in the meantime — never overwrites", async () => {
-    prisma.ticket.findUnique.mockResolvedValue({ ...ticketRow, assignedToUserId: "user-other" });
+  it("skips entirely when every eligible field is already set — never overwrites", async () => {
+    prisma.ticket.findUnique.mockResolvedValue({
+      ...ticketRow,
+      assignedToUserId: "user-other",
+      category: "billing",
+      departmentId: "dept-existing",
+    });
 
-    await listener.onAutomationRuleMatched(matchedEvent);
+    await listener.onAutomationRuleMatched({
+      ...matchedEvent,
+      setCategory: "billing",
+      setDepartmentId: "dept-1",
+    });
 
     expect(prisma.ticket.update).not.toHaveBeenCalled();
     expect(eventEmitter.emit).not.toHaveBeenCalled();
@@ -86,7 +98,7 @@ describe("AutomationActionListener", () => {
 
     expect(prisma.ticket.update).toHaveBeenCalledWith({
       where: { id: "ticket-1" },
-      data: { assignedToUserId: "user-1" },
+      data: { assignedToUser: { connect: { id: "user-1" } } },
     });
   });
 
@@ -111,6 +123,119 @@ describe("AutomationActionListener", () => {
         updatedAt: ticketRow.updatedAt,
       },
       actorUserId: null,
+    });
+  });
+
+  it("never emits ticket.recategorized for an assignment-only change", async () => {
+    prisma.ticket.findUnique.mockResolvedValue(ticketRow);
+    prisma.ticket.update.mockResolvedValue({ ...ticketRow, assignedToUserId: "user-1" });
+
+    await listener.onAutomationRuleMatched(matchedEvent);
+
+    expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+      TICKET_RECATEGORIZED_EVENT,
+      expect.anything(),
+    );
+  });
+
+  // Story 83 — Automation Rules — Category & Department Actions.
+  describe("category/department actions (Story 83)", () => {
+    it("applies the category when the ticket's own is null", async () => {
+      const uncategorized = { ...ticketRow, category: null, assignedToUserId: "user-already" };
+      prisma.ticket.findUnique.mockResolvedValue(uncategorized);
+      prisma.ticket.update.mockResolvedValue({ ...uncategorized, category: "billing" });
+
+      await listener.onAutomationRuleMatched({ ...matchedEvent, setCategory: "billing" });
+
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: "ticket-1" },
+        data: { category: "billing" },
+      });
+    });
+
+    it("applies the department when the ticket's own is null", async () => {
+      const unrouted = { ...ticketRow, departmentId: null, assignedToUserId: "user-already" };
+      prisma.ticket.findUnique.mockResolvedValue(unrouted);
+      prisma.ticket.update.mockResolvedValue({ ...unrouted, departmentId: "dept-1" });
+
+      await listener.onAutomationRuleMatched({ ...matchedEvent, setDepartmentId: "dept-1" });
+
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: "ticket-1" },
+        data: { department: { connect: { id: "dept-1" } } },
+      });
+    });
+
+    it("applies category, department, and assignment together in one update", async () => {
+      const untouched = { ...ticketRow, category: null, departmentId: null, assignedToUserId: null };
+      prisma.ticket.findUnique.mockResolvedValue(untouched);
+      prisma.ticket.update.mockResolvedValue({
+        ...untouched,
+        category: "billing",
+        departmentId: "dept-1",
+        assignedToUserId: "user-1",
+      });
+
+      await listener.onAutomationRuleMatched({
+        ...matchedEvent,
+        setCategory: "billing",
+        setDepartmentId: "dept-1",
+      });
+
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: "ticket-1" },
+        data: {
+          assignedToUser: { connect: { id: "user-1" } },
+          category: "billing",
+          department: { connect: { id: "dept-1" } },
+        },
+      });
+    });
+
+    it("skips a field the ticket already has set, but still applies the others", async () => {
+      const partiallySet = { ...ticketRow, category: "billing", departmentId: null, assignedToUserId: null };
+      prisma.ticket.findUnique.mockResolvedValue(partiallySet);
+      prisma.ticket.update.mockResolvedValue({ ...partiallySet, departmentId: "dept-1" });
+
+      await listener.onAutomationRuleMatched({
+        ...matchedEvent,
+        setCategory: "sales",
+        setDepartmentId: "dept-1",
+      });
+
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: "ticket-1" },
+        data: {
+          assignedToUser: { connect: { id: "user-1" } },
+          department: { connect: { id: "dept-1" } },
+        },
+      });
+    });
+
+    it("emits ticket.recategorized when the category changes", async () => {
+      const uncategorized = { ...ticketRow, category: null, assignedToUserId: "user-already" };
+      prisma.ticket.findUnique.mockResolvedValue(uncategorized);
+      prisma.ticket.update.mockResolvedValue({ ...uncategorized, category: "billing" });
+
+      await listener.onAutomationRuleMatched({ ...matchedEvent, setCategory: "billing" });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        TICKET_RECATEGORIZED_EVENT,
+        expect.objectContaining({ actorUserId: null }),
+      );
+    });
+
+    it("emits ticket.recategorized when the department changes", async () => {
+      const unrouted = { ...ticketRow, departmentId: null, assignedToUserId: "user-already" };
+      prisma.ticket.findUnique.mockResolvedValue(unrouted);
+      prisma.ticket.update.mockResolvedValue({ ...unrouted, departmentId: "dept-1" });
+
+      await listener.onAutomationRuleMatched({ ...matchedEvent, setDepartmentId: "dept-1" });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        TICKET_RECATEGORIZED_EVENT,
+        expect.objectContaining({ actorUserId: null }),
+      );
     });
   });
 

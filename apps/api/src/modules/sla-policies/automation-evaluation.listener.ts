@@ -49,6 +49,8 @@ export class AutomationEvaluationListener {
         ticketId: event.ticket.id,
         ruleId: matchedRule.id,
         assignToUserId: matchedRule.actionAssignToUserId,
+        setCategory: matchedRule.actionSetCategory,
+        setDepartmentId: matchedRule.actionSetDepartmentId,
       } satisfies AutomationRuleMatchedEvent);
     } catch (error) {
       this.logger.error("Failed to evaluate automation rules for ticket.created", error as Error);
@@ -64,7 +66,12 @@ export class AutomationEvaluationListener {
   private async resolveMatchingRule(
     branchId: string,
     category: string | null,
-  ): Promise<{ id: string; actionAssignToUserId: string } | null> {
+  ): Promise<{
+    id: string;
+    actionAssignToUserId: string;
+    actionSetCategory: string | null;
+    actionSetDepartmentId: string | null;
+  } | null> {
     const categoryFilter = category
       ? { OR: [{ conditionCategory: null }, { conditionCategory: category }] }
       : { conditionCategory: null };
@@ -72,7 +79,12 @@ export class AutomationEvaluationListener {
     const rule = await this.prisma.automationRule.findFirst({
       where: { branchId, isActive: true, ...categoryFilter },
       orderBy: { createdAt: "asc" },
-      select: { id: true, actionAssignToUserId: true },
+      select: {
+        id: true,
+        actionAssignToUserId: true,
+        actionSetCategory: true,
+        actionSetDepartmentId: true,
+      },
     });
     return rule;
   }

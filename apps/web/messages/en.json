@@ -603,6 +603,8 @@
       "name": "Name",
       "condition": "Condition",
       "assignTo": "Assign to",
+      "setCategory": "Set category",
+      "setDepartment": "Set department",
       "status": "Status"
     },
     "createHeading": "New automation rule",
@@ -610,6 +612,9 @@
     "conditionCategoryLabel": "Category (optional)",
     "actionAssignToLabel": "Assign to",
     "actionAssignToPlaceholder": "Select an agent",
+    "actionSetCategoryLabel": "Set category (optional)",
+    "actionSetDepartmentLabel": "Set department (optional)",
+    "noAction": "—",
     "createSubmit": "Create rule",
     "createSubmitting": "Creating...",
     "createFailed": "Couldn't create the rule. Please try again."
