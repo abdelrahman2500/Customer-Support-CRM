@@ -88,6 +88,14 @@ export interface AgentPresenceChangedPayload {
  * own two-step resolution). `branch:{id}:notifications` and
  * `agent:{id}:presence` are now explicitly agent-only — neither was ever
  * documented as customer-facing, and nothing about Live Chat requires it.
+ *
+ * Story 86 — `customer:{customerId}:notifications`, the Customer Portal's
+ * own notification room (see `CustomerNotificationRealtimeListener`).
+ * Customer-scoped, not Contact-scoped (mirrors how portal ticket
+ * visibility already works), and explicitly customer-audience-only — an
+ * agent socket is rejected outright, symmetric with
+ * `branch:{id}:notifications`/`agent:{id}:presence` being rejected for a
+ * customer socket.
  */
 @Injectable()
 @WebSocketGateway()
@@ -211,6 +219,26 @@ export class RealtimeGateway
         select: { contactId: true },
       });
       return session !== null && session.contactId === claims.userId;
+    }
+
+    // Story 86 — the inverse of the two rooms below: customer-only, never
+    // agent (agents already have their own `branch:{id}:notifications`
+    // mechanism). Portal ticket visibility is Customer-scoped, not
+    // Contact-scoped (any Contact of the same Customer already sees the
+    // same tickets/messages via `PortalTicketsService`), so this room is
+    // keyed by `customerId`, not the caller's own Contact id — resolved
+    // the same way the `ticket:(.+)$` customer branch above resolves its
+    // own `Contact.customerId` lookup.
+    const customerNotificationsMatch = /^customer:(.+):notifications$/.exec(room);
+    if (customerNotificationsMatch) {
+      if (claims.audience !== "customer") {
+        return false;
+      }
+      const contact = await this.prisma.contact.findUnique({
+        where: { id: claims.userId },
+        select: { customerId: true },
+      });
+      return contact !== null && contact.customerId === customerNotificationsMatch[1];
     }
 
     // Story 77 — explicitly agent-only: neither room was ever documented

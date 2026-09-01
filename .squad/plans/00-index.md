@@ -79,3 +79,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | sla-automation-rules-category-department | [sla-automation-rules-category-department/00-overview.md](./sla-automation-rules-category-department/00-overview.md) | 83–      |
 | identity-audit-logging | [identity-audit-logging/00-overview.md](./identity-audit-logging/00-overview.md) | 84–      |
 | ai-chat-escalation-to-ticket | [ai-chat-escalation-to-ticket/00-overview.md](./ai-chat-escalation-to-ticket/00-overview.md) | 85–      |
+| customer-portal-notification-delivery | [customer-portal-notification-delivery/00-overview.md](./customer-portal-notification-delivery/00-overview.md) | 86–      |

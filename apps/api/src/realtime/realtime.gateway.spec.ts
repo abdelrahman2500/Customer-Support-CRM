@@ -380,6 +380,59 @@ describe("RealtimeGateway", () => {
       expect(prisma.chatSession.findUnique).not.toHaveBeenCalled();
     });
 
+    // Story 86 — customer:{customerId}:notifications is the inverse of
+    // branch:{id}:notifications/agent:{id}:presence below: customer-only,
+    // never agent.
+    it("allows a customer to join customer:{customerId}:notifications for their own customerId", async () => {
+      const client = connectedCustomerClient();
+      prisma.contact.findUnique.mockResolvedValue({ customerId: "customer-1" });
+
+      const result = await gateway.onJoin(client as never, {
+        room: "customer:customer-1:notifications",
+      });
+
+      expect(prisma.contact.findUnique).toHaveBeenCalledWith({
+        where: { id: "contact-1" },
+        select: { customerId: true },
+      });
+      expect(result).toEqual({ ok: true });
+      expect(client.join).toHaveBeenCalledWith("customer:customer-1:notifications");
+    });
+
+    it("denies a customer joining customer:{customerId}:notifications for another customer's id", async () => {
+      const client = connectedCustomerClient();
+      prisma.contact.findUnique.mockResolvedValue({ customerId: "customer-1" });
+
+      const result = await gateway.onJoin(client as never, {
+        room: "customer:customer-2:notifications",
+      });
+
+      expect(result).toEqual({ ok: false });
+      expect(client.join).not.toHaveBeenCalled();
+    });
+
+    it("denies a customer joining customer:{customerId}:notifications when their own contact record is somehow missing", async () => {
+      const client = connectedCustomerClient();
+      prisma.contact.findUnique.mockResolvedValue(null);
+
+      const result = await gateway.onJoin(client as never, {
+        room: "customer:customer-1:notifications",
+      });
+
+      expect(result).toEqual({ ok: false });
+    });
+
+    it("denies an agent joining customer:{customerId}:notifications outright — customer-only", async () => {
+      const client = connectedClient();
+
+      const result = await gateway.onJoin(client as never, {
+        room: "customer:customer-1:notifications",
+      });
+
+      expect(result).toEqual({ ok: false });
+      expect(prisma.contact.findUnique).not.toHaveBeenCalled();
+    });
+
     it("denies a customer joining branch:{id}:notifications — agent-only", async () => {
       const client = connectedCustomerClient();
 

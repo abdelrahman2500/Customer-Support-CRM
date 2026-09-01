@@ -100,5 +100,17 @@
     "escalate": "Escalate to a human agent",
     "escalating": "Escalating…",
     "escalateFailed": "Couldn't escalate this conversation. Please try again."
+  },
+  "notifications": {
+    "regionLabel": "Notifications",
+    "dismiss": "Dismiss",
+    "viewTicket": "View ticket",
+    "eventLabel": {
+      "ticketUpdated": "Ticket updated",
+      "newReply": "New reply"
+    },
+    "ticketUpdated": "Your ticket \"{subject}\" was updated — status: {status}.",
+    "newReply": "You have a new reply on your ticket.",
+    "generic": "New notification"
   }
 }

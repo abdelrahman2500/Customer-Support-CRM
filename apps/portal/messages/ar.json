@@ -100,5 +100,17 @@
     "escalate": "التصعيد إلى وكيل بشري",
     "escalating": "جارٍ التصعيد...",
     "escalateFailed": "تعذّر تصعيد هذه المحادثة. حاول مرة أخرى."
+  },
+  "notifications": {
+    "regionLabel": "الإشعارات",
+    "dismiss": "إغلاق",
+    "viewTicket": "عرض التذكرة",
+    "eventLabel": {
+      "ticketUpdated": "تم تحديث التذكرة",
+      "newReply": "رد جديد"
+    },
+    "ticketUpdated": "تم تحديث تذكرتك \"{subject}\" — الحالة: {status}.",
+    "newReply": "لديك رد جديد على تذكرتك.",
+    "generic": "إشعار جديد"
   }
 }

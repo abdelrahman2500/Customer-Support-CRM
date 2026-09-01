@@ -4,6 +4,7 @@ import { RealtimeGateway } from "./realtime.gateway";
 import { TicketRealtimeListener } from "./ticket-realtime.listener";
 import { ChatRealtimeListener } from "./chat-realtime.listener";
 import { BranchNotificationRealtimeListener } from "./branch-notification-realtime.listener";
+import { CustomerNotificationRealtimeListener } from "./customer-notification-realtime.listener";
 import { PresenceService } from "./presence.service";
 
 /**
@@ -27,6 +28,13 @@ import { PresenceService } from "./presence.service";
  * `ai.chat_message_completed` and relaying into `chat-session:{id}`
  * (`RealtimeGateway.authorizeRoom`'s own new customer-only branch) —
  * fully independent of `TicketRealtimeListener`/`ticket:{id}`.
+ *
+ * Story 86 — `CustomerNotificationRealtimeListener` registered the same
+ * way, reacting to `ticket.updated`/`channel.message.created` and
+ * relaying into `customer:{customerId}:notifications`
+ * (`RealtimeGateway.authorizeRoom`'s own new customer-only branch) — the
+ * Customer Portal's own mirror of `BranchNotificationRealtimeListener`,
+ * fully independent of it and of `TicketRealtimeListener`/`ticket:{id}`.
  */
 @Module({
   imports: [AuthModule],
@@ -35,6 +43,7 @@ import { PresenceService } from "./presence.service";
     TicketRealtimeListener,
     ChatRealtimeListener,
     BranchNotificationRealtimeListener,
+    CustomerNotificationRealtimeListener,
     PresenceService,
   ],
 })
