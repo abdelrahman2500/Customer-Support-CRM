@@ -168,14 +168,20 @@ describe("Channels — Public Web-Form Ticket Intake (e2e)", () => {
   // Placed last: every prior test in this file makes 8 calls to this route
   // combined, comfortably under this route's own tighter @Throttle
   // (20/60s, still far tighter than the global default's 100/60s). Firing
-  // 20 more here reliably pushes the window's total past 20.
+  // subsequent requests sequentially reliably pushes the window's total past 20
+  // without triggering concurrent socket reset (ECONNRESET) on closed throttled connections.
   it("enforces its own tighter rate limit than the global default", async () => {
-    const attempts = await Promise.all(
-      Array.from({ length: 20 }, () =>
-        request(app.getHttpServer()).post("/api/v1/channels/web-form").send(validPayload()),
-      ),
-    );
+    const statuses: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/channels/web-form")
+        .send(validPayload());
+      statuses.push(response.status);
+      if (response.status === 429) {
+        break;
+      }
+    }
 
-    expect(attempts.some((response) => response.status === 429)).toBe(true);
+    expect(statuses).toContain(429);
   });
 });
