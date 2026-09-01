@@ -12,7 +12,7 @@ import {
   useStartChatSessionMutation,
 } from "@/hooks/use-chat";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 
 /**
  * Story 80 — AI Portal Chatbot (Foundation). Crosses
@@ -32,6 +32,7 @@ import { ApiError } from "@/lib/api";
  */
 export function ChatWidget() {
   const t = useTranslations("chat");
+  const errorMessage = useErrorMessage();
   const { locale } = useParams<{ locale: string }>();
   const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -54,9 +55,10 @@ export function ChatWidget() {
       router.push(`/${locale}/tickets/${result.ticketId}`);
     } catch (escalateSubmitError) {
       setEscalateError(
-        escalateSubmitError instanceof ApiError
-          ? escalateSubmitError.message
-          : t("escalateFailed"),
+        errorMessage(escalateSubmitError, {
+          forbidden: t("actionForbidden"),
+          generic: t("escalateFailed"),
+        }),
       );
     }
   }
@@ -187,6 +189,7 @@ function ChatComposer({
   onSent: (logId: string) => void;
 }) {
   const t = useTranslations("chat");
+  const errorMessage = useErrorMessage();
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const mutation = useSendChatMessageMutation(sessionId ?? "");
@@ -202,7 +205,7 @@ function ChatComposer({
       setBody("");
       onSent(result.id);
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("sendFailed"));
+      setError(errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("sendFailed") }));
     }
   }
 

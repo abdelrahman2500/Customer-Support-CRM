@@ -182,12 +182,16 @@ describe("ChatWidget", () => {
     expect(screen.queryByText("typing")).not.toBeInTheDocument();
   });
 
-  it("shows an inline error when sending fails", async () => {
+  // Story 94 — a 401 is never shown as raw backend text (it isn't a
+  // feature-specific "generic form error" — the caller's session itself is
+  // the problem), so this renders the shared, translated "session expired"
+  // copy rather than the ApiError's own message.
+  it("shows the shared session-expired message when sending fails with 401", async () => {
     vi.mocked(useChatMessagesQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
     vi.mocked(useSendChatMessageMutation).mockReturnValue({
-      mutateAsync: vi.fn().mockRejectedValue(new ApiError("Session expired", 401)),
+      mutateAsync: vi.fn().mockRejectedValue(new ApiError("Unauthorized", 401)),
       isPending: false,
     } as never);
 
@@ -195,7 +199,7 @@ describe("ChatWidget", () => {
     fireEvent.change(screen.getByLabelText("placeholder"), { target: { value: "hello" } });
     fireEvent.click(screen.getByText("send"));
 
-    await screen.findByText("Session expired");
+    await screen.findByText("errors.unauthorized");
   });
 
   // Story 85 — AI Chat: Escalate to a Human Ticket.

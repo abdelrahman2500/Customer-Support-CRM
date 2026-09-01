@@ -6,7 +6,7 @@ import {
   useUpdatePortalNotificationPreferenceMutation,
 } from "@/hooks/use-portal-notification-preferences";
 import type { PortalNotificationPreferenceSummary } from "@/lib/notification-preferences-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 
 /** The same two event-type strings `PORTAL_NOTIFICATION_EVENT_TYPES` names
  * on the backend (`apps/api/src/modules/notifications/
@@ -72,6 +72,7 @@ export function NotificationPreferencesSection() {
  * mirroring `apps/web`'s own `PreferenceRow` Rules-of-Hooks convention. */
 function PreferenceRow({ preference }: { preference: PortalNotificationPreferenceSummary }) {
   const t = useTranslations("notifications");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdatePortalNotificationPreferenceMutation();
 
   const labelKey = EVENT_LABEL_KEYS[preference.eventType];
@@ -107,7 +108,10 @@ function PreferenceRow({ preference }: { preference: PortalNotificationPreferenc
       </div>
       {mutation.isError && (
         <p className="mt-1 text-xs text-red-600">
-          {mutation.error instanceof ApiError ? mutation.error.message : t("preferences.actionFailed")}
+          {errorMessage(mutation.error, {
+            forbidden: t("preferences.actionForbidden"),
+            generic: t("preferences.actionFailed"),
+          })}
         </p>
       )}
     </li>

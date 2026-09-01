@@ -11,7 +11,8 @@ import {
   useUsersQuery,
 } from "@/hooks/use-tickets";
 import type { TicketPriority } from "@/lib/tickets-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
+import { showSuccessToast } from "@/lib/toast-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
@@ -57,6 +58,7 @@ const UNSET_ASSIGNEE = "__unset__";
  */
 export function CreateTicketView() {
   const t = useTranslations("tickets");
+  const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const searchParams = useSearchParams();
@@ -105,10 +107,14 @@ export function CreateTicketView() {
         ...(departmentId !== UNSET_DEPARTMENT ? { departmentId } : {}),
         ...(assignedToUserId !== UNSET_ASSIGNEE ? { assignedToUserId } : {}),
       });
+      showSuccessToast(t("create.createSuccess"));
       router.push(`/${locale}/tickets/${ticket.id}`);
     } catch (submitError) {
       setError(
-        submitError instanceof ApiError ? submitError.message : t("create.createFailed"),
+        errorMessage(submitError, {
+          forbidden: t("create.actionForbidden"),
+          generic: t("create.createFailed"),
+        }),
       );
     }
   }

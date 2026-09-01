@@ -8,13 +8,14 @@ import {
   useUpdateQuickReplyMutation,
 } from "@/hooks/use-quick-replies";
 import type { QuickReplySummary } from "@/lib/quick-replies-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
  * Story 91 — Communication/Channels: Quick Replies. Mirrors
@@ -80,10 +81,20 @@ export function QuickRepliesView() {
  * `AutomationRuleRow`'s Rules-of-Hooks convention. */
 function QuickReplyRow({ quickReply }: { quickReply: QuickReplySummary }) {
   const t = useTranslations("quickReplies");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateQuickReplyMutation(quickReply.id);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
-  function toggleActive() {
-    mutation.mutate({ isActive: !quickReply.isActive });
+  function handleToggleActiveClick() {
+    if (quickReply.isActive) {
+      setConfirmDeactivateOpen(true);
+      return;
+    }
+    mutation.mutate({ isActive: true });
+  }
+
+  function confirmDeactivate() {
+    mutation.mutate({ isActive: false }, { onSuccess: () => setConfirmDeactivateOpen(false) });
   }
 
   return (
@@ -95,15 +106,27 @@ function QuickReplyRow({ quickReply }: { quickReply: QuickReplySummary }) {
           <Badge variant={quickReply.isActive ? "success" : "secondary"}>
             {quickReply.isActive ? t("active") : t("inactive")}
           </Badge>
-          <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={toggleActive}>
+          <Button
+            variant={quickReply.isActive ? "destructive" : "outline"}
+            size="sm"
+            disabled={mutation.isPending}
+            onClick={handleToggleActiveClick}
+          >
             {quickReply.isActive ? t("deactivate") : t("activate")}
           </Button>
+          <ConfirmDialog
+            open={confirmDeactivateOpen}
+            onOpenChange={setConfirmDeactivateOpen}
+            title={t("deactivateConfirmTitle")}
+            description={t("deactivateConfirmDescription", { title: quickReply.title })}
+            confirmLabel={t("deactivate")}
+            onConfirm={confirmDeactivate}
+            isPending={mutation.isPending}
+          />
         </div>
         {mutation.isError && (
           <p className="mt-1 text-xs text-red-600">
-            {mutation.error instanceof ApiError && mutation.error.status === 403
-              ? t("actionForbidden")
-              : t("actionFailed")}
+            {errorMessage(mutation.error, { forbidden: t("actionForbidden"), generic: t("actionFailed") })}
           </p>
         )}
       </TableCell>
@@ -115,6 +138,7 @@ function QuickReplyRow({ quickReply }: { quickReply: QuickReplySummary }) {
  * table, mirroring `AddAutomationRuleForm`'s exact submit/error pattern. */
 function AddQuickReplyForm() {
   const t = useTranslations("quickReplies");
+  const errorMessage = useErrorMessage();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +152,7 @@ function AddQuickReplyForm() {
       setTitle("");
       setBody("");
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("createFailed"));
+      setError(errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }));
     }
   }
 

@@ -12,6 +12,7 @@ import {
 import { usePortalTicketRealtime } from "@/hooks/use-portal-ticket-realtime";
 import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
@@ -166,6 +167,7 @@ function CsatSection({ ticketId }: { ticketId: string }) {
 
 function CsatForm({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const errorMessage = useErrorMessage();
   const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -184,7 +186,10 @@ function CsatForm({ ticketId }: { ticketId: string }) {
       });
     } catch (submitError) {
       setError(
-        submitError instanceof ApiError ? submitError.message : t("detail.csatSubmitFailed"),
+        errorMessage(submitError, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.csatSubmitFailed"),
+        }),
       );
     }
   }

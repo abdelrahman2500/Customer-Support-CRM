@@ -191,15 +191,32 @@ describe("BranchDepartmentsView", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("toggles the branch's active state via the activate/deactivate button", () => {
+  it("does not deactivate the branch immediately — clicking 'Deactivate' opens a confirmation dialog first", () => {
     const mutate = vi.fn();
     mockedUseUpdateBranchMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
     renderView();
 
-    fireEvent.click(screen.getByText("Deactivate"));
+    fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
 
-    expect(mutate).toHaveBeenCalledWith({ isActive: false });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("toggles the branch's active state via the activate/deactivate button's confirmation dialog", () => {
+    const mutate = vi.fn();
+    mockedUseUpdateBranchMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+    renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Deactivate" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { isActive: false },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   it("commits a department rename on blur when the name changed", () => {
@@ -236,7 +253,7 @@ describe("BranchDepartmentsView", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("toggles a department's active state via its row's button", () => {
+  it("toggles a department's active state via its row's button and confirmation dialog", () => {
     const mutate = vi.fn();
     mockedUseManagedDepartmentsQuery.mockReturnValue(
       queryResult({ isSuccess: true, data: [baseDepartment] }) as never,
@@ -249,9 +266,16 @@ describe("BranchDepartmentsView", () => {
     // button (both default to active) — scope to the departments table so
     // this click targets the row's button, not the branch's.
     const table = screen.getByRole("table");
-    fireEvent.click(within(table).getByText("Deactivate"));
+    fireEvent.click(within(table).getByRole("button", { name: "Deactivate" }));
+    expect(mutate).not.toHaveBeenCalled();
 
-    expect(mutate).toHaveBeenCalledWith({ isActive: false });
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Deactivate" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { isActive: false },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   describe("inline mutation errors", () => {
@@ -348,7 +372,7 @@ describe("BranchDepartmentsView", () => {
       expect(screen.getByDisplayValue("Support")).toBeInTheDocument();
     });
 
-    it("falls back to a generic message when the create-department rejection is not an ApiError", async () => {
+    it("falls back to the shared network-failure message when the create-department rejection is not an ApiError", async () => {
       const mutateAsync = vi.fn().mockRejectedValue(new Error("network down"));
       mockedUseCreateDepartmentMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
 
@@ -360,7 +384,7 @@ describe("BranchDepartmentsView", () => {
       fireEvent.click(screen.getByRole("button", { name: "Add department" }));
 
       expect(
-        await screen.findByText("Couldn't create the department. Please try again."),
+        await screen.findByText("Couldn't reach the server. Check your connection and try again."),
       ).toBeInTheDocument();
     });
 

@@ -10,13 +10,15 @@ import {
   useUpdateDepartmentMutation,
 } from "@/hooks/use-branches";
 import type { ManagedBranch, ManagedDepartment } from "@/lib/branches-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
+import { showSuccessToast } from "@/lib/toast-store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
  * Story 45 — Branch & Department Management: a single combined screen, the
@@ -84,8 +86,10 @@ function MyBranchSection() {
  */
 function MyBranchFields({ branch }: { branch: ManagedBranch }) {
   const t = useTranslations("branches");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateBranchMutation(branch.id);
   const [nameDraft, setNameDraft] = useState(branch.name);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
   function commitName() {
     const trimmed = nameDraft.trim();
@@ -96,8 +100,16 @@ function MyBranchFields({ branch }: { branch: ManagedBranch }) {
     mutation.mutate({ name: trimmed }, { onError: () => setNameDraft(branch.name) });
   }
 
-  function toggleActive() {
-    mutation.mutate({ isActive: !branch.isActive });
+  function handleToggleActiveClick() {
+    if (branch.isActive) {
+      setConfirmDeactivateOpen(true);
+      return;
+    }
+    mutation.mutate({ isActive: true });
+  }
+
+  function confirmDeactivate() {
+    mutation.mutate({ isActive: false }, { onSuccess: () => setConfirmDeactivateOpen(false) });
   }
 
   return (
@@ -114,15 +126,30 @@ function MyBranchFields({ branch }: { branch: ManagedBranch }) {
         <Badge variant={branch.isActive ? "success" : "secondary"}>
           {branch.isActive ? t("myBranch.active") : t("myBranch.inactive")}
         </Badge>
-        <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={toggleActive}>
+        <Button
+          variant={branch.isActive ? "destructive" : "outline"}
+          size="sm"
+          disabled={mutation.isPending}
+          onClick={handleToggleActiveClick}
+        >
           {branch.isActive ? t("myBranch.deactivate") : t("myBranch.activate")}
         </Button>
+        <ConfirmDialog
+          open={confirmDeactivateOpen}
+          onOpenChange={setConfirmDeactivateOpen}
+          title={t("myBranch.deactivateConfirmTitle")}
+          description={t("myBranch.deactivateConfirmDescription", { name: branch.name })}
+          confirmLabel={t("myBranch.deactivate")}
+          onConfirm={confirmDeactivate}
+          isPending={mutation.isPending}
+        />
       </div>
       {mutation.isError && (
         <p className="text-xs text-red-600">
-          {mutation.error instanceof ApiError && mutation.error.status === 403
-            ? t("myBranch.actionForbidden")
-            : t("myBranch.actionFailed")}
+          {errorMessage(mutation.error, {
+            forbidden: t("myBranch.actionForbidden"),
+            generic: t("myBranch.actionFailed"),
+          })}
         </p>
       )}
     </div>
@@ -190,8 +217,10 @@ function DepartmentsSection() {
  */
 function DepartmentRow({ department }: { department: ManagedDepartment }) {
   const t = useTranslations("branches");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateDepartmentMutation(department.id);
   const [nameDraft, setNameDraft] = useState(department.name);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
   function commitName() {
     const trimmed = nameDraft.trim();
@@ -202,8 +231,16 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
     mutation.mutate({ name: trimmed }, { onError: () => setNameDraft(department.name) });
   }
 
-  function toggleActive() {
-    mutation.mutate({ isActive: !department.isActive });
+  function handleToggleActiveClick() {
+    if (department.isActive) {
+      setConfirmDeactivateOpen(true);
+      return;
+    }
+    mutation.mutate({ isActive: true });
+  }
+
+  function confirmDeactivate() {
+    mutation.mutate({ isActive: false }, { onSuccess: () => setConfirmDeactivateOpen(false) });
   }
 
   return (
@@ -217,9 +254,10 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
         />
         {mutation.isError && (
           <p className="mt-1 text-xs text-red-600">
-            {mutation.error instanceof ApiError && mutation.error.status === 403
-              ? t("departments.actionForbidden")
-              : t("departments.actionFailed")}
+            {errorMessage(mutation.error, {
+              forbidden: t("departments.actionForbidden"),
+              generic: t("departments.actionFailed"),
+            })}
           </p>
         )}
       </TableCell>
@@ -228,9 +266,23 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
           <Badge variant={department.isActive ? "success" : "secondary"}>
             {department.isActive ? t("departments.active") : t("departments.inactive")}
           </Badge>
-          <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={toggleActive}>
+          <Button
+            variant={department.isActive ? "destructive" : "outline"}
+            size="sm"
+            disabled={mutation.isPending}
+            onClick={handleToggleActiveClick}
+          >
             {department.isActive ? t("departments.deactivate") : t("departments.activate")}
           </Button>
+          <ConfirmDialog
+            open={confirmDeactivateOpen}
+            onOpenChange={setConfirmDeactivateOpen}
+            title={t("departments.deactivateConfirmTitle")}
+            description={t("departments.deactivateConfirmDescription", { name: department.name })}
+            confirmLabel={t("departments.deactivate")}
+            onConfirm={confirmDeactivate}
+            isPending={mutation.isPending}
+          />
         </div>
       </TableCell>
     </TableRow>
@@ -244,6 +296,7 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
  */
 function AddDepartmentForm() {
   const t = useTranslations("branches");
+  const errorMessage = useErrorMessage();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const mutation = useCreateDepartmentMutation();
@@ -254,8 +307,14 @@ function AddDepartmentForm() {
     try {
       await mutation.mutateAsync({ name: name.trim() });
       setName("");
+      showSuccessToast(t("departments.createSuccess", { name: name.trim() }));
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("departments.createFailed"));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("departments.actionForbidden"),
+          generic: t("departments.createFailed"),
+        }),
+      );
     }
   }
 

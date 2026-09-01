@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateMyTicketMutation, useMyTicketsQuery } from "@/hooks/use-portal-tickets";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
+import { showSuccessToast } from "@/lib/toast-store";
 
 /**
  * Story 53 — Customer Portal — Submit & Track Own Tickets. Mirrors
@@ -84,6 +85,7 @@ export function TicketListView() {
 
 function CreateTicketForm() {
   const t = useTranslations("tickets");
+  const errorMessage = useErrorMessage();
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -99,8 +101,9 @@ function CreateTicketForm() {
       });
       setSubject("");
       setCategory("");
+      showSuccessToast(t("list.createSuccess"));
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("list.createFailed"));
+      setError(errorMessage(submitError, { forbidden: t("list.actionForbidden"), generic: t("list.createFailed") }));
     }
   }
 

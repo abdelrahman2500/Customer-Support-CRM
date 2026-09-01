@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateSlaPolicyMutation } from "@/hooks/use-sla-policies";
 import type { SlaPolicyPriority } from "@/lib/sla-policies-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
+import { showSuccessToast } from "@/lib/toast-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
@@ -35,6 +36,7 @@ const UNSET_PRIORITY = "__unset__";
  */
 export function CreateSlaPolicyView() {
   const t = useTranslations("slaPolicies");
+  const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
@@ -69,9 +71,15 @@ export function CreateSlaPolicyView() {
         responseTargetMinutes: parsedResponse,
         resolutionTargetMinutes: parsedResolution,
       });
+      showSuccessToast(t("create.createSuccess"));
       router.push(`/${locale}/sla-policies`);
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("create.createFailed"));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("create.actionForbidden"),
+          generic: t("create.createFailed"),
+        }),
+      );
     }
   }
 

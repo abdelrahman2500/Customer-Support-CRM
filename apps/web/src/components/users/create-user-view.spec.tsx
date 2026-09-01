@@ -244,7 +244,9 @@ describe("CreateUserView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Create user" }));
 
-    expect(await screen.findByText("Couldn't create the user. Please try again.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Couldn't reach the server. Check your connection and try again."),
+    ).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
   });
 

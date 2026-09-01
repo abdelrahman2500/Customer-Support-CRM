@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useBranchesQuery, useCreateUserMutation, useDepartmentsQuery } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
+import { showSuccessToast } from "@/lib/toast-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
@@ -39,6 +40,7 @@ const UNSET_DEPARTMENT = "__unset__";
  */
 export function CreateUserView() {
   const t = useTranslations("users");
+  const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
@@ -68,9 +70,15 @@ export function CreateUserView() {
         roleId,
         ...(departmentId !== UNSET_DEPARTMENT ? { departmentId } : {}),
       });
+      showSuccessToast(t("create.createSuccess", { name: fullName.trim() }));
       router.push(`/${locale}/users`);
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("create.createFailed"));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("create.actionForbidden"),
+          generic: t("create.createFailed"),
+        }),
+      );
     }
   }
 

@@ -24,6 +24,13 @@ import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { ApiError } from "@/lib/api";
+import { showSuccessToast } from "@/lib/toast-store";
+
+vi.mock("@/lib/toast-store", () => ({
+  showSuccessToast: vi.fn(),
+}));
+
+const mockedShowSuccessToast = vi.mocked(showSuccessToast);
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
@@ -357,6 +364,62 @@ describe("TicketDetailView", () => {
       expect(mutate).toHaveBeenCalledWith({ departmentId: "dept-1" });
     });
 
+    // Story 94 — success feedback.
+    it("shows a translated success toast once the status-update mutation actually succeeds", async () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
+        options?.onSuccess?.();
+      });
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({ mutate, isError: false, error: null } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByText("OPEN"));
+      fireEvent.click(await screen.findByRole("option", { name: "IN_PROGRESS" }));
+
+      expect(mockedShowSuccessToast).toHaveBeenCalledWith(
+        'detail.statusUpdateSuccess:{"status":"IN_PROGRESS"}',
+      );
+    });
+
+    it("shows a translated success toast once the priority-update mutation actually succeeds", async () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
+        options?.onSuccess?.();
+      });
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({ mutate, isError: false, error: null } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByText("HIGH"));
+      fireEvent.click(await screen.findByRole("option", { name: "URGENT" }));
+
+      expect(mockedShowSuccessToast).toHaveBeenCalledWith(
+        'detail.priorityUpdateSuccess:{"priority":"URGENT"}',
+      );
+    });
+
+    it("does not show a success toast when the status-update mutation is not yet successful", async () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      // A bare `vi.fn()` never invokes `onSuccess` — mirrors a real,
+      // still-pending/rejected mutation.
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByText("OPEN"));
+      fireEvent.click(await screen.findByRole("option", { name: "IN_PROGRESS" }));
+
+      expect(mockedShowSuccessToast).not.toHaveBeenCalled();
+    });
+
     it("renders an inline error when departments fail to load", () => {
       vi.mocked(useTicketQuery).mockReturnValue(
         queryResult({ data: baseTicket, isSuccess: true }) as never,
@@ -654,7 +717,7 @@ describe("TicketDetailView", () => {
       expect(await screen.findByText("Note too long")).toBeInTheDocument();
     });
 
-    it("shows the generic create-failed fallback for a non-ApiError failure", async () => {
+    it("shows the shared network-failure message for a non-ApiError failure", async () => {
       vi.mocked(useTicketNotesQuery).mockReturnValue(
         queryResult({ data: [], isSuccess: true }) as never,
       );
@@ -674,7 +737,7 @@ describe("TicketDetailView", () => {
       });
       fireEvent.click(screen.getByText("detail.notesSubmit"));
 
-      expect(await screen.findByText("detail.notesCreateFailed")).toBeInTheDocument();
+      expect(await screen.findByText("errors.network")).toBeInTheDocument();
     });
 
     it("does not interfere with the History card's own rendering", () => {

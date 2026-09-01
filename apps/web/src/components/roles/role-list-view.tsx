@@ -10,12 +10,14 @@ import {
   useUpdateRoleMutation,
 } from "@/hooks/use-roles";
 import type { PermissionSummary, RoleSummary } from "@/lib/roles-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
+import { showSuccessToast } from "@/lib/toast-store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Select,
@@ -42,9 +44,11 @@ function RoleRow({
   allPermissions: PermissionSummary[];
 }) {
   const t = useTranslations("roles");
+  const errorMessage = useErrorMessage();
   const updateMutation = useUpdateRoleMutation(role.id);
   const permissionsMutation = useSetRolePermissionsMutation(role.id);
   const [nameDraft, setNameDraft] = useState(role.name);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
   const isProtected = PROTECTED_ROLE_NAMES.has(role.name);
 
   function commitName() {
@@ -56,8 +60,19 @@ function RoleRow({
     updateMutation.mutate({ name: trimmed }, { onError: () => setNameDraft(role.name) });
   }
 
-  function toggleActive() {
-    updateMutation.mutate({ isActive: !role.isActive });
+  function handleToggleActiveClick() {
+    if (role.isActive) {
+      setConfirmDeactivateOpen(true);
+      return;
+    }
+    updateMutation.mutate({ isActive: true });
+  }
+
+  function confirmDeactivate() {
+    updateMutation.mutate(
+      { isActive: false },
+      { onSuccess: () => setConfirmDeactivateOpen(false) },
+    );
   }
 
   function changeVisibilityScope(value: string) {
@@ -113,13 +128,22 @@ function RoleRow({
                 </Badge>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={role.isActive ? "destructive" : "outline"}
                   size="sm"
                   disabled={updateMutation.isPending}
-                  onClick={toggleActive}
+                  onClick={handleToggleActiveClick}
                 >
                   {role.isActive ? t("list.deactivate") : t("list.activate")}
                 </Button>
+                <ConfirmDialog
+                  open={confirmDeactivateOpen}
+                  onOpenChange={setConfirmDeactivateOpen}
+                  title={t("list.deactivateConfirmTitle")}
+                  description={t("list.deactivateConfirmDescription", { name: role.name })}
+                  confirmLabel={t("list.deactivate")}
+                  onConfirm={confirmDeactivate}
+                  isPending={updateMutation.isPending}
+                />
               </>
             )}
             <Button type="button" variant="outline" size="sm" onClick={onToggle}>
@@ -128,11 +152,10 @@ function RoleRow({
           </div>
           {hasError && (
             <p className="mt-1 text-xs text-red-600">
-              {activeError instanceof ApiError && activeError.status === 403
-                ? t("list.actionForbidden")
-                : activeError instanceof ApiError
-                  ? activeError.message
-                  : t("list.actionFailed")}
+              {errorMessage(activeError, {
+                forbidden: t("list.actionForbidden"),
+                generic: t("list.actionFailed"),
+              })}
             </p>
           )}
         </TableCell>
@@ -171,6 +194,7 @@ function RoleRow({
  */
 function AddRoleForm() {
   const t = useTranslations("roles");
+  const errorMessage = useErrorMessage();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const mutation = useCreateRoleMutation();
@@ -181,8 +205,9 @@ function AddRoleForm() {
     try {
       await mutation.mutateAsync({ name: name.trim() });
       setName("");
+      showSuccessToast(t("list.createSuccess", { name: name.trim() }));
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("list.createFailed"));
+      setError(errorMessage(submitError, { forbidden: t("list.actionForbidden"), generic: t("list.createFailed") }));
     }
   }
 

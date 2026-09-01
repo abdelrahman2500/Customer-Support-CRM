@@ -8,12 +8,14 @@ import {
   useUpdateArticleMutation,
 } from "@/hooks/use-knowledge-base";
 import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
  * Story 51 — Article Detail/Edit. Mirrors `TicketDetailView`'s
@@ -27,6 +29,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
  */
 export function ArticleDetailView({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
+  const errorMessage = useErrorMessage();
 
   const articleQuery = useArticleQuery(articleId);
   const mutation = useUpdateArticleMutation(articleId);
@@ -34,6 +37,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [bodyDraft, setBodyDraft] = useState<string | null>(null);
   const [categoryDraft, setCategoryDraft] = useState<string | null>(null);
+  const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
 
   if (articleQuery.isLoading) {
     return (
@@ -56,8 +60,16 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
     return null;
   }
 
-  const togglePublished = () => {
-    mutation.mutate({ status: article.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED" });
+  const handleTogglePublishedClick = () => {
+    if (article.status === "PUBLISHED") {
+      setConfirmUnpublishOpen(true);
+      return;
+    }
+    mutation.mutate({ status: "PUBLISHED" });
+  };
+
+  const confirmUnpublish = () => {
+    mutation.mutate({ status: "DRAFT" }, { onSuccess: () => setConfirmUnpublishOpen(false) });
   };
 
   return (
@@ -79,17 +91,32 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
           <Badge variant={article.status === "PUBLISHED" ? "success" : "secondary"}>
             {article.status === "PUBLISHED" ? t("list.published") : t("list.draft")}
           </Badge>
-          <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={togglePublished}>
+          <Button
+            variant={article.status === "PUBLISHED" ? "destructive" : "outline"}
+            size="sm"
+            disabled={mutation.isPending}
+            onClick={handleTogglePublishedClick}
+          >
             {article.status === "PUBLISHED" ? t("list.unpublish") : t("list.publish")}
           </Button>
+          <ConfirmDialog
+            open={confirmUnpublishOpen}
+            onOpenChange={setConfirmUnpublishOpen}
+            title={t("list.unpublishConfirmTitle")}
+            description={t("list.unpublishConfirmDescription", { title: article.title })}
+            confirmLabel={t("list.unpublish")}
+            onConfirm={confirmUnpublish}
+            isPending={mutation.isPending}
+          />
         </div>
       </div>
 
       {mutation.isError && (
         <Alert variant="destructive">
-          {mutation.error instanceof ApiError && mutation.error.status === 403
-            ? t("detail.actionForbidden")
-            : t("detail.actionFailed")}
+          {errorMessage(mutation.error, {
+            forbidden: t("detail.actionForbidden"),
+            generic: t("detail.actionFailed"),
+          })}
         </Alert>
       )}
 

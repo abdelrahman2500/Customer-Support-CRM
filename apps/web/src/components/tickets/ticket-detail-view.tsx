@@ -23,6 +23,8 @@ import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
+import { showSuccessToast } from "@/lib/toast-store";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
@@ -122,6 +124,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const customersQuery = useCustomersQuery();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateTicketMutation(ticketId);
 
   const [categoryDraft, setCategoryDraft] = useState<string | null>(null);
@@ -194,9 +197,10 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
       {mutation.isError && (
         <Alert variant="destructive">
-          {mutation.error instanceof ApiError && mutation.error.status === 403
-            ? t("detail.actionForbidden")
-            : t("detail.actionFailed")}
+          {errorMessage(mutation.error, {
+            forbidden: t("detail.actionForbidden"),
+            generic: t("detail.actionFailed"),
+          })}
         </Alert>
       )}
 
@@ -204,7 +208,13 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <Field label={t("detail.status")}>
           <Select
             value={ticket.status}
-            onValueChange={(value) => mutation.mutate({ status: value as TicketStatus })}
+            disabled={mutation.isPending}
+            onValueChange={(value) =>
+              mutation.mutate(
+                { status: value as TicketStatus },
+                { onSuccess: () => showSuccessToast(t("detail.statusUpdateSuccess", { status: value })) },
+              )
+            }
           >
             <SelectTrigger>
               <SelectValue />
@@ -222,7 +232,16 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <Field label={t("detail.priority")}>
           <Select
             value={ticket.priority}
-            onValueChange={(value) => mutation.mutate({ priority: value as TicketPriority })}
+            disabled={mutation.isPending}
+            onValueChange={(value) =>
+              mutation.mutate(
+                { priority: value as TicketPriority },
+                {
+                  onSuccess: () =>
+                    showSuccessToast(t("detail.priorityUpdateSuccess", { priority: value })),
+                },
+              )
+            }
           >
             <SelectTrigger>
               <SelectValue />
@@ -252,6 +271,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <Field label={t("detail.assignedAgent")}>
           <Select
             value={ticket.assignedToUserId ?? undefined}
+            disabled={mutation.isPending}
             onValueChange={(value) => mutation.mutate({ assignedToUserId: value })}
           >
             <SelectTrigger>
@@ -270,6 +290,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <Field label={t("detail.department")}>
           <Select
             value={ticket.departmentId ?? undefined}
+            disabled={mutation.isPending}
             onValueChange={(value) => mutation.mutate({ departmentId: value })}
           >
             <SelectTrigger>
@@ -433,6 +454,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
  */
 function AddNoteForm({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const errorMessage = useErrorMessage();
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const mutation = useCreateTicketNoteMutation(ticketId);
@@ -445,7 +467,10 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
       setBody("");
     } catch (submitError) {
       setError(
-        submitError instanceof ApiError ? submitError.message : t("detail.notesCreateFailed"),
+        errorMessage(submitError, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.notesCreateFailed"),
+        }),
       );
     }
   }

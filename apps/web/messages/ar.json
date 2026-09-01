@@ -6,7 +6,15 @@
     "notSignedIn": "لم يتم تسجيل الدخول.",
     "login": "تسجيل الدخول",
     "email": "البريد الإلكتروني",
-    "password": "كلمة المرور"
+    "password": "كلمة المرور",
+    "cancel": "إلغاء",
+    "working": "جارٍ التنفيذ...",
+    "dismiss": "إغلاق",
+    "successToastRegionLabel": "إشعارات النجاح",
+    "errors": {
+      "network": "تعذّر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى.",
+      "unauthorized": "انتهت صلاحية جلستك. يرجى تسجيل الدخول مرة أخرى."
+    }
   },
   "auth": {
     "title": "تسجيل الدخول",
@@ -128,7 +136,9 @@
       "notFound": "تعذّر العثور على هذه التذكرة.",
       "loadError": "تعذّر تحميل هذه التذكرة.",
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
-      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى."
+      "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+      "statusUpdateSuccess": "تم تحديث الحالة إلى {status}.",
+      "priorityUpdateSuccess": "تم تحديث الأولوية إلى {priority}."
     },
     "sla": {
       "none": "لا يوجد هدف اتفاقية مستوى خدمة",
@@ -162,7 +172,9 @@
       "assignedAgentLoadError": "تعذّر تحميل الوكلاء.",
       "submit": "إنشاء التذكرة",
       "submitting": "جارٍ الإنشاء...",
-      "createFailed": "تعذّر إنشاء التذكرة. حاول مرة أخرى."
+      "createFailed": "تعذّر إنشاء التذكرة. حاول مرة أخرى.",
+      "createSuccess": "تم إنشاء التذكرة.",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء."
     }
   },
   "customers": {
@@ -210,7 +222,9 @@
       "attachmentsError": "تعذّر تحميل مرفقات هذا العميل.",
       "attachmentsEmpty": "لا توجد مرفقات حتى الآن.",
       "attachmentsUploading": "جارٍ الرفع...",
-      "attachmentsUploadFailed": "تعذّر رفع الملف. حاول مرة أخرى."
+      "attachmentsUploadFailed": "تعذّر رفع الملف. حاول مرة أخرى.",
+      "portalPasswordConfirmTitle": "هل تريد إعادة تعيين كلمة مرور البوابة لجهة الاتصال هذه؟",
+      "portalPasswordConfirmDescription": "ستتوقف كلمة مرور البوابة الحالية عن العمل فورًا."
     },
     "create": {
       "title": "عميل جديد",
@@ -269,7 +283,8 @@
       "roleLoadError": "تعذّر تحميل الأدوار.",
       "submit": "إنشاء المستخدم",
       "submitting": "جارٍ الإنشاء...",
-      "createFailed": "تعذّر إنشاء المستخدم. حاول مرة أخرى."
+      "createFailed": "تعذّر إنشاء المستخدم. حاول مرة أخرى.",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء."
     }
   },
   "slaPolicies": {
@@ -295,7 +310,9 @@
         "responseTarget": "هدف الاستجابة (دقيقة)",
         "resolutionTarget": "هدف الحل (دقيقة)",
         "status": "الحالة"
-      }
+      },
+      "deactivateConfirmTitle": "هل تريد إلغاء تفعيل سياسة اتفاقية مستوى الخدمة هذه؟",
+      "deactivateConfirmDescription": "لن يتم تطبيق هدف الاستجابة أو الحل بعد الآن على التذاكر المطابقة لنطاق هذه السياسة."
     },
     "create": {
       "title": "سياسة اتفاقية خدمة جديدة",
@@ -309,7 +326,8 @@
       "invalidTargets": "يجب أن تكون أهداف الاستجابة والحل أرقامًا صحيحة لا تقل عن دقيقة واحدة.",
       "submit": "إنشاء السياسة",
       "submitting": "جارٍ الإنشاء...",
-      "createFailed": "تعذّر إنشاء سياسة اتفاقية الخدمة. حاول مرة أخرى."
+      "createFailed": "تعذّر إنشاء سياسة اتفاقية الخدمة. حاول مرة أخرى.",
+      "createSuccess": "تم إنشاء سياسة اتفاقية مستوى الخدمة."
     }
   },
   "roles": {
@@ -397,7 +415,9 @@
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
       "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
       "loadError": "تعذّر تحميل فرعك.",
-      "retry": "إعادة المحاولة"
+      "retry": "إعادة المحاولة",
+      "deactivateConfirmTitle": "هل تريد إلغاء تفعيل هذا الفرع؟",
+      "deactivateConfirmDescription": "سيفقد \"{name}\" وجميع من فيه إمكانية الوصول حتى تتم إعادة تفعيله."
     },
     "departments": {
       "heading": "الأقسام",
@@ -418,7 +438,10 @@
       "columns": {
         "name": "الاسم",
         "status": "الحالة"
-      }
+      },
+      "deactivateConfirmTitle": "هل تريد إلغاء تفعيل هذا القسم؟",
+      "deactivateConfirmDescription": "لن يكون \"{name}\" قابلاً للتعيين للتذاكر أو المستخدمين بعد الآن.",
+      "createSuccess": "تم إنشاء القسم \"{name}\"."
     }
   },
   "auditLogs": {
@@ -496,7 +519,9 @@
         "title": "العنوان",
         "category": "الفئة",
         "status": "الحالة"
-      }
+      },
+      "unpublishConfirmTitle": "هل تريد إلغاء نشر هذا المقال؟",
+      "unpublishConfirmDescription": "لن يكون \"{title}\" مرئيًا بعد الآن للوكلاء عند البحث في قاعدة المعرفة أو للعملاء في البوابة."
     },
     "create": {
       "title": "مقالة جديدة",
@@ -627,7 +652,9 @@
     "noAction": "—",
     "createSubmit": "إنشاء القاعدة",
     "createSubmitting": "جارٍ الإنشاء...",
-    "createFailed": "تعذّر إنشاء القاعدة. حاول مرة أخرى."
+    "createFailed": "تعذّر إنشاء القاعدة. حاول مرة أخرى.",
+    "deactivateConfirmTitle": "هل تريد إلغاء تفعيل قاعدة الأتمتة هذه؟",
+    "deactivateConfirmDescription": "سيتوقف \"{name}\" عن العمل على التذاكر الجديدة."
   },
   "quickReplies": {
     "title": "الردود السريعة",
@@ -650,7 +677,9 @@
     "bodyLabel": "النص",
     "createSubmit": "إنشاء الرد السريع",
     "createSubmitting": "جارٍ الإنشاء...",
-    "createFailed": "تعذّر إنشاء الرد السريع. حاول مرة أخرى."
+    "createFailed": "تعذّر إنشاء الرد السريع. حاول مرة أخرى.",
+    "deactivateConfirmTitle": "هل تريد إلغاء تفعيل هذا الرد السريع؟",
+    "deactivateConfirmDescription": "لن يكون \"{title}\" متاحًا بعد الآن في قائمة الردود."
   },
   "notificationTemplates": {
     "title": "قوالب الإشعارات",

@@ -444,7 +444,7 @@ describe("CustomerDetailView", () => {
       expect(submit).not.toBeDisabled();
     });
 
-    it("does not commit on blur — only an explicit click submits, with the exact { newPassword } payload", () => {
+    it("does not commit on blur, and clicking submit opens a confirmation dialog rather than committing immediately", () => {
       const mutate = vi.fn();
       mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation({ mutate }) as never);
 
@@ -454,7 +454,22 @@ describe("CustomerDetailView", () => {
       fireEvent.blur(input);
       expect(mutate).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByText("detail.portalPasswordSubmit"));
+      fireEvent.click(screen.getByRole("button", { name: "detail.portalPasswordSubmit" }));
+
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it("commits with the exact { newPassword } payload only once the confirmation dialog's own submit button is clicked", () => {
+      const mutate = vi.fn();
+      mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      const input = screen.getByPlaceholderText("detail.portalPasswordPlaceholder");
+      fireEvent.change(input, { target: { value: "newpassword1" } });
+      fireEvent.click(screen.getByRole("button", { name: "detail.portalPasswordSubmit" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "detail.portalPasswordSubmit" }));
 
       expect(mockedUseSetContactPortalPasswordMutation).toHaveBeenCalledWith(
         "customer-1",
@@ -476,13 +491,16 @@ describe("CustomerDetailView", () => {
       render(<CustomerDetailView customerId="customer-1" />);
       const input = screen.getByPlaceholderText("detail.portalPasswordPlaceholder");
       fireEvent.change(input, { target: { value: "newpassword1" } });
-      fireEvent.click(screen.getByText("detail.portalPasswordSubmit"));
+      fireEvent.click(screen.getByRole("button", { name: "detail.portalPasswordSubmit" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "detail.portalPasswordSubmit" }));
       act(() => {
         capturedOnSuccess?.();
       });
 
       expect(input).toHaveValue("");
       expect(screen.getByText("detail.portalPasswordSuccess")).toBeInTheDocument();
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     });
 
     it("renders the backend's own message inline when the mutation fails", () => {

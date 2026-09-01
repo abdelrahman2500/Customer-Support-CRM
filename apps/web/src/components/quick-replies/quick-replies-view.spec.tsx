@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QuickRepliesView } from "./quick-replies-view";
 import {
   useCreateQuickReplyMutation,
@@ -100,7 +100,7 @@ describe("QuickRepliesView", () => {
     expect(screen.getByText("active")).toBeInTheDocument();
   });
 
-  it("toggles a quick reply's active state", () => {
+  it("does not deactivate immediately — clicking deactivate opens a confirmation dialog first", () => {
     const mutate = vi.fn();
     mockedUseQuickRepliesQuery.mockReturnValue(
       queryResult({ data: [baseQuickReply], isSuccess: true }) as never,
@@ -109,9 +109,29 @@ describe("QuickRepliesView", () => {
 
     render(<QuickRepliesView />);
 
-    fireEvent.click(screen.getByText("deactivate"));
+    fireEvent.click(screen.getByRole("button", { name: "deactivate" }));
 
-    expect(mutate).toHaveBeenCalledWith({ isActive: false });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("toggles a quick reply's active state via the confirmation dialog", () => {
+    const mutate = vi.fn();
+    mockedUseQuickRepliesQuery.mockReturnValue(
+      queryResult({ data: [baseQuickReply], isSuccess: true }) as never,
+    );
+    mockedUseUpdateQuickReplyMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+    render(<QuickRepliesView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "deactivate" }));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "deactivate" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { isActive: false },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   it("shows a forbidden message when toggling fails with 403", () => {

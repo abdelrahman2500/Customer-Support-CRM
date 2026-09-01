@@ -12,12 +12,13 @@ import {
 } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
 import type { UserSummary } from "@/lib/tickets-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Select,
@@ -128,6 +129,7 @@ export function UserListView() {
 
 function UserRow({ user }: { user: UserSummary }) {
   const t = useTranslations("users");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateUserMutation(user.id);
   const assignmentMutation = useUpdateUserAssignmentMutation(user.id);
   const resetPasswordMutation = useResetPasswordMutation(user.id);
@@ -137,6 +139,13 @@ function UserRow({ user }: { user: UserSummary }) {
   const [emailDraft, setEmailDraft] = useState(user.email);
   const [newPasswordDraft, setNewPasswordDraft] = useState("");
   const [passwordResetSuccess, setPasswordResetSuccess] = useState(false);
+  // Story 94 — deactivating a user and resetting their password are both
+  // genuinely destructive/hard-to-undo (a deactivated user can no longer
+  // sign in; a reset password immediately invalidates the old one) — both
+  // now require an explicit confirmation step before the existing mutation
+  // fires. Activating a user is not destructive and stays immediate.
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
   function commitFullName() {
     const trimmed = fullNameDraft.trim();
@@ -162,17 +171,34 @@ function UserRow({ user }: { user: UserSummary }) {
     );
   }
 
-  function toggleActive() {
-    mutation.mutate({ isActive: !user.isActive });
+  function handleToggleActiveClick() {
+    if (user.isActive) {
+      setConfirmDeactivateOpen(true);
+      return;
+    }
+    mutation.mutate({ isActive: true });
   }
 
-  function handleResetPassword() {
+  function confirmDeactivate() {
+    mutation.mutate(
+      { isActive: false },
+      { onSuccess: () => setConfirmDeactivateOpen(false) },
+    );
+  }
+
+  function confirmResetPassword() {
+    // Feedback for this one stays the existing inline green confirmation
+    // line (below) rather than also firing a toast — it already gives
+    // clear, non-silent success feedback, unlike the mutations this story's
+    // toast wiring specifically targets (Recon: "the existing UX currently
+    // goes silent").
     resetPasswordMutation.mutate(
       { newPassword: newPasswordDraft },
       {
         onSuccess: () => {
           setNewPasswordDraft("");
           setPasswordResetSuccess(true);
+          setConfirmResetOpen(false);
         },
       },
     );
@@ -191,11 +217,10 @@ function UserRow({ user }: { user: UserSummary }) {
           />
           {mutation.isError && (
             <p className="text-xs text-red-600">
-              {mutation.error instanceof ApiError && mutation.error.status === 403
-                ? t("list.actionForbidden")
-                : mutation.error instanceof ApiError
-                  ? mutation.error.message
-                  : t("list.actionFailed")}
+              {errorMessage(mutation.error, {
+                forbidden: t("list.actionForbidden"),
+                generic: t("list.actionFailed"),
+              })}
             </p>
           )}
 
@@ -215,23 +240,30 @@ function UserRow({ user }: { user: UserSummary }) {
               variant="outline"
               size="sm"
               disabled={newPasswordDraft.length < 8 || resetPasswordMutation.isPending}
-              onClick={handleResetPassword}
+              onClick={() => setConfirmResetOpen(true)}
             >
               {resetPasswordMutation.isPending
                 ? t("list.passwordResetSubmitting")
                 : t("list.passwordResetSubmit")}
             </Button>
+            <ConfirmDialog
+              open={confirmResetOpen}
+              onOpenChange={setConfirmResetOpen}
+              title={t("list.passwordResetConfirmTitle")}
+              description={t("list.passwordResetConfirmDescription")}
+              confirmLabel={t("list.passwordResetSubmit")}
+              onConfirm={confirmResetPassword}
+              isPending={resetPasswordMutation.isPending}
+            />
             {passwordResetSuccess && (
               <p className="text-xs text-emerald-600">{t("list.passwordResetSuccess")}</p>
             )}
             {resetPasswordMutation.isError && (
               <p className="text-xs text-red-600">
-                {resetPasswordMutation.error instanceof ApiError &&
-                resetPasswordMutation.error.status === 403
-                  ? t("list.actionForbidden")
-                  : resetPasswordMutation.error instanceof ApiError
-                    ? resetPasswordMutation.error.message
-                    : t("list.actionFailed")}
+                {errorMessage(resetPasswordMutation.error, {
+                  forbidden: t("list.actionForbidden"),
+                  generic: t("list.actionFailed"),
+                })}
               </p>
             )}
           </div>
@@ -246,9 +278,10 @@ function UserRow({ user }: { user: UserSummary }) {
         />
         {mutation.isError && (
           <p className="mt-1 text-xs text-red-600">
-            {mutation.error instanceof ApiError && mutation.error.status === 403
-              ? t("list.actionForbidden")
-              : t("list.actionFailed")}
+            {errorMessage(mutation.error, {
+              forbidden: t("list.actionForbidden"),
+              generic: t("list.actionFailed"),
+            })}
           </p>
         )}
       </TableCell>
@@ -307,11 +340,10 @@ function UserRow({ user }: { user: UserSummary }) {
 
           {assignmentMutation.isError && (
             <p className="text-xs text-red-600">
-              {assignmentMutation.error instanceof ApiError && assignmentMutation.error.status === 403
-                ? t("list.actionForbidden")
-                : assignmentMutation.error instanceof ApiError
-                  ? assignmentMutation.error.message
-                  : t("list.actionFailed")}
+              {errorMessage(assignmentMutation.error, {
+                forbidden: t("list.actionForbidden"),
+                generic: t("list.actionFailed"),
+              })}
             </p>
           )}
         </div>
@@ -322,13 +354,22 @@ function UserRow({ user }: { user: UserSummary }) {
             {user.isActive ? t("list.active") : t("list.inactive")}
           </Badge>
           <Button
-            variant="outline"
+            variant={user.isActive ? "destructive" : "outline"}
             size="sm"
             disabled={mutation.isPending}
-            onClick={toggleActive}
+            onClick={handleToggleActiveClick}
           >
             {user.isActive ? t("list.deactivate") : t("list.activate")}
           </Button>
+          <ConfirmDialog
+            open={confirmDeactivateOpen}
+            onOpenChange={setConfirmDeactivateOpen}
+            title={t("list.deactivateConfirmTitle")}
+            description={t("list.deactivateConfirmDescription", { name: user.fullName })}
+            confirmLabel={t("list.deactivate")}
+            onConfirm={confirmDeactivate}
+            isPending={mutation.isPending}
+          />
         </div>
       </TableCell>
     </TableRow>

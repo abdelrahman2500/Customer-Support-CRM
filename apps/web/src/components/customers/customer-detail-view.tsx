@@ -14,11 +14,13 @@ import {
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { ApiError } from "@/lib/api";
 import type { ContactSummary } from "@/lib/tickets-api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   Select,
   SelectContent,
@@ -49,6 +51,7 @@ function priorityBadgeVariant(priority: string) {
  */
 function ContactRow({ customerId, contact }: { customerId: string; contact: ContactSummary }) {
   const t = useTranslations("customers");
+  const errorMessage = useErrorMessage();
   const [fullNameDraft, setFullNameDraft] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState<string | null>(null);
   const [phoneDraft, setPhoneDraft] = useState<string | null>(null);
@@ -56,14 +59,21 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
   const portalPasswordMutation = useSetContactPortalPasswordMutation(customerId, contact.id);
   const [portalPasswordDraft, setPortalPasswordDraft] = useState("");
   const [portalPasswordSuccess, setPortalPasswordSuccess] = useState(false);
+  // Story 94 — setting a contact's portal password immediately invalidates
+  // whatever they currently sign in with, same as an agent's own password
+  // reset (`UserRow`) — now requires confirmation, and its error branch,
+  // which previously had no 403 check at all, is normalized like every
+  // sibling mutation on this page.
+  const [confirmPortalPasswordOpen, setConfirmPortalPasswordOpen] = useState(false);
 
-  function handleSetPortalPassword() {
+  function confirmSetPortalPassword() {
     portalPasswordMutation.mutate(
       { newPassword: portalPasswordDraft },
       {
         onSuccess: () => {
           setPortalPasswordDraft("");
           setPortalPasswordSuccess(true);
+          setConfirmPortalPasswordOpen(false);
         },
       },
     );
@@ -122,9 +132,10 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
       </div>
       {mutation.isError && (
         <span className="text-xs text-red-600">
-          {mutation.error instanceof ApiError && mutation.error.status === 403
-            ? t("detail.actionForbidden")
-            : t("detail.actionFailed")}
+          {errorMessage(mutation.error, {
+            forbidden: t("detail.actionForbidden"),
+            generic: t("detail.actionFailed"),
+          })}
         </span>
       )}
 
@@ -146,21 +157,31 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
             variant="outline"
             size="sm"
             disabled={portalPasswordDraft.length < 8 || portalPasswordMutation.isPending}
-            onClick={handleSetPortalPassword}
+            onClick={() => setConfirmPortalPasswordOpen(true)}
           >
             {portalPasswordMutation.isPending
               ? t("detail.portalPasswordSubmitting")
               : t("detail.portalPasswordSubmit")}
           </Button>
+          <ConfirmDialog
+            open={confirmPortalPasswordOpen}
+            onOpenChange={setConfirmPortalPasswordOpen}
+            title={t("detail.portalPasswordConfirmTitle")}
+            description={t("detail.portalPasswordConfirmDescription")}
+            confirmLabel={t("detail.portalPasswordSubmit")}
+            onConfirm={confirmSetPortalPassword}
+            isPending={portalPasswordMutation.isPending}
+          />
         </div>
         {portalPasswordSuccess && (
           <p className="text-xs text-emerald-600">{t("detail.portalPasswordSuccess")}</p>
         )}
         {portalPasswordMutation.isError && (
           <p className="text-xs text-red-600">
-            {portalPasswordMutation.error instanceof ApiError
-              ? portalPasswordMutation.error.message
-              : t("detail.actionFailed")}
+            {errorMessage(portalPasswordMutation.error, {
+              forbidden: t("detail.actionForbidden"),
+              generic: t("detail.actionFailed"),
+            })}
           </p>
         )}
       </div>
@@ -177,6 +198,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
  */
 function AddContactForm({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");
+  const errorMessage = useErrorMessage();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -199,7 +221,12 @@ function AddContactForm({ customerId }: { customerId: string }) {
       setPhone("");
       setIsPrimary(false);
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("detail.addContactFailed"));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.addContactFailed"),
+        }),
+      );
     }
   }
 
@@ -267,6 +294,7 @@ function AddContactForm({ customerId }: { customerId: string }) {
  */
 export function CustomerDetailView({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");
+  const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const customerQuery = useCustomerQuery(customerId);
@@ -316,6 +344,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           />
           <Select
             value={customer.isActive ? "active" : "inactive"}
+            disabled={updateCustomerMutation.isPending}
             onValueChange={(value) => updateCustomerMutation.mutate({ isActive: value === "active" })}
           >
             <SelectTrigger className="w-32">
@@ -337,9 +366,10 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
 
       {updateCustomerMutation.isError && (
         <Alert variant="destructive">
-          {updateCustomerMutation.error instanceof ApiError && updateCustomerMutation.error.status === 403
-            ? t("detail.actionForbidden")
-            : t("detail.actionFailed")}
+          {errorMessage(updateCustomerMutation.error, {
+            forbidden: t("detail.actionForbidden"),
+            generic: t("detail.actionFailed"),
+          })}
         </Alert>
       )}
 

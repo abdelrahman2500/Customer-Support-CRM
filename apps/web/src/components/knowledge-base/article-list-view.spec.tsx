@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { ArticleListView } from "./article-list-view";
 import { useArticlesQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
 import { ApiError } from "@/lib/api";
@@ -148,7 +148,7 @@ describe("ArticleListView", () => {
     expect(mutate).toHaveBeenCalledWith({ status: "PUBLISHED" });
   });
 
-  it("unpublishes a published article via the unpublish button", () => {
+  it("does not unpublish immediately — clicking unpublish opens a confirmation dialog first", () => {
     const mutate = vi.fn();
     mockedUseArticlesQuery.mockReturnValue(
       queryResult({
@@ -159,9 +159,31 @@ describe("ArticleListView", () => {
     mockedUseUpdateArticleMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
     render(<ArticleListView />);
-    fireEvent.click(screen.getByText("list.unpublish"));
+    fireEvent.click(screen.getByRole("button", { name: "list.unpublish" }));
 
-    expect(mutate).toHaveBeenCalledWith({ status: "DRAFT" });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("unpublishes a published article via the unpublish button's confirmation dialog", () => {
+    const mutate = vi.fn();
+    mockedUseArticlesQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: [{ ...baseArticle, status: "PUBLISHED", publishedAt: "2026-01-02T00:00:00.000Z" }],
+      }) as never,
+    );
+    mockedUseUpdateArticleMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+    render(<ArticleListView />);
+    fireEvent.click(screen.getByRole("button", { name: "list.unpublish" }));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "list.unpublish" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { status: "DRAFT" },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   it("renders an inline permission error when a mutation is rejected with 403", () => {

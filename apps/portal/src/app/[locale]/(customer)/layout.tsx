@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { fetchCurrentContact } from "@/lib/auth-server";
 import { PortalHeader } from "@/components/portal/portal-header";
 import { PortalNotifications } from "@/components/portal/portal-notifications";
+import { SuccessToaster } from "@/components/portal/success-toaster";
 
 /**
  * Story 52 — the real auth guard for the Customer Portal, mirroring
@@ -32,6 +33,10 @@ export default async function CustomerLayout({
       <PortalHeader contact={contact} />
       <PortalNotifications customerId={contact.customerId} />
       <main className="flex-1 p-6">{children}</main>
+      {/* Story 94 — one generic success-feedback renderer for the whole
+          authenticated session; deliberately separate from
+          PortalNotifications' real-time domain-event stack. */}
+      <SuccessToaster />
     </div>
   );
 }

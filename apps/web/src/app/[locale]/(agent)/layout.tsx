@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { fetchCurrentUser } from "@/lib/auth-server";
 import { WorkspaceNav } from "@/components/workspace/workspace-nav";
 import { BranchNotifications } from "@/components/notifications/branch-notifications";
+import { SuccessToaster } from "@/components/ui/success-toaster";
 
 /**
  * Story 23 — the real auth guard for the agent workspace, replacing the
@@ -38,6 +39,11 @@ export default async function AgentWorkspaceLayout({
       {/* Story 24 — one branch-wide notification consumer for the whole
           authenticated session, not per-page (see BranchNotifications). */}
       <BranchNotifications branchId={user.branchId} />
+      {/* Story 94 — one generic success-feedback renderer for the whole
+          authenticated session; deliberately separate from
+          BranchNotifications' domain-event stack (see SuccessToaster's own
+          doc comment). */}
+      <SuccessToaster />
     </div>
   );
 }

@@ -9,13 +9,14 @@ import {
 } from "@/hooks/use-automation-rules";
 import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import type { AutomationRuleSummary } from "@/lib/automation-rules-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   Select,
   SelectContent,
@@ -132,10 +133,20 @@ function AutomationRuleRow({
   departmentNameById: Map<string, string>;
 }) {
   const t = useTranslations("automationRules");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateAutomationRuleMutation(rule.id);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
-  function toggleActive() {
-    mutation.mutate({ isActive: !rule.isActive });
+  function handleToggleActiveClick() {
+    if (rule.isActive) {
+      setConfirmDeactivateOpen(true);
+      return;
+    }
+    mutation.mutate({ isActive: true });
+  }
+
+  function confirmDeactivate() {
+    mutation.mutate({ isActive: false }, { onSuccess: () => setConfirmDeactivateOpen(false) });
   }
 
   return (
@@ -158,15 +169,27 @@ function AutomationRuleRow({
           <Badge variant={rule.isActive ? "success" : "secondary"}>
             {rule.isActive ? t("active") : t("inactive")}
           </Badge>
-          <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={toggleActive}>
+          <Button
+            variant={rule.isActive ? "destructive" : "outline"}
+            size="sm"
+            disabled={mutation.isPending}
+            onClick={handleToggleActiveClick}
+          >
             {rule.isActive ? t("deactivate") : t("activate")}
           </Button>
+          <ConfirmDialog
+            open={confirmDeactivateOpen}
+            onOpenChange={setConfirmDeactivateOpen}
+            title={t("deactivateConfirmTitle")}
+            description={t("deactivateConfirmDescription", { name: rule.name })}
+            confirmLabel={t("deactivate")}
+            onConfirm={confirmDeactivate}
+            isPending={mutation.isPending}
+          />
         </div>
         {mutation.isError && (
           <p className="mt-1 text-xs text-red-600">
-            {mutation.error instanceof ApiError && mutation.error.status === 403
-              ? t("actionForbidden")
-              : t("actionFailed")}
+            {errorMessage(mutation.error, { forbidden: t("actionForbidden"), generic: t("actionFailed") })}
           </p>
         )}
       </TableCell>
@@ -180,6 +203,7 @@ function AutomationRuleRow({
  * `actionSetDepartmentId`, alongside the original three. */
 function AddAutomationRuleForm() {
   const t = useTranslations("automationRules");
+  const errorMessage = useErrorMessage();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
   const [name, setName] = useState("");
@@ -207,7 +231,7 @@ function AddAutomationRuleForm() {
       setActionSetCategory("");
       setActionSetDepartmentId("");
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("createFailed"));
+      setError(errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }));
     }
   }
 

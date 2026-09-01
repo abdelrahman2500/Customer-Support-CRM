@@ -5,13 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla-policies";
 import type { SlaPolicySummary } from "@/lib/sla-policies-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
  * Story 31 — SLA Policy list, over the already-existing `GET /sla-policies`
@@ -99,10 +100,12 @@ export function SlaPolicyListView() {
  */
 function SlaPolicyRow({ policy }: { policy: SlaPolicySummary }) {
   const t = useTranslations("slaPolicies");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateSlaPolicyMutation(policy.id);
 
   const [responseDraft, setResponseDraft] = useState(String(policy.responseTargetMinutes));
   const [resolutionDraft, setResolutionDraft] = useState(String(policy.resolutionTargetMinutes));
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
 
   function commitResponseTarget() {
     const parsed = Number(responseDraft);
@@ -134,8 +137,16 @@ function SlaPolicyRow({ policy }: { policy: SlaPolicySummary }) {
     );
   }
 
-  function toggleActive() {
-    mutation.mutate({ isActive: !policy.isActive });
+  function handleToggleActiveClick() {
+    if (policy.isActive) {
+      setConfirmDeactivateOpen(true);
+      return;
+    }
+    mutation.mutate({ isActive: true });
+  }
+
+  function confirmDeactivate() {
+    mutation.mutate({ isActive: false }, { onSuccess: () => setConfirmDeactivateOpen(false) });
   }
 
   return (
@@ -176,15 +187,30 @@ function SlaPolicyRow({ policy }: { policy: SlaPolicySummary }) {
           <Badge variant={policy.isActive ? "success" : "secondary"}>
             {policy.isActive ? t("list.active") : t("list.inactive")}
           </Badge>
-          <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={toggleActive}>
+          <Button
+            variant={policy.isActive ? "destructive" : "outline"}
+            size="sm"
+            disabled={mutation.isPending}
+            onClick={handleToggleActiveClick}
+          >
             {policy.isActive ? t("list.deactivate") : t("list.activate")}
           </Button>
+          <ConfirmDialog
+            open={confirmDeactivateOpen}
+            onOpenChange={setConfirmDeactivateOpen}
+            title={t("list.deactivateConfirmTitle")}
+            description={t("list.deactivateConfirmDescription")}
+            confirmLabel={t("list.deactivate")}
+            onConfirm={confirmDeactivate}
+            isPending={mutation.isPending}
+          />
         </div>
         {mutation.isError && (
           <p className="mt-1 text-xs text-red-600">
-            {mutation.error instanceof ApiError && mutation.error.status === 403
-              ? t("list.actionForbidden")
-              : t("list.actionFailed")}
+            {errorMessage(mutation.error, {
+              forbidden: t("list.actionForbidden"),
+              generic: t("list.actionFailed"),
+            })}
           </p>
         )}
       </TableCell>

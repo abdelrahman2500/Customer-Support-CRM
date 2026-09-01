@@ -5,13 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useArticlesQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
 import type { ArticleSummary } from "@/lib/knowledge-base-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
  * Story 51 — Knowledge Base article list, over the new `GET
@@ -112,12 +113,22 @@ export function ArticleListView() {
  */
 function ArticleRow({ article }: { article: ArticleSummary }) {
   const t = useTranslations("knowledgeBase");
+  const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const mutation = useUpdateArticleMutation(article.id);
+  const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
 
-  function togglePublished() {
-    mutation.mutate({ status: article.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED" });
+  function handleTogglePublishedClick() {
+    if (article.status === "PUBLISHED") {
+      setConfirmUnpublishOpen(true);
+      return;
+    }
+    mutation.mutate({ status: "PUBLISHED" });
+  }
+
+  function confirmUnpublish() {
+    mutation.mutate({ status: "DRAFT" }, { onSuccess: () => setConfirmUnpublishOpen(false) });
   }
 
   return (
@@ -125,7 +136,7 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
       <TableCell>
         <button
           type="button"
-          className="text-left font-medium text-slate-800 hover:underline"
+          className="text-start font-medium text-slate-800 hover:underline"
           onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
         >
           {article.title}
@@ -137,15 +148,30 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
           <Badge variant={article.status === "PUBLISHED" ? "success" : "secondary"}>
             {article.status === "PUBLISHED" ? t("list.published") : t("list.draft")}
           </Badge>
-          <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={togglePublished}>
+          <Button
+            variant={article.status === "PUBLISHED" ? "destructive" : "outline"}
+            size="sm"
+            disabled={mutation.isPending}
+            onClick={handleTogglePublishedClick}
+          >
             {article.status === "PUBLISHED" ? t("list.unpublish") : t("list.publish")}
           </Button>
+          <ConfirmDialog
+            open={confirmUnpublishOpen}
+            onOpenChange={setConfirmUnpublishOpen}
+            title={t("list.unpublishConfirmTitle")}
+            description={t("list.unpublishConfirmDescription", { title: article.title })}
+            confirmLabel={t("list.unpublish")}
+            onConfirm={confirmUnpublish}
+            isPending={mutation.isPending}
+          />
         </div>
         {mutation.isError && (
           <p className="mt-1 text-xs text-red-600">
-            {mutation.error instanceof ApiError && mutation.error.status === 403
-              ? t("list.actionForbidden")
-              : t("list.actionFailed")}
+            {errorMessage(mutation.error, {
+              forbidden: t("list.actionForbidden"),
+              generic: t("list.actionFailed"),
+            })}
           </p>
         )}
       </TableCell>

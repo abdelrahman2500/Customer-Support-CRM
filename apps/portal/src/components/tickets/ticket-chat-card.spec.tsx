@@ -179,7 +179,10 @@ describe("TicketChatCard (portal)", () => {
     await screen.findByText("Ticket not found");
   });
 
-  it("shows the fallback error message for a non-ApiError send failure", async () => {
+  // Story 94 — a non-ApiError rejection (e.g. a dropped connection) is now
+  // classified as a network failure, not this feature's own generic
+  // "couldn't send" copy — see `error-message.ts`.
+  it("shows the shared network-failure message for a non-ApiError send failure", async () => {
     vi.mocked(useMyTicketMessagesQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -194,6 +197,6 @@ describe("TicketChatCard (portal)", () => {
     });
     fireEvent.click(screen.getByText("detail.chatSend"));
 
-    await screen.findByText("detail.chatSendFailed");
+    await screen.findByText("errors.network");
   });
 });

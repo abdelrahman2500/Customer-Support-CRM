@@ -8,7 +8,7 @@ import {
   useMyTicketMessagesQuery,
   useSendMyTicketMessageMutation,
 } from "@/hooks/use-portal-tickets";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 
 /**
  * Story 78 — Live Chat UI (Customer Portal side). Reads
@@ -96,6 +96,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
  * renders inline and leaves the draft in the textarea. */
 function ChatComposer({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const errorMessage = useErrorMessage();
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const mutation = useSendMyTicketMessageMutation(ticketId);
@@ -110,7 +111,12 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
       await mutation.mutateAsync({ body: trimmed });
       setBody("");
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("detail.chatSendFailed"));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.chatSendFailed"),
+        }),
+      );
     }
   }
 

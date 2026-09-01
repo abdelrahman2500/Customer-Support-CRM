@@ -10,8 +10,15 @@ import {
   useUpdateRoleMutation,
 } from "@/hooks/use-roles";
 import { ApiError } from "@/lib/api";
+import { showSuccessToast } from "@/lib/toast-store";
 import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
+
+vi.mock("@/lib/toast-store", () => ({
+  showSuccessToast: vi.fn(),
+}));
+
+const mockedShowSuccessToast = vi.mocked(showSuccessToast);
 
 /**
  * Story 46 — Role & Permission Management. Mirrors
@@ -257,7 +264,7 @@ describe("RoleListView", () => {
     });
   });
 
-  it("toggles a custom role's active state via the activate/deactivate button", () => {
+  it("does not deactivate immediately — clicking 'Deactivate' opens a confirmation dialog first", () => {
     const mutate = vi.fn();
     mockedUseManagedRolesQuery.mockReturnValue(
       queryResult({
@@ -269,9 +276,32 @@ describe("RoleListView", () => {
 
     renderView();
 
-    fireEvent.click(screen.getByText("Deactivate"));
+    fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
 
-    expect(mutate).toHaveBeenCalledWith({ isActive: false });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("toggles a custom role's active state via the activate/deactivate button's confirmation dialog", () => {
+    const mutate = vi.fn();
+    mockedUseManagedRolesQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: [{ id: "role-1", name: "Viewer", permissions: [], isActive: true }],
+      }) as never,
+    );
+    mockedUseUpdateRoleMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+    renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Deactivate" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { isActive: false },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   it("toggles an inactive custom role back to active", () => {
@@ -396,7 +426,7 @@ describe("RoleListView", () => {
       expect(screen.getByText("A role with this name already exists")).toBeInTheDocument();
     });
 
-    it("renders the generic failed message when a role-update mutation is rejected with a non-ApiError", () => {
+    it("renders the shared network-failure message when a role-update mutation is rejected with a non-ApiError", () => {
       mockedUseManagedRolesQuery.mockReturnValue(queryResult({ isSuccess: true, data: roleData }) as never);
       mockedUseUpdateRoleMutation.mockReturnValue(
         mutationResult({ isError: true, error: new Error("network down") }) as never,
@@ -405,7 +435,7 @@ describe("RoleListView", () => {
       renderView();
 
       expect(
-        screen.getByText("That change couldn't be saved. Please try again."),
+        screen.getByText("Couldn't reach the server. Check your connection and try again."),
       ).toBeInTheDocument();
     });
   });
@@ -437,6 +467,25 @@ describe("RoleListView", () => {
       await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ name: "Ops" }));
     });
 
+    // Story 94 — success feedback.
+    it("shows a translated success toast only after the create-role mutation resolves", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "role-99" });
+      mockedUseCreateRoleMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+      renderView();
+
+      fireEvent.change(screen.getByPlaceholderText("Role name"), {
+        target: { value: "Ops" },
+      });
+      expect(mockedShowSuccessToast).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Add role" }));
+
+      await waitFor(() =>
+        expect(mockedShowSuccessToast).toHaveBeenCalledWith('Role "Ops" created.'),
+      );
+    });
+
     it("shows the backend's own message inline on a rejected submission (duplicate name) and preserves the entered value", async () => {
       const mutateAsync = vi.fn().mockRejectedValue(new ApiError("A role with this name already exists", 409));
       mockedUseCreateRoleMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
@@ -452,7 +501,7 @@ describe("RoleListView", () => {
       expect(screen.getByDisplayValue("Ops")).toBeInTheDocument();
     });
 
-    it("falls back to a generic message when the create-role rejection is not an ApiError", async () => {
+    it("falls back to the shared network-failure message when the create-role rejection is not an ApiError", async () => {
       const mutateAsync = vi.fn().mockRejectedValue(new Error("network down"));
       mockedUseCreateRoleMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
 
@@ -464,7 +513,7 @@ describe("RoleListView", () => {
       fireEvent.click(screen.getByRole("button", { name: "Add role" }));
 
       expect(
-        await screen.findByText("Couldn't create the role. Please try again."),
+        await screen.findByText("Couldn't reach the server. Check your connection and try again."),
       ).toBeInTheDocument();
     });
 

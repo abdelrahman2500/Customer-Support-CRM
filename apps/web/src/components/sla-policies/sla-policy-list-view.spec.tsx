@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { SlaPolicyListView } from "./sla-policy-list-view";
 import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla-policies";
 import { ApiError } from "@/lib/api";
@@ -199,7 +199,7 @@ describe("SlaPolicyListView", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("toggles active state via the activate/deactivate button", () => {
+  it("does not deactivate immediately — clicking the deactivate button opens a confirmation dialog first", () => {
     const mutate = vi.fn();
     mockedUseSlaPoliciesQuery.mockReturnValue(
       queryResult({ isSuccess: true, data: [basePolicy] }) as never,
@@ -208,9 +208,29 @@ describe("SlaPolicyListView", () => {
 
     render(<SlaPolicyListView />);
 
-    fireEvent.click(screen.getByText("list.deactivate"));
+    fireEvent.click(screen.getByRole("button", { name: "list.deactivate" }));
 
-    expect(mutate).toHaveBeenCalledWith({ isActive: false });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("toggles active state via the activate/deactivate button's confirmation dialog", () => {
+    const mutate = vi.fn();
+    mockedUseSlaPoliciesQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [basePolicy] }) as never,
+    );
+    mockedUseUpdateSlaPolicyMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+    render(<SlaPolicyListView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "list.deactivate" }));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "list.deactivate" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { isActive: false },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   it("renders an inline permission error when a mutation is rejected with 403", () => {

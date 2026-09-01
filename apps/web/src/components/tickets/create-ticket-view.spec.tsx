@@ -10,6 +10,7 @@ import {
   useUsersQuery,
 } from "@/hooks/use-tickets";
 import { ApiError } from "@/lib/api";
+import { showSuccessToast } from "@/lib/toast-store";
 import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
 
@@ -21,6 +22,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
   useSearchParams: () => mockSearchParams,
 }));
+
+vi.mock("@/lib/toast-store", () => ({
+  showSuccessToast: vi.fn(),
+}));
+
+const mockedShowSuccessToast = vi.mocked(showSuccessToast);
 
 vi.mock("@/hooks/use-tickets", () => ({
   useCreateTicketMutation: vi.fn(),
@@ -113,6 +120,38 @@ describe("CreateTicketView", () => {
       }),
     );
     expect(push).toHaveBeenCalledWith("/en/tickets/ticket-42");
+  });
+
+  // Story 94 — success feedback.
+  it("shows a translated success toast, and only after the mutation actually resolves", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ id: "ticket-42" });
+    mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+    renderWithLocale("en");
+
+    fireEvent.click(screen.getByText("Select a customer"));
+    fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Cannot log in" } });
+    expect(mockedShowSuccessToast).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
+
+    await waitFor(() => expect(mockedShowSuccessToast).toHaveBeenCalledWith("Ticket created."));
+  });
+
+  it("never shows a success toast when the mutation is rejected", async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Customer not found", 404));
+    mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+    renderWithLocale("en");
+
+    fireEvent.click(screen.getByText("Select a customer"));
+    fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
+    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
+
+    await screen.findByText("Customer not found");
+    expect(mockedShowSuccessToast).not.toHaveBeenCalled();
   });
 
   it("renders the backend's own message inline on a rejected submission", async () => {

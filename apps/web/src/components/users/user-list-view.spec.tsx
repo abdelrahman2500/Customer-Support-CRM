@@ -295,7 +295,25 @@ describe("UserListView", () => {
     });
   });
 
-  it("toggles active state via the activate/deactivate button, without affecting the assignment mutation", () => {
+  // Story 94 — deactivating a user now requires confirmation: the trigger
+  // button opens a dialog rather than mutating immediately, and the
+  // mutation only fires once the dialog's own "Deactivate" button (a
+  // second, distinct element with the same accessible name) is clicked.
+  it("does not deactivate immediately — clicking 'Deactivate' opens a confirmation dialog first", () => {
+    mockedUseUsersQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [baseUser] }) as never,
+    );
+    const renameMutate = vi.fn();
+    mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(renameMutate).not.toHaveBeenCalled();
+  });
+
+  it("toggles active state via the activate/deactivate button's confirmation dialog, without affecting the assignment mutation", () => {
     const renameMutate = vi.fn();
     const assignmentMutate = vi.fn();
     mockedUseUsersQuery.mockReturnValue(
@@ -308,10 +326,29 @@ describe("UserListView", () => {
 
     renderView();
 
-    fireEvent.click(screen.getByText("Deactivate"));
+    fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Deactivate" }));
 
-    expect(renameMutate).toHaveBeenCalledWith({ isActive: false });
+    expect(renameMutate).toHaveBeenCalledWith(
+      { isActive: false },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
     expect(assignmentMutate).not.toHaveBeenCalled();
+  });
+
+  it("activating an inactive user does not require confirmation", () => {
+    const renameMutate = vi.fn();
+    mockedUseUsersQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [{ ...baseUser, isActive: false }] }) as never,
+    );
+    mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+
+    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "Activate" }));
+
+    expect(renameMutate).toHaveBeenCalledWith({ isActive: true });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 
   describe("reassigning role/department", () => {
@@ -462,7 +499,11 @@ describe("UserListView", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders a generic action-failed message when the rejection is not an ApiError", () => {
+    // Story 94 — a non-ApiError rejection (the update mutation's promise
+    // rejecting with something that isn't a real HTTP response, e.g. a
+    // dropped connection) is now classified as a network failure, not the
+    // feature's generic "couldn't be saved" copy — see `error-message.ts`.
+    it("renders the shared network-failure message when the rejection is not an ApiError", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [baseUser] }) as never,
       );
@@ -474,7 +515,7 @@ describe("UserListView", () => {
 
       const emailCell = screen.getAllByRole("cell")[0]!;
       expect(
-        within(emailCell).getByText("That change couldn't be saved. Please try again."),
+        within(emailCell).getByText("Couldn't reach the server. Check your connection and try again."),
       ).toBeInTheDocument();
     });
   });
@@ -529,7 +570,7 @@ describe("UserListView", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders a generic action-failed message when the assignment rejection is not an ApiError", () => {
+    it("renders the shared network-failure message when the assignment rejection is not an ApiError", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [baseUser] }) as never,
       );
@@ -540,7 +581,7 @@ describe("UserListView", () => {
       renderView();
 
       expect(
-        screen.getByText("That change couldn't be saved. Please try again."),
+        screen.getByText("Couldn't reach the server. Check your connection and try again."),
       ).toBeInTheDocument();
     });
   });
@@ -564,7 +605,7 @@ describe("UserListView", () => {
       expect(submitButton).toBeEnabled();
     });
 
-    it("does not commit on blur — only an explicit click on the button commits, with the exact { newPassword } payload", () => {
+    it("does not commit on blur, and clicking 'Reset password' opens a confirmation dialog rather than committing immediately", () => {
       const mutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [baseUser] }) as never,
@@ -579,6 +620,25 @@ describe("UserListView", () => {
       expect(mutate).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it("commits with the exact { newPassword } payload only once the confirmation dialog's own Reset password button is clicked", () => {
+      const mutate = vi.fn();
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+      renderView();
+
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Reset password" }));
 
       expect(mutate).toHaveBeenCalledWith(
         { newPassword: "newpassword1" },
@@ -601,6 +661,8 @@ describe("UserListView", () => {
       const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Reset password" }));
 
       expect(screen.getByDisplayValue("newpassword1")).toBeInTheDocument();
     });
@@ -620,6 +682,8 @@ describe("UserListView", () => {
       const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Reset password" }));
 
       // Simulate the real mutation resolving successfully by invoking the
       // callback the component actually passed to `mutate`.
@@ -629,6 +693,7 @@ describe("UserListView", () => {
 
       expect(passwordInput).toHaveValue("");
       expect(screen.getByText("Password reset.")).toBeInTheDocument();
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     });
   });
 
@@ -666,7 +731,7 @@ describe("UserListView", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders a generic action-failed message when the rejection is not an ApiError", () => {
+    it("renders the shared network-failure message when the rejection is not an ApiError", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [baseUser] }) as never,
       );
@@ -677,7 +742,7 @@ describe("UserListView", () => {
       renderView();
 
       expect(
-        screen.getByText("That change couldn't be saved. Please try again."),
+        screen.getByText("Couldn't reach the server. Check your connection and try again."),
       ).toBeInTheDocument();
     });
   });
@@ -732,6 +797,8 @@ describe("UserListView", () => {
       const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Reset password" }));
 
       expect(resetPasswordMutate).toHaveBeenCalledWith(
         { newPassword: "newpassword1" },

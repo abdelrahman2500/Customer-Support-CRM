@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { AutomationRulesView } from "./automation-rules-view";
 import {
   useAutomationRulesQuery,
@@ -149,7 +149,7 @@ describe("AutomationRulesView", () => {
     expect(screen.getAllByText("anyCategory").length).toBeGreaterThan(0);
   });
 
-  it("toggles a rule's active state", () => {
+  it("does not deactivate immediately — clicking deactivate opens a confirmation dialog first", () => {
     const mutate = vi.fn();
     mockedUseAutomationRulesQuery.mockReturnValue(
       queryResult({ data: [baseRule], isSuccess: true }) as never,
@@ -158,9 +158,29 @@ describe("AutomationRulesView", () => {
 
     render(<AutomationRulesView />);
 
-    fireEvent.click(screen.getByText("deactivate"));
+    fireEvent.click(screen.getByRole("button", { name: "deactivate" }));
 
-    expect(mutate).toHaveBeenCalledWith({ isActive: false });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("toggles a rule's active state via the confirmation dialog", () => {
+    const mutate = vi.fn();
+    mockedUseAutomationRulesQuery.mockReturnValue(
+      queryResult({ data: [baseRule], isSuccess: true }) as never,
+    );
+    mockedUseUpdateAutomationRuleMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+    render(<AutomationRulesView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "deactivate" }));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "deactivate" }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { isActive: false },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   it("shows a forbidden message when toggling fails with 403", () => {

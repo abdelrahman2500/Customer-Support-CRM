@@ -6,7 +6,15 @@
     "notSignedIn": "Not signed in.",
     "login": "Log in",
     "email": "Email",
-    "password": "Password"
+    "password": "Password",
+    "cancel": "Cancel",
+    "working": "Working...",
+    "dismiss": "Dismiss",
+    "successToastRegionLabel": "Success notifications",
+    "errors": {
+      "network": "Couldn't reach the server. Check your connection and try again.",
+      "unauthorized": "Your session has expired. Please sign in again."
+    }
   },
   "auth": {
     "title": "Sign in",
@@ -128,7 +136,9 @@
       "notFound": "This ticket could not be found.",
       "loadError": "Couldn't load this ticket.",
       "actionForbidden": "You don't have permission to perform that action.",
-      "actionFailed": "That change couldn't be saved. Please try again."
+      "actionFailed": "That change couldn't be saved. Please try again.",
+      "statusUpdateSuccess": "Status updated to {status}.",
+      "priorityUpdateSuccess": "Priority updated to {priority}."
     },
     "sla": {
       "none": "No SLA target",
@@ -162,7 +172,9 @@
       "assignedAgentLoadError": "Couldn't load agents.",
       "submit": "Create ticket",
       "submitting": "Creating...",
-      "createFailed": "Couldn't create the ticket. Please try again."
+      "createFailed": "Couldn't create the ticket. Please try again.",
+      "createSuccess": "Ticket created.",
+      "actionForbidden": "You don't have permission to perform that action."
     }
   },
   "customers": {
@@ -210,7 +222,9 @@
       "attachmentsError": "Couldn't load this customer's attachments.",
       "attachmentsEmpty": "No attachments yet.",
       "attachmentsUploading": "Uploading...",
-      "attachmentsUploadFailed": "Couldn't upload the file. Please try again."
+      "attachmentsUploadFailed": "Couldn't upload the file. Please try again.",
+      "portalPasswordConfirmTitle": "Reset this contact's portal password?",
+      "portalPasswordConfirmDescription": "Their current portal password will stop working immediately."
     },
     "create": {
       "title": "New customer",
@@ -233,6 +247,10 @@
       "inactive": "Inactive",
       "activate": "Activate",
       "deactivate": "Deactivate",
+      "deactivateConfirmTitle": "Deactivate this user?",
+      "deactivateConfirmDescription": "\"{name}\" will no longer be able to sign in.",
+      "passwordResetConfirmTitle": "Reset this user's password?",
+      "passwordResetConfirmDescription": "Their current password will stop working immediately.",
       "noRoles": "—",
       "actionForbidden": "You don't have permission to perform that action.",
       "actionFailed": "That change couldn't be saved. Please try again.",
@@ -269,7 +287,9 @@
       "roleLoadError": "Couldn't load roles.",
       "submit": "Create user",
       "submitting": "Creating...",
-      "createFailed": "Couldn't create the user. Please try again."
+      "createFailed": "Couldn't create the user. Please try again.",
+      "createSuccess": "User \"{name}\" created.",
+      "actionForbidden": "You don't have permission to perform that action."
     }
   },
   "slaPolicies": {
@@ -295,7 +315,9 @@
         "responseTarget": "Response target (min)",
         "resolutionTarget": "Resolution target (min)",
         "status": "Status"
-      }
+      },
+      "deactivateConfirmTitle": "Deactivate this SLA policy?",
+      "deactivateConfirmDescription": "Tickets matching this policy's scope will no longer have a response or resolution target applied."
     },
     "create": {
       "title": "New SLA policy",
@@ -309,7 +331,8 @@
       "invalidTargets": "Response and resolution targets must be whole numbers of at least 1 minute.",
       "submit": "Create policy",
       "submitting": "Creating...",
-      "createFailed": "Couldn't create the SLA policy. Please try again."
+      "createFailed": "Couldn't create the SLA policy. Please try again.",
+      "createSuccess": "SLA policy created."
     }
   },
   "roles": {
@@ -330,11 +353,14 @@
       "createSubmit": "Add role",
       "createSubmitting": "Adding...",
       "createFailed": "Couldn't create the role. Please try again.",
+      "createSuccess": "Role \"{name}\" created.",
       "systemRole": "System role",
       "active": "Active",
       "inactive": "Inactive",
       "activate": "Activate",
       "deactivate": "Deactivate",
+      "deactivateConfirmTitle": "Deactivate this role?",
+      "deactivateConfirmDescription": "Users assigned \"{name}\" will lose every permission it grants the next time their permissions are checked.",
       "actionForbidden": "You don't have permission to perform that action.",
       "actionFailed": "That change couldn't be saved. Please try again.",
       "permissionsAssignHeading": "Assign permissions",
@@ -397,7 +423,9 @@
       "actionForbidden": "You don't have permission to perform that action.",
       "actionFailed": "That change couldn't be saved. Please try again.",
       "loadError": "Couldn't load your branch.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "deactivateConfirmTitle": "Deactivate this branch?",
+      "deactivateConfirmDescription": "\"{name}\" and everyone in it will lose access until it's reactivated."
     },
     "departments": {
       "heading": "Departments",
@@ -418,7 +446,10 @@
       "columns": {
         "name": "Name",
         "status": "Status"
-      }
+      },
+      "deactivateConfirmTitle": "Deactivate this department?",
+      "deactivateConfirmDescription": "\"{name}\" will no longer be assignable to tickets or users.",
+      "createSuccess": "Department \"{name}\" created."
     }
   },
   "auditLogs": {
@@ -496,7 +527,9 @@
         "title": "Title",
         "category": "Category",
         "status": "Status"
-      }
+      },
+      "unpublishConfirmTitle": "Unpublish this article?",
+      "unpublishConfirmDescription": "\"{title}\" will no longer be visible to agents searching the knowledge base or to customers in the portal."
     },
     "create": {
       "title": "New article",
@@ -627,7 +660,9 @@
     "noAction": "—",
     "createSubmit": "Create rule",
     "createSubmitting": "Creating...",
-    "createFailed": "Couldn't create the rule. Please try again."
+    "createFailed": "Couldn't create the rule. Please try again.",
+    "deactivateConfirmTitle": "Deactivate this automation rule?",
+    "deactivateConfirmDescription": "\"{name}\" will stop running against new tickets."
   },
   "quickReplies": {
     "title": "Quick Replies",
@@ -650,7 +685,9 @@
     "bodyLabel": "Body",
     "createSubmit": "Create quick reply",
     "createSubmitting": "Creating...",
-    "createFailed": "Couldn't create the quick reply. Please try again."
+    "createFailed": "Couldn't create the quick reply. Please try again.",
+    "deactivateConfirmTitle": "Deactivate this quick reply?",
+    "deactivateConfirmDescription": "\"{title}\" will no longer be available in the reply picker."
   },
   "notificationTemplates": {
     "title": "Notification Templates",
