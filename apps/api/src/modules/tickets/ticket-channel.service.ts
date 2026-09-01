@@ -93,6 +93,22 @@ export class TicketChannelService {
     }
   }
 
+  /**
+   * Story 87 — the public Web-Form intake orchestrator's final step:
+   * records the submitted message on the ticket just created for this
+   * contact. No authorization check of its own — mirrors
+   * `recordAiChatTranscript`'s identical "caller already owns this
+   * brand-new ticket/contact pairing" precedent (Story 85).
+   */
+  async recordWebFormMessage(ticketId: string, contactId: string, body: string): Promise<void> {
+    await this.channelMessagesService.createInboundFromContact(
+      ticketId,
+      "WEB_FORM",
+      contactId,
+      body,
+    );
+  }
+
   /** Mirrors `TicketsService`'s own private `requireAuthenticatedUserId`
    * exactly (same error, same `TenantContext.userId` source). */
   private requireAuthenticatedUserId(): string {

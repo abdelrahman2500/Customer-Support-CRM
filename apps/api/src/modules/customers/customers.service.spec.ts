@@ -7,6 +7,9 @@ import type { TenantContext } from "../../common/tenant/tenant-context";
 
 function buildPrismaMock() {
   return {
+    branch: {
+      findFirst: vi.fn(),
+    },
     customer: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -235,6 +238,101 @@ describe("CustomersService", () => {
       await expect(
         service.createContact("customer-1", { fullName: "Jane Doe", email: "jane@example.com" }),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  describe("findOrCreateContactForWebForm", () => {
+    const input = { fullName: "Jane Doe", email: "jane@example.com", phone: "555-0100" };
+
+    it("throws NotFoundException for an unknown branch id", async () => {
+      prisma.branch.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOrCreateContactForWebForm("missing-branch", input)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+        where: { id: "missing-branch", isActive: true },
+      });
+      expect(prisma.contact.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException for an inactive branch (excluded by the isActive filter)", async () => {
+      prisma.branch.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOrCreateContactForWebForm("branch-1", input)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it("reuses an existing Contact/Customer pair found by (branchId, email)", async () => {
+      prisma.branch.findFirst.mockResolvedValue({ id: "branch-1", isActive: true });
+      prisma.contact.findFirst.mockResolvedValue({
+        id: "contact-1",
+        customerId: "customer-1",
+        email: "jane@example.com",
+      });
+
+      const result = await service.findOrCreateContactForWebForm("branch-1", input);
+
+      expect(prisma.contact.findFirst).toHaveBeenCalledWith({
+        where: { email: "jane@example.com", customer: { branchId: "branch-1" } },
+      });
+      expect(prisma.customer.create).not.toHaveBeenCalled();
+      expect(prisma.contact.create).not.toHaveBeenCalled();
+      expect(result).toEqual({ customerId: "customer-1", contactId: "contact-1" });
+    });
+
+    it("creates a new Customer + primary Contact when none exists", async () => {
+      prisma.branch.findFirst.mockResolvedValue({ id: "branch-1", isActive: true });
+      prisma.contact.findFirst.mockResolvedValue(null);
+      prisma.customer.create.mockResolvedValue({ id: "customer-new", branchId: "branch-1" });
+      prisma.contact.create.mockResolvedValue({ id: "contact-new", customerId: "customer-new" });
+
+      const result = await service.findOrCreateContactForWebForm("branch-1", input);
+
+      expect(prisma.customer.create).toHaveBeenCalledWith({
+        data: { branchId: "branch-1", displayName: "Jane Doe" },
+      });
+      expect(prisma.contact.create).toHaveBeenCalledWith({
+        data: {
+          customerId: "customer-new",
+          fullName: "Jane Doe",
+          email: "jane@example.com",
+          phone: "555-0100",
+          isPrimary: true,
+        },
+      });
+      expect(result).toEqual({ customerId: "customer-new", contactId: "contact-new" });
+    });
+
+    it("defaults phone to null when omitted", async () => {
+      prisma.branch.findFirst.mockResolvedValue({ id: "branch-1", isActive: true });
+      prisma.contact.findFirst.mockResolvedValue(null);
+      prisma.customer.create.mockResolvedValue({ id: "customer-new", branchId: "branch-1" });
+      prisma.contact.create.mockResolvedValue({ id: "contact-new", customerId: "customer-new" });
+
+      await service.findOrCreateContactForWebForm("branch-1", {
+        fullName: "Jane Doe",
+        email: "jane@example.com",
+      });
+
+      expect(prisma.contact.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ phone: null }) }),
+      );
+    });
+
+    it("scopes the lookup to the given branch — a same-email contact in another branch is not found, so a new Customer is created there instead", async () => {
+      prisma.branch.findFirst.mockResolvedValue({ id: "branch-2", isActive: true });
+      prisma.contact.findFirst.mockResolvedValue(null);
+      prisma.customer.create.mockResolvedValue({ id: "customer-branch-2", branchId: "branch-2" });
+      prisma.contact.create.mockResolvedValue({ id: "contact-branch-2", customerId: "customer-branch-2" });
+
+      const result = await service.findOrCreateContactForWebForm("branch-2", input);
+
+      expect(prisma.contact.findFirst).toHaveBeenCalledWith({
+        where: { email: "jane@example.com", customer: { branchId: "branch-2" } },
+      });
+      expect(result).toEqual({ customerId: "customer-branch-2", contactId: "contact-branch-2" });
     });
   });
 

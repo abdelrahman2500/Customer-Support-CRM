@@ -102,6 +102,57 @@ export class CustomersService {
     }
   }
 
+  // ---------------------------------------------------------------------
+  // Story 87 — Communication/Channels: Public Web-Form Ticket Intake
+  // (no TenantContext; the caller has no branch session at all — mirrors
+  // TicketsService's own "Story 53 — customer-scoped, no TenantContext"
+  // precedent exactly).
+  // ---------------------------------------------------------------------
+
+  /**
+   * Finds an existing Contact with this email under this branch (searched
+   * across every Customer in the branch, since `Contact.email` is unique
+   * only per-Customer, never globally — see this file's `Contact` model
+   * doc comment in schema.prisma); creates a brand-new Customer + Contact
+   * when none exists. `branchId` is a caller-supplied parameter, not
+   * resolved from `TenantContext` — mirrors `TicketsService.
+   * requireDepartmentInScope`'s/`IdentityService.updateBranch`'s own
+   * existing precedent of a service reading another domain's `Branch` row
+   * directly for a scope-existence check.
+   */
+  async findOrCreateContactForWebForm(
+    branchId: string,
+    input: { fullName: string; email: string; phone?: string },
+  ): Promise<{ customerId: string; contactId: string }> {
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: branchId, isActive: true },
+    });
+    if (!branch) {
+      throw new NotFoundException("Branch not found");
+    }
+
+    const existing = await this.prisma.contact.findFirst({
+      where: { email: input.email, customer: { branchId } },
+    });
+    if (existing) {
+      return { customerId: existing.customerId, contactId: existing.id };
+    }
+
+    const customer = await this.prisma.customer.create({
+      data: { branchId, displayName: input.fullName },
+    });
+    const contact = await this.prisma.contact.create({
+      data: {
+        customerId: customer.id,
+        fullName: input.fullName,
+        email: input.email,
+        phone: input.phone ?? null,
+        isPrimary: true,
+      },
+    });
+    return { customerId: customer.id, contactId: contact.id };
+  }
+
   async updateContact(
     customerId: string,
     contactId: string,

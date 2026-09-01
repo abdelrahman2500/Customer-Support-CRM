@@ -185,4 +185,27 @@ describe("TicketChannelService", () => {
       expect(ticketsService.getTicketForCustomer).not.toHaveBeenCalled();
     });
   });
+
+  // Story 87 — Communication/Channels: Public Web-Form Ticket Intake.
+  describe("recordWebFormMessage", () => {
+    it("records an INBOUND WEB_FORM message via createInboundFromContact", async () => {
+      channelMessagesService.createInboundFromContact.mockResolvedValue({ id: "message-1" });
+
+      await service.recordWebFormMessage("ticket-1", "contact-1", "I need help with my order");
+
+      expect(channelMessagesService.createInboundFromContact).toHaveBeenCalledWith(
+        "ticket-1",
+        "WEB_FORM",
+        "contact-1",
+        "I need help with my order",
+      );
+    });
+
+    it("never calls getTicket/getTicketForCustomer — no authorization check of its own", async () => {
+      await service.recordWebFormMessage("ticket-1", "contact-1", "body");
+
+      expect(ticketsService.getTicket).not.toHaveBeenCalled();
+      expect(ticketsService.getTicketForCustomer).not.toHaveBeenCalled();
+    });
+  });
 });

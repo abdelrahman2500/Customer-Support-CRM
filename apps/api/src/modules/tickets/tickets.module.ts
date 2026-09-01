@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { AiModule } from "../ai/ai.module";
 import { ChannelsModule } from "../channels/channels.module";
+import { CustomersModule } from "../customers/customers.module";
 import { QueuesModule } from "../../queues/queues.module";
 import { AutomationActionListener } from "./automation-action.listener";
 import { TicketAiService } from "./ticket-ai.service";
@@ -10,6 +11,8 @@ import { TicketEscalationListener } from "./ticket-escalation.listener";
 import { TicketHistoryListener } from "./ticket-history.listener";
 import { TicketsController } from "./tickets.controller";
 import { TicketsService } from "./tickets.service";
+import { WebFormIntakeController } from "./web-form-intake.controller";
+import { WebFormIntakeService } from "./web-form-intake.service";
 
 /**
  * Owns the `ticketing` schema — see docs/architecture/03-domain-boundaries.md
@@ -38,10 +41,16 @@ import { TicketsService } from "./tickets.service";
  * yet) — `PortalModule`'s `PortalTicketsService` calls its customer-scoped
  * methods directly, mirroring how it already calls `TicketsService`'s own
  * customer-scoped methods.
+ *
+ * Story 87 — `CustomersModule` imported the same way, so the new
+ * `WebFormIntakeService` can inject the already-exported
+ * `CustomersService` directly. `WebFormIntakeController`/`Service` are the
+ * first fully public (`@Public()`, no `TenantContext`) surface on this
+ * module — see `web-form-intake.controller.ts`'s own doc comment.
  */
 @Module({
-  imports: [AiModule, ChannelsModule, QueuesModule],
-  controllers: [TicketsController],
+  imports: [AiModule, ChannelsModule, CustomersModule, QueuesModule],
+  controllers: [TicketsController, WebFormIntakeController],
   providers: [
     TicketsService,
     TenantContext,
@@ -50,6 +59,7 @@ import { TicketsService } from "./tickets.service";
     AutomationActionListener,
     TicketAiService,
     TicketChannelService,
+    WebFormIntakeService,
   ],
   exports: [TicketsService, TicketChannelService],
 })
