@@ -194,4 +194,68 @@ describe("ReportsView", () => {
     fireEvent.click(screen.getByText("retry"));
     expect(refetch).toHaveBeenCalledOnce();
   });
+
+  it("shows the invalid-range message, with no retry action, for a 400 failure", () => {
+    mockedUseTicketVolumeQuery.mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("from must not be after to", 400) }) as never,
+    );
+
+    render(<ReportsView />);
+
+    expect(screen.getByText("dateRange.invalidRange")).toBeInTheDocument();
+    expect(screen.queryByText("retry")).not.toBeInTheDocument();
+  });
+
+  // Story 93 — date-range filtering.
+  describe("date-range control", () => {
+    it("calls every hook with an empty range ({}) on initial render (preserves all-time default)", () => {
+      render(<ReportsView />);
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenCalledWith({});
+      expect(mockedUseSlaComplianceQuery).toHaveBeenCalledWith({});
+      expect(mockedUseCsatSummaryQuery).toHaveBeenCalledWith({});
+      expect(mockedUseAgentPerformanceQuery).toHaveBeenCalledWith({});
+      expect(mockedUseTicketAgingQuery).toHaveBeenCalledWith({});
+    });
+
+    it("re-invokes every hook with the selected range once both from and to are set", () => {
+      render(<ReportsView />);
+
+      fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
+        target: { value: "2026-01-01" },
+      });
+      fireEvent.change(screen.getByLabelText("dateRange.toLabel"), {
+        target: { value: "2026-01-31" },
+      });
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({
+        from: "2026-01-01",
+        to: "2026-01-31",
+      });
+      expect(mockedUseTicketAgingQuery).toHaveBeenLastCalledWith({
+        from: "2026-01-01",
+        to: "2026-01-31",
+      });
+    });
+
+    it("resets every hook back to an empty range when Clear is clicked", () => {
+      render(<ReportsView />);
+
+      fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
+        target: { value: "2026-01-01" },
+      });
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({ from: "2026-01-01" });
+
+      fireEvent.click(screen.getByText("dateRange.clear"));
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({});
+      expect(screen.getByLabelText("dateRange.fromLabel")).toHaveValue("");
+    });
+
+    it("disables Clear when no range is selected", () => {
+      render(<ReportsView />);
+
+      expect(screen.getByText("dateRange.clear")).toBeDisabled();
+    });
+  });
 });

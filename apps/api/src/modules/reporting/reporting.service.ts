@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { TicketStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
+import { hasDateRange, resolveReportDateRange } from "./report-date-range.util";
 
 /** One row per `TicketStatus` value with at least one ticket in the caller's
  * branch — no zero-padding, same "only what exists" convention as every
@@ -73,6 +74,14 @@ function bucketForAgeDays(ageDays: number): AgeBucketLabel {
  * ... outgrow Postgres"). Every method is branch-scoped via
  * `TenantContext.requireBranchScope()`, the same mechanism every other
  * branch-scoped read in this codebase already uses.
+ *
+ * Story 93 — every method gains optional `from`/`to` (`YYYY-MM-DD`,
+ * resolved via `resolveReportDateRange`). Each report filters on whichever
+ * timestamp actually represents "when this fact became true" for that
+ * report — not a single blanket `Ticket.createdAt` — see each method's own
+ * doc comment. Omitting both produces a `where` textually identical to the
+ * pre-Story-93 query (guarded by `hasDateRange`), so every existing
+ * no-range caller/test is unaffected.
  */
 @Injectable()
 export class ReportingService {
@@ -81,11 +90,15 @@ export class ReportingService {
     private readonly tenantContext: TenantContext,
   ) {}
 
-  async getTicketVolumeByStatus(): Promise<TicketVolumeByStatus[]> {
+  /** Filters on `Ticket.createdAt` — "how many tickets, by status, were
+   * created in this window." The same field/table `getTicketAging` already
+   * uses. */
+  async getTicketVolumeByStatus(from?: string, to?: string): Promise<TicketVolumeByStatus[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
+    const range = resolveReportDateRange(from, to);
     const grouped = await this.prisma.ticket.groupBy({
       by: ["status"],
-      where: { branchId },
+      where: { branchId, ...(hasDateRange(range) ? { createdAt: range } : {}) },
       _count: { _all: true },
     });
     return grouped.map((row) => ({ status: row.status, count: row._count._all }));
@@ -98,22 +111,45 @@ export class ReportingService {
    * real time-to-resolution measure is not yet possible and is explicitly
    * deferred, not approximated here.
    *
+   * Story 93 — the reporting cohort is defined by `SlaTicketTarget.createdAt`
+   * (when the ticket entered SLA tracking), not `SlaEscalation.escalatedAt`
+   * (when a breach was recorded): the two can differ (a ticket targeted
+   * last month can breach this month), and mixing them would let
+   * `breachedCount` describe a different set of tickets than
+   * `totalWithTarget`, breaking the `compliantCount = totalWithTarget -
+   * breachedCount` arithmetic's own meaning. Selecting `ticketId` (not
+   * `count()`) is what makes the escalation lookup below
+   * cohort-constrained: `SlaTicketTarget.ticketId` is `@unique` (one row
+   * per ticket, ever — Story 16's recategorization updates it in place
+   * rather than creating a new row), so `ticketIds` is exactly the set of
+   * tickets in this report's cohort, and `breachedCount` can never exceed
+   * `totalWithTarget` by construction, not merely by the defensive
+   * `Math.max` below (kept as cheap, harmless defense-in-depth).
+   *
    * `distinct: ["ticketId"]` on the escalation lookup, not a raw row count:
    * `SlaEscalation` is unique on `(ticketId, targetType, targetAt)`, so a
    * ticket recategorized after already breaching could in principle carry
    * more than one `resolution`-type row across different target windows —
    * counting distinct tickets avoids double-counting a single ticket twice.
    */
-  async getSlaCompliance(): Promise<SlaComplianceSummary> {
+  async getSlaCompliance(from?: string, to?: string): Promise<SlaComplianceSummary> {
     const { branchId } = this.tenantContext.requireBranchScope();
-    const totalWithTarget = await this.prisma.slaTicketTarget.count({
-      where: { ticket: { branchId } },
-    });
-    const breachedTickets = await this.prisma.slaEscalation.findMany({
-      where: { branchId, targetType: "resolution" },
+    const range = resolveReportDateRange(from, to);
+
+    const targets = await this.prisma.slaTicketTarget.findMany({
+      where: { ticket: { branchId }, ...(hasDateRange(range) ? { createdAt: range } : {}) },
       select: { ticketId: true },
-      distinct: ["ticketId"],
     });
+    const totalWithTarget = targets.length;
+    const ticketIds = targets.map((target) => target.ticketId);
+
+    const breachedTickets = ticketIds.length
+      ? await this.prisma.slaEscalation.findMany({
+          where: { branchId, targetType: "resolution", ticketId: { in: ticketIds } },
+          select: { ticketId: true },
+          distinct: ["ticketId"],
+        })
+      : [];
     const breachedCount = breachedTickets.length;
     const compliantCount = Math.max(totalWithTarget - breachedCount, 0);
     const complianceRate = totalWithTarget > 0 ? compliantCount / totalWithTarget : null;
@@ -124,11 +160,17 @@ export class ReportingService {
    * column — `TicketCsatResponse` carries none of its own, by design, same
    * as `TicketNote` (mirrors `SlaEscalationsService`'s own
    * scope-through-the-parent-Ticket pattern where a child has no branch
-   * column of its own). */
-  async getCsatSummary(): Promise<CsatSummary> {
+   * column of its own).
+   *
+   * Story 93 — filters on `TicketCsatResponse.createdAt` (submission time),
+   * not `Ticket.createdAt`: this report means "feedback submitted in this
+   * window," not "feedback on tickets created in this window" — the only
+   * sensible anchor for a CSAT trend report. */
+  async getCsatSummary(from?: string, to?: string): Promise<CsatSummary> {
     const { branchId } = this.tenantContext.requireBranchScope();
+    const range = resolveReportDateRange(from, to);
     const result = await this.prisma.ticketCsatResponse.aggregate({
-      where: { ticket: { branchId } },
+      where: { ticket: { branchId }, ...(hasDateRange(range) ? { createdAt: range } : {}) },
       _avg: { rating: true },
       _count: { _all: true },
     });
@@ -144,12 +186,26 @@ export class ReportingService {
    * entirely — there is no "agent" to attribute them to. Sorted by
    * `fullName` ascending — simple, deterministic, no workload-ranking
    * judgment call baked into the API response itself.
+   *
+   * Story 93 — filters on `Ticket.createdAt` (same field/table as ticket
+   * volume). Flagged semantic shift, not silently redefined: with no range,
+   * this is a *live workload snapshot* ("tickets currently assigned to me,
+   * by current status"); with a range applied it becomes *"of tickets
+   * created in this window, their current status breakdown"* — a
+   * cohort-outcome view, not a live-workload view. Same category of
+   * disclosed limitation this method's own "no `resolvedAt`, count only"
+   * comment already carries.
    */
-  async getAgentPerformance(): Promise<AgentPerformanceSummary[]> {
+  async getAgentPerformance(from?: string, to?: string): Promise<AgentPerformanceSummary[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
+    const range = resolveReportDateRange(from, to);
     const grouped = await this.prisma.ticket.groupBy({
       by: ["assignedToUserId", "status"],
-      where: { branchId, assignedToUserId: { not: null } },
+      where: {
+        branchId,
+        assignedToUserId: { not: null },
+        ...(hasDateRange(range) ? { createdAt: range } : {}),
+      },
       _count: { _all: true },
     });
 
@@ -194,11 +250,25 @@ export class ReportingService {
    * a resolution-duration measure. Every bucket always appears, even at
    * `0` (Design decision 1) — unlike `TicketVolumeByStatus`'s sparse
    * "only what exists" convention.
+   *
+   * Story 93 — the range filters *which currently-open tickets are
+   * included* (`Ticket.createdAt` within the window); the age bucketing
+   * itself stays relative to the real current time, unchanged. This report
+   * is inherently a live snapshot ("how old are today's currently-open
+   * tickets") — reinterpreting age as "as of `to`" would invent a new
+   * "as-of" semantic with no precedent anywhere else in this codebase. With
+   * a range applied, this reads as "of tickets created in this window that
+   * are *still* open today, how old are they now."
    */
-  async getTicketAging(): Promise<TicketAgingBucket[]> {
+  async getTicketAging(from?: string, to?: string): Promise<TicketAgingBucket[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
+    const range = resolveReportDateRange(from, to);
     const tickets = await this.prisma.ticket.findMany({
-      where: { branchId, status: { in: ["OPEN", "IN_PROGRESS"] } },
+      where: {
+        branchId,
+        status: { in: ["OPEN", "IN_PROGRESS"] },
+        ...(hasDateRange(range) ? { createdAt: range } : {}),
+      },
       select: { createdAt: true },
     });
 

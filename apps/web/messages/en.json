@@ -568,6 +568,12 @@
     "forbidden": "You don't have permission to view reports.",
     "error": "Couldn't load this report.",
     "retry": "Retry",
+    "dateRange": {
+      "fromLabel": "From",
+      "toLabel": "To",
+      "clear": "Clear",
+      "invalidRange": "The selected date range is invalid — \"From\" must not be after \"To\"."
+    },
     "ticketVolume": {
       "heading": "Ticket Volume by Status",
       "empty": "No tickets yet."

@@ -96,48 +96,83 @@ describe("Reporting & Analytics (e2e)", () => {
     return ticket.body.id;
   }
 
-  async function getTicketVolume(): Promise<{ status: string; count: number }[]> {
+  /** Story 93 — `{from, to}` (each `YYYY-MM-DD`) appended as query params
+   * when supplied; omitted entirely (not even as empty-string params)
+   * otherwise, mirroring the frontend's own `toQueryString` convention. */
+  interface DateRange {
+    from?: string;
+    to?: string;
+  }
+
+  function toQueryString(range: DateRange = {}): string {
+    const params = new URLSearchParams();
+    if (range.from) params.set("from", range.from);
+    if (range.to) params.set("to", range.to);
+    const query = params.toString();
+    return query ? `?${query}` : "";
+  }
+
+  /** `YYYY-MM-DD` for "today"/"yesterday" relative to the real current
+   * time. Every `createdAt` this suite's fixtures produce is server-set to
+   * `now()` (`Ticket`/`TicketCsatResponse`/`SlaTicketTarget` all default to
+   * `now()` with no client-settable override anywhere in this schema — a
+   * historical fixture timestamp cannot be fabricated), so range-boundary
+   * assertions below are necessarily expressed relative to "today"/
+   * "yesterday" rather than fixed historical constants. */
+  function isoDate(date: Date): string {
+    return date.toISOString().slice(0, 10);
+  }
+  function today(): string {
+    return isoDate(new Date());
+  }
+  function yesterday(): string {
+    return isoDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  }
+
+  async function getTicketVolume(range?: DateRange): Promise<{ status: string; count: number }[]> {
     const response = await request(app.getHttpServer())
-      .get("/api/v1/reports/ticket-volume")
+      .get(`/api/v1/reports/ticket-volume${toQueryString(range)}`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     return response.body;
   }
 
-  async function getSlaCompliance(): Promise<{
+  async function getSlaCompliance(range?: DateRange): Promise<{
     totalWithTarget: number;
     breachedCount: number;
     compliantCount: number;
     complianceRate: number | null;
   }> {
     const response = await request(app.getHttpServer())
-      .get("/api/v1/reports/sla-compliance")
+      .get(`/api/v1/reports/sla-compliance${toQueryString(range)}`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     return response.body;
   }
 
-  async function getCsat(): Promise<{ responseCount: number; averageRating: number | null }> {
+  async function getCsat(
+    range?: DateRange,
+  ): Promise<{ responseCount: number; averageRating: number | null }> {
     const response = await request(app.getHttpServer())
-      .get("/api/v1/reports/csat")
+      .get(`/api/v1/reports/csat${toQueryString(range)}`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     return response.body;
   }
 
-  async function getAgentPerformance(): Promise<
-    { userId: string; fullName: string; openCount: number; resolvedCount: number }[]
-  > {
+  async function getAgentPerformance(
+    range?: DateRange,
+  ): Promise<{ userId: string; fullName: string; openCount: number; resolvedCount: number }[]> {
     const response = await request(app.getHttpServer())
-      .get("/api/v1/reports/agent-performance")
+      .get(`/api/v1/reports/agent-performance${toQueryString(range)}`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     return response.body;
   }
 
-  async function getTicketAging(): Promise<{ bucket: string; count: number }[]> {
+  async function getTicketAging(range?: DateRange): Promise<{ bucket: string; count: number }[]> {
     const response = await request(app.getHttpServer())
-      .get("/api/v1/reports/ticket-aging")
+      .get(`/api/v1/reports/ticket-aging${toQueryString(range)}`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     return response.body;
@@ -422,5 +457,224 @@ describe("Reporting & Analytics (e2e)", () => {
     // the total drops by exactly one, even though other e2e activity may be
     // concurrently changing other tickets' ages between buckets.
     expect(totalAfter).toBe(totalBefore - 1);
+  });
+
+  // -------------------------------------------------------------------
+  // Story 93 — date-range filtering, all five routes.
+  // -------------------------------------------------------------------
+
+  it("rejects a malformed from/to value with 400 on ticket-volume", async () => {
+    await request(app.getHttpServer())
+      .get("/api/v1/reports/ticket-volume?from=not-a-date")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(400);
+  });
+
+  it("rejects a reversed range (from > to) with 400 on ticket-volume", async () => {
+    await request(app.getHttpServer())
+      .get(`/api/v1/reports/ticket-volume?from=${today()}&to=${yesterday()}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(400);
+  });
+
+  it("rejects a shape-valid but non-existent calendar date (2026-02-30) with 400", async () => {
+    await request(app.getHttpServer())
+      .get("/api/v1/reports/ticket-volume?from=2026-02-30")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(400);
+  });
+
+  it("ticket-volume: a [today, today] range includes a freshly-created ticket; a [yesterday, yesterday] range excludes it", async () => {
+    const beforeToday = await getTicketVolume({ from: today(), to: today() });
+    const beforeTodayOpen = beforeToday.find((row) => row.status === "OPEN")?.count ?? 0;
+
+    await createTicket();
+
+    const afterToday = await getTicketVolume({ from: today(), to: today() });
+    const afterTodayOpen = afterToday.find((row) => row.status === "OPEN")?.count ?? 0;
+    expect(afterTodayOpen).toBe(beforeTodayOpen + 1);
+
+    const yesterdayOnly = await getTicketVolume({ from: yesterday(), to: yesterday() });
+    const yesterdayOpen = yesterdayOnly.find((row) => row.status === "OPEN")?.count ?? 0;
+    expect(yesterdayOpen).toBe(0);
+  });
+
+  it("csat: a [today, today] range includes freshly-submitted feedback; a [yesterday, yesterday] range excludes it", async () => {
+    const contactEmail = `reporting-e2e-range-contact-${randomUUID()}@example.com`;
+    const portalPassword = "a-strong-portal-password";
+    const customer = await request(app.getHttpServer())
+      .post("/api/v1/customers")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ displayName: `Reporting e2e range CSAT customer ${randomUUID()}` })
+      .expect(201);
+    const contact = await request(app.getHttpServer())
+      .post(`/api/v1/customers/${customer.body.id}/contacts`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ fullName: "Reporting e2e Range Contact", email: contactEmail })
+      .expect(201);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/customers/${customer.body.id}/contacts/${contact.body.id}/portal-password`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ newPassword: portalPassword })
+      .expect(200);
+    const portalLogin = await request(app.getHttpServer())
+      .post("/api/v1/portal/auth/login")
+      .send({ email: contactEmail, password: portalPassword })
+      .expect(200);
+    const portalToken = portalLogin.body.accessToken as string;
+
+    const beforeToday = await getCsat({ from: today(), to: today() });
+    const beforeYesterday = await getCsat({ from: yesterday(), to: yesterday() });
+
+    const ticket = await request(app.getHttpServer())
+      .post("/api/v1/portal/tickets")
+      .set("Authorization", `Bearer ${portalToken}`)
+      .send({ subject: "Reporting e2e range CSAT ticket" })
+      .expect(201);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticket.body.id}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "RESOLVED" })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/api/v1/portal/tickets/${ticket.body.id}/csat`)
+      .set("Authorization", `Bearer ${portalToken}`)
+      .send({ rating: 5 })
+      .expect(201);
+
+    const afterToday = await getCsat({ from: today(), to: today() });
+    expect(afterToday.responseCount).toBe(beforeToday.responseCount + 1);
+
+    // The feedback was just submitted "today," not "yesterday" — that
+    // range's own count (captured before this fixture existed) must be
+    // unchanged, not equal to `beforeToday`'s unrelated count.
+    const afterYesterday = await getCsat({ from: yesterday(), to: yesterday() });
+    expect(afterYesterday.responseCount).toBe(beforeYesterday.responseCount);
+  });
+
+  it("sla-compliance: filters the cohort by SlaTicketTarget.createdAt — a [today, today] range includes a fresh target+breach; [yesterday, yesterday] excludes it", async () => {
+    const beforeToday = await getSlaCompliance({ from: today(), to: today() });
+    const beforeYesterday = await getSlaCompliance({ from: yesterday(), to: yesterday() });
+
+    const matchingCategory = `reporting-e2e-range-${randomUUID()}`;
+    await request(app.getHttpServer())
+      .post("/api/v1/sla-policies")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ category: matchingCategory, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
+      .expect(201);
+    const ticketId = await createTicket(matchingCategory);
+
+    const deadline = Date.now() + 5000;
+    let targetSeen = false;
+    while (Date.now() < deadline && !targetSeen) {
+      const targetResponse = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/sla-target`)
+        .set("Authorization", `Bearer ${adminAccessToken}`);
+      targetSeen = targetResponse.status === 200;
+      if (!targetSeen) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+    expect(targetSeen).toBe(true);
+
+    eventEmitter.emit(SLA_BREACHED_EVENT, {
+      ticketId,
+      branchId: adminBranchId,
+      targetType: "resolution",
+      targetAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    const escalationDeadline = Date.now() + 5000;
+    let afterToday = beforeToday;
+    while (
+      Date.now() < escalationDeadline &&
+      afterToday.breachedCount === beforeToday.breachedCount
+    ) {
+      afterToday = await getSlaCompliance({ from: today(), to: today() });
+      if (afterToday.breachedCount === beforeToday.breachedCount) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+
+    expect(afterToday.totalWithTarget).toBe(beforeToday.totalWithTarget + 1);
+    expect(afterToday.breachedCount).toBe(beforeToday.breachedCount + 1);
+    expect(afterToday.compliantCount).toBe(afterToday.totalWithTarget - afterToday.breachedCount);
+
+    // The target (and therefore the whole cohort) was created today, not
+    // yesterday — that range's own count (captured before this fixture
+    // existed) must be unchanged, not equal to `beforeToday`'s unrelated
+    // count.
+    const afterYesterday = await getSlaCompliance({ from: yesterday(), to: yesterday() });
+    expect(afterYesterday.totalWithTarget).toBe(beforeYesterday.totalWithTarget);
+    expect(afterYesterday.breachedCount).toBe(beforeYesterday.breachedCount);
+  });
+
+  it("agent-performance: a [today, today] range includes a freshly-assigned ticket's current status; [yesterday, yesterday] excludes it", async () => {
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+    const me = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    const agentEmail = `agent-performance-range-e2e-${randomUUID()}@example.com`;
+    const agent = await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: agentEmail,
+        password: "agent-test-password-123",
+        fullName: "Test Agent Performance Range",
+        branchId: me.body.branchId,
+        departmentId: me.body.departmentId ?? undefined,
+        roleId: agentRole.id,
+      })
+      .expect(201);
+    const agentUserId = agent.body.id;
+
+    await request(app.getHttpServer())
+      .post("/api/v1/tickets")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        customerId: await createCustomer(),
+        subject: "Agent performance range e2e ticket",
+        assignedToUserId: agentUserId,
+      })
+      .expect(201);
+
+    const afterToday = await getAgentPerformance({ from: today(), to: today() });
+    expect(afterToday.find((row) => row.userId === agentUserId)).toEqual({
+      userId: agentUserId,
+      fullName: "Test Agent Performance Range",
+      openCount: 1,
+      resolvedCount: 0,
+    });
+
+    const yesterdayOnly = await getAgentPerformance({ from: yesterday(), to: yesterday() });
+    expect(yesterdayOnly.find((row) => row.userId === agentUserId)).toBeUndefined();
+  });
+
+  it("ticket-aging: a [today, today] range includes a freshly-created open ticket in 0-1d; [yesterday, yesterday] excludes it", async () => {
+    const beforeToday = await getTicketAging({ from: today(), to: today() });
+    const beforeCount = beforeToday.find((row) => row.bucket === "0-1d")?.count ?? 0;
+
+    await createTicket();
+
+    const afterToday = await getTicketAging({ from: today(), to: today() });
+    const afterCount = afterToday.find((row) => row.bucket === "0-1d")?.count ?? 0;
+    expect(afterCount).toBe(beforeCount + 1);
+
+    const yesterdayOnly = await getTicketAging({ from: yesterday(), to: yesterday() });
+    const yesterdayCount = yesterdayOnly.find((row) => row.bucket === "0-1d")?.count ?? 0;
+    expect(yesterdayCount).toBe(0);
+  });
+
+  it("omitting from/to entirely reproduces the exact all-time response (backward compatibility)", async () => {
+    const allTime = await getTicketVolume();
+    const explicitlyUnfiltered = await getTicketVolume({});
+    expect(explicitlyUnfiltered).toEqual(allTime);
   });
 });

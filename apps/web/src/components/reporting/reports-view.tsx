@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import {
   useAgentPerformanceQuery,
@@ -9,9 +9,11 @@ import {
   useTicketAgingQuery,
   useTicketVolumeQuery,
 } from "@/hooks/use-reporting";
+import type { ReportDateRange } from "@/lib/reporting-api";
 import { ApiError } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
@@ -30,19 +32,57 @@ import { Skeleton } from "@/components/ui/skeleton";
  * Story 60 — a fifth card, `GET /reports/ticket-aging`, added the same
  * way; always renders all four fixed buckets (no "empty" state — the
  * backend already zero-fills every bucket).
+ *
+ * Story 93 — a single, shared `{from, to}` date-range state drives all five
+ * cards at once (one dashboard-wide "view this period" control, not five
+ * independent pickers — nothing in this per-card architecture disclosed a
+ * need for report-specific ranges). Native `<Input type="date">` ×2
+ * (mirrors `business-hours-view.tsx`'s own exact date-input pattern — no
+ * new UI library) plus a Clear button resetting to `{}`, the exact
+ * pre-Story-93 all-time default every hook already falls back to.
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
+  const [range, setRange] = useState<ReportDateRange>({});
 
-  const ticketVolumeQuery = useTicketVolumeQuery();
-  const slaComplianceQuery = useSlaComplianceQuery();
-  const csatQuery = useCsatSummaryQuery();
-  const agentPerformanceQuery = useAgentPerformanceQuery();
-  const ticketAgingQuery = useTicketAgingQuery();
+  const ticketVolumeQuery = useTicketVolumeQuery(range);
+  const slaComplianceQuery = useSlaComplianceQuery(range);
+  const csatQuery = useCsatSummaryQuery(range);
+  const agentPerformanceQuery = useAgentPerformanceQuery(range);
+  const ticketAgingQuery = useTicketAgingQuery(range);
 
   return (
     <section className="flex flex-col gap-6">
       <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("dateRange.fromLabel")}
+          <Input
+            type="date"
+            value={range.from ?? ""}
+            onChange={(event) => setRange((prev) => ({ ...prev, from: event.target.value || undefined }))}
+            className="w-40"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("dateRange.toLabel")}
+          <Input
+            type="date"
+            value={range.to ?? ""}
+            onChange={(event) => setRange((prev) => ({ ...prev, to: event.target.value || undefined }))}
+            className="w-40"
+          />
+        </label>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setRange({})}
+          disabled={!range.from && !range.to}
+        >
+          {t("dateRange.clear")}
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <ReportCard
@@ -165,6 +205,12 @@ function ReportCard({
   children: ReactNode;
 }) {
   const forbidden = query.isError && query.error instanceof ApiError && query.error.status === 403;
+  // Story 93 — an invalid/reversed date range (400) is distinguished from a
+  // generic failure the same way `forbidden` already is: no retry action,
+  // since retrying with the exact same range cannot change the outcome —
+  // the fix is changing the range via the controls above the cards.
+  const invalidRange =
+    query.isError && query.error instanceof ApiError && query.error.status === 400;
 
   return (
     <div className="rounded-md border border-slate-200 bg-white p-4">
@@ -175,7 +221,12 @@ function ReportCard({
           {t("forbidden")}
         </Alert>
       )}
-      {query.isError && !forbidden && (
+      {query.isError && invalidRange && (
+        <Alert variant="destructive" className="mt-2">
+          {t("dateRange.invalidRange")}
+        </Alert>
+      )}
+      {query.isError && !forbidden && !invalidRange && (
         <Alert variant="destructive" className="mt-2 flex items-center justify-between">
           <span>{t("error")}</span>
           <Button variant="outline" size="sm" onClick={() => query.refetch()}>

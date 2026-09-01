@@ -1,6 +1,7 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
+import { ReportDateRangeQueryDto } from "./dto/report-date-range-query.dto";
 import type {
   AgentPerformanceSummary,
   CsatSummary,
@@ -21,7 +22,11 @@ import { ReportingService } from "./reporting.service";
  * permission.
  *
  * Story 60 — `GET /reports/ticket-aging` added the same way; no new
- * permission. */
+ * permission.
+ *
+ * Story 93 — every route gains optional `?from=&to=` (`ReportDateRangeQueryDto`),
+ * forwarded straight to the corresponding `ReportingService` method. Both
+ * omitted reproduces each route's exact pre-Story-93 response. */
 @ApiTags("reporting")
 @ApiBearerAuth()
 @Controller("reports")
@@ -30,31 +35,33 @@ export class ReportingController {
 
   @Get("ticket-volume")
   @RequirePermissions("report:read")
-  getTicketVolume(): Promise<TicketVolumeByStatus[]> {
-    return this.reportingService.getTicketVolumeByStatus();
+  getTicketVolume(@Query() { from, to }: ReportDateRangeQueryDto): Promise<TicketVolumeByStatus[]> {
+    return this.reportingService.getTicketVolumeByStatus(from, to);
   }
 
   @Get("sla-compliance")
   @RequirePermissions("report:read")
-  getSlaCompliance(): Promise<SlaComplianceSummary> {
-    return this.reportingService.getSlaCompliance();
+  getSlaCompliance(@Query() { from, to }: ReportDateRangeQueryDto): Promise<SlaComplianceSummary> {
+    return this.reportingService.getSlaCompliance(from, to);
   }
 
   @Get("csat")
   @RequirePermissions("report:read")
-  getCsat(): Promise<CsatSummary> {
-    return this.reportingService.getCsatSummary();
+  getCsat(@Query() { from, to }: ReportDateRangeQueryDto): Promise<CsatSummary> {
+    return this.reportingService.getCsatSummary(from, to);
   }
 
   @Get("agent-performance")
   @RequirePermissions("report:read")
-  getAgentPerformance(): Promise<AgentPerformanceSummary[]> {
-    return this.reportingService.getAgentPerformance();
+  getAgentPerformance(
+    @Query() { from, to }: ReportDateRangeQueryDto,
+  ): Promise<AgentPerformanceSummary[]> {
+    return this.reportingService.getAgentPerformance(from, to);
   }
 
   @Get("ticket-aging")
   @RequirePermissions("report:read")
-  getTicketAging(): Promise<TicketAgingBucket[]> {
-    return this.reportingService.getTicketAging();
+  getTicketAging(@Query() { from, to }: ReportDateRangeQueryDto): Promise<TicketAgingBucket[]> {
+    return this.reportingService.getTicketAging(from, to);
   }
 }

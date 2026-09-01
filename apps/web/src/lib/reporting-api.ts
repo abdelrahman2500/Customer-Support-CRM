@@ -7,7 +7,28 @@ import { apiFetch } from "./api";
  *
  * Mirrors the backend's own `ReportingService` types
  * (`apps/api/src/modules/reporting/reporting.service.ts`) exactly.
+ *
+ * Story 93 — every function gains an optional `range` parameter
+ * (`{from?, to?}`, each `YYYY-MM-DD`), serialized via `toQueryString`
+ * (mirrors `tickets-api.ts`'s own identical helper — `URLSearchParams`,
+ * skips `undefined`/`""`). Omitting `range` entirely reproduces each
+ * function's exact pre-Story-93 call.
  */
+export interface ReportDateRange {
+  from?: string;
+  to?: string;
+}
+
+function toQueryString(range: ReportDateRange): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(range)) {
+    if (value !== undefined && value !== "") {
+      params.set(key, value);
+    }
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
 export interface TicketVolumeByStatus {
   status: string;
   count: number;
@@ -40,22 +61,22 @@ export interface TicketAgingBucket {
   count: number;
 }
 
-export function getTicketVolumeByStatus(): Promise<TicketVolumeByStatus[]> {
-  return apiFetch<TicketVolumeByStatus[]>("/reports/ticket-volume");
+export function getTicketVolumeByStatus(range: ReportDateRange = {}): Promise<TicketVolumeByStatus[]> {
+  return apiFetch<TicketVolumeByStatus[]>(`/reports/ticket-volume${toQueryString(range)}`);
 }
 
-export function getSlaCompliance(): Promise<SlaComplianceSummary> {
-  return apiFetch<SlaComplianceSummary>("/reports/sla-compliance");
+export function getSlaCompliance(range: ReportDateRange = {}): Promise<SlaComplianceSummary> {
+  return apiFetch<SlaComplianceSummary>(`/reports/sla-compliance${toQueryString(range)}`);
 }
 
-export function getCsatSummary(): Promise<CsatSummary> {
-  return apiFetch<CsatSummary>("/reports/csat");
+export function getCsatSummary(range: ReportDateRange = {}): Promise<CsatSummary> {
+  return apiFetch<CsatSummary>(`/reports/csat${toQueryString(range)}`);
 }
 
-export function getAgentPerformance(): Promise<AgentPerformanceSummary[]> {
-  return apiFetch<AgentPerformanceSummary[]>("/reports/agent-performance");
+export function getAgentPerformance(range: ReportDateRange = {}): Promise<AgentPerformanceSummary[]> {
+  return apiFetch<AgentPerformanceSummary[]>(`/reports/agent-performance${toQueryString(range)}`);
 }
 
-export function getTicketAging(): Promise<TicketAgingBucket[]> {
-  return apiFetch<TicketAgingBucket[]>("/reports/ticket-aging");
+export function getTicketAging(range: ReportDateRange = {}): Promise<TicketAgingBucket[]> {
+  return apiFetch<TicketAgingBucket[]>(`/reports/ticket-aging${toQueryString(range)}`);
 }

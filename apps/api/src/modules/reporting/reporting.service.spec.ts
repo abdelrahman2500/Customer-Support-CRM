@@ -10,7 +10,7 @@ function buildPrismaMock() {
       findMany: vi.fn(),
     },
     slaTicketTarget: {
-      count: vi.fn(),
+      findMany: vi.fn(),
     },
     slaEscalation: {
       findMany: vi.fn(),
@@ -98,11 +98,46 @@ describe("ReportingService", () => {
 
       await expect(service.getTicketVolumeByStatus()).rejects.toThrow(/no active branch/);
     });
+
+    // Story 93 — date-range filtering.
+    it("omits createdAt entirely from the where clause when from/to are both omitted (byte-for-byte pre-Story-93 query)", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByStatus();
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["status"],
+        where: { branchId: "branch-1" },
+        _count: { _all: true },
+      });
+    });
+
+    it("filters by Ticket.createdAt when a range is supplied", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByStatus("2026-01-01", "2026-01-31");
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["status"],
+        where: {
+          branchId: "branch-1",
+          createdAt: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2026-02-01T00:00:00.000Z") },
+        },
+        _count: { _all: true },
+      });
+    });
+
+    it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
+      await expect(
+        service.getTicketVolumeByStatus("2026-02-01", "2026-01-01"),
+      ).rejects.toThrow(/from must not be after to/);
+      expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
+    });
   });
 
   describe("getSlaCompliance", () => {
     it("returns a null complianceRate when no ticket has an SLA target yet", async () => {
-      prisma.slaTicketTarget.count.mockResolvedValue(0);
+      prisma.slaTicketTarget.findMany.mockResolvedValue([]);
       prisma.slaEscalation.findMany.mockResolvedValue([]);
 
       const result = await service.getSlaCompliance();
@@ -116,7 +151,18 @@ describe("ReportingService", () => {
     });
 
     it("computes compliantCount/complianceRate from targeted vs. breached tickets", async () => {
-      prisma.slaTicketTarget.count.mockResolvedValue(10);
+      prisma.slaTicketTarget.findMany.mockResolvedValue([
+        { ticketId: "ticket-1" },
+        { ticketId: "ticket-2" },
+        { ticketId: "ticket-3" },
+        { ticketId: "ticket-4" },
+        { ticketId: "ticket-5" },
+        { ticketId: "ticket-6" },
+        { ticketId: "ticket-7" },
+        { ticketId: "ticket-8" },
+        { ticketId: "ticket-9" },
+        { ticketId: "ticket-10" },
+      ]);
       prisma.slaEscalation.findMany.mockResolvedValue([
         { ticketId: "ticket-1" },
         { ticketId: "ticket-2" },
@@ -132,24 +178,65 @@ describe("ReportingService", () => {
       });
     });
 
-    it("scopes both queries by branch and filters escalations to resolution breaches only", async () => {
-      prisma.slaTicketTarget.count.mockResolvedValue(0);
+    // Story 93 — regression: proves the cohort-query rewrite below produces
+    // the exact same logical result, for the exact same no-range scenario,
+    // as the pre-Story-93 `count()`/independent-`findMany()` implementation
+    // (see the "computes compliantCount/complianceRate..." test above —
+    // this is the identical 10-targeted/2-breached scenario, asserted the
+    // same way).
+    it("REGRESSION: with no from/to, returns the same logical result as the pre-Story-93 implementation", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue(
+        Array.from({ length: 10 }, (_, i) => ({ ticketId: `ticket-${i + 1}` })),
+      );
+      prisma.slaEscalation.findMany.mockResolvedValue([
+        { ticketId: "ticket-1" },
+        { ticketId: "ticket-2" },
+      ]);
+
+      const result = await service.getSlaCompliance();
+
+      expect(result).toEqual({
+        totalWithTarget: 10,
+        breachedCount: 2,
+        compliantCount: 8,
+        complianceRate: 0.8,
+      });
+    });
+
+    it("scopes the target lookup by branch, then scopes the escalation lookup to that exact cohort's ticket ids plus branch/resolution", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([
+        { ticketId: "ticket-1" },
+        { ticketId: "ticket-2" },
+      ]);
       prisma.slaEscalation.findMany.mockResolvedValue([]);
 
       await service.getSlaCompliance();
 
-      expect(prisma.slaTicketTarget.count).toHaveBeenCalledWith({
+      expect(prisma.slaTicketTarget.findMany).toHaveBeenCalledWith({
         where: { ticket: { branchId: "branch-1" } },
+        select: { ticketId: true },
       });
       expect(prisma.slaEscalation.findMany).toHaveBeenCalledWith({
-        where: { branchId: "branch-1", targetType: "resolution" },
+        where: {
+          branchId: "branch-1",
+          targetType: "resolution",
+          ticketId: { in: ["ticket-1", "ticket-2"] },
+        },
         select: { ticketId: true },
         distinct: ["ticketId"],
       });
     });
 
-    it("never returns a negative compliantCount even if breachedCount somehow exceeds totalWithTarget", async () => {
-      prisma.slaTicketTarget.count.mockResolvedValue(1);
+    it("never queries slaEscalation at all when the cohort has no targeted tickets", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([]);
+
+      await service.getSlaCompliance();
+
+      expect(prisma.slaEscalation.findMany).not.toHaveBeenCalled();
+    });
+
+    it("never returns a negative compliantCount even if breachedCount somehow exceeds totalWithTarget (defense-in-depth — the cohort's own ticketId: {in: ...} filter already makes this unreachable in production, since prisma.slaEscalation.findMany is mocked here rather than truly filtered)", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([{ ticketId: "ticket-1" }]);
       prisma.slaEscalation.findMany.mockResolvedValue([
         { ticketId: "ticket-1" },
         { ticketId: "ticket-2" },
@@ -158,6 +245,37 @@ describe("ReportingService", () => {
       const result = await service.getSlaCompliance();
 
       expect(result.compliantCount).toBe(0);
+    });
+
+    // Story 93 — date-range filtering.
+    it("filters the target cohort by SlaTicketTarget.createdAt, not SlaEscalation.escalatedAt, when a range is supplied", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([{ ticketId: "ticket-1" }]);
+      prisma.slaEscalation.findMany.mockResolvedValue([]);
+
+      await service.getSlaCompliance("2026-01-01", "2026-01-31");
+
+      expect(prisma.slaTicketTarget.findMany).toHaveBeenCalledWith({
+        where: {
+          ticket: { branchId: "branch-1" },
+          createdAt: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2026-02-01T00:00:00.000Z") },
+        },
+        select: { ticketId: true },
+      });
+      // The escalation lookup is never itself date-filtered — it stays
+      // constrained to the cohort's ticketIds regardless of when the
+      // breach was recorded (see this method's own doc comment).
+      expect(prisma.slaEscalation.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", targetType: "resolution", ticketId: { in: ["ticket-1"] } },
+        select: { ticketId: true },
+        distinct: ["ticketId"],
+      });
+    });
+
+    it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
+      await expect(service.getSlaCompliance("2026-02-01", "2026-01-01")).rejects.toThrow(
+        /from must not be after to/,
+      );
+      expect(prisma.slaTicketTarget.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -197,6 +315,32 @@ describe("ReportingService", () => {
         _avg: { rating: true },
         _count: { _all: true },
       });
+    });
+
+    // Story 93 — date-range filtering.
+    it("filters by TicketCsatResponse.createdAt (submission time), not Ticket.createdAt, when a range is supplied", async () => {
+      prisma.ticketCsatResponse.aggregate.mockResolvedValue({
+        _avg: { rating: null },
+        _count: { _all: 0 },
+      });
+
+      await service.getCsatSummary("2026-01-01", "2026-01-31");
+
+      expect(prisma.ticketCsatResponse.aggregate).toHaveBeenCalledWith({
+        where: {
+          ticket: { branchId: "branch-1" },
+          createdAt: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2026-02-01T00:00:00.000Z") },
+        },
+        _avg: { rating: true },
+        _count: { _all: true },
+      });
+    });
+
+    it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
+      await expect(service.getCsatSummary("2026-02-01", "2026-01-01")).rejects.toThrow(
+        /from must not be after to/,
+      );
+      expect(prisma.ticketCsatResponse.aggregate).not.toHaveBeenCalled();
     });
   });
 
@@ -269,6 +413,30 @@ describe("ReportingService", () => {
         { userId: "user-unknown", fullName: "user-unknown", openCount: 1, resolvedCount: 0 },
       ]);
     });
+
+    // Story 93 — date-range filtering.
+    it("filters by Ticket.createdAt when a range is supplied (a cohort-outcome view, not a live-workload view)", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getAgentPerformance("2026-01-01", "2026-01-31");
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["assignedToUserId", "status"],
+        where: {
+          branchId: "branch-1",
+          assignedToUserId: { not: null },
+          createdAt: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2026-02-01T00:00:00.000Z") },
+        },
+        _count: { _all: true },
+      });
+    });
+
+    it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
+      await expect(service.getAgentPerformance("2026-02-01", "2026-01-01")).rejects.toThrow(
+        /from must not be after to/,
+      );
+      expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
+    });
   });
 
   describe("getTicketAging", () => {
@@ -330,6 +498,29 @@ describe("ReportingService", () => {
         { bucket: "3-7d", count: 2 },
         { bucket: "7d+", count: 2 },
       ]);
+    });
+
+    // Story 93 — date-range filtering.
+    it("filters which tickets are included by Ticket.createdAt, but buckets age relative to the real current time, unchanged", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.getTicketAging("2026-01-01", "2026-01-05");
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith({
+        where: {
+          branchId: "branch-1",
+          status: { in: ["OPEN", "IN_PROGRESS"] },
+          createdAt: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2026-01-06T00:00:00.000Z") },
+        },
+        select: { createdAt: true },
+      });
+    });
+
+    it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
+      await expect(service.getTicketAging("2026-02-01", "2026-01-01")).rejects.toThrow(
+        /from must not be after to/,
+      );
+      expect(prisma.ticket.findMany).not.toHaveBeenCalled();
     });
   });
 });
