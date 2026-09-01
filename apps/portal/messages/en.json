@@ -123,6 +123,17 @@
         "ticket": "Ticket",
         "loggedAt": "Date"
       }
+    },
+    "preferences": {
+      "heading": "Notification Preferences",
+      "description": "Choose which live notifications you want to see while you're signed in.",
+      "error": "Couldn't load your preferences.",
+      "retry": "Retry",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "enable": "Enable",
+      "disable": "Disable",
+      "actionFailed": "Couldn't save that change. Please try again."
     }
   }
 }

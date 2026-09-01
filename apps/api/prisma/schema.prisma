@@ -285,6 +285,8 @@ model Contact {
   csatResponses   TicketCsatResponse[]
   channelMessages ChannelMessage[]
   chatSessions    ChatSession[]
+  /// Story 90 — this Contact's own `PortalNotificationPreference` rows.
+  notificationPreferences PortalNotificationPreference[]
   createdAt       DateTime              @default(now()) @map("created_at")
 
   @@unique([customerId, email])
@@ -786,6 +788,31 @@ model NotificationPreference {
 
   @@unique([userId, eventType])
   @@map("notification_preferences")
+  @@schema("notifications")
+}
+
+/// Story 90 — the Customer Portal's counterpart to `NotificationPreference`,
+/// for a `Contact` rather than a `User`. A brand-new, separate table —
+/// mirrors this codebase's own `ContactRefreshToken`-vs-`RefreshToken`
+/// precedent (a separate table so the `customers` schema keeps owning
+/// everything about a Contact's lifecycle, and so the already-shipped
+/// `NotificationPreference`/`User` relationship is never touched) —
+/// rather than widening `NotificationPreference` with a nullable
+/// `contactId`. Governs only the live in-app toast for the two events
+/// `CustomerNotificationRealtimeListener` relays (`ticket.updated`/
+/// `channel.message.created`), never `NotificationLog`/history. No row
+/// means "enabled" — identical convention to `NotificationPreference`.
+model PortalNotificationPreference {
+  id           String   @id @default(uuid())
+  contactId    String   @map("contact_id")
+  contact      Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  eventType    String   @map("event_type")
+  inAppEnabled Boolean  @default(true) @map("in_app_enabled")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([contactId, eventType])
+  @@map("portal_notification_preferences")
   @@schema("notifications")
 }
 

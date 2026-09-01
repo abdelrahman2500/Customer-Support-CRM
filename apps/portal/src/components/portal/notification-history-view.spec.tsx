@@ -3,6 +3,10 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { NotificationHistoryView } from "./notification-history-view";
 import { useMyNotificationsQuery } from "@/hooks/use-portal-notification-history";
 import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
+import {
+  usePortalNotificationPreferencesQuery,
+  useUpdatePortalNotificationPreferenceMutation,
+} from "@/hooks/use-portal-notification-preferences";
 
 const push = vi.fn();
 
@@ -23,8 +27,17 @@ vi.mock("@/hooks/use-portal-tickets", () => ({
   useMyTicketsQuery: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-portal-notification-preferences", () => ({
+  usePortalNotificationPreferencesQuery: vi.fn(),
+  useUpdatePortalNotificationPreferenceMutation: vi.fn(),
+}));
+
 const mockedUseMyNotificationsQuery = vi.mocked(useMyNotificationsQuery);
 const mockedUseMyTicketsQuery = vi.mocked(useMyTicketsQuery);
+const mockedUsePortalNotificationPreferencesQuery = vi.mocked(usePortalNotificationPreferencesQuery);
+const mockedUseUpdatePortalNotificationPreferenceMutation = vi.mocked(
+  useUpdatePortalNotificationPreferenceMutation,
+);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -61,6 +74,23 @@ describe("NotificationHistoryView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedUseMyTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUsePortalNotificationPreferencesQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    mockedUseUpdatePortalNotificationPreferenceMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+  });
+
+  it("renders the notification preferences section", () => {
+    mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("preferences.heading")).toBeInTheDocument();
   });
 
   it("shows a loading state while the notifications query is pending", () => {

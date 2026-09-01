@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useMyNotificationsQuery } from "@/hooks/use-portal-notification-history";
 import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import type { PortalNotificationSummary } from "@/lib/notifications-api";
+import { NotificationPreferencesSection } from "./notification-preferences-section";
 
 const TICKET_UPDATED_EVENT = "ticket.updated";
 
@@ -43,6 +44,11 @@ function eventLabelKeyFor(eventType: string): string {
  * `use-portal-tickets.ts` is not modified. A resolution failure/miss never
  * blocks the notification list itself from rendering — an unresolved row
  * simply falls back to the raw `ticketId`.
+ *
+ * Story 90 — renders `NotificationPreferencesSection` above the history
+ * table (its own independent query/state, per that component's own doc
+ * comment), giving the signed-in contact a place to mute either live toast
+ * event type without leaving this page.
  */
 export function NotificationHistoryView() {
   const t = useTranslations("notifications");
@@ -63,6 +69,8 @@ export function NotificationHistoryView() {
   return (
     <section className="flex flex-col gap-4">
       <h1 className="text-lg font-semibold text-slate-900">{t("history.title")}</h1>
+
+      <NotificationPreferencesSection />
 
       {notificationsQuery.isLoading && (
         <div className="flex flex-col gap-2">

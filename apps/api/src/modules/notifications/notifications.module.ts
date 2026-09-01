@@ -4,6 +4,7 @@ import { NotificationsController } from "./notifications.controller";
 import { NotificationsService } from "./notifications.service";
 import { NotificationPreferencesController } from "./notification-preferences.controller";
 import { NotificationPreferencesService } from "./notification-preferences.service";
+import { PortalNotificationPreferencesService } from "./portal-notification-preferences.service";
 import { NotificationTemplatesController } from "./notification-templates.controller";
 import { NotificationTemplatesService } from "./notification-templates.service";
 import { SlaAtRiskNotificationListener } from "./sla-at-risk-notification.listener";
@@ -42,6 +43,12 @@ import { PortalNotificationLogListener } from "./portal-notification-log.listene
  * is now exported so `PortalModule` can inject it directly for the new
  * `GET /portal/notifications` route — this module's first controller-
  * external consumer.
+ *
+ * Story 90 — `PortalNotificationPreferencesService` added the same way,
+ * exported for `PortalModule`'s new `PortalNotificationPreferencesController`
+ * to inject directly (mirrors Story 88's `NotificationsService` export).
+ * Self-scoped by the caller's own `contactId` (never `TenantContext`/a
+ * permission) — see that service's own doc comment.
  */
 @Module({
   controllers: [
@@ -52,12 +59,13 @@ import { PortalNotificationLogListener } from "./portal-notification-log.listene
   providers: [
     NotificationsService,
     NotificationPreferencesService,
+    PortalNotificationPreferencesService,
     NotificationTemplatesService,
     TenantContext,
     SlaAtRiskNotificationListener,
     TicketEscalatedNotificationListener,
     PortalNotificationLogListener,
   ],
-  exports: [NotificationsService],
+  exports: [NotificationsService, PortalNotificationPreferencesService],
 })
 export class NotificationsModule {}

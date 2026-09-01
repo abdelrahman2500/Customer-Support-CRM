@@ -83,3 +83,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | channels-web-form-intake | [channels-web-form-intake/00-overview.md](./channels-web-form-intake/00-overview.md) | 87–      |
 | customer-portal-notification-history | [customer-portal-notification-history/00-overview.md](./customer-portal-notification-history/00-overview.md) | 88–      |
 | customer-portal-notification-history-frontend | [customer-portal-notification-history-frontend/00-overview.md](./customer-portal-notification-history-frontend/00-overview.md) | 89–      |
+| customer-portal-notification-preferences | [customer-portal-notification-preferences/00-overview.md](./customer-portal-notification-preferences/00-overview.md) | 90–      |

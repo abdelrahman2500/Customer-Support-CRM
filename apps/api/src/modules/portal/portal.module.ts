@@ -13,6 +13,7 @@ import { PortalKnowledgeBaseController } from "./portal-knowledge-base.controlle
 import { PortalChatController } from "./portal-chat.controller";
 import { PortalBrandingController } from "./portal-branding.controller";
 import { PortalNotificationsController } from "./portal-notifications.controller";
+import { PortalNotificationPreferencesController } from "./portal-notification-preferences.controller";
 
 /**
  * Story 52 — the Customer Portal's first module. `AuthModule` provides the
@@ -50,6 +51,11 @@ import { PortalNotificationsController } from "./portal-notifications.controller
  * `PortalNotificationsController` can inject the now-exported
  * `NotificationsService` directly (no intermediate service — see that
  * controller's own doc comment).
+ *
+ * Story 90 — no new import edge: `PortalNotificationPreferencesController`
+ * injects `NotificationsModule`'s now-additionally-exported
+ * `PortalNotificationPreferencesService` directly, the same way
+ * `PortalNotificationsController` already injects `NotificationsService`.
  */
 @Module({
   imports: [AuthModule, TicketsModule, KnowledgeBaseModule, AiModule, AdminModule, NotificationsModule],
@@ -60,6 +66,7 @@ import { PortalNotificationsController } from "./portal-notifications.controller
     PortalChatController,
     PortalBrandingController,
     PortalNotificationsController,
+    PortalNotificationPreferencesController,
   ],
   providers: [PortalService, PortalTicketsService],
   exports: [PortalService],
