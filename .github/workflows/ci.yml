@@ -219,10 +219,25 @@ jobs:
         run: pnpm --filter @crm/api prisma:seed
 
       - name: Build web
-        run: pnpm --filter @crm/web build
+        # `pnpm --filter @crm/web build` runs only apps/web's own `build`
+        # script — it does not know about turbo.json's `build` task
+        # dependency (`dependsOn: ["^build"]`), so on this job's fresh
+        # checkout (no prior turbo build/cache from build-and-test — a
+        # separate runner) `@crm/shared` was never compiled to
+        # `packages/shared/dist`. `next build`'s SWC compile step still
+        # "succeeds" because apps/web only ever imports `@crm/shared` via
+        # `import type` (erased before bundling, so it needs no resolvable
+        # module), but Next's separate `tsc`-based type-check pass then
+        # fails with "Cannot find module '@crm/shared'". Going through
+        # turbo (`--filter=@crm/web` still scopes the run to just this
+        # package) restores turbo's own `^build` dependency graph, so
+        # `@crm/shared#build` (cached or not) runs first.
+        run: pnpm exec turbo run build --filter=@crm/web
 
       - name: Build portal
-        run: pnpm --filter @crm/portal build
+        # Same reasoning as "Build web" above — apps/portal also depends
+        # on @crm/shared.
+        run: pnpm exec turbo run build --filter=@crm/portal
 
       - name: Install Playwright browsers
         run: pnpm --filter @crm/e2e exec playwright install --with-deps chromium
