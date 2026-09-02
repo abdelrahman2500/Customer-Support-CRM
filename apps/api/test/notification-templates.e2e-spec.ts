@@ -69,7 +69,11 @@ describe("Notification Templates (e2e)", () => {
       .expect(401);
   });
 
-  it("rejects an Agent-role user lacking notification:create/read/update on every route (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `notification:read`
+  // (previously `[]`), so the GET route below is now reachable; the write
+  // routes (`notification:create`/`notification:update`, still not
+  // granted) remain 403.
+  it("allows reading (notification:read) but still rejects creating/updating templates (403) for an Agent-role user (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -102,7 +106,7 @@ describe("Notification Templates (e2e)", () => {
     await request(app.getHttpServer())
       .get("/api/v1/notification-templates")
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
     await request(app.getHttpServer())
       .post("/api/v1/notification-templates")
       .set("Authorization", `Bearer ${agentAccessToken}`)

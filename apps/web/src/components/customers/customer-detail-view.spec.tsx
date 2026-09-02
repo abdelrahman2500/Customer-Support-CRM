@@ -4,6 +4,7 @@ import { CustomerDetailView } from "./customer-detail-view";
 import {
   useCreateContactMutation,
   useCustomerQuery,
+  useRevokeContactPortalAccessMutation,
   useSetContactPortalPasswordMutation,
   useTicketsQuery,
   useUpdateContactMutation,
@@ -31,6 +32,7 @@ vi.mock("@/hooks/use-tickets", () => ({
   useCreateContactMutation: vi.fn(),
   useUpdateContactMutation: vi.fn(),
   useSetContactPortalPasswordMutation: vi.fn(),
+  useRevokeContactPortalAccessMutation: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-attachments", () => ({
@@ -44,6 +46,7 @@ const mockedUseUpdateCustomerMutation = vi.mocked(useUpdateCustomerMutation);
 const mockedUseCreateContactMutation = vi.mocked(useCreateContactMutation);
 const mockedUseUpdateContactMutation = vi.mocked(useUpdateContactMutation);
 const mockedUseSetContactPortalPasswordMutation = vi.mocked(useSetContactPortalPasswordMutation);
+const mockedUseRevokeContactPortalAccessMutation = vi.mocked(useRevokeContactPortalAccessMutation);
 const mockedUseAttachmentsQuery = vi.mocked(useAttachmentsQuery);
 const mockedUseUploadAttachmentMutation = vi.mocked(useUploadAttachmentMutation);
 
@@ -82,6 +85,7 @@ describe("CustomerDetailView", () => {
     mockedUseCreateContactMutation.mockReturnValue(idleMutation() as never);
     mockedUseUpdateContactMutation.mockReturnValue(idleMutation() as never);
     mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation() as never);
+    mockedUseRevokeContactPortalAccessMutation.mockReturnValue(idleMutation() as never);
     // Story 67 — every render path also calls `useAttachmentsQuery` (the
     // new Attachments card); default to an empty, successful result so
     // pre-existing tests are unaffected.
@@ -558,6 +562,110 @@ describe("CustomerDetailView", () => {
       expect(
         screen.getByText("Another contact already has portal access with this email address"),
       ).toBeInTheDocument();
+    });
+  });
+
+  // Story 100 — Identity & Access: Security Hardening.
+  describe("revoke contact portal access (Story 100)", () => {
+    function customerWithContact(hasPortalAccess: boolean) {
+      return queryResult({
+        isSuccess: true,
+        data: {
+          id: "customer-1",
+          displayName: "Acme Inc.",
+          isActive: true,
+          contacts: [
+            {
+              id: "contact-1",
+              fullName: "Jane Doe",
+              email: "jane@acme.test",
+              phone: null,
+              isPrimary: false,
+              hasPortalAccess,
+            },
+          ],
+        },
+      }) as never;
+    }
+
+    it("shows no revoke affordance for a contact without portal access", () => {
+      mockedUseCustomerQuery.mockReturnValue(customerWithContact(false));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.queryByText("detail.revokePortalAccessSubmit")).not.toBeInTheDocument();
+      expect(screen.queryByText("detail.portalAccessGranted")).not.toBeInTheDocument();
+    });
+
+    it("shows the revoke affordance for a contact with portal access", () => {
+      mockedUseCustomerQuery.mockReturnValue(customerWithContact(true));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.portalAccessGranted")).toBeInTheDocument();
+      expect(screen.getByText("detail.revokePortalAccessSubmit")).toHaveClass("bg-red-600");
+    });
+
+    it("clicking revoke opens a confirmation dialog rather than committing immediately", () => {
+      const mutate = vi.fn();
+      mockedUseRevokeContactPortalAccessMutation.mockReturnValue(idleMutation({ mutate }) as never);
+      mockedUseCustomerQuery.mockReturnValue(customerWithContact(true));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByRole("button", { name: "detail.revokePortalAccessSubmit" }));
+
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it("commits with no arguments only once the confirmation dialog's own submit button is clicked", () => {
+      const mutate = vi.fn();
+      mockedUseRevokeContactPortalAccessMutation.mockReturnValue(idleMutation({ mutate }) as never);
+      mockedUseCustomerQuery.mockReturnValue(customerWithContact(true));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByRole("button", { name: "detail.revokePortalAccessSubmit" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "detail.revokePortalAccessSubmit" }));
+
+      expect(mockedUseRevokeContactPortalAccessMutation).toHaveBeenCalledWith(
+        "customer-1",
+        "contact-1",
+      );
+      expect(mutate).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+
+    it("closes the confirmation dialog when the mutation succeeds", () => {
+      let capturedOnSuccess: (() => void) | undefined;
+      const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
+        capturedOnSuccess = options?.onSuccess;
+      });
+      mockedUseRevokeContactPortalAccessMutation.mockReturnValue(idleMutation({ mutate }) as never);
+      mockedUseCustomerQuery.mockReturnValue(customerWithContact(true));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByRole("button", { name: "detail.revokePortalAccessSubmit" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "detail.revokePortalAccessSubmit" }));
+      act(() => {
+        capturedOnSuccess?.();
+      });
+
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    it("renders the backend's own message inline when the mutation fails", () => {
+      mockedUseRevokeContactPortalAccessMutation.mockReturnValue(
+        idleMutation({ isError: true, error: new ApiError("Contact not found", 404) }) as never,
+      );
+      mockedUseCustomerQuery.mockReturnValue(customerWithContact(true));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("Contact not found")).toBeInTheDocument();
     });
   });
 

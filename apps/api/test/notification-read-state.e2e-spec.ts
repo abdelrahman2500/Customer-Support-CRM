@@ -102,14 +102,19 @@ describe("Notifications — read-state (unread count + mark as read) (e2e)", () 
     throw new Error("Timed out waiting for the NotificationLog row to be persisted");
   }
 
-  /** Creates a fresh Agent-role user in the admin's branch, granted no
-   * permissions — used only for the 403 tests below. */
+  /** Creates a fresh user under a dedicated, brand-new role granted no
+   * permissions — used only for the 403 tests below. Story 100 — the
+   * seeded `Agent` role itself now defaults to a real permission set
+   * (including `notification:read`), so it can no longer stand in for "a
+   * role with zero permissions"; a fresh empty-permission role, mirroring
+   * `createNotificationReaderAgent`'s own "dedicated custom role" pattern,
+   * is what actually has none. */
   async function createPlainAgent(): Promise<string> {
-    const roles = await request(app.getHttpServer())
-      .get("/api/v1/identity/roles")
+    const roleResponse = await request(app.getHttpServer())
+      .post("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .expect(200);
-    const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      .send({ name: `No-Permissions E2E Role ${randomUUID()}` })
+      .expect(201);
 
     const email = `read-state-plain-agent-${randomUUID()}@example.com`;
     const agentPassword = "agent-test-password-123";
@@ -121,7 +126,7 @@ describe("Notifications — read-state (unread count + mark as read) (e2e)", () 
         password: agentPassword,
         fullName: "Read-State Plain Agent",
         branchId: adminBranchId,
-        roleId: agentRole.id,
+        roleId: roleResponse.body.id,
       })
       .expect(201);
 
@@ -183,7 +188,7 @@ describe("Notifications — read-state (unread count + mark as read) (e2e)", () 
     await request(app.getHttpServer()).patch("/api/v1/notifications/read-state").expect(401);
   });
 
-  it("rejects an Agent-role user lacking notification:read (403) on both routes", async () => {
+  it("rejects a user under a role lacking notification:read (403) on both routes", async () => {
     const token = await createPlainAgent();
 
     await request(app.getHttpServer())

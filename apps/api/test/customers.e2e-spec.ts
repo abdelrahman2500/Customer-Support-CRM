@@ -163,7 +163,10 @@ describe("Customer Management (e2e)", () => {
       .expect(200);
   });
 
-  it("rejects an Agent-role user attempting to create a customer (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `customer:create`
+  // (previously `[]`), so this route is now reachable by a freshly seeded
+  // Agent-role user; this proves that, rather than a 403.
+  it("allows an Agent-role user with the default customer:create grant to create a customer (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -200,6 +203,6 @@ describe("Customer Management (e2e)", () => {
       .post("/api/v1/customers")
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .send({ displayName: "Should Not Be Created" })
-      .expect(403);
+      .expect(201);
   });
 });

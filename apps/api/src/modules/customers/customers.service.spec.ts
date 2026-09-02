@@ -175,7 +175,14 @@ describe("CustomersService", () => {
     it("scopes contacts to the parent customer once it's confirmed in scope", async () => {
       prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
       prisma.contact.findMany.mockResolvedValue([
-        { id: "contact-1", fullName: "Jane Doe", email: "jane@example.com", phone: null, isPrimary: true },
+        {
+          id: "contact-1",
+          fullName: "Jane Doe",
+          email: "jane@example.com",
+          phone: null,
+          isPrimary: true,
+          passwordHash: null,
+        },
       ]);
 
       const result = await service.listContacts("customer-1");
@@ -184,8 +191,35 @@ describe("CustomersService", () => {
         expect.objectContaining({ where: { customerId: "customer-1" } }),
       );
       expect(result).toEqual([
-        { id: "contact-1", fullName: "Jane Doe", email: "jane@example.com", phone: null, isPrimary: true },
+        {
+          id: "contact-1",
+          fullName: "Jane Doe",
+          email: "jane@example.com",
+          phone: null,
+          isPrimary: true,
+          hasPortalAccess: false,
+        },
       ]);
+    });
+
+    it("reports hasPortalAccess: true for a contact with a password hash set", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.findMany.mockResolvedValue([
+        {
+          id: "contact-1",
+          fullName: "Jane Doe",
+          email: "jane@example.com",
+          phone: null,
+          isPrimary: true,
+          passwordHash: "hashed",
+        },
+      ]);
+
+      const result = await service.listContacts("customer-1");
+
+      expect(result[0]).toEqual(
+        expect.objectContaining({ id: "contact-1", hasPortalAccess: true }),
+      );
     });
   });
 
@@ -209,6 +243,7 @@ describe("CustomersService", () => {
         email: null,
         phone: null,
         isPrimary: false,
+        passwordHash: null,
       });
 
       const result = await service.createContact("customer-1", dto);
@@ -228,6 +263,7 @@ describe("CustomersService", () => {
         email: null,
         phone: null,
         isPrimary: false,
+        hasPortalAccess: false,
       });
     });
 
@@ -437,6 +473,46 @@ describe("CustomersService", () => {
       expect(prisma.contact.update).toHaveBeenCalledWith({
         where: { id: "contact-1" },
         data: { passwordHash: expect.any(String) },
+      });
+      expect(prisma.contactRefreshToken.updateMany).toHaveBeenCalledWith({
+        where: { contactId: "contact-1", revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+  });
+
+  describe("revokeContactPortalAccess", () => {
+    it("throws NotFoundException when the contact doesn't belong to the customer", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.revokeContactPortalAccess("customer-1", "missing-contact"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.contact.update).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException when the parent customer isn't in scope", async () => {
+      prisma.customer.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.revokeContactPortalAccess("missing-customer", "contact-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.contact.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("clears the password hash and revokes every existing refresh token", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.findFirst.mockResolvedValue({ id: "contact-1", passwordHash: "hashed" });
+      prisma.contact.update.mockResolvedValue({ id: "contact-1" });
+      prisma.contactRefreshToken.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.revokeContactPortalAccess("customer-1", "contact-1");
+
+      expect(result).toEqual({ id: "contact-1" });
+      expect(prisma.contact.update).toHaveBeenCalledWith({
+        where: { id: "contact-1" },
+        data: { passwordHash: null },
       });
       expect(prisma.contactRefreshToken.updateMany).toHaveBeenCalledWith({
         where: { contactId: "contact-1", revokedAt: null },

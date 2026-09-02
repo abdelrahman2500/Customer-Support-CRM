@@ -236,7 +236,12 @@
       "attachmentsUploading": "جارٍ الرفع...",
       "attachmentsUploadFailed": "تعذّر رفع الملف. حاول مرة أخرى.",
       "portalPasswordConfirmTitle": "هل تريد إعادة تعيين كلمة مرور البوابة لجهة الاتصال هذه؟",
-      "portalPasswordConfirmDescription": "ستتوقف كلمة مرور البوابة الحالية عن العمل فورًا."
+      "portalPasswordConfirmDescription": "ستتوقف كلمة مرور البوابة الحالية عن العمل فورًا.",
+      "portalAccessGranted": "تم منح الوصول إلى البوابة",
+      "revokePortalAccessSubmit": "إلغاء الوصول إلى البوابة",
+      "revokePortalAccessSubmitting": "جارٍ الإلغاء...",
+      "revokePortalAccessConfirmTitle": "هل تريد إلغاء وصول جهة الاتصال هذه إلى البوابة؟",
+      "revokePortalAccessConfirmDescription": "سيتم تسجيل خروجهم من بوابة العملاء فورًا ولن يتمكنوا من تسجيل الدخول حتى يتم تعيين كلمة مرور جديدة."
     },
     "create": {
       "title": "عميل جديد",

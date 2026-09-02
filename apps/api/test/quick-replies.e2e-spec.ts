@@ -47,7 +47,10 @@ describe("Quick Replies (e2e)", () => {
     await request(app.getHttpServer()).get("/api/v1/quick-replies").expect(401);
   });
 
-  it("rejects an Agent-role user lacking quick-reply:* (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `quick-reply:read`
+  // (previously `[]`), so the GET route below is now reachable; only the
+  // write route (`quick-reply:create`, still not granted) remains 403.
+  it("allows reading (quick-reply:read) but still rejects creating (403) for an Agent-role user (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -83,7 +86,7 @@ describe("Quick Replies (e2e)", () => {
     await request(app.getHttpServer())
       .get("/api/v1/quick-replies")
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
     await request(app.getHttpServer())
       .post("/api/v1/quick-replies")
       .set("Authorization", `Bearer ${agentAccessToken}`)

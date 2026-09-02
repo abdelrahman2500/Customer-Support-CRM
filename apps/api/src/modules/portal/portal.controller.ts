@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import type { AuthenticatedContact, JwtAccessTokenClaims } from "@crm/shared";
 import { Public } from "../../common/auth/public.decorator";
@@ -21,6 +22,11 @@ import { PortalService } from "./portal.service";
 
 const REFRESH_COOKIE_NAME = "crm_portal_refresh_token";
 const REFRESH_COOKIE_PATH = "/api/v1/portal/auth";
+
+// Story 100 — same override, same rationale, as `IdentityController`'s
+// `AUTH_THROTTLE` (see that file's doc comment) — portal login/refresh is
+// an equally credential-stuffing-attractive target.
+const AUTH_THROTTLE = { default: { limit: 40, ttl: 60_000 } };
 
 /**
  * Story 52 — the Customer Portal's auth surface, mirroring
@@ -40,6 +46,7 @@ export class PortalController {
   ) {}
 
   @Public()
+  @Throttle(AUTH_THROTTLE)
   @Post("login")
   @HttpCode(HttpStatus.OK)
   async login(
@@ -52,6 +59,7 @@ export class PortalController {
   }
 
   @Public()
+  @Throttle(AUTH_THROTTLE)
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   async refresh(

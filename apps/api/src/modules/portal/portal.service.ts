@@ -37,6 +37,14 @@ export class PortalService {
    * write time, that at most one portal-enabled contact ever shares a given
    * email (plan Design item 2) — this query never has more than one match
    * to choose between.
+   *
+   * Story 100 — also rejects a contact whose owning `Customer` has been
+   * deactivated (`isActive: false`), mirroring `IdentityService.login`'s
+   * exact `!user.isActive` precedent: same rejection point (credential
+   * verification), same generic message — a specific "your organization's
+   * account is deactivated" message would leak that the email is otherwise
+   * valid, exactly what this method's shared error message already avoids
+   * for an unknown email or a wrong password.
    */
   async login(email: string, password: string): Promise<AuthTokenPair> {
     const contact = await this.prisma.contact.findFirst({
@@ -44,7 +52,7 @@ export class PortalService {
       include: { customer: true },
     });
 
-    if (!contact || !contact.passwordHash) {
+    if (!contact || !contact.passwordHash || !contact.customer.isActive) {
       throw new UnauthorizedException("Invalid email or password");
     }
 
@@ -61,6 +69,11 @@ export class PortalService {
   /**
    * Rotates a refresh token — mirrors `IdentityService.refresh` exactly,
    * against `ContactRefreshToken`.
+   *
+   * Story 100 — also rejects when `contact.customer.isActive` is false,
+   * mirroring `IdentityService.refresh`'s exact `!user.isActive` re-check
+   * on every rotation: a customer deactivated mid-session must not be able
+   * to keep refreshing indefinitely on a token issued before deactivation.
    */
   async refresh(presentedToken: string): Promise<AuthTokenPair> {
     const tokenHash = this.hashRefreshToken(presentedToken);
@@ -74,7 +87,7 @@ export class PortalService {
       where: { id: record.contactId },
       include: { customer: true },
     });
-    if (!contact || !contact.passwordHash) {
+    if (!contact || !contact.passwordHash || !contact.customer.isActive) {
       throw new UnauthorizedException("Refresh token is invalid or expired");
     }
 

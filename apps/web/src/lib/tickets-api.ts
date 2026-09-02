@@ -83,6 +83,8 @@ export interface ContactSummary {
   email: string | null;
   phone: string | null;
   isPrimary: boolean;
+  /** Story 100 — whether this contact currently has a portal password set. */
+  hasPortalAccess: boolean;
 }
 
 /** Mirrors `GET /customers/:id`'s response shape — contacts already embedded, no second request needed (plan Design item 1). */
@@ -292,6 +294,18 @@ export function setContactPortalPassword(
       method: "PATCH",
       body: JSON.stringify(input),
     },
+  );
+}
+
+/** Story 100 — the inverse of `setContactPortalPassword`; same permission
+ * (`customer:update`), no request body. */
+export function revokeContactPortalAccess(
+  customerId: string,
+  contactId: string,
+): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(
+    `/customers/${customerId}/contacts/${contactId}/portal-access/revoke`,
+    { method: "PATCH" },
   );
 }
 

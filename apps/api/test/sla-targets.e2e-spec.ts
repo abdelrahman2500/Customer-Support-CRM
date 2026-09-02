@@ -162,7 +162,10 @@ describe("SLA Targets (e2e)", () => {
       .expect(404);
   });
 
-  it("rejects an Agent-role user attempting to read an SLA target (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `sla:read`
+  // (previously `[]`), so this route is now reachable by a freshly seeded
+  // Agent-role user; this proves that, rather than a 403.
+  it("allows an Agent-role user with the default sla:read grant to read an SLA target (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -198,6 +201,6 @@ describe("SLA Targets (e2e)", () => {
     await request(app.getHttpServer())
       .get(`/api/v1/tickets/${matchingTicketId}/sla-target`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
   });
 });

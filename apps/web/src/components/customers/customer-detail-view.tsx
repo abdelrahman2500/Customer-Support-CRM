@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import {
   useCreateContactMutation,
   useCustomerQuery,
+  useRevokeContactPortalAccessMutation,
   useSetContactPortalPasswordMutation,
   useTicketsQuery,
   useUpdateContactMutation,
@@ -86,6 +87,15 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
         },
       },
     );
+  }
+
+  // Story 100 — revocation, mirroring the set-password control's exact
+  // destructive-confirm shape immediately above.
+  const revokeMutation = useRevokeContactPortalAccessMutation(customerId, contact.id);
+  const [confirmRevokeOpen, setConfirmRevokeOpen] = useState(false);
+
+  function confirmRevokePortalAccess() {
+    revokeMutation.mutate(undefined, { onSuccess: () => setConfirmRevokeOpen(false) });
   }
 
   return (
@@ -192,6 +202,42 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
         {portalPasswordMutation.isError && (
           <p className="text-xs text-red-600">
             {errorMessage(portalPasswordMutation.error, {
+              forbidden: t("detail.actionForbidden"),
+              generic: t("detail.actionFailed"),
+            })}
+          </p>
+        )}
+        {/* Story 100 — shown only when there is something to revoke;
+            mirrors the set-password control's own destructive-confirm
+            shape immediately above. */}
+        {contact.hasPortalAccess && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="success">{t("detail.portalAccessGranted")}</Badge>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={revokeMutation.isPending}
+              onClick={() => setConfirmRevokeOpen(true)}
+            >
+              {revokeMutation.isPending
+                ? t("detail.revokePortalAccessSubmitting")
+                : t("detail.revokePortalAccessSubmit")}
+            </Button>
+            <ConfirmDialog
+              open={confirmRevokeOpen}
+              onOpenChange={setConfirmRevokeOpen}
+              title={t("detail.revokePortalAccessConfirmTitle")}
+              description={t("detail.revokePortalAccessConfirmDescription")}
+              confirmLabel={t("detail.revokePortalAccessSubmit")}
+              onConfirm={confirmRevokePortalAccess}
+              isPending={revokeMutation.isPending}
+            />
+          </div>
+        )}
+        {revokeMutation.isError && (
+          <p className="text-xs text-red-600">
+            {errorMessage(revokeMutation.error, {
               forbidden: t("detail.actionForbidden"),
               generic: t("detail.actionFailed"),
             })}

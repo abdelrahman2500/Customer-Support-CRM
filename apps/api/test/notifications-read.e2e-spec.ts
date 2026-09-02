@@ -181,7 +181,10 @@ describe("Notifications — read endpoint (e2e)", () => {
     });
   });
 
-  it("rejects an Agent user (no notification:read permission) with 403", async () => {
+  // Story 100 — Agent's default seed grant now includes `notification:read`
+  // (previously `[]`), so this route is now reachable by a freshly seeded
+  // Agent-role user; this proves that, rather than a 403.
+  it("allows an Agent user with the default notification:read grant (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -210,6 +213,6 @@ describe("Notifications — read endpoint (e2e)", () => {
     await request(app.getHttpServer())
       .get("/api/v1/notifications")
       .set("Authorization", `Bearer ${loginResponse.body.accessToken}`)
-      .expect(403);
+      .expect(200);
   });
 });

@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import type { AuthenticatedUser, JwtAccessTokenClaims } from "@crm/shared";
 import { Public } from "../../common/auth/public.decorator";
@@ -19,6 +20,15 @@ import { LoginDto } from "./dto/login.dto";
 import { IdentityService } from "./identity.service";
 
 const REFRESH_COOKIE_NAME = "refreshToken";
+
+// Story 100 — tighter than the global default (100/60s, `app.module.ts`),
+// mirroring `WebFormIntakeController`'s own `@Throttle` override precedent.
+// 40 sits comfortably above `identity.e2e-spec.ts`'s own real usage (25
+// login calls within its single run — the highest of any existing spec
+// file), so this does not break any existing test's own login/refresh
+// budget while still being a meaningfully stricter, dedicated limit on the
+// exact endpoints a credential-stuffing/brute-force attempt would target.
+const AUTH_THROTTLE = { default: { limit: 40, ttl: 60_000 } };
 
 @ApiTags("auth")
 @Controller("auth")
@@ -29,6 +39,7 @@ export class IdentityController {
   ) {}
 
   @Public()
+  @Throttle(AUTH_THROTTLE)
   @Post("login")
   @HttpCode(HttpStatus.OK)
   async login(
@@ -46,6 +57,7 @@ export class IdentityController {
   }
 
   @Public()
+  @Throttle(AUTH_THROTTLE)
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   async refresh(

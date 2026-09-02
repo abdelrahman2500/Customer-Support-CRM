@@ -236,7 +236,12 @@
       "attachmentsUploading": "Uploading...",
       "attachmentsUploadFailed": "Couldn't upload the file. Please try again.",
       "portalPasswordConfirmTitle": "Reset this contact's portal password?",
-      "portalPasswordConfirmDescription": "Their current portal password will stop working immediately."
+      "portalPasswordConfirmDescription": "Their current portal password will stop working immediately.",
+      "portalAccessGranted": "Portal access granted",
+      "revokePortalAccessSubmit": "Revoke portal access",
+      "revokePortalAccessSubmitting": "Revoking...",
+      "revokePortalAccessConfirmTitle": "Revoke this contact's portal access?",
+      "revokePortalAccessConfirmDescription": "They will be signed out of the Customer Portal immediately and will no longer be able to log in until a new password is set."
     },
     "create": {
       "title": "New customer",

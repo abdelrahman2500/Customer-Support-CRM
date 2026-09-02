@@ -284,7 +284,11 @@ describe("Knowledge Base (e2e)", () => {
     expect(noMatch.body).toEqual([]);
   });
 
-  it("rejects an Agent-role user attempting to create, read, or update articles (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `kb:read`
+  // (previously `[]`), so the two read routes below are now reachable;
+  // only the write routes (`kb:create`/`kb:update`, still not granted)
+  // remain 403.
+  it("allows reading (kb:read) but still rejects creating or updating articles (403) for an Agent-role user (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -325,7 +329,7 @@ describe("Knowledge Base (e2e)", () => {
     await request(app.getHttpServer())
       .get("/api/v1/knowledge-base/articles")
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
     await request(app.getHttpServer())
       .patch(`/api/v1/knowledge-base/articles/${articleId}`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
@@ -334,6 +338,6 @@ describe("Knowledge Base (e2e)", () => {
     await request(app.getHttpServer())
       .get(`/api/v1/knowledge-base/articles/${articleId}/versions`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
   });
 });

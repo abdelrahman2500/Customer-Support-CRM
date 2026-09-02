@@ -23,6 +23,11 @@ export interface ContactSummary {
   email: string | null;
   phone: string | null;
   isPrimary: boolean;
+  /** Story 100 — `passwordHash !== null`, the existing "no portal access"
+   * semantic this model's own doc comment already establishes (Story 52).
+   * Lets the frontend show a "Revoke" affordance only when there is
+   * something to revoke. */
+  hasPortalAccess: boolean;
 }
 
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
@@ -232,13 +237,55 @@ export class CustomersService {
     return { id: contactId };
   }
 
+  /**
+   * Story 100 — the inverse of `setContactPortalPassword`: clears portal
+   * access rather than granting it. Mirrors its exact validate-then-
+   * `$transaction` shape, minus the new-password/duplicate-email checks
+   * that only apply when *granting* access. `passwordHash: null` is
+   * already the established "no portal access" semantic (this model's own
+   * doc comment, Story 52) — `PortalService.login`'s `passwordHash: {
+   * not: null }` filter already rejects this contact with zero change to
+   * that method. Revoking every live `ContactRefreshToken` mirrors
+   * `setContactPortalPassword`'s own session-invalidation rule, so an
+   * already-issued refresh token cannot outlive the revocation.
+   */
+  async revokeContactPortalAccess(customerId: string, contactId: string): Promise<{ id: string }> {
+    await this.requireCustomerInScope(customerId);
+    const existing = await this.prisma.contact.findFirst({
+      where: { id: contactId, customerId },
+    });
+    if (!existing) {
+      throw new NotFoundException("Contact not found");
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.contact.update({ where: { id: contactId }, data: { passwordHash: null } }),
+      this.prisma.contactRefreshToken.updateMany({
+        where: { contactId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    return { id: contactId };
+  }
+
   // ---------------------------------------------------------------------
   // internals
   // ---------------------------------------------------------------------
 
-  private async findCustomerInScope(
-    id: string,
-  ): Promise<{ id: string; displayName: string; isActive: boolean; contacts: ContactSummary[] }> {
+  private async findCustomerInScope(id: string): Promise<{
+    id: string;
+    displayName: string;
+    isActive: boolean;
+    contacts: Array<{
+      id: string;
+      fullName: string;
+      email: string | null;
+      phone: string | null;
+      isPrimary: boolean;
+      passwordHash: string | null;
+    }>;
+  }> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const customer = await this.prisma.customer.findFirst({
       where: { id, branchId },
@@ -273,6 +320,7 @@ function toContactSummary(contact: {
   email: string | null;
   phone: string | null;
   isPrimary: boolean;
+  passwordHash: string | null;
 }): ContactSummary {
   return {
     id: contact.id,
@@ -280,6 +328,7 @@ function toContactSummary(contact: {
     email: contact.email,
     phone: contact.phone,
     isPrimary: contact.isPrimary,
+    hasPortalAccess: contact.passwordHash !== null,
   };
 }
 

@@ -240,7 +240,10 @@ describe("Business-Hours Calendars (e2e)", () => {
       .expect(404);
   });
 
-  it("rejects an Agent-role user attempting to read or write the calendar (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `sla:read`
+  // (previously `[]`), so the GET route below is now reachable; only the
+  // write routes (`sla:create`/`sla:update`, still not granted) remain 403.
+  it("allows reading (sla:read) but still rejects writing the calendar (403) for an Agent-role user (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -276,7 +279,7 @@ describe("Business-Hours Calendars (e2e)", () => {
     await request(app.getHttpServer())
       .get("/api/v1/business-hours-calendars")
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
 
     await request(app.getHttpServer())
       .patch("/api/v1/business-hours-calendars")

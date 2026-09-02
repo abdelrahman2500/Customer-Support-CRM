@@ -91,7 +91,44 @@ describe("Identity & Access (e2e)", () => {
     const prisma = app.get(PrismaService);
     const agentRole = await prisma.role.findUnique({ where: { name: "Agent" } });
     if (agentRole) {
-      await prisma.rolePermission.deleteMany({ where: { roleId: agentRole.id } });
+      // Story 100 — restore the seed's own default Agent grant, not an
+      // empty set: this suite's own "dynamic Agent" test above
+      // deliberately full-replaces the shared Agent role's permissions
+      // mid-run (see that test's doc comment); previously restoring to
+      // `[]` matched the pre-Story-100 seed default, but now silently
+      // wiping Agent back to zero permissions here would incorrectly
+      // starve every OTHER e2e spec file that runs after this one in the
+      // same `--no-file-parallelism` sweep and expects Agent's real,
+      // seeded permission set (`apps/api/prisma/seed.ts`'s `ROLE_GRANTS.Agent`,
+      // duplicated here as literal keys — the same "spell out the exact
+      // permission keys inline" convention every other test in this file
+      // already uses for `setRolePermissions` calls).
+      const restoredKeys = [
+        "ticket:create",
+        "ticket:read",
+        "ticket:update",
+        "customer:create",
+        "customer:read",
+        "customer:update",
+        "branch:read",
+        "user:read",
+        "kb:read",
+        "quick-reply:read",
+        "notification:read",
+        "sla:read",
+      ];
+      const restoredPermissions = await prisma.permission.findMany({
+        where: { key: { in: restoredKeys } },
+      });
+      await prisma.$transaction([
+        prisma.rolePermission.deleteMany({ where: { roleId: agentRole.id } }),
+        prisma.rolePermission.createMany({
+          data: restoredPermissions.map((permission) => ({
+            roleId: agentRole.id,
+            permissionId: permission.id,
+          })),
+        }),
+      ]);
     }
     const superAdminRole = await prisma.role.findUnique({ where: { name: "SuperAdmin" } });
     if (superAdminRole) {
@@ -280,7 +317,10 @@ describe("Identity & Access (e2e)", () => {
       .expect(403);
   });
 
-  it("rejects the Agent user (no branch:read permission) from listing branches/departments (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `branch:read`
+  // (previously `[]`), so both routes below are now reachable by a
+  // freshly seeded Agent-role user; this proves that, rather than a 403.
+  it("allows an Agent-role user with the default branch:read grant to list branches/departments (Story 100)", async () => {
     const loginResponse = await request(app.getHttpServer())
       .post("/api/v1/auth/login")
       .send({ email: agentEmail, password: agentPassword })
@@ -290,11 +330,11 @@ describe("Identity & Access (e2e)", () => {
     await request(app.getHttpServer())
       .get("/api/v1/identity/branches")
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
     await request(app.getHttpServer())
       .get("/api/v1/identity/departments")
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
   });
 
   it("deactivates the agent user, after which they can no longer log in", async () => {
@@ -830,17 +870,23 @@ describe("Identity & Access (e2e)", () => {
       .expect(200);
     const dynamicAgentAccessToken = loginResponse.body.accessToken as string;
 
-    // The Agent role does not (yet) grant notification:read.
+    // Story 100 — the Agent role's default seed grant no longer excludes
+    // `notification:read` (it now includes it, among others), so this
+    // proof is rebuilt on `role:read` (`GET /identity/roles`) instead — a
+    // permission Agent still does not hold by default. The permission
+    // chosen here is otherwise incidental to what this test actually
+    // proves (dynamic, uncached permission resolution).
+    // The Agent role does not (yet) grant role:read.
     await request(app.getHttpServer())
-      .get("/api/v1/notifications")
+      .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${dynamicAgentAccessToken}`)
       .expect(403);
 
-    // As the admin, grant Agent the notification:read permission.
+    // As the admin, grant Agent the role:read permission.
     await request(app.getHttpServer())
       .patch(`/api/v1/identity/roles/${agentRoleId}/permissions`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ permissionKeys: ["notification:read"] })
+      .send({ permissionKeys: ["role:read"] })
       .expect(200);
 
     // With NO token refresh/re-login step, the very next request using the
@@ -848,7 +894,7 @@ describe("Identity & Access (e2e)", () => {
     // resolution is fully dynamic (re-checked fresh from the DB on every
     // guarded request), never cached and never dependent on token reissue.
     await request(app.getHttpServer())
-      .get("/api/v1/notifications")
+      .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${dynamicAgentAccessToken}`)
       .expect(200);
   });
@@ -1087,10 +1133,12 @@ describe("Identity & Access (e2e)", () => {
   // `secondAgentEmail`/`secondAgentPassword` (created in the Story 45
   // section, above) is reused for every 403 check below: the Story 46
   // section's "dynamic Agent" test replaced the Agent role's permission set
-  // with exactly `["notification:read"]` (a full-replace, not additive —
-  // see `setRolePermissions`), so by this point in the suite Agent holds
-  // neither `user:update` nor `user:reset-password`, matching `ROLE_GRANTS`'s
-  // `Agent: []` default with no manual edit needed for this story.
+  // with exactly `["role:read"]` (a full-replace, not additive — see
+  // `setRolePermissions`), so by this point in the suite Agent holds
+  // neither `user:update` nor `user:reset-password` — true regardless of
+  // whether `ROLE_GRANTS`'s own default (Story 100: a real permission set,
+  // not `[]`) ever included either of those two, since the full-replace
+  // above already discarded it.
   // ---------------------------------------------------------------------
 
   it("rejects PATCH /identity/users/:id/password with no token", async () => {

@@ -164,7 +164,11 @@ describe("Ticket Attachments (e2e)", () => {
       .expect(404);
   });
 
-  it("rejects an Agent-role user lacking ticket:update/ticket:read (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `ticket:update`
+  // and `ticket:read` (previously `[]`), so both routes below are now
+  // reachable by a freshly seeded Agent-role user; this proves that,
+  // rather than a 403.
+  it("allows an Agent-role user with the default ticket:update/ticket:read grant (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -201,10 +205,10 @@ describe("Ticket Attachments (e2e)", () => {
       .post(`/api/v1/tickets/${ticketId}/attachments`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .attach("file", Buffer.from("hi"), "note.txt")
-      .expect(403);
+      .expect(201);
     await request(app.getHttpServer())
       .get(`/api/v1/tickets/${ticketId}/attachments`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
   });
 });

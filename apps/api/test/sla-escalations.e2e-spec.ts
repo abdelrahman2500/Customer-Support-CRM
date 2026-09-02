@@ -107,7 +107,10 @@ describe("SLA Escalations (e2e)", () => {
       .expect(401);
   });
 
-  it("rejects an Agent-role user attempting to read SLA escalations (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `sla:read`
+  // (previously `[]`), so this route is now reachable by a freshly seeded
+  // Agent-role user; this proves that, rather than a 403.
+  it("allows an Agent-role user with the default sla:read grant to read SLA escalations (Story 100)", async () => {
     const ticketId = await createTicket();
 
     const roles = await request(app.getHttpServer())
@@ -145,7 +148,7 @@ describe("SLA Escalations (e2e)", () => {
     await request(app.getHttpServer())
       .get(`/api/v1/tickets/${ticketId}/sla-escalations`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
   });
 
   it("returns an empty array for a ticket with no escalations", async () => {

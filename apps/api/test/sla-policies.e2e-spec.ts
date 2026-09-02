@@ -160,7 +160,10 @@ describe("SLA Policies (e2e)", () => {
       .expect(404);
   });
 
-  it("rejects an Agent-role user attempting to create an SLA policy (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `sla:read`
+  // (previously `[]`), so the GET route below is now reachable; only the
+  // write route (`sla:create`, still not granted) remains 403.
+  it("allows reading (sla:read) but still rejects creating an SLA policy (403) for an Agent-role user (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -202,6 +205,6 @@ describe("SLA Policies (e2e)", () => {
     await request(app.getHttpServer())
       .get("/api/v1/sla-policies")
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
   });
 });

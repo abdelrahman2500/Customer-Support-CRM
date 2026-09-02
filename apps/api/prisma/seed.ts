@@ -60,12 +60,32 @@ const PERMISSION_CATALOG = [
   "quick-reply:update",
 ] as const;
 
-// No ticketing/customer/etc. permissions yet — those land with the stories
-// that introduce those domains. `Agent` exists as a baseline non-admin role
-// so the permission model has more than one role to distinguish from day one.
+// Story 100 — `Agent`'s default grant: exactly what frontline ticket work
+// in the existing web app needs, deliberately excluding every
+// admin/configuration-only permission (role/permission management, branch
+// settings, department management, audit log, reporting, automation,
+// branding, AI configuration, user management beyond reading, and
+// authoring kb/quick-reply content). Ticket AI-assist buttons are gated by
+// `ticket:read`, not `ai:read`, so excluding `ai:*` does not block them.
+// This list is reconciled on every `prisma:seed` run via the same
+// delete-then-recreate transaction below, so an existing database's
+// `Agent` role is corrected the same way a fresh one is seeded.
 const ROLE_GRANTS: Record<string, readonly string[]> = {
   SuperAdmin: PERMISSION_CATALOG,
-  Agent: [],
+  Agent: [
+    "ticket:create",
+    "ticket:read",
+    "ticket:update",
+    "customer:create",
+    "customer:read",
+    "customer:update",
+    "branch:read",
+    "user:read",
+    "kb:read",
+    "quick-reply:read",
+    "notification:read",
+    "sla:read",
+  ],
 };
 
 const DEFAULT_ORGANIZATION_NAME = "Default Organization";

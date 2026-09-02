@@ -49,4 +49,16 @@ export class ContactsController {
   ): Promise<{ id: string }> {
     return this.customersService.setContactPortalPassword(customerId, contactId, dto);
   }
+
+  /** Story 100 — the inverse of `setPortalPassword`; same permission, since
+   * this is the same "managing a customer contact's portal access"
+   * capability, not a new one. */
+  @Patch(":id/contacts/:contactId/portal-access/revoke")
+  @RequirePermissions("customer:update")
+  revokePortalAccess(
+    @Param("id") customerId: string,
+    @Param("contactId") contactId: string,
+  ): Promise<{ id: string }> {
+    return this.customersService.revokeContactPortalAccess(customerId, contactId);
+  }
 }

@@ -72,7 +72,7 @@ describe("PortalService", () => {
       prisma.contact.findFirst.mockResolvedValue({
         id: "contact-1",
         passwordHash: "hashed:correct-password",
-        customer: { branchId: "branch-1" },
+        customer: { branchId: "branch-1", isActive: true },
       });
       vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
       prisma.contactRefreshToken.create.mockResolvedValue({ id: "rt-1" });
@@ -106,12 +106,30 @@ describe("PortalService", () => {
       prisma.contact.findFirst.mockResolvedValue({
         id: "contact-1",
         passwordHash: "hashed:correct-password",
-        customer: { branchId: "branch-1" },
+        customer: { branchId: "branch-1", isActive: true },
       });
       vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
 
       await expect(service.login("jane@example.com", "wrong-password")).rejects.toBeInstanceOf(
         UnauthorizedException,
+      );
+    });
+
+    it("rejects a contact whose owning Customer has been deactivated, even with the correct password", async () => {
+      prisma.contact.findFirst.mockResolvedValue({
+        id: "contact-1",
+        passwordHash: "hashed:correct-password",
+        customer: { branchId: "branch-1", isActive: false },
+      });
+      vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+
+      await expect(service.login("jane@example.com", "correct-password")).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      // Story 100 — same generic message as every other login rejection,
+      // deliberately not distinguishing "deactivated" from "wrong password".
+      await expect(service.login("jane@example.com", "correct-password")).rejects.toThrow(
+        "Invalid email or password",
       );
     });
   });
@@ -129,7 +147,7 @@ describe("PortalService", () => {
       prisma.contact.findUnique.mockResolvedValue({
         id: "contact-1",
         passwordHash: "hashed:whatever",
-        customer: { branchId: "branch-1" },
+        customer: { branchId: "branch-1", isActive: true },
       });
       prisma.contactRefreshToken.create.mockResolvedValue({ id: "rt-2" });
 
@@ -177,12 +195,26 @@ describe("PortalService", () => {
       prisma.contact.findUnique.mockResolvedValue({
         id: "contact-1",
         passwordHash: null,
-        customer: { branchId: "branch-1" },
+        customer: { branchId: "branch-1", isActive: true },
       });
 
       await expect(service.refresh("presented-raw-token")).rejects.toBeInstanceOf(
         UnauthorizedException,
       );
+    });
+
+    it("rejects when the contact's owning Customer has been deactivated mid-session", async () => {
+      prisma.contactRefreshToken.findUnique.mockResolvedValue(validRecord);
+      prisma.contact.findUnique.mockResolvedValue({
+        id: "contact-1",
+        passwordHash: "hashed:whatever",
+        customer: { branchId: "branch-1", isActive: false },
+      });
+
+      await expect(service.refresh("presented-raw-token")).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(prisma.contactRefreshToken.create).not.toHaveBeenCalled();
     });
   });
 

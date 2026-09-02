@@ -218,7 +218,10 @@ describe("Customer Portal (e2e)", () => {
       .expect(401);
   });
 
-  it("rejects an Agent-role user attempting to set a contact's portal password (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `customer:update`
+  // (previously `[]`), so this is now reachable by a freshly seeded
+  // Agent-role user; this proves that, rather than a 403.
+  it("allows an Agent-role user with the default customer:update grant to set a contact's portal password (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -253,7 +256,136 @@ describe("Customer Portal (e2e)", () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/customers/${customerId}/contacts/${contactId}/portal-password`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .send({ newPassword: "should-not-apply" })
-      .expect(403);
+      .send({ newPassword: "agent-set-password-123" })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/portal/auth/login")
+      .send({ email: contactEmail, password: "agent-set-password-123" })
+      .expect(200);
+  });
+
+  // ---------------------------------------------------------------------
+  // Story 100 — portal-contact access revocation
+  // ---------------------------------------------------------------------
+  describe("portal access revocation (Story 100)", () => {
+    it("ContactSummary reflects hasPortalAccess before and after revocation", async () => {
+      const before = await request(app.getHttpServer())
+        .get(`/api/v1/customers/${customerId}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(
+        before.body.find((c: { id: string }) => c.id === contactId),
+      ).toMatchObject({ hasPortalAccess: true });
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${customerId}/contacts/${contactId}/portal-access/revoke`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const after = await request(app.getHttpServer())
+        .get(`/api/v1/customers/${customerId}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(
+        after.body.find((c: { id: string }) => c.id === contactId),
+      ).toMatchObject({ hasPortalAccess: false });
+    });
+
+    it("a subsequent login with the now-revoked password fails", async () => {
+      await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/login")
+        .send({ email: contactEmail, password: "agent-set-password-123" })
+        .expect(401);
+    });
+
+    it("returns 404 for an unknown contact id", async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${customerId}/contacts/${randomUUID()}/portal-access/revoke`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("restoring a password and revoking again also cuts off a live refresh token", async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${customerId}/contacts/${contactId}/portal-password`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ newPassword: "restored-password-123" })
+        .expect(200);
+
+      const loginResponse = await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/login")
+        .send({ email: contactEmail, password: "restored-password-123" })
+        .expect(200);
+      const rawRefreshCookie = extractPortalRefreshCookie(loginResponse);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${customerId}/contacts/${contactId}/portal-access/revoke`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/refresh")
+        .set("Cookie", rawRefreshCookie)
+        .expect(401);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Story 100 — Customer.isActive enforcement on portal login/refresh
+  // ---------------------------------------------------------------------
+  describe("Customer.isActive enforcement (Story 100)", () => {
+    let inactiveCustomerId: string;
+    let inactiveContactId: string;
+    const inactiveContactEmail = `portal-inactive-${randomUUID()}@example.com`;
+    const inactivePassword = "inactive-customer-password-123";
+
+    beforeAll(async () => {
+      const customer = await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName: `Inactive Portal Fixture Customer ${randomUUID()}` })
+        .expect(201);
+      inactiveCustomerId = customer.body.id;
+
+      const contact = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${inactiveCustomerId}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ fullName: "Inactive Portal Contact", email: inactiveContactEmail })
+        .expect(201);
+      inactiveContactId = contact.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${inactiveCustomerId}/contacts/${inactiveContactId}/portal-password`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ newPassword: inactivePassword })
+        .expect(200);
+    });
+
+    it("rejects a login for a contact whose Customer has been deactivated", async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/login")
+        .send({ email: inactiveContactEmail, password: inactivePassword })
+        .expect(200);
+      const rawRefreshCookie = extractPortalRefreshCookie(loginResponse);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${inactiveCustomerId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ isActive: false })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/login")
+        .send({ email: inactiveContactEmail, password: inactivePassword })
+        .expect(401);
+
+      // A refresh token issued before deactivation is also rejected —
+      // deactivation is enforced on every rotation, not only at login.
+      await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/refresh")
+        .set("Cookie", rawRefreshCookie)
+        .expect(401);
+    });
   });
 });

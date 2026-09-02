@@ -493,7 +493,10 @@ describe("Ticketing (e2e)", () => {
     expect(after.body.assignedToUserId).toBe(adminUserId);
   });
 
-  it("rejects an Agent-role user attempting to create a ticket (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `ticket:create`
+  // (previously `[]`), so this route is now reachable by a freshly seeded
+  // Agent-role user; this proves that, rather than a 403.
+  it("allows an Agent-role user with the default ticket:create grant to create a ticket (Story 100)", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -530,10 +533,13 @@ describe("Ticketing (e2e)", () => {
       .post("/api/v1/tickets")
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .send({ customerId, subject: "Should not be created" })
-      .expect(403);
+      .expect(201);
   });
 
-  it("rejects an Agent-role user attempting to read tickets (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `ticket:read`
+  // (previously `[]`), so this route is now reachable by a freshly seeded
+  // Agent-role user; this proves that, rather than a 403.
+  it("allows an Agent-role user with the default ticket:read grant to read tickets (Story 100)", async () => {
     const agentEmail = `agent-read-${randomUUID()}@example.com`;
     const agentPassword = "agent-test-password-123";
     const roles = await request(app.getHttpServer())
@@ -568,10 +574,13 @@ describe("Ticketing (e2e)", () => {
     await request(app.getHttpServer())
       .get("/api/v1/tickets")
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
   });
 
-  it("rejects an Agent-role user attempting to read ticket history (403)", async () => {
+  // Story 100 — Agent's default seed grant now includes `ticket:read`
+  // (previously `[]`), so this route is now reachable by a freshly seeded
+  // Agent-role user; this proves that, rather than a 403.
+  it("allows an Agent-role user with the default ticket:read grant to read ticket history (Story 100)", async () => {
     const agentEmail = `agent-history-${randomUUID()}@example.com`;
     const agentPassword = "agent-test-password-123";
     const roles = await request(app.getHttpServer())
@@ -606,7 +615,7 @@ describe("Ticketing (e2e)", () => {
     await request(app.getHttpServer())
       .get(`/api/v1/tickets/${ticketId}/history`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
-      .expect(403);
+      .expect(200);
   });
 
   // Story 50 — Ticket Internal Notes (Agent-Only).
@@ -619,7 +628,12 @@ describe("Ticketing (e2e)", () => {
       await request(app.getHttpServer()).get(`/api/v1/tickets/${ticketId}/notes`).expect(401);
     });
 
-    it("rejects an Agent-role user attempting to create or read notes (403)", async () => {
+    // Story 100 — Agent's default seed grant now includes `ticket:create`
+    // and `ticket:read` (previously `[]`), so both routes below are now
+    // reachable by a freshly seeded Agent-role user; this proves that,
+    // rather than a 403 — fitting, since this describe block's own title
+    // already says "Agent-Only".
+    it("allows an Agent-role user with the default ticket:create/ticket:read grant to create and read notes (Story 100)", async () => {
       const agentEmail = `agent-notes-${randomUUID()}@example.com`;
       const agentPassword = "agent-test-password-123";
       const roles = await request(app.getHttpServer())
@@ -651,15 +665,24 @@ describe("Ticketing (e2e)", () => {
         .expect(200);
       const agentAccessToken = agentLogin.body.accessToken as string;
 
-      await request(app.getHttpServer())
-        .post(`/api/v1/tickets/${ticketId}/notes`)
+      // A fresh ticket, not the shared `ticketId` fixture below's own
+      // "returns [] for a ticket with no notes yet" test still needs to
+      // see zero notes on it.
+      const agentTicket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
         .set("Authorization", `Bearer ${agentAccessToken}`)
-        .send({ body: "Should not be created" })
-        .expect(403);
+        .send({ customerId, subject: "Agent notes permission fixture" })
+        .expect(201);
+
       await request(app.getHttpServer())
-        .get(`/api/v1/tickets/${ticketId}/notes`)
+        .post(`/api/v1/tickets/${agentTicket.body.id}/notes`)
         .set("Authorization", `Bearer ${agentAccessToken}`)
-        .expect(403);
+        .send({ body: "Agent note" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${agentTicket.body.id}/notes`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(200);
     });
 
     it("returns [] for a ticket with no notes yet", async () => {
@@ -748,7 +771,10 @@ describe("Ticketing (e2e)", () => {
         .expect(401);
     });
 
-    it("rejects an Agent-role user lacking ticket:read (403)", async () => {
+    // Story 100 — Agent's default seed grant now includes `ticket:read`
+    // (previously `[]`), so this route is now reachable by a freshly
+    // seeded Agent-role user; this proves that, rather than a 403.
+    it("allows an Agent-role user with the default ticket:read grant (Story 100)", async () => {
       const agentEmail = `agent-ai-summarize-${randomUUID()}@example.com`;
       const agentPassword = "agent-test-password-123";
       const roles = await request(app.getHttpServer())
@@ -783,7 +809,7 @@ describe("Ticketing (e2e)", () => {
       await request(app.getHttpServer())
         .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
         .set("Authorization", `Bearer ${agentAccessToken}`)
-        .expect(403);
+        .expect(201);
     });
 
     it("returns 404 for a ticket that doesn't exist", async () => {
@@ -874,7 +900,8 @@ describe("Ticketing (e2e)", () => {
         .expect(401);
     });
 
-    it("rejects an Agent-role user lacking ticket:read (403)", async () => {
+    // Story 100 — see the identical note on the summarize describe block above.
+    it("allows an Agent-role user with the default ticket:read grant (Story 100)", async () => {
       const agentEmail = `agent-ai-suggest-reply-${randomUUID()}@example.com`;
       const agentPassword = "agent-test-password-123";
       const roles = await request(app.getHttpServer())
@@ -909,7 +936,7 @@ describe("Ticketing (e2e)", () => {
       await request(app.getHttpServer())
         .post(`/api/v1/tickets/${ticketId}/ai/suggest-reply`)
         .set("Authorization", `Bearer ${agentAccessToken}`)
-        .expect(403);
+        .expect(201);
     });
 
     it("returns 404 for a ticket that doesn't exist", async () => {
@@ -951,7 +978,8 @@ describe("Ticketing (e2e)", () => {
         .expect(401);
     });
 
-    it("rejects an Agent-role user lacking ticket:read (403)", async () => {
+    // Story 100 — see the identical note on the summarize describe block above.
+    it("allows an Agent-role user with the default ticket:read grant (Story 100)", async () => {
       const agentEmail = `agent-ai-categorize-${randomUUID()}@example.com`;
       const agentPassword = "agent-test-password-123";
       const roles = await request(app.getHttpServer())
@@ -986,7 +1014,7 @@ describe("Ticketing (e2e)", () => {
       await request(app.getHttpServer())
         .post(`/api/v1/tickets/${ticketId}/ai/categorize`)
         .set("Authorization", `Bearer ${agentAccessToken}`)
-        .expect(403);
+        .expect(201);
     });
 
     it("returns 404 for a ticket that doesn't exist", async () => {
@@ -1078,7 +1106,8 @@ describe("Ticketing (e2e)", () => {
         .expect(401);
     });
 
-    it("rejects an Agent-role user lacking ticket:read (403)", async () => {
+    // Story 100 — see the identical note on the summarize describe block above.
+    it("allows an Agent-role user with the default ticket:read grant (Story 100)", async () => {
       const submitted = await request(app.getHttpServer())
         .post(`/api/v1/tickets/${ticketId}/ai/summarize`)
         .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -1118,7 +1147,7 @@ describe("Ticketing (e2e)", () => {
       await request(app.getHttpServer())
         .get(`/api/v1/tickets/${ticketId}/ai/${submitted.body.id}`)
         .set("Authorization", `Bearer ${agentAccessToken}`)
-        .expect(403);
+        .expect(200);
     });
 
     it("returns 404 for a ticket that doesn't exist", async () => {
@@ -1221,7 +1250,12 @@ describe("Ticketing (e2e)", () => {
       await request(app.getHttpServer()).get(`/api/v1/tickets/${ticketId}/messages`).expect(401);
     });
 
-    it("rejects an Agent-role user attempting to create or read messages (403)", async () => {
+    // Story 100 — Agent's default seed grant now includes `ticket:create`
+    // and `ticket:read` (previously `[]`), so both routes below are now
+    // reachable by a freshly seeded Agent-role user; this proves that,
+    // rather than a 403 — this describe block's own doc comment already
+    // named these two permissions as the intended gate.
+    it("allows an Agent-role user with the default ticket:create/ticket:read grant to create and read messages (Story 100)", async () => {
       const agentEmail = `agent-messages-${randomUUID()}@example.com`;
       const agentPassword = "agent-test-password-123";
       const roles = await request(app.getHttpServer())
@@ -1253,15 +1287,24 @@ describe("Ticketing (e2e)", () => {
         .expect(200);
       const agentAccessToken = agentLogin.body.accessToken as string;
 
-      await request(app.getHttpServer())
-        .post(`/api/v1/tickets/${ticketId}/messages`)
+      // A fresh ticket, not the shared `ticketId` fixture below's own
+      // "returns [] for a ticket with no messages yet" test still needs to
+      // see zero messages on it.
+      const agentTicket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
         .set("Authorization", `Bearer ${agentAccessToken}`)
-        .send({ body: "Should not be created" })
-        .expect(403);
+        .send({ customerId, subject: "Agent messages permission fixture" })
+        .expect(201);
+
       await request(app.getHttpServer())
-        .get(`/api/v1/tickets/${ticketId}/messages`)
+        .post(`/api/v1/tickets/${agentTicket.body.id}/messages`)
         .set("Authorization", `Bearer ${agentAccessToken}`)
-        .expect(403);
+        .send({ body: "Agent message" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${agentTicket.body.id}/messages`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(200);
     });
 
     it("returns [] for a ticket with no messages yet", async () => {
