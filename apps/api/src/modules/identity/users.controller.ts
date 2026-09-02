@@ -12,6 +12,7 @@ import { CreateRoleDto } from "./dto/create-role.dto";
 import { UpdateRoleDto } from "./dto/update-role.dto";
 import { SetRolePermissionsDto } from "./dto/set-role-permissions.dto";
 import { UpdateUserAssignmentDto } from "./dto/update-user-assignment.dto";
+import { GrantBranchAssignmentDto } from "./dto/grant-branch-assignment.dto";
 import type {
   BranchSummary,
   DepartmentSummary,
@@ -65,6 +66,16 @@ import { IdentityService } from "./identity.service";
  * permission (SuperAdmin-only, unlike `branch:read`/`branch:update`) —
  * `listBranches` itself stays scoped to the caller's own branch only; a
  * cross-branch listing/switching UI remains a separate, future story.
+ *
+ * Story 118 adds `POST users/:id/branch-assignments`, gated by its own
+ * `user:branch-assign` permission (SuperAdmin-only) — grants an
+ * EXISTING user an additional branch/department/role membership in a
+ * DIFFERENT branch, closing the gap this file's own Story 47/107
+ * comments above named as deferred. `updateUserAssignment` stays
+ * same-branch-only, unchanged. The branch-switching endpoints
+ * themselves (`POST auth/switch-branch`, `GET auth/me/branches`) live
+ * in `IdentityController`, not here — see that controller's own doc
+ * comment for why (the refresh-token cookie's path scoping).
  */
 @ApiTags("identity")
 @ApiBearerAuth()
@@ -106,6 +117,23 @@ export class UsersController {
     @Body() dto: ResetPasswordDto,
   ): Promise<{ id: string }> {
     return this.identityService.resetPassword(id, dto);
+  }
+
+  /**
+   * Story 118 — grants an EXISTING user an additional
+   * branch/department/role membership, in a DIFFERENT branch than
+   * `updateUserAssignment` above ever touches. Its own,
+   * SuperAdmin-only `user:branch-assign` permission — see
+   * `IdentityService.grantBranchAssignment`'s own doc comment for why
+   * this isn't folded into `user:reassign`.
+   */
+  @Post("users/:id/branch-assignments")
+  @RequirePermissions("user:branch-assign")
+  grantBranchAssignment(
+    @Param("id") id: string,
+    @Body() dto: GrantBranchAssignmentDto,
+  ): Promise<{ id: string }> {
+    return this.identityService.grantBranchAssignment(id, dto);
   }
 
   @Get("roles")

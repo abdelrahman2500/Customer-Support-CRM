@@ -2,16 +2,18 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { WorkspaceNav } from "./workspace-nav";
 import { useBrandingQuery } from "@/hooks/use-branding";
+import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
-import { clearAccessToken, logout } from "@/lib/api";
+import { clearAccessToken, logout, switchBranch } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
 const push = vi.fn();
+const refresh = vi.fn();
 let pathname = "/en/tickets";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, refresh }),
   usePathname: () => pathname,
 }));
 
@@ -23,6 +25,7 @@ vi.mock("next-intl", () => ({
 vi.mock("@/lib/api", () => ({
   logout: vi.fn(),
   clearAccessToken: vi.fn(),
+  switchBranch: vi.fn(),
 }));
 
 // Story 95 — Authentication Recovery.
@@ -40,11 +43,18 @@ vi.mock("@/hooks/use-notifications", () => ({
   useUnreadNotificationCountQuery: vi.fn(),
 }));
 
+// Story 118 — Branch switcher.
+vi.mock("@/hooks/use-branch-memberships", () => ({
+  useMyBranchMembershipsQuery: vi.fn(),
+}));
+
 const mockedLogout = vi.mocked(logout);
 const mockedClearAccessToken = vi.mocked(clearAccessToken);
+const mockedSwitchBranch = vi.mocked(switchBranch);
 const mockedClearQueryCache = vi.mocked(clearQueryCache);
 const mockedUseBrandingQuery = vi.mocked(useBrandingQuery);
 const mockedUseUnreadNotificationCountQuery = vi.mocked(useUnreadNotificationCountQuery);
+const mockedUseMyBranchMembershipsQuery = vi.mocked(useMyBranchMembershipsQuery);
 
 const user = {
   id: "user-1",
@@ -64,6 +74,22 @@ describe("WorkspaceNav", () => {
     mockedUseUnreadNotificationCountQuery.mockReturnValue({
       data: undefined,
       isSuccess: false,
+    } as never);
+    // Story 118 — a single membership (the common case for every user
+    // before this story) hides the switcher entirely; tests that need
+    // more than one override this explicitly.
+    mockedUseMyBranchMembershipsQuery.mockReturnValue({
+      data: [
+        {
+          branchId: "branch-1",
+          branchName: "Main Branch",
+          departmentId: null,
+          departmentName: null,
+          roleId: "role-1",
+          roleName: "Agent",
+          isActive: true,
+        },
+      ],
     } as never);
   });
 
@@ -283,6 +309,91 @@ describe("WorkspaceNav", () => {
           expect(link).not.toHaveAttribute("aria-current");
         }
       }
+    });
+  });
+
+  // Story 118 — Identity & Access: Multi-branch assignment + branch switching.
+  describe("branch switcher (Story 118)", () => {
+    const singleMembership = [
+      {
+        branchId: "branch-1",
+        branchName: "Main Branch",
+        departmentId: null,
+        departmentName: null,
+        roleId: "role-1",
+        roleName: "Agent",
+        isActive: true,
+      },
+    ];
+    const twoMemberships = [
+      ...singleMembership,
+      {
+        branchId: "branch-2",
+        branchName: "Second Branch",
+        departmentId: null,
+        departmentName: null,
+        roleId: "role-2",
+        roleName: "Agent",
+        isActive: false,
+      },
+    ];
+
+    it("renders no switcher for a user with only one membership", () => {
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.queryByLabelText("branchSwitcher.label")).not.toBeInTheDocument();
+    });
+
+    it("renders a switcher, pre-selecting the currently active membership, once there is more than one", () => {
+      mockedUseMyBranchMembershipsQuery.mockReturnValue({ data: twoMemberships } as never);
+
+      render(<WorkspaceNav user={user} />);
+
+      const select = screen.getByLabelText("branchSwitcher.label") as HTMLSelectElement;
+      expect(select).toHaveValue("branch-1::");
+      expect(screen.getByText("Main Branch")).toBeInTheDocument();
+      expect(screen.getByText("Second Branch")).toBeInTheDocument();
+    });
+
+    it("switches branch, clears the query cache, and refreshes the current route", async () => {
+      mockedUseMyBranchMembershipsQuery.mockReturnValue({ data: twoMemberships } as never);
+      mockedSwitchBranch.mockResolvedValue("new-access-token");
+
+      render(<WorkspaceNav user={user} />);
+      fireEvent.change(screen.getByLabelText("branchSwitcher.label"), {
+        target: { value: "branch-2::" },
+      });
+
+      await waitFor(() => expect(mockedSwitchBranch).toHaveBeenCalledWith("branch-2", undefined));
+      expect(mockedClearQueryCache).toHaveBeenCalledOnce();
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+
+    it("passes departmentId through when the target membership has one", async () => {
+      mockedUseMyBranchMembershipsQuery.mockReturnValue({
+        data: [
+          ...singleMembership,
+          {
+            branchId: "branch-2",
+            branchName: "Second Branch",
+            departmentId: "dept-2",
+            departmentName: "Support",
+            roleId: "role-2",
+            roleName: "Agent",
+            isActive: false,
+          },
+        ],
+      } as never);
+      mockedSwitchBranch.mockResolvedValue("new-access-token");
+
+      render(<WorkspaceNav user={user} />);
+      fireEvent.change(screen.getByLabelText("branchSwitcher.label"), {
+        target: { value: "branch-2::dept-2" },
+      });
+
+      await waitFor(() =>
+        expect(mockedSwitchBranch).toHaveBeenCalledWith("branch-2", "dept-2"),
+      );
     });
   });
 });

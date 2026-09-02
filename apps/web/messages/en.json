@@ -38,6 +38,10 @@
     "appName": "Customer Support CRM",
     "signedInAs": "Signed in as {name}",
     "signOut": "Sign out",
+    "branchSwitcher": {
+      "label": "Switch branch",
+      "branchAndDepartment": "{branch} — {department}"
+    },
     "nav": {
       "label": "Workspace navigation",
       "dashboard": "Dashboard",

@@ -38,6 +38,10 @@
     "appName": "نظام إدارة خدمة العملاء",
     "signedInAs": "مسجّل الدخول باسم {name}",
     "signOut": "تسجيل الخروج",
+    "branchSwitcher": {
+      "label": "تبديل الفرع",
+      "branchAndDepartment": "{branch} — {department}"
+    },
     "nav": {
       "label": "التنقل في مساحة العمل",
       "dashboard": "لوحة التحكم",

@@ -17,6 +17,8 @@ import type { AuthenticatedUser, JwtAccessTokenClaims } from "@crm/shared";
 import { Public } from "../../common/auth/public.decorator";
 import type { EnvConfig } from "../../common/config/env.validation";
 import { LoginDto } from "./dto/login.dto";
+import { SwitchBranchDto } from "./dto/switch-branch.dto";
+import type { BranchMembershipSummary } from "./identity.service";
 import { IdentityService } from "./identity.service";
 
 const REFRESH_COOKIE_NAME = "refreshToken";
@@ -91,6 +93,47 @@ export class IdentityController {
   async me(@Req() request: Request): Promise<AuthenticatedUser> {
     const user = request.user as JwtAccessTokenClaims;
     return this.identityService.getAuthenticatedUser(user.sub);
+  }
+
+  /** Story 118 — the caller's own branch/department/role memberships,
+   * flagging the currently-active one. No extra permission gate — the
+   * caller's own data, mirrors `me` above's identical precedent. */
+  @Get("me/branches")
+  async myBranches(): Promise<BranchMembershipSummary[]> {
+    return this.identityService.listMyBranchMemberships();
+  }
+
+  /**
+   * Story 118 — switches the caller's active branch/department to one
+   * of their OTHER existing memberships (granted via `POST
+   * identity/users/:id/branch-assignments`). Lives under `auth/*`, not
+   * `identity/*`: the refresh-token cookie is scoped to
+   * `path: "/api/v1/auth"` (see `setRefreshCookie` below) — a route
+   * outside that prefix would never receive it. `@Public()` +
+   * cookie-only, mirroring `refresh` above exactly: the presented
+   * refresh token alone identifies the caller, no Bearer access token
+   * required.
+   */
+  @Public()
+  @Throttle(AUTH_THROTTLE)
+  @Post("switch-branch")
+  @HttpCode(HttpStatus.OK)
+  async switchBranch(
+    @Body() dto: SwitchBranchDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<{ accessToken: string }> {
+    const presented = request.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
+    if (!presented) {
+      throw new UnauthorizedException("Missing refresh token");
+    }
+    const { accessToken, refreshToken } = await this.identityService.switchActiveBranch(
+      presented,
+      dto.branchId,
+      dto.departmentId ?? null,
+    );
+    this.setRefreshCookie(response, refreshToken);
+    return { accessToken };
   }
 
   private setRefreshCookie(response: Response, token: string): void {

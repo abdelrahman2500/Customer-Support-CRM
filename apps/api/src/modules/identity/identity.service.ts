@@ -27,6 +27,7 @@ import type { CreateRoleDto } from "./dto/create-role.dto";
 import type { UpdateRoleDto } from "./dto/update-role.dto";
 import type { SetRolePermissionsDto } from "./dto/set-role-permissions.dto";
 import type { UpdateUserAssignmentDto } from "./dto/update-user-assignment.dto";
+import type { GrantBranchAssignmentDto } from "./dto/grant-branch-assignment.dto";
 
 const BCRYPT_ROUNDS = 12;
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
@@ -65,6 +66,21 @@ export interface UserSummary {
 export interface BranchSummary {
   id: string;
   name: string;
+  isActive: boolean;
+}
+
+/** Story 118 — one row per `UserBranchRole` the caller holds, returned by
+ * `GET auth/me/branches`. `isActive` matches the *current request's own*
+ * JWT claims, not necessarily `branchRoles[0]` — a caller who has
+ * switched sees the switched-to membership flagged, not their original
+ * one. */
+export interface BranchMembershipSummary {
+  branchId: string;
+  branchName: string;
+  departmentId: string | null;
+  departmentName: string | null;
+  roleId: string;
+  roleName: string;
   isActive: boolean;
 }
 
@@ -159,7 +175,10 @@ export class IdentityService {
       throw new UnauthorizedException("Invalid email or password");
     }
 
-    const accessToken = await this.issueAccessToken(user.id, user.branchRoles);
+    const accessToken = await this.issueAccessToken(user.id, user.branchRoles, {
+      branchId: user.activeBranchId,
+      departmentId: user.activeDepartmentId,
+    });
     const { raw: refreshToken } = await this.createRefreshTokenRecord(user.id);
     await this.recordAuditLog({
       actorId: user.id,
@@ -181,9 +200,99 @@ export class IdentityService {
    * than silently reissuing).
    */
   async refresh(presentedToken: string): Promise<AuthTokenPair> {
+    const { record, user } = await this.validateAndLoadRefreshSubject(presentedToken);
+
+    const { raw: newRawToken, id: newTokenId } = await this.createRefreshTokenRecord(user.id);
+    await this.prisma.refreshToken.update({
+      where: { id: record.id },
+      data: { revokedAt: new Date(), replacedBy: newTokenId },
+    });
+
+    // Story 118 — passes the user's own last explicit switch
+    // (`activeBranchId`/`activeDepartmentId`, `null` for every user who
+    // has never switched) rather than nothing, so a switched branch
+    // survives this silent refresh (Story 41) instead of reverting to
+    // `branchRoles[0]` on the very next one.
+    const accessToken = await this.issueAccessToken(user.id, user.branchRoles, {
+      branchId: user.activeBranchId,
+      departmentId: user.activeDepartmentId,
+    });
+    return { accessToken, refreshToken: newRawToken };
+  }
+
+  /**
+   * Story 118 — switches the caller's active branch/department to one of
+   * their OTHER existing `UserBranchRole` memberships (granted via
+   * `grantBranchAssignment`, below). Authenticates identically to
+   * `refresh()` — the presented refresh token alone, no Bearer access
+   * token required — and performs the exact same validate-then-rotate
+   * flow, since this endpoint sits behind the same `/api/v1/auth`
+   * -scoped refresh-token cookie (`IdentityController.setRefreshCookie`).
+   * Persists the switch (`activeBranchId`/`activeDepartmentId` on
+   * `User`) so it survives every subsequent silent refresh too, not just
+   * this immediate access token — see `refresh()`'s own updated comment.
+   */
+  async switchActiveBranch(
+    presentedToken: string,
+    branchId: string,
+    departmentId: string | null,
+  ): Promise<AuthTokenPair> {
+    const { record, user } = await this.validateAndLoadRefreshSubject(presentedToken);
+
+    const membership = user.branchRoles.find(
+      (branchRole) => branchRole.branchId === branchId && branchRole.departmentId === departmentId,
+    );
+    if (!membership) {
+      throw new NotFoundException("You do not have a role in that branch/department");
+    }
+
+    const before = { branchId: user.activeBranchId, departmentId: user.activeDepartmentId };
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { activeBranchId: branchId, activeDepartmentId: departmentId },
+    });
+
+    const { raw: newRawToken, id: newTokenId } = await this.createRefreshTokenRecord(user.id);
+    await this.prisma.refreshToken.update({
+      where: { id: record.id },
+      data: { revokedAt: new Date(), replacedBy: newTokenId },
+    });
+
+    const accessToken = await this.issueAccessToken(user.id, user.branchRoles, {
+      branchId,
+      departmentId,
+    });
+
+    // Story 84 — mirrors `auth.login`/`auth.logout`'s own explicit-audit
+    // convention (a session-lifecycle action `AuditInterceptor` cannot
+    // capture route-generically).
+    await this.recordAuditLog({
+      actorId: user.id,
+      action: "auth.branch_switched",
+      entityType: "user",
+      entityId: user.id,
+      branchId,
+      diff: { before, after: { branchId, departmentId } },
+    });
+
+    return { accessToken, refreshToken: newRawToken };
+  }
+
+  /** Shared by `refresh()`/`switchActiveBranch()`: validates the presented
+   * refresh token (unknown/expired/revoked all fail identically) and
+   * loads its owning, still-active user with every branch membership. */
+  private async validateAndLoadRefreshSubject(presentedToken: string): Promise<{
+    record: { id: string; userId: string };
+    user: {
+      id: string;
+      isActive: boolean;
+      activeBranchId: string | null;
+      activeDepartmentId: string | null;
+      branchRoles: Array<{ branchId: string; departmentId: string | null; role: { name: string } }>;
+    };
+  }> {
     const tokenHash = this.hashRefreshToken(presentedToken);
     const record = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
-
     if (!record || record.revokedAt || record.expiresAt < new Date()) {
       throw new UnauthorizedException("Refresh token is invalid or expired");
     }
@@ -196,14 +305,7 @@ export class IdentityService {
       throw new UnauthorizedException("Refresh token is invalid or expired");
     }
 
-    const { raw: newRawToken, id: newTokenId } = await this.createRefreshTokenRecord(user.id);
-    await this.prisma.refreshToken.update({
-      where: { id: record.id },
-      data: { revokedAt: new Date(), replacedBy: newTokenId },
-    });
-
-    const accessToken = await this.issueAccessToken(user.id, user.branchRoles);
-    return { accessToken, refreshToken: newRawToken };
+    return { record, user };
   }
 
   /**
@@ -253,7 +355,16 @@ export class IdentityService {
       throw new UnauthorizedException("User no longer exists");
     }
 
-    const active = user.branchRoles[0];
+    // Story 118 — resolved the same way `issueAccessToken` resolves its
+    // own token claims (`user.activeBranchId`/`activeDepartmentId`,
+    // falling back to `branchRoles[0]`) — without this, `GET auth/me`
+    // would keep reporting a switched-away-from branch as "active" even
+    // though the caller's actual JWT claims (and every subsequent
+    // request) already reflect the switch.
+    const active = this.resolveActiveMembership(user.branchRoles, {
+      branchId: user.activeBranchId,
+      departmentId: user.activeDepartmentId,
+    });
     return {
       id: user.id,
       email: user.email,
@@ -266,6 +377,41 @@ export class IdentityService {
         )
         .map((br) => br.role.name),
     };
+  }
+
+  /**
+   * Story 118 — every `UserBranchRole` the caller
+   * (`TenantContext.userId`) holds, with branch/department/role names
+   * resolved, flagging which one is the currently-active membership
+   * (matching `TenantContext.branchId`/`.departmentId` — the current
+   * request's own JWT claims, already resolved at token-issuance time).
+   * No extra permission gate: this is the caller's own data, mirroring
+   * `getAuthenticatedUser`/`GET auth/me`'s identical precedent.
+   */
+  async listMyBranchMemberships(): Promise<BranchMembershipSummary[]> {
+    const userId = this.tenantContext.userId;
+    if (!userId) {
+      throw new UnauthorizedException("No authenticated user on this request");
+    }
+
+    const memberships = await this.prisma.userBranchRole.findMany({
+      where: { userId },
+      include: { branch: true, department: true, role: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const activeBranchId = this.tenantContext.branchId;
+    const activeDepartmentId = this.tenantContext.departmentId;
+    return memberships.map((membership) => ({
+      branchId: membership.branchId,
+      branchName: membership.branch.name,
+      departmentId: membership.departmentId,
+      departmentName: membership.department?.name ?? null,
+      roleId: membership.roleId,
+      roleName: membership.role.name,
+      isActive:
+        membership.branchId === activeBranchId && membership.departmentId === activeDepartmentId,
+    }));
   }
 
   /**
@@ -299,6 +445,120 @@ export class IdentityService {
     });
 
     return { id: user.id, email: user.email };
+  }
+
+  /**
+   * Story 118 — grants an EXISTING user an additional
+   * branch/department/role membership (a second, third, ... row) in a
+   * DIFFERENT branch — the one write path `createUser`'s single-initial
+   * -membership and `updateUserAssignment`'s same-branch-only edit
+   * deliberately never provide. Gated by its own `user:branch-assign`
+   * permission (SuperAdmin-only, mirrors `branch:create`'s exact "new
+   * key, not added to Agent's grant list" precedent) — cross-branch
+   * access must stay "an explicit, audited permission, never a default"
+   * (docs/architecture/04-data-and-multitenancy.md).
+   *
+   * `dto.branchId` is validated against the *granting admin's own
+   * organization* — mirrors `createBranch`'s exact organization-scoping
+   * pattern — never trusted as a bare client-supplied id. This
+   * codebase has exactly one real `Organization` row today, but the
+   * check is still the correct trust boundary for when that changes.
+   */
+  async grantBranchAssignment(
+    userId: string,
+    dto: GrantBranchAssignmentDto,
+  ): Promise<{ id: string }> {
+    const { branchId: callerBranchId } = this.tenantContext.requireBranchScope();
+    const callerBranch = await this.prisma.branch.findFirst({
+      where: { id: callerBranchId },
+      select: { organizationId: true },
+    });
+    if (!callerBranch) {
+      throw new NotFoundException("Branch not found");
+    }
+
+    const targetUser = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser) {
+      throw new NotFoundException("User not found");
+    }
+
+    const targetBranch = await this.prisma.branch.findFirst({
+      where: { id: dto.branchId, organizationId: callerBranch.organizationId },
+    });
+    if (!targetBranch) {
+      throw new NotFoundException("Branch not found");
+    }
+
+    if (dto.departmentId !== undefined) {
+      const department = await this.prisma.department.findFirst({
+        where: { id: dto.departmentId, branchId: dto.branchId },
+      });
+      if (!department) {
+        throw new NotFoundException("Department not found");
+      }
+      if (!department.isActive) {
+        throw new BadRequestException("Cannot assign an inactive department");
+      }
+    }
+
+    const role = await this.prisma.role.findUnique({ where: { id: dto.roleId } });
+    if (!role) {
+      throw new NotFoundException("Role not found");
+    }
+    if (!role.isActive) {
+      throw new BadRequestException("Cannot assign an inactive role");
+    }
+
+    // Explicit pre-check, not just the `@@unique` constraint's own P2002
+    // below: Postgres unique constraints treat every NULL as distinct
+    // from every other NULL, so `@@unique([userId, branchId,
+    // departmentId, roleId])` alone does NOT reject a second row with an
+    // identical `(userId, branchId, roleId)` when `departmentId` is
+    // `null` (the common case here — most cross-branch grants are
+    // branch-wide, no department) — confirmed while first authoring
+    // this method's own e2e coverage. Mirrors `createUser`'s own
+    // "pre-check via a real query, P2002 catch as race-window
+    // defense-in-depth" precedent (its duplicate-email check).
+    const existingMembership = await this.prisma.userBranchRole.findFirst({
+      where: {
+        userId,
+        branchId: dto.branchId,
+        departmentId: dto.departmentId ?? null,
+        roleId: dto.roleId,
+      },
+    });
+    if (existingMembership) {
+      throw new ConflictException("This user already has this exact assignment");
+    }
+
+    try {
+      const membership = await this.prisma.userBranchRole.create({
+        data: {
+          userId,
+          branchId: dto.branchId,
+          departmentId: dto.departmentId ?? null,
+          roleId: dto.roleId,
+        },
+      });
+      // `branchId` here is the ADMIN's OWN acting branch, not the
+      // (cross-branch) target — `AuditLogsService.listAuditLogs` scopes
+      // by the caller's own active branch (`OR: [{branchId}, {branchId:
+      // null}]`), so tagging this with the target branch would make the
+      // granting admin's own action invisible to their own audit trail.
+      // The target branch/department/role are still fully captured in
+      // `diff`.
+      await this.recordAuditLog({
+        actorId: this.tenantContext.userId,
+        action: "user.branch_assignment_granted",
+        entityType: "user",
+        entityId: userId,
+        branchId: callerBranchId,
+        diff: { branchId: dto.branchId, departmentId: dto.departmentId ?? null, roleId: dto.roleId },
+      });
+      return { id: membership.id };
+    } catch (error) {
+      throw translateDuplicateUserAssignment(error);
+    }
   }
 
   /**
@@ -840,24 +1100,54 @@ export class IdentityService {
     }
   }
 
+  /**
+   * Story 118 — shared by `issueAccessToken`/`getAuthenticatedUser`, so
+   * a token's claims and `GET auth/me`'s own read of "the active
+   * membership" can never disagree. `active.branchId === null` (never
+   * switched) or no matching `branchRoles` entry (self-healing — the
+   * previously-active membership was since removed) both fall back to
+   * the first assignment by creation order, exactly this codebase's
+   * pre-Story-118 behavior.
+   */
+  private resolveActiveMembership<
+    T extends { branchId: string; departmentId: string | null },
+  >(branchRoles: T[], active: { branchId: string | null; departmentId: string | null }): T | undefined {
+    return (
+      (active.branchId !== null
+        ? branchRoles.find(
+            (br) => br.branchId === active.branchId && br.departmentId === active.departmentId,
+          )
+        : undefined) ?? branchRoles[0]
+    );
+  }
+
+  /**
+   * Story 118 — `active` names the caller's explicit last switch
+   * (`User.activeBranchId`/`activeDepartmentId`, or the just-validated
+   * target of `switchActiveBranch` itself); its default,
+   * `{ branchId: null, departmentId: null }`, reproduces this method's
+   * exact pre-Story-118 behavior — resolution itself is
+   * `resolveActiveMembership`, above.
+   */
   private async issueAccessToken(
     userId: string,
     branchRoles: Array<{ branchId: string; departmentId: string | null; role: { name: string } }>,
+    active: { branchId: string | null; departmentId: string | null } = {
+      branchId: null,
+      departmentId: null,
+    },
   ): Promise<string> {
-    // NOTE: a user can hold roles in multiple branches/departments; this
-    // foundation story has no branch-switching UI yet, so the first
-    // assignment (by creation order) becomes the token's active context.
-    // Replacing this with an explicit "switch branch" flow is future work,
-    // not a gap introduced here — see docs/architecture/04-data-and-multitenancy.md.
-    const active = branchRoles[0];
+    const resolvedActive = this.resolveActiveMembership(branchRoles, active);
     const claims: JwtAccessTokenClaims = {
       sub: userId,
       audience: "agent",
-      branchId: active?.branchId ?? null,
-      departmentId: active?.departmentId ?? null,
+      branchId: resolvedActive?.branchId ?? null,
+      departmentId: resolvedActive?.departmentId ?? null,
       roles: branchRoles
         .filter(
-          (br) => br.branchId === active?.branchId && br.departmentId === active?.departmentId,
+          (br) =>
+            br.branchId === resolvedActive?.branchId &&
+            br.departmentId === resolvedActive?.departmentId,
         )
         .map((br) => br.role.name),
     };

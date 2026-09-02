@@ -90,6 +90,33 @@ async function refreshAccessToken(): Promise<string> {
 }
 
 /**
+ * Story 118 — switches the caller's active branch/department to one of
+ * their OTHER existing memberships. Mirrors `refreshAccessToken()`'s
+ * exact pattern: a raw `fetch(..., { credentials: "include" })`, not
+ * routed through `apiFetch` — `POST auth/switch-branch` is `@Public()`
+ * and authenticates via the httpOnly refresh-token cookie alone (no
+ * Bearer header needed), exactly like `refreshAccessToken`'s own doc
+ * comment explains for `/auth/refresh`. Throws `ApiError` on any non-2xx
+ * response (e.g. a `404` for a branch/department the caller doesn't
+ * actually hold); on success, persists the new access token and returns
+ * it.
+ */
+export async function switchBranch(branchId: string, departmentId?: string): Promise<string> {
+  const response = await fetch(`${getApiBaseUrl()}/auth/switch-branch`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ branchId, ...(departmentId !== undefined ? { departmentId } : {}) }),
+  });
+  if (!response.ok) {
+    throw new ApiError("Failed to switch branch", response.status);
+  }
+  const { accessToken } = (await response.json()) as { accessToken: string };
+  setAccessToken(accessToken);
+  return accessToken;
+}
+
+/**
  * Story 41 — module-level in-flight-refresh guard. `POST /auth/refresh`
  * rotates and revokes the presented refresh token server-side
  * (`identity.service.ts`), so two independent, concurrent refresh calls

@@ -102,6 +102,18 @@ model User {
   /// "never marked read" — every matching row counts as unread.
   notificationsReadAt         DateTime?                @map("notifications_read_at")
   reportDashboards            ReportDashboard[]
+  /// Story 118 — the branch/department this user last explicitly
+  /// switched to (`POST auth/switch-branch`). Plain reference columns,
+  /// no FK — mirrors `AuditLog.branchId`'s own existing precedent in
+  /// this schema. `null` (every user before this story, and every user
+  /// who has never switched) means "no explicit choice yet" —
+  /// `issueAccessToken` falls back to `branchRoles[0]`, exactly as
+  /// before this story existed. Never trusted for referential integrity
+  /// directly: resolution always re-validates against the user's live
+  /// `UserBranchRole` rows and self-heals (falls back to
+  /// `branchRoles[0]`) if the stored membership no longer exists.
+  activeBranchId              String?                  @map("active_branch_id")
+  activeDepartmentId          String?                  @map("active_department_id")
   createdAt                   DateTime                 @default(now()) @map("created_at")
   updatedAt                   DateTime                 @updatedAt @map("updated_at")
 
