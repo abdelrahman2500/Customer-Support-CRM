@@ -4,13 +4,17 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
+import type { KbLocale } from "@/lib/knowledge-base-api";
 
 /** Story 54 — read-only article detail; mirrors `TicketDetailView`'s
- * loading/not-found/generic-error convention. */
+ * loading/not-found/generic-error convention.
+ *
+ * Story 109 — see `ArticleListView`'s own doc comment: the active locale
+ * is passed through the same way. */
 export function ArticleDetailView({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
   const { locale } = useParams<{ locale: string }>();
-  const articleQuery = usePublishedArticleQuery(articleId);
+  const articleQuery = usePublishedArticleQuery(articleId, locale.toUpperCase() as KbLocale);
 
   if (articleQuery.isLoading) {
     return (

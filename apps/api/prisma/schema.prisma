@@ -914,6 +914,8 @@ model KnowledgeBaseArticle {
   /// generated input type, so no existing call site needs to change).
   searchVector Unsupported("tsvector")?      @map("search_vector")
   versions     KnowledgeBaseArticleVersion[]
+  /// Story 109 — see `KnowledgeBaseArticleTranslation`'s own doc comment.
+  translations KnowledgeBaseArticleTranslation[]
 
   @@index([branchId])
   @@map("knowledge_base_articles")
@@ -944,6 +946,38 @@ model KnowledgeBaseArticleVersion {
   @@unique([articleId, versionNumber])
   @@index([articleId])
   @@map("knowledge_base_article_versions")
+  @@schema("knowledge_base")
+}
+
+/// Story 109 — see docs/architecture/10-i18n-and-rtl.md ("Translatable
+/// user/domain content... uses a per-entity translations pattern: one row
+/// per entity/locale/field... decided by the feature story") — this is
+/// that decision: one row per article/locale, mirroring
+/// `KnowledgeBaseArticleVersion`'s own "one row per article variant"
+/// shape, not a locale-keyed JSON column. The base article's own
+/// `title`/`body` are left untouched and remain the fallback whenever no
+/// row exists here for the requested locale — see
+/// `KnowledgeBaseService`'s own locale-resolution doc comment.
+enum KbLocale {
+  EN
+  AR
+
+  @@schema("knowledge_base")
+}
+
+model KnowledgeBaseArticleTranslation {
+  id        String               @id @default(uuid())
+  articleId String               @map("article_id")
+  article   KnowledgeBaseArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  locale    KbLocale
+  title     String
+  body      String
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
+
+  @@unique([articleId, locale])
+  @@index([articleId])
+  @@map("knowledge_base_article_translations")
   @@schema("knowledge_base")
 }
 

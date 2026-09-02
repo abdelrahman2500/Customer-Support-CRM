@@ -111,7 +111,18 @@ describe("ArticleListView", () => {
       target: { value: "password" },
     });
 
-    expect(mockedUsePublishedArticlesQuery).toHaveBeenLastCalledWith("password");
+    expect(mockedUsePublishedArticlesQuery).toHaveBeenLastCalledWith("password", "EN");
+  });
+
+  // Story 109 — Multi-locale content.
+  it("passes the active locale, uppercased, through to usePublishedArticlesQuery", () => {
+    mockedUsePublishedArticlesQuery.mockReturnValue(
+      queryResult({ data: [baseArticle], isSuccess: true }) as never,
+    );
+
+    render(<ArticleListView />);
+
+    expect(mockedUsePublishedArticlesQuery).toHaveBeenCalledWith("", "EN");
   });
 
   it("shows a distinct no-results state (not the browse-prompting empty state) when a search yields nothing", () => {

@@ -18,22 +18,39 @@ export interface PortalArticleSummary {
   updatedAt: string;
 }
 
+/** Story 109 — matches the backend's `KbLocale` enum exactly. */
+export type KbLocale = "EN" | "AR";
+
 /** Story 64 — Article Search. Mirrors `apps/web`'s own `toQueryString`
  * convention: an omitted/empty `search` produces the exact same request
- * every existing caller already sends. */
-function toQueryString(search: string | undefined): string {
+ * every existing caller already sends.
+ *
+ * Story 109 — `locale` added the same way: omitted entirely when absent,
+ * so a caller that never passes one keeps sending the exact same request
+ * as before this story. */
+function toQueryString(search: string | undefined, locale?: KbLocale): string {
   const params = new URLSearchParams();
   if (search !== undefined && search !== "") {
     params.set("search", search);
+  }
+  if (locale !== undefined) {
+    params.set("locale", locale);
   }
   const query = params.toString();
   return query ? `?${query}` : "";
 }
 
-export function listPublishedArticles(search?: string): Promise<PortalArticleSummary[]> {
-  return apiFetch<PortalArticleSummary[]>(`/portal/knowledge-base/articles${toQueryString(search)}`);
+export function listPublishedArticles(
+  search?: string,
+  locale?: KbLocale,
+): Promise<PortalArticleSummary[]> {
+  return apiFetch<PortalArticleSummary[]>(
+    `/portal/knowledge-base/articles${toQueryString(search, locale)}`,
+  );
 }
 
-export function getPublishedArticle(id: string): Promise<PortalArticleSummary> {
-  return apiFetch<PortalArticleSummary>(`/portal/knowledge-base/articles/${id}`);
+export function getPublishedArticle(id: string, locale?: KbLocale): Promise<PortalArticleSummary> {
+  return apiFetch<PortalArticleSummary>(
+    `/portal/knowledge-base/articles/${id}${toQueryString(undefined, locale)}`,
+  );
 }

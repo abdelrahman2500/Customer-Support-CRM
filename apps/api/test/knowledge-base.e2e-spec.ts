@@ -392,6 +392,117 @@ describe("Knowledge Base (e2e)", () => {
     });
   });
 
+  // Story 109 — Multi-locale content. A dedicated fixture article, not
+  // the shared `articleId` above (which other tests in this file mutate
+  // through publish/unpublish/edit cycles) — translations are tested in
+  // isolation against their own, otherwise-untouched article.
+  describe("translations", () => {
+    let translatedArticleId: string;
+
+    beforeAll(async () => {
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: "How to reset a password", body: "Step-by-step instructions..." })
+        .expect(201);
+      translatedArticleId = response.body.id;
+    });
+
+    it("rejects an unauthenticated request", async () => {
+      await request(app.getHttpServer())
+        .put(`/api/v1/knowledge-base/articles/${translatedArticleId}/translations/AR`)
+        .send({ title: "عنوان", body: "نص" })
+        .expect(401);
+      await request(app.getHttpServer())
+        .get(`/api/v1/knowledge-base/articles/${translatedArticleId}/translations`)
+        .expect(401);
+    });
+
+    it("rejects an invalid :locale segment with 400", async () => {
+      await request(app.getHttpServer())
+        .put(`/api/v1/knowledge-base/articles/${translatedArticleId}/translations/FR`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: "Titre", body: "Texte" })
+        .expect(400);
+    });
+
+    it("returns 404 for an unknown article id", async () => {
+      await request(app.getHttpServer())
+        .put(`/api/v1/knowledge-base/articles/${randomUUID()}/translations/AR`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: "عنوان", body: "نص" })
+        .expect(404);
+    });
+
+    it("returns [] for an article with no translations set yet", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/knowledge-base/articles/${translatedArticleId}/translations`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+
+    it("sets an AR translation, then lists it back", async () => {
+      await request(app.getHttpServer())
+        .put(`/api/v1/knowledge-base/articles/${translatedArticleId}/translations/AR`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: "كيفية إعادة تعيين كلمة المرور", body: "تعليمات خطوة بخطوة..." })
+        .expect(200);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/knowledge-base/articles/${translatedArticleId}/translations`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toEqual([
+        expect.objectContaining({
+          articleId: translatedArticleId,
+          locale: "AR",
+          title: "كيفية إعادة تعيين كلمة المرور",
+          body: "تعليمات خطوة بخطوة...",
+        }),
+      ]);
+    });
+
+    it("resolves the AR translation via GET .../articles/:id?locale=AR", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/knowledge-base/articles/${translatedArticleId}`)
+        .query({ locale: "AR" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.title).toBe("كيفية إعادة تعيين كلمة المرور");
+      expect(response.body.body).toBe("تعليمات خطوة بخطوة...");
+    });
+
+    it("falls back to the base (English) content when no locale is given", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/knowledge-base/articles/${translatedArticleId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.title).toBe("How to reset a password");
+    });
+
+    it("re-setting the same locale replaces the translation wholesale (upsert), not merge", async () => {
+      await request(app.getHttpServer())
+        .put(`/api/v1/knowledge-base/articles/${translatedArticleId}/translations/AR`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: "عنوان محدّث", body: "نص محدّث" })
+        .expect(200);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/knowledge-base/articles/${translatedArticleId}/translations`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toEqual([
+        expect.objectContaining({ locale: "AR", title: "عنوان محدّث", body: "نص محدّث" }),
+      ]);
+    });
+  });
+
   // Story 100 — Agent's default seed grant now includes `kb:read`
   // (previously `[]`), so the two read routes below are now reachable;
   // only the write routes (`kb:create`/`kb:update`, still not granted)

@@ -184,6 +184,74 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
     expect(noMatch.body).toEqual([]);
   });
 
+  // Story 109 — Multi-locale content. A dedicated published article, not
+  // `publishedArticleId` above (the very next test unpublishes it).
+  describe("locale", () => {
+    let localizedArticleId: string;
+
+    beforeAll(async () => {
+      const article = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: "How to contact support", body: "Call us or email us." })
+        .expect(201);
+      localizedArticleId = article.body.id;
+      await request(app.getHttpServer())
+        .patch(`/api/v1/knowledge-base/articles/${localizedArticleId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status: "PUBLISHED" })
+        .expect(200);
+      await request(app.getHttpServer())
+        .put(`/api/v1/knowledge-base/articles/${localizedArticleId}/translations/AR`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: "كيفية التواصل مع الدعم", body: "اتصل بنا أو راسلنا عبر البريد الإلكتروني." })
+        .expect(200);
+    });
+
+    it("returns the AR translation for the single-article endpoint when ?locale=AR is given", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/knowledge-base/articles/${localizedArticleId}`)
+        .query({ locale: "AR" })
+        .set("Authorization", `Bearer ${portalAccessToken}`)
+        .expect(200);
+
+      expect(response.body.title).toBe("كيفية التواصل مع الدعم");
+      expect(response.body.body).toBe("اتصل بنا أو راسلنا عبر البريد الإلكتروني.");
+    });
+
+    it("returns the base (English) content when no locale is given", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/knowledge-base/articles/${localizedArticleId}`)
+        .set("Authorization", `Bearer ${portalAccessToken}`)
+        .expect(200);
+
+      expect(response.body.title).toBe("How to contact support");
+    });
+
+    it("returns the AR translation in the list endpoint when ?locale=AR is given", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/portal/knowledge-base/articles")
+        .query({ locale: "AR" })
+        .set("Authorization", `Bearer ${portalAccessToken}`)
+        .expect(200);
+
+      const found = response.body.find(
+        (article: { id: string }) => article.id === localizedArticleId,
+      );
+      expect(found).toMatchObject({ title: "كيفية التواصل مع الدعم" });
+    });
+
+    it("falls back to the base content for a locale with no translation set", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/knowledge-base/articles/${localizedArticleId}`)
+        .query({ locale: "EN" })
+        .set("Authorization", `Bearer ${portalAccessToken}`)
+        .expect(200);
+
+      expect(response.body.title).toBe("How to contact support");
+    });
+  });
+
   it("unpublishing the article makes it disappear from the portal view", async () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/knowledge-base/articles/${publishedArticleId}`)

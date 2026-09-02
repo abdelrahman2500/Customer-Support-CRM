@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import type { KnowledgeBaseArticleStatus } from "@prisma/client";
+import type { KbLocale, KnowledgeBaseArticleStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateArticleDto } from "./dto/create-article.dto";
 import type { UpdateArticleDto } from "./dto/update-article.dto";
+import type { SetArticleTranslationDto } from "./dto/set-article-translation.dto";
 
 /** Story 106 — mirrors `AuditLogsService`'s own `MAX_AUDIT_LOG_ROWS`
  * precedent (Story 104): a KB article library is a "generous page for a
@@ -23,6 +24,17 @@ export interface ArticleSummary {
   category: string | null;
   status: KnowledgeBaseArticleStatus;
   publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Story 109 — one article's content in one locale. */
+export interface ArticleTranslationSummary {
+  id: string;
+  articleId: string;
+  locale: KbLocale;
+  title: string;
+  body: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +76,24 @@ export interface ArticleVersionSummary {
  * domains.md: "publishing creates a new version rather than mutating
  * published content"), inside the same `$transaction` as the article
  * update. A plain content edit or an unpublish creates no version.
+ *
+ * Story 109 — Multi-locale content. Every read method now takes an
+ * optional `locale`. When given, and a matching
+ * `KnowledgeBaseArticleTranslation` row exists, that translation's
+ * `title`/`body` are substituted for the base article's own — resolved as
+ * a small, separate post-processing step (`applyLocale`) over whatever
+ * the existing, unmodified query already returned, never folded into the
+ * query itself. This keeps every pre-existing query/test's behavior
+ * byte-for-byte identical when `locale` is omitted (the common case,
+ * still every agent-facing call site today), and avoids Prisma's
+ * conditional-`include` typing complexity entirely. No translation for
+ * the requested locale (or no `locale` given at all) silently falls back
+ * to the base `title`/`body` — the same content every caller already saw
+ * before this story, never a 404 or an empty field.
+ * `setArticleTranslation`/`listArticleTranslations` are the write/list
+ * side; `searchArticles` is deliberately untouched — full-text search
+ * stays English-only against the base `search_vector` column (this
+ * story's own plan doc, "Non-goals").
  */
 @Injectable()
 export class KnowledgeBaseService {
@@ -86,22 +116,23 @@ export class KnowledgeBaseService {
     return toArticleSummary(article);
   }
 
-  async listArticles(search?: string): Promise<ArticleSummary[]> {
+  async listArticles(search?: string, locale?: KbLocale): Promise<ArticleSummary[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
     if (search?.trim()) {
-      return this.searchArticles(branchId, search.trim());
+      const results = await this.searchArticles(branchId, search.trim());
+      return this.applyLocale(results, locale);
     }
     const articles = await this.prisma.knowledgeBaseArticle.findMany({
       where: { branchId },
       orderBy: { updatedAt: "desc" },
       take: MAX_ARTICLE_ROWS,
     });
-    return articles.map(toArticleSummary);
+    return this.applyLocale(articles.map(toArticleSummary), locale);
   }
 
-  async getArticle(id: string): Promise<ArticleSummary> {
+  async getArticle(id: string, locale?: KbLocale): Promise<ArticleSummary> {
     const article = await this.findArticleInScope(id);
-    return toArticleSummary(article);
+    return this.applyLocaleToOne(toArticleSummary(article), locale);
   }
 
   /**
@@ -183,6 +214,38 @@ export class KnowledgeBaseService {
     }));
   }
 
+  /**
+   * Story 109 — creates or replaces the article's translation for one
+   * locale. Reuses `findArticleInScope`'s existing branch-scope/404
+   * guarantee first — a translation is never reachable (or settable)
+   * outside the parent article's own branch scope, exactly like
+   * `listArticleVersions`. `upsert` keyed on the `@@unique([articleId,
+   * locale])` constraint — calling this again for the same article/locale
+   * pair replaces the existing translation wholesale (both `title`/`body`
+   * are required on the DTO — see `SetArticleTranslationDto`'s own doc
+   * comment), never merges partial fields.
+   */
+  async setArticleTranslation(
+    id: string,
+    locale: KbLocale,
+    dto: SetArticleTranslationDto,
+  ): Promise<ArticleTranslationSummary> {
+    await this.findArticleInScope(id);
+    return this.prisma.knowledgeBaseArticleTranslation.upsert({
+      where: { articleId_locale: { articleId: id, locale } },
+      create: { articleId: id, locale, title: dto.title, body: dto.body },
+      update: { title: dto.title, body: dto.body },
+    });
+  }
+
+  /** Story 109 — every translation currently set for this article, in no
+   * particular order (there are at most two, one per `KbLocale`). Reuses
+   * `findArticleInScope`'s existing branch-scope/404 guarantee. */
+  async listArticleTranslations(id: string): Promise<ArticleTranslationSummary[]> {
+    await this.findArticleInScope(id);
+    return this.prisma.knowledgeBaseArticleTranslation.findMany({ where: { articleId: id } });
+  }
+
   // ---------------------------------------------------------------------
   // Story 54 — Customer Portal (published-only, branch-scoped, no
   // TenantContext — the caller's branch comes from the JWT's own claim,
@@ -195,28 +258,34 @@ export class KnowledgeBaseService {
   async listPublishedArticlesForBranch(
     branchId: string,
     search?: string,
+    locale?: KbLocale,
   ): Promise<ArticleSummary[]> {
     if (search?.trim()) {
-      return this.searchArticles(branchId, search.trim(), { publishedOnly: true });
+      const results = await this.searchArticles(branchId, search.trim(), { publishedOnly: true });
+      return this.applyLocale(results, locale);
     }
     const articles = await this.prisma.knowledgeBaseArticle.findMany({
       where: { branchId, status: "PUBLISHED" },
       orderBy: { publishedAt: "desc" },
       take: MAX_ARTICLE_ROWS,
     });
-    return articles.map(toArticleSummary);
+    return this.applyLocale(articles.map(toArticleSummary), locale);
   }
 
   /** 404s identically for a draft article, one in a different branch, or an
    * unknown id — a portal caller never learns a draft exists. */
-  async getPublishedArticleForBranch(id: string, branchId: string): Promise<ArticleSummary> {
+  async getPublishedArticleForBranch(
+    id: string,
+    branchId: string,
+    locale?: KbLocale,
+  ): Promise<ArticleSummary> {
     const article = await this.prisma.knowledgeBaseArticle.findFirst({
       where: { id, branchId, status: "PUBLISHED" },
     });
     if (!article) {
       throw new NotFoundException("Article not found");
     }
-    return toArticleSummary(article);
+    return this.applyLocaleToOne(toArticleSummary(article), locale);
   }
 
   // ---------------------------------------------------------------------
@@ -242,6 +311,47 @@ export class KnowledgeBaseService {
       throw new NotFoundException("Article not found");
     }
     return article;
+  }
+
+  /**
+   * Story 109 — resolves `locale` against `KnowledgeBaseArticleTranslation`
+   * for every article in `articles`, in one batched query (never N+1). A
+   * missing `locale`, an empty `articles` array, or no translation row for
+   * a given article/locale pair all fall back to that article's own
+   * unmodified `title`/`body` — the input array's own field values,
+   * already whatever the caller's query resolved (base content or a
+   * full-text search hit), passed straight through.
+   */
+  private async applyLocale(
+    articles: ArticleSummary[],
+    locale: KbLocale | undefined,
+  ): Promise<ArticleSummary[]> {
+    if (!locale || articles.length === 0) {
+      return articles;
+    }
+    const translations = await this.prisma.knowledgeBaseArticleTranslation.findMany({
+      where: { articleId: { in: articles.map((article) => article.id) }, locale },
+    });
+    const byArticleId = new Map(translations.map((translation) => [translation.articleId, translation]));
+    return articles.map((article) => {
+      const translation = byArticleId.get(article.id);
+      return translation ? { ...article, title: translation.title, body: translation.body } : article;
+    });
+  }
+
+  /** Story 109 — the single-article counterpart to `applyLocale`, used by
+   * `getArticle`/`getPublishedArticleForBranch`. `applyLocale` always
+   * returns an array the same length as its input, so indexing `[0]` of a
+   * one-element input is always defined — this just gives that guarantee
+   * an actual `ArticleSummary` return type instead of an
+   * `ArticleSummary | undefined` one callers would otherwise have to
+   * needlessly narrow. */
+  private async applyLocaleToOne(
+    article: ArticleSummary,
+    locale: KbLocale | undefined,
+  ): Promise<ArticleSummary> {
+    const [resolved] = await this.applyLocale([article], locale);
+    return resolved ?? article;
   }
 
   /**

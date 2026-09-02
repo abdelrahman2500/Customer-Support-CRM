@@ -54,6 +54,17 @@ describe("ArticleDetailView", () => {
     expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
+  // Story 109 — Multi-locale content.
+  it("passes the active locale, uppercased, through to usePublishedArticleQuery", () => {
+    vi.mocked(usePublishedArticleQuery).mockReturnValue(
+      queryResult({ isLoading: true }) as never,
+    );
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    expect(usePublishedArticleQuery).toHaveBeenCalledWith("article-1", "EN");
+  });
+
   it("renders a not-found message when the article lookup 404s", () => {
     vi.mocked(usePublishedArticleQuery).mockReturnValue(
       queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,

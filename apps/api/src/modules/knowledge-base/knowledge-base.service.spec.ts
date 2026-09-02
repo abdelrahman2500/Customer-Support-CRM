@@ -17,6 +17,10 @@ function buildPrismaMock() {
       findMany: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
     };
+    knowledgeBaseArticleTranslation: {
+      findMany: ReturnType<typeof vi.fn>;
+      upsert: ReturnType<typeof vi.fn>;
+    };
     $queryRaw: ReturnType<typeof vi.fn>;
     $transaction: ReturnType<typeof vi.fn>;
   } = {
@@ -30,6 +34,12 @@ function buildPrismaMock() {
       create: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
+    },
+    // Story 109 — `applyLocale`'s batched lookup and
+    // `setArticleTranslation`'s `upsert`.
+    knowledgeBaseArticleTranslation: {
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn(),
     },
     // Story 102 — `searchArticles`'s tagged-template `$queryRaw` calls.
     // Mocked as a plain function: invoking it as a tagged template
@@ -212,6 +222,41 @@ describe("KnowledgeBaseService", () => {
         take: 200,
       });
     });
+
+    // Story 109 — Multi-locale content.
+    it("resolves each article's AR title/body when a matching translation exists", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([baseArticleRow]);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([
+        { id: "t1", articleId: "article-1", locale: "AR", title: "كيفية إعادة تعيين كلمة المرور", body: "تعليمات..." },
+      ]);
+
+      const result = await service.listArticles(undefined, "AR" as never);
+
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).toHaveBeenCalledWith({
+        where: { articleId: { in: ["article-1"] }, locale: "AR" },
+      });
+      expect(result).toEqual([
+        { ...baseArticleRow, title: "كيفية إعادة تعيين كلمة المرور", body: "تعليمات..." },
+      ]);
+    });
+
+    it("falls back to the base title/body when no translation exists for the requested locale", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([baseArticleRow]);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      const result = await service.listArticles(undefined, "AR" as never);
+
+      expect(result).toEqual([baseArticleRow]);
+    });
+
+    it("never queries translations when locale is omitted", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([baseArticleRow]);
+
+      const result = await service.listArticles();
+
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).not.toHaveBeenCalled();
+      expect(result).toEqual([baseArticleRow]);
+    });
   });
 
   describe("getArticle", () => {
@@ -222,6 +267,36 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.findFirst).toHaveBeenCalledWith({
         where: { id: "missing-id", branchId: "branch-1" },
       });
+    });
+
+    it("returns the base article when no locale is given", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+
+      const result = await service.getArticle("article-1");
+
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).not.toHaveBeenCalled();
+      expect(result).toEqual(baseArticleRow);
+    });
+
+    // Story 109 — Multi-locale content.
+    it("resolves the AR title/body when a matching translation exists", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([
+        { id: "t1", articleId: "article-1", locale: "AR", title: "العنوان بالعربية", body: "النص بالعربية" },
+      ]);
+
+      const result = await service.getArticle("article-1", "AR" as never);
+
+      expect(result).toEqual({ ...baseArticleRow, title: "العنوان بالعربية", body: "النص بالعربية" });
+    });
+
+    it("falls back to the base title/body when no AR translation exists", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      const result = await service.getArticle("article-1", "AR" as never);
+
+      expect(result).toEqual(baseArticleRow);
     });
   });
 
@@ -488,6 +563,27 @@ describe("KnowledgeBaseService", () => {
         take: 200,
       });
     });
+
+    // Story 109 — Multi-locale content.
+    it("resolves the AR title/body when a matching translation exists", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([publishedArticleRow]);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([
+        { id: "t1", articleId: publishedArticleRow.id, locale: "AR", title: "عنوان", body: "نص" },
+      ]);
+
+      const result = await service.listPublishedArticlesForBranch("branch-1", undefined, "AR" as never);
+
+      expect(result).toEqual([{ ...publishedArticleRow, title: "عنوان", body: "نص" }]);
+    });
+
+    it("falls back to the base title/body when no translation exists for the requested locale", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([publishedArticleRow]);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      const result = await service.listPublishedArticlesForBranch("branch-1", undefined, "AR" as never);
+
+      expect(result).toEqual([publishedArticleRow]);
+    });
   });
 
   describe("getPublishedArticleForBranch", () => {
@@ -499,6 +595,35 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.findFirst).toHaveBeenCalledWith({
         where: { id: "article-2", branchId: "branch-1", status: "PUBLISHED" },
       });
+      expect(result).toEqual(publishedArticleRow);
+    });
+
+    // Story 109 — Multi-locale content.
+    it("resolves the AR title/body when a matching translation exists", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(publishedArticleRow);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([
+        { id: "t1", articleId: publishedArticleRow.id, locale: "AR", title: "عنوان", body: "نص" },
+      ]);
+
+      const result = await service.getPublishedArticleForBranch(
+        "article-2",
+        "branch-1",
+        "AR" as never,
+      );
+
+      expect(result).toEqual({ ...publishedArticleRow, title: "عنوان", body: "نص" });
+    });
+
+    it("falls back to the base title/body when no translation exists for the requested locale", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(publishedArticleRow);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      const result = await service.getPublishedArticleForBranch(
+        "article-2",
+        "branch-1",
+        "AR" as never,
+      );
+
       expect(result).toEqual(publishedArticleRow);
     });
 
@@ -529,6 +654,80 @@ describe("KnowledgeBaseService", () => {
       await expect(
         service.getPublishedArticleForBranch("article-2", "branch-2"),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  // Story 109 — Multi-locale content.
+  describe("setArticleTranslation", () => {
+    it("throws NotFoundException for an unknown/out-of-scope id, never touching the translation table", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.setArticleTranslation("missing-id", "AR" as never, {
+          title: "عنوان",
+          body: "نص",
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.knowledgeBaseArticleTranslation.upsert).not.toHaveBeenCalled();
+    });
+
+    it("upserts the translation, keyed on the articleId/locale unique constraint", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      prisma.knowledgeBaseArticleTranslation.upsert.mockResolvedValue({
+        id: "t1",
+        articleId: "article-1",
+        locale: "AR",
+        title: "عنوان",
+        body: "نص",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+
+      await service.setArticleTranslation("article-1", "AR" as never, {
+        title: "عنوان",
+        body: "نص",
+      });
+
+      expect(prisma.knowledgeBaseArticleTranslation.upsert).toHaveBeenCalledWith({
+        where: { articleId_locale: { articleId: "article-1", locale: "AR" } },
+        create: { articleId: "article-1", locale: "AR", title: "عنوان", body: "نص" },
+        update: { title: "عنوان", body: "نص" },
+      });
+    });
+  });
+
+  describe("listArticleTranslations", () => {
+    it("throws NotFoundException for an unknown/out-of-scope id", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
+
+      await expect(service.listArticleTranslations("missing-id")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).not.toHaveBeenCalled();
+    });
+
+    it("returns every translation currently set for the article", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      const translations = [
+        { id: "t1", articleId: "article-1", locale: "AR", title: "عنوان", body: "نص" },
+      ];
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue(translations);
+
+      const result = await service.listArticleTranslations("article-1");
+
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).toHaveBeenCalledWith({
+        where: { articleId: "article-1" },
+      });
+      expect(result).toEqual(translations);
+    });
+
+    it("returns [] for an article with no translations set", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      const result = await service.listArticleTranslations("article-1");
+
+      expect(result).toEqual([]);
     });
   });
 });

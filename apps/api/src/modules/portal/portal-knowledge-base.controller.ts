@@ -4,6 +4,7 @@ import type { Request } from "express";
 import type { JwtAccessTokenClaims } from "@crm/shared";
 import { PortalRoute } from "../../common/auth/portal-route.decorator";
 import { ListArticlesQueryDto } from "../knowledge-base/dto/list-articles-query.dto";
+import { LocaleQueryDto } from "../knowledge-base/dto/locale-query.dto";
 import { KnowledgeBaseService } from "../knowledge-base/knowledge-base.service";
 import type { ArticleSummary } from "../knowledge-base/knowledge-base.service";
 
@@ -31,15 +32,21 @@ export class PortalKnowledgeBaseController {
     return this.knowledgeBaseService.listPublishedArticlesForBranch(
       this.requireBranchId(request),
       query.search,
+      query.locale,
     );
   }
 
   @PortalRoute()
   @Get(":id")
-  getOne(@Req() request: Request, @Param("id") id: string): Promise<ArticleSummary> {
+  getOne(
+    @Req() request: Request,
+    @Param("id") id: string,
+    @Query() query: LocaleQueryDto,
+  ): Promise<ArticleSummary> {
     return this.knowledgeBaseService.getPublishedArticleForBranch(
       id,
       this.requireBranchId(request),
+      query.locale,
     );
   }
 

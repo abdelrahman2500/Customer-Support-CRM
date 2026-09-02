@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
+import type { KbLocale } from "@/lib/knowledge-base-api";
 
 /**
  * Story 54 — Customer Portal — Knowledge Base Browsing. Read-only: no
@@ -14,13 +15,20 @@ import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
  * Story 64 — a plain, un-debounced search input above the list, mirroring
  * `apps/web`'s own `ArticleListView` addition; local `useState`, wired
  * straight into `usePublishedArticlesQuery(search)`.
+ *
+ * Story 109 — the active `next-intl` locale (`en`/`ar`, already
+ * destructured off `useParams()` for navigation, previously unused for
+ * this) is uppercased to `KbLocale`'s own `EN`/`AR` values and passed
+ * through, so a visitor sees an article's Arabic content whenever an
+ * agent has set it — falling back to the base (English) content
+ * otherwise, resolved server-side.
  */
 export function ArticleListView() {
   const t = useTranslations("knowledgeBase");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const [search, setSearch] = useState("");
-  const articlesQuery = usePublishedArticlesQuery(search);
+  const articlesQuery = usePublishedArticlesQuery(search, locale.toUpperCase() as KbLocale);
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
