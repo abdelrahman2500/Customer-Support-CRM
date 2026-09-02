@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useAuditLogsQuery } from "@/hooks/use-audit-logs";
 import { useUsersQuery } from "@/hooks/use-tickets";
-import type { AuditLogSummary } from "@/lib/audit-logs-api";
+import type { AuditLogFilters, AuditLogSummary } from "@/lib/audit-logs-api";
 import { ApiError } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -53,13 +54,27 @@ function ActorCell({ actorId, nameById }: { actorId: string | null; nameById: Ma
  * specific `ApiError.status` from every other failure — shown as its own
  * message with no retry action, since retrying with the same permissions
  * cannot change the outcome.
+ *
+ * Story 104 — a filter bar: blur-commit `action`/`entityType` `Input`s
+ * (mirrors `TicketListView`'s own `category` filter `Input` — both are
+ * exact-match backend filters, not full-text search) plus a `{from, to}`
+ * date-range pair (mirrors `ReportsView`'s own Story 93 date `Input`
+ * pair). No `actorId` filter control — the backend supports it, but a
+ * usable picker needs the same name-resolution this view already does
+ * for *display*, not just an id text box; deferred rather than shipping
+ * a raw-UUID input.
  */
 export function AuditLogView() {
   const t = useTranslations("auditLogs");
   const { locale } = useParams<{ locale: string }>();
 
-  const auditLogsQuery = useAuditLogsQuery();
+  const [filters, setFilters] = useState<AuditLogFilters>({});
+  const auditLogsQuery = useAuditLogsQuery(filters);
   const usersQuery = useUsersQuery();
+
+  function updateFilter<K extends keyof AuditLogFilters>(key: K, value: string) {
+    setFilters((current) => ({ ...current, [key]: value || undefined }));
+  }
 
   const actorNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -77,6 +92,54 @@ export function AuditLogView() {
   return (
     <section className="flex flex-col gap-4">
       <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+
+      <div className="flex flex-wrap gap-3">
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("filterAction")}
+          <Input
+            className="min-w-[10rem]"
+            defaultValue={filters.action ?? ""}
+            placeholder={t("filterActionPlaceholder")}
+            onBlur={(event) => updateFilter("action", event.target.value.trim())}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("filterEntityType")}
+          <Input
+            className="min-w-[10rem]"
+            defaultValue={filters.entityType ?? ""}
+            placeholder={t("filterEntityTypePlaceholder")}
+            onBlur={(event) => updateFilter("entityType", event.target.value.trim())}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("filterFrom")}
+          <Input
+            type="date"
+            className="w-40"
+            value={filters.from ?? ""}
+            onChange={(event) => updateFilter("from", event.target.value)}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("filterTo")}
+          <Input
+            type="date"
+            className="w-40"
+            value={filters.to ?? ""}
+            onChange={(event) => updateFilter("to", event.target.value)}
+          />
+        </label>
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-end"
+          onClick={() => setFilters({})}
+          disabled={!filters.action && !filters.entityType && !filters.from && !filters.to}
+        >
+          {t("filterClear")}
+        </Button>
+      </div>
 
       {auditLogsQuery.isLoading && (
         <div className="flex flex-col gap-2">

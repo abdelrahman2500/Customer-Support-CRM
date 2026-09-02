@@ -212,6 +212,9 @@ model AuditLog {
   ipAddress  String?  @map("ip_address")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  /// Story 104 — supports the branch-scoped, `createdAt`-ordered,
+  /// capped query `AuditLogsService.listAuditLogs` now always runs.
+  @@index([branchId, createdAt])
   @@map("audit_logs")
   @@schema("admin")
 }

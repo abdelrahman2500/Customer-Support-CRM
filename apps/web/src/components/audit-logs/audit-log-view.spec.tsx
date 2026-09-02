@@ -181,4 +181,72 @@ describe("AuditLogView", () => {
     expect(screen.getByText("noBranch")).toBeInTheDocument();
     expect(screen.getByText("noIpAddress")).toBeInTheDocument();
   });
+
+  // Story 104 — Audit Log Search, Filtering & a Bounded Result Cap.
+  describe("filter bar (Story 104)", () => {
+    beforeEach(() => {
+      mockedUseAuditLogsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [] }) as never,
+      );
+    });
+
+    it("defaults to no filters", () => {
+      render(<AuditLogView />);
+
+      expect(mockedUseAuditLogsQuery).toHaveBeenCalledWith({});
+    });
+
+    it("commits an action filter on blur", () => {
+      render(<AuditLogView />);
+
+      const input = screen.getByPlaceholderText("filterActionPlaceholder");
+      fireEvent.change(input, { target: { value: "POST /api/v1/tickets" } });
+      fireEvent.blur(input);
+
+      expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({
+        action: "POST /api/v1/tickets",
+      });
+    });
+
+    it("commits an entityType filter on blur", () => {
+      render(<AuditLogView />);
+
+      const input = screen.getByPlaceholderText("filterEntityTypePlaceholder");
+      fireEvent.change(input, { target: { value: "ticket" } });
+      fireEvent.blur(input);
+
+      expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({ entityType: "ticket" });
+    });
+
+    it("updates the date range immediately on change (no blur-commit)", () => {
+      render(<AuditLogView />);
+
+      const dateInputs = document.querySelectorAll('input[type="date"]');
+      fireEvent.change(dateInputs[0]!, { target: { value: "2026-06-01" } });
+
+      expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({ from: "2026-06-01" });
+
+      fireEvent.change(dateInputs[1]!, { target: { value: "2026-06-30" } });
+
+      expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({
+        from: "2026-06-01",
+        to: "2026-06-30",
+      });
+    });
+
+    it("the Clear button resets every filter and starts disabled", () => {
+      render(<AuditLogView />);
+
+      const clearButton = screen.getByText("filterClear");
+      expect(clearButton).toBeDisabled();
+
+      const dateInputs = document.querySelectorAll('input[type="date"]');
+      fireEvent.change(dateInputs[0]!, { target: { value: "2026-06-01" } });
+      expect(clearButton).not.toBeDisabled();
+
+      fireEvent.click(clearButton);
+
+      expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({});
+    });
+  });
 });

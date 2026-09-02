@@ -120,6 +120,90 @@ describe("Audit logs — read endpoint (e2e)", () => {
     expect(timestamps).toEqual(sorted);
   });
 
+  // Story 104 — Audit Log Search, Filtering & a Bounded Result Cap.
+  describe("filtering (Story 104)", () => {
+    it("filters by action, returning only exact matches", async () => {
+      const displayName = `Audit log filter e2e customer ${randomUUID()}`;
+      await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName })
+        .expect(201);
+      await waitForAuditLogRow("POST /api/v1/customers");
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/audit-logs")
+        .query({ action: "POST /api/v1/customers" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.length).toBeGreaterThan(0);
+      for (const log of response.body) {
+        expect(log.action).toBe("POST /api/v1/customers");
+      }
+    });
+
+    it("filters by entityType, returning only exact matches", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/audit-logs")
+        .query({ entityType: "http_request" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.length).toBeGreaterThan(0);
+      for (const log of response.body) {
+        expect(log.entityType).toBe("http_request");
+      }
+    });
+
+    it("filters by actorId, returning only exact matches", async () => {
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/audit-logs")
+        .query({ actorId: me.body.id })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.length).toBeGreaterThan(0);
+      for (const log of response.body) {
+        expect(log.actorId).toBe(me.body.id);
+      }
+    });
+
+    it("filters by date range, matching GET /reports/*'s own semantics", async () => {
+      const today = new Date().toISOString().slice(0, 10);
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/audit-logs")
+        .query({ from: today, to: today })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.length).toBeGreaterThan(0);
+    });
+
+    it("rejects an invalid date range with 400", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/audit-logs")
+        .query({ from: "2026-06-05", to: "2026-06-01" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(400);
+    });
+
+    it("never returns more than 200 rows", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/audit-logs")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.length).toBeLessThanOrEqual(200);
+    });
+  });
+
   it("rejects an Agent user (no audit:read permission) with 403", async () => {
     const roles = await request(app.getHttpServer())
       .get("/api/v1/identity/roles")

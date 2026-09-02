@@ -25,6 +25,28 @@ export interface AuditLogSummary {
   createdAt: string;
 }
 
-export function listAuditLogs(): Promise<AuditLogSummary[]> {
-  return apiFetch<AuditLogSummary[]>("/audit-logs");
+/** Story 104 — mirrors `ListCustomersFilters`'s own shape/`toQueryString`
+ * convention. `action`/`entityType` match `ListAuditLogsQueryDto`'s exact
+ * exact-match semantics on the backend (never `contains`). */
+export interface AuditLogFilters {
+  action?: string;
+  entityType?: string;
+  actorId?: string;
+  from?: string;
+  to?: string;
+}
+
+function toQueryString(filters: AuditLogFilters): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") {
+      params.set(key, value);
+    }
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export function listAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogSummary[]> {
+  return apiFetch<AuditLogSummary[]>(`/audit-logs${toQueryString(filters)}`);
 }

@@ -147,5 +147,125 @@ describe("AuditLogsService", () => {
 
       await expect(service.listAuditLogs()).rejects.toThrow(/no active branch/);
     });
+
+    // Story 104 — Audit Log Search, Filtering & a Bounded Result Cap.
+    it("caps every query at 200 rows, unconditionally", async () => {
+      prisma.auditLog.findMany.mockResolvedValue([]);
+
+      await service.listAuditLogs();
+
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 200 }),
+      );
+    });
+
+    it("omitting every filter reproduces the exact pre-Story-104 where clause", async () => {
+      prisma.auditLog.findMany.mockResolvedValue([]);
+
+      await service.listAuditLogs({});
+
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { OR: [{ branchId: "branch-1" }, { branchId: null }] },
+        }),
+      );
+    });
+
+    it("filters by action, ANDed with the existing branch/null scope", async () => {
+      prisma.auditLog.findMany.mockResolvedValue([]);
+
+      await service.listAuditLogs({ action: "role.updated" });
+
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              { OR: [{ branchId: "branch-1" }, { branchId: null }] },
+              { action: "role.updated" },
+            ],
+          },
+        }),
+      );
+    });
+
+    it("filters by entityType", async () => {
+      prisma.auditLog.findMany.mockResolvedValue([]);
+
+      await service.listAuditLogs({ entityType: "role" });
+
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              { OR: [{ branchId: "branch-1" }, { branchId: null }] },
+              { entityType: "role" },
+            ],
+          },
+        }),
+      );
+    });
+
+    it("filters by actorId", async () => {
+      prisma.auditLog.findMany.mockResolvedValue([]);
+
+      await service.listAuditLogs({ actorId: "user-1" });
+
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              { OR: [{ branchId: "branch-1" }, { branchId: null }] },
+              { actorId: "user-1" },
+            ],
+          },
+        }),
+      );
+    });
+
+    it("filters by date range, reusing resolveReportDateRange's own [gte, lt) semantics", async () => {
+      prisma.auditLog.findMany.mockResolvedValue([]);
+
+      await service.listAuditLogs({ from: "2026-06-01", to: "2026-06-01" });
+
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              { OR: [{ branchId: "branch-1" }, { branchId: null }] },
+              {
+                createdAt: {
+                  gte: new Date("2026-06-01T00:00:00.000Z"),
+                  lt: new Date("2026-06-02T00:00:00.000Z"),
+                },
+              },
+            ],
+          },
+        }),
+      );
+    });
+
+    it("rejects an invalid date range (from after to)", async () => {
+      await expect(
+        service.listAuditLogs({ from: "2026-06-05", to: "2026-06-01" }),
+      ).rejects.toThrow(/from must not be after to/);
+    });
+
+    it("combines multiple filters, all ANDed with the branch/null scope", async () => {
+      prisma.auditLog.findMany.mockResolvedValue([]);
+
+      await service.listAuditLogs({ action: "role.updated", entityType: "role" });
+
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              { OR: [{ branchId: "branch-1" }, { branchId: null }] },
+              { action: "role.updated" },
+              { entityType: "role" },
+            ],
+          },
+        }),
+      );
+    });
   });
 });
