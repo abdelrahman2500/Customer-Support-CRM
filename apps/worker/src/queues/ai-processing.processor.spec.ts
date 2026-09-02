@@ -35,6 +35,11 @@ function buildPrismaMock() {
         { id: "current-message", role: "CUSTOMER", body: "Hi, I need help", createdAt: new Date() },
       ]),
     },
+    // Story 117 — `fetchKnowledgeBaseContext`'s tagged-template
+    // `$queryRaw` call. Defaults to "no matching article" (the common
+    // case in the pre-Story-117 CHAT_PAYLOAD tests below, none of which
+    // set up any Knowledge Base content).
+    $queryRaw: vi.fn().mockResolvedValue([]),
   };
 }
 
@@ -269,7 +274,7 @@ describe("AiProcessingProcessor", () => {
         chatSessionId: "session-1",
       };
 
-      it("calls provider.chat with { sessionId, message, history } and never the ticket-scoped methods", async () => {
+      it("calls provider.chat with { sessionId, message, history, context } and never the ticket-scoped methods", async () => {
         provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
         const job = buildJob(CHAT_PAYLOAD);
 
@@ -279,6 +284,7 @@ describe("AiProcessingProcessor", () => {
           sessionId: "session-1",
           message: "Hi, I need help",
           history: [],
+          context: [],
         });
         expect(provider.summarize).not.toHaveBeenCalled();
         expect(provider.suggestReply).not.toHaveBeenCalled();
@@ -319,6 +325,7 @@ describe("AiProcessingProcessor", () => {
               { role: "user", content: "I ordered a widget." },
               { role: "assistant", content: "What's your order number?" },
             ],
+            context: [],
           });
         });
 
@@ -335,7 +342,72 @@ describe("AiProcessingProcessor", () => {
             sessionId: "session-1",
             message: "Hi, I need help",
             history: [],
+            context: [],
           });
+        });
+      });
+
+      // Story 117 — Knowledge Base grounding.
+      describe("Knowledge Base context (Story 117)", () => {
+        it("queries the Knowledge Base scoped to the job's branchId, using the current message as the search query", async () => {
+          provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+          const job = buildJob(CHAT_PAYLOAD);
+
+          await processor.process(job);
+
+          expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+          const [strings, ...values] = prisma.$queryRaw.mock.calls[0]!;
+          expect(strings.join("")).toContain("branch_id =");
+          expect(strings.join("")).toContain("status = 'PUBLISHED'");
+          expect(values).toContain(CHAT_PAYLOAD.branchId);
+          expect(values).toContain(CHAT_PAYLOAD.body);
+        });
+
+        it("passes matching articles as context, truncated and formatted as 'title: excerpt'", async () => {
+          provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+          prisma.$queryRaw.mockResolvedValue([
+            { title: "Password reset", body: "Go to Settings and click Reset Password." },
+            { title: "Account lockout", body: "Wait 15 minutes after 5 failed attempts." },
+          ]);
+          const job = buildJob(CHAT_PAYLOAD);
+
+          await processor.process(job);
+
+          expect(provider.chat).toHaveBeenCalledWith(
+            expect.objectContaining({
+              context: [
+                "Password reset: Go to Settings and click Reset Password.",
+                "Account lockout: Wait 15 minutes after 5 failed attempts.",
+              ],
+            }),
+          );
+        });
+
+        it("truncates an excerpt longer than 500 characters", async () => {
+          provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+          const longBody = "x".repeat(600);
+          prisma.$queryRaw.mockResolvedValue([{ title: "Long article", body: longBody }]);
+          const job = buildJob(CHAT_PAYLOAD);
+
+          await processor.process(job);
+
+          const call = provider.chat.mock.calls[0]![0];
+          expect(call.context[0]).toBe(`Long article: ${"x".repeat(500)}`);
+        });
+
+        it("fails open (empty context) when the Knowledge Base query throws, without failing the job", async () => {
+          provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+          prisma.$queryRaw.mockRejectedValue(new Error("connection reset"));
+          const job = buildJob(CHAT_PAYLOAD);
+
+          await processor.process(job);
+
+          expect(provider.chat).toHaveBeenCalledWith(
+            expect.objectContaining({ context: [] }),
+          );
+          expect(prisma.aiPromptLog.update).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ outcome: "SUCCESS" }) }),
+          );
         });
       });
 

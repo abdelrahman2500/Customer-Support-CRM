@@ -52,9 +52,17 @@ export interface AiChatTurn {
  * that same story — there is no external consumer of this internal
  * package's types to stay backward compatible with by making it
  * optional. A session's first-ever message passes an empty array, not a
- * missing field. */
+ * missing field.
+ *
+ * Story 117 — `context` follows the exact same "required, three call
+ * sites, all updated together" reasoning: pre-truncated Knowledge Base
+ * excerpt strings (`"title: body excerpt"`), already scoped/searched by
+ * the caller (`AiProcessingProcessor`). An empty array means "no
+ * grounding content found (or KB search failed)" — the chat proceeds
+ * exactly like before this story existed, never a missing field. */
 export interface AiChatMessageInput {
   sessionId: string;
   message: string;
   history: AiChatTurn[];
+  context: string[];
 }

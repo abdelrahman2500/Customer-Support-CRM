@@ -77,27 +77,46 @@ export class AnthropicAiProvider implements AiProvider {
     ]);
   }
 
-  /** Story 116 — includes the session's prior turns (oldest-first, fetched
+  /**
+   * Story 116 — includes the session's prior turns (oldest-first, fetched
    * and capped by the caller — see `AiProcessingProcessor`) before the
    * current message, so the model actually has conversation context
-   * instead of treating every turn as a fresh, isolated prompt. */
+   * instead of treating every turn as a fresh, isolated prompt.
+   *
+   * Story 117 — additionally grounds the reply in `input.context` (KB
+   * excerpts the caller already searched/truncated) via a `system`
+   * prompt, when any were found. Empty `context` sends no `system`
+   * param at all — byte-identical to every pre-Story-117 call.
+   */
   async chat(input: AiChatMessageInput): Promise<AiCallResult> {
-    return this.complete([
-      ...input.history.map((turn) => ({ role: turn.role, content: turn.content })),
-      { role: "user", content: input.message },
-    ]);
+    return this.complete(
+      [
+        ...input.history.map((turn) => ({ role: turn.role, content: turn.content })),
+        { role: "user", content: input.message },
+      ],
+      buildChatSystemPrompt(input.context),
+    );
   }
 
   /** Story 116 — generalized from a single prompt string to a full
    * message array so `chat()` can include prior turns; `summarize`/
    * `suggestReply`/`categorize` each wrap their existing single prompt as
    * a one-element array — an identical resulting API call, just
-   * expressed as the general case. */
-  private async complete(messages: Anthropic.MessageParam[]): Promise<AiCallResult> {
+   * expressed as the general case.
+   *
+   * Story 117 — `system` is optional and omitted from the API call
+   * entirely when absent (`undefined`, not an empty string) — the three
+   * ticket-scoped methods above never pass one, so their calls are
+   * completely unaffected by this story. */
+  private async complete(
+    messages: Anthropic.MessageParam[],
+    system?: string,
+  ): Promise<AiCallResult> {
     try {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: MAX_TOKENS,
+        ...(system !== undefined ? { system } : {}),
         messages,
       });
       const text = response.content
@@ -124,4 +143,19 @@ export class AnthropicAiProvider implements AiProvider {
       };
     }
   }
+}
+
+/** Story 117 — `undefined` (not an empty string) for no context, so
+ * `complete()`'s `system !== undefined` check correctly omits the
+ * `system` param entirely rather than sending an empty one. */
+function buildChatSystemPrompt(context: string[]): string | undefined {
+  if (context.length === 0) {
+    return undefined;
+  }
+  return [
+    "Answer the customer's question primarily using the following knowledge base excerpts.",
+    "If the excerpts do not cover the question, say you don't know and suggest the customer ask a human agent.",
+    "",
+    ...context.map((excerpt, index) => `Excerpt ${index + 1}: ${excerpt}`),
+  ].join("\n");
 }

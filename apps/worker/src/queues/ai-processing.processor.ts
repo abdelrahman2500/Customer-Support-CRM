@@ -22,6 +22,12 @@ export const AI_PROCESSING_QUEUE = "ai-processing";
  * `AiSettings` field — no story has disclosed a need to tune this. */
 const CHAT_HISTORY_LIMIT = 20;
 
+/** Story 117 — bounds how many Knowledge Base articles/how much excerpt
+ * text are sent to the model as grounding context, for the same
+ * token/cost reason as `CHAT_HISTORY_LIMIT` — also a plain constant. */
+const KB_CONTEXT_MAX_ARTICLES = 3;
+const KB_CONTEXT_SNIPPET_MAX_CHARS = 500;
+
 /** Must stay identical to `AiProcessingJobPayload` in
  * apps/api/src/queues/ai-processing.producer.ts.
  *
@@ -171,8 +177,16 @@ export class AiProcessingProcessor extends WorkerHost {
         return this.provider.categorize({ subject: data.subject ?? "", body: data.body });
       case "CHAT": {
         const chatSessionId = data.chatSessionId ?? "";
-        const history = await this.fetchChatHistory(chatSessionId);
-        return this.provider.chat({ sessionId: chatSessionId, message: data.body, history });
+        const [history, context] = await Promise.all([
+          this.fetchChatHistory(chatSessionId),
+          this.fetchKnowledgeBaseContext(data.branchId, data.body),
+        ]);
+        return this.provider.chat({
+          sessionId: chatSessionId,
+          message: data.body,
+          history,
+          context,
+        });
       }
     }
   }
@@ -202,6 +216,42 @@ export class AiProcessingProcessor extends WorkerHost {
         role: row.role === "CUSTOMER" ? "user" : "assistant",
         content: row.body,
       }));
+  }
+
+  /**
+   * Story 117 — up to `KB_CONTEXT_MAX_ARTICLES` published, branch-scoped
+   * Knowledge Base articles matching the customer's current message,
+   * used as grounding context for the chatbot's reply. Mirrors
+   * `KnowledgeBaseService.searchArticles`'s exact query shape
+   * (`apps/api/src/modules/knowledge-base/knowledge-base.service.ts`) —
+   * a worker-local, direct-Prisma copy rather than a call back into
+   * `apps/api`'s NestJS modules, the same established convention
+   * `SlaTimerProcessor` already uses (the worker has no HTTP client to
+   * `apps/api`, by design). English-only, matching that same story's own
+   * non-goal for locale-aware search.
+   *
+   * Fails open on any query error (logged, never thrown further) — a KB
+   * search hiccup must never break the customer's ability to chat at
+   * all; the reply then proceeds exactly as it did before this story
+   * existed (an empty `context` sends no grounding `system` prompt —
+   * see `AnthropicAiProvider.chat()`).
+   */
+  private async fetchKnowledgeBaseContext(branchId: string, message: string): Promise<string[]> {
+    try {
+      const rows = await this.prisma.$queryRaw<{ title: string; body: string }[]>`
+        SELECT title, body
+        FROM knowledge_base.knowledge_base_articles
+        WHERE branch_id = ${branchId}
+          AND status = 'PUBLISHED'
+          AND search_vector @@ websearch_to_tsquery('english', ${message})
+        ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${message})) DESC
+        LIMIT ${KB_CONTEXT_MAX_ARTICLES}
+      `;
+      return rows.map((row) => `${row.title}: ${row.body.slice(0, KB_CONTEXT_SNIPPET_MAX_CHARS)}`);
+    } catch (error) {
+      this.logger.warn(`Knowledge Base context lookup failed for branch ${branchId}: ${error}`);
+      return [];
+    }
   }
 
   /**

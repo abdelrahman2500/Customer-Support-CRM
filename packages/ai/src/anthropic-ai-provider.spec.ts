@@ -110,15 +110,23 @@ describe("AnthropicAiProvider", () => {
       expect(createMock).toHaveBeenCalledOnce();
     });
 
-    it("chat sends the raw message as the prompt when there is no prior history", async () => {
+    it("chat sends the raw message as the prompt when there is no prior history or context", async () => {
       const provider = createProvider();
-      const result = await provider.chat({ sessionId: "sess-1", message: "hello", history: [] });
+      const result = await provider.chat({
+        sessionId: "sess-1",
+        message: "hello",
+        history: [],
+        context: [],
+      });
       expect(result.outcome).toBe("SUCCESS");
       expect(createMock).toHaveBeenCalledWith(
         expect.objectContaining({
           messages: [{ role: "user", content: "hello" }],
         }),
       );
+      // Story 117 — no context means no `system` param at all, not an
+      // empty one.
+      expect(createMock.mock.calls[0][0]).not.toHaveProperty("system");
     });
 
     // Story 116 — conversation memory.
@@ -131,6 +139,7 @@ describe("AnthropicAiProvider", () => {
           { role: "user", content: "I ordered a widget last week." },
           { role: "assistant", content: "I can help with that. What's the order number?" },
         ],
+        context: [],
       });
 
       expect(result.outcome).toBe("SUCCESS");
@@ -143,6 +152,31 @@ describe("AnthropicAiProvider", () => {
           ],
         }),
       );
+    });
+
+    // Story 117 — Knowledge Base grounding.
+    it("chat sends a grounding system prompt including every context excerpt when context is non-empty", async () => {
+      const provider = createProvider();
+      await provider.chat({
+        sessionId: "sess-1",
+        message: "How do I reset my password?",
+        history: [],
+        context: [
+          "Password reset: Go to Settings > Security and click Reset Password.",
+          "Account lockout: After 5 failed attempts, wait 15 minutes.",
+        ],
+      });
+
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          system: expect.stringContaining(
+            "Password reset: Go to Settings > Security and click Reset Password.",
+          ),
+        }),
+      );
+      const system = createMock.mock.calls[0][0].system as string;
+      expect(system).toContain("Account lockout: After 5 failed attempts, wait 15 minutes.");
+      expect(system).toContain("don't know");
     });
   });
 
