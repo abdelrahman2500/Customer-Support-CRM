@@ -272,13 +272,13 @@ model Customer {
 /// Email is unique per Customer, never globally — the same real person's
 /// email may legitimately appear under a different Customer.
 model Contact {
-  id              String                @id @default(uuid())
-  customerId      String                @map("customer_id")
-  customer        Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  fullName        String                @map("full_name")
-  email           String?
-  phone           String?
-  isPrimary       Boolean               @default(false) @map("is_primary")
+  id                      String                         @id @default(uuid())
+  customerId              String                         @map("customer_id")
+  customer                Customer                       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  fullName                String                         @map("full_name")
+  email                   String?
+  phone                   String?
+  isPrimary               Boolean                        @default(false) @map("is_primary")
   /// Story 52 — nullable: a Contact has no portal access until an agent
   /// explicitly sets one (`CustomersService.setContactPortalPassword`, no
   /// self-registration — see docs/architecture/05-auth-and-security.md).
@@ -286,12 +286,14 @@ model Contact {
   /// above), so login-lookup safety for portal-enabled contacts is enforced
   /// at the application layer, not by a DB constraint — see
   /// `setContactPortalPassword`'s own doc comment.
-  passwordHash    String?               @map("password_hash")
-  tickets         Ticket[]
-  refreshTokens   ContactRefreshToken[]
-  csatResponses   TicketCsatResponse[]
-  channelMessages ChannelMessage[]
-  chatSessions    ChatSession[]
+  passwordHash            String?                        @map("password_hash")
+  tickets                 Ticket[]
+  refreshTokens           ContactRefreshToken[]
+  csatResponses           TicketCsatResponse[]
+  channelMessages         ChannelMessage[]
+  chatSessions            ChatSession[]
+  /// Story 103 — this Contact's own uploaded ticket attachments.
+  ticketAttachments       TicketAttachment[]
   /// Story 90 — this Contact's own `PortalNotificationPreference` rows.
   notificationPreferences PortalNotificationPreference[]
   /// Story 92 — this Contact's own "read up to" cursor over
@@ -302,8 +304,8 @@ model Contact {
   /// and shared by every Contact of that Customer — see
   /// `NotificationsService.getUnreadCountForCustomer`'s own doc comment.
   /// `null` means "never marked read".
-  notificationsReadAt      DateTime?                       @map("notifications_read_at")
-  createdAt       DateTime              @default(now()) @map("created_at")
+  notificationsReadAt     DateTime?                      @map("notifications_read_at")
+  createdAt               DateTime                       @default(now()) @map("created_at")
 
   @@unique([customerId, email])
   @@index([customerId])
@@ -343,17 +345,26 @@ model ContactRefreshToken {
 /// are the first real consumer; customer-level attachments are a
 /// deferred, separately-planned follow-up. `key` is the S3 object key
 /// (server-generated, never derived from the client-supplied filename).
+/// Story 103 — `uploadedByUserId`/`uploadedByContactId` mirror
+/// `ChannelMessage`'s own `senderUserId`/`senderContactId` shape exactly:
+/// both nullable, exactly one populated per row (an agent-initiated
+/// upload sets `uploadedByUserId`; a portal-contact-initiated one sets
+/// `uploadedByContactId`) — enforced by which `AttachmentsService` method
+/// is called, not a DB constraint, matching `ChannelMessagesService`'s
+/// own precedent of no DB-level XOR check.
 model TicketAttachment {
-  id               String   @id @default(uuid())
-  ticketId         String   @map("ticket_id")
-  ticket           Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  key              String   @unique
-  filename         String
-  size             Int
-  mimeType         String   @map("mime_type")
-  uploadedByUserId String   @map("uploaded_by_user_id")
-  uploadedByUser   User     @relation(fields: [uploadedByUserId], references: [id])
-  createdAt        DateTime @default(now()) @map("created_at")
+  id                  String   @id @default(uuid())
+  ticketId            String   @map("ticket_id")
+  ticket              Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  key                 String   @unique
+  filename            String
+  size                Int
+  mimeType            String   @map("mime_type")
+  uploadedByUserId    String?  @map("uploaded_by_user_id")
+  uploadedByUser      User?    @relation(fields: [uploadedByUserId], references: [id])
+  uploadedByContactId String?  @map("uploaded_by_contact_id")
+  uploadedByContact   Contact? @relation(fields: [uploadedByContactId], references: [id])
+  createdAt           DateTime @default(now()) @map("created_at")
 
   @@index([ticketId])
   @@map("ticket_attachments")
@@ -880,16 +891,16 @@ enum KnowledgeBaseArticleStatus {
 /// version history lives in `KnowledgeBaseArticleVersion` (Story 65). No
 /// Customer Portal or AI Services consumption yet.
 model KnowledgeBaseArticle {
-  id          String                        @id @default(uuid())
-  branchId    String                        @map("branch_id")
-  branch      Branch                        @relation(fields: [branchId], references: [id])
-  title       String
-  body        String
-  category    String?
-  status      KnowledgeBaseArticleStatus    @default(DRAFT)
-  publishedAt DateTime?                     @map("published_at")
-  createdAt   DateTime                      @default(now()) @map("created_at")
-  updatedAt   DateTime                      @updatedAt @map("updated_at")
+  id           String                        @id @default(uuid())
+  branchId     String                        @map("branch_id")
+  branch       Branch                        @relation(fields: [branchId], references: [id])
+  title        String
+  body         String
+  category     String?
+  status       KnowledgeBaseArticleStatus    @default(DRAFT)
+  publishedAt  DateTime?                     @map("published_at")
+  createdAt    DateTime                      @default(now()) @map("created_at")
+  updatedAt    DateTime                      @updatedAt @map("updated_at")
   /// Story 102 — generated column (see this story's own migration SQL):
   /// `to_tsvector('english', title || ' ' || body)`, STORED, with a GIN
   /// index. `Unsupported` because Prisma Client has no native `tsvector`
@@ -898,8 +909,8 @@ model KnowledgeBaseArticle {
   /// typed `create`/`update`/`findMany` API (Postgres maintains it
   /// itself; `Unsupported` fields are automatically excluded from every
   /// generated input type, so no existing call site needs to change).
-  searchVector Unsupported("tsvector")? @map("search_vector")
-  versions    KnowledgeBaseArticleVersion[]
+  searchVector Unsupported("tsvector")?      @map("search_vector")
+  versions     KnowledgeBaseArticleVersion[]
 
   @@index([branchId])
   @@map("knowledge_base_articles")

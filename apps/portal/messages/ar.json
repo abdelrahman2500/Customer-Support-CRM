@@ -84,7 +84,12 @@
       "csatSubmitFailed": "تعذّر إرسال ملاحظاتك. حاول مرة أخرى.",
       "csatRatingLabel": "تقييمك: {rating}/5",
       "csatSubmitted": "شكرًا لك على ملاحظاتك!",
-      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء."
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "attachmentsHeading": "المرفقات",
+      "attachmentsError": "تعذّر تحميل المرفقات.",
+      "attachmentsEmpty": "لا توجد مرفقات حتى الآن.",
+      "attachmentsUploading": "جارٍ الرفع...",
+      "attachmentsUploadFailed": "تعذّر رفع الملف. حاول مرة أخرى."
     }
   },
   "knowledgeBase": {

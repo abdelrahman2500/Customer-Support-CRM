@@ -5,6 +5,7 @@ import type { PortalService } from "./portal.service";
 import type { TicketsService } from "../tickets/tickets.service";
 import type { TicketChannelService } from "../tickets/ticket-channel.service";
 import type { AiChatService } from "../ai/ai-chat.service";
+import type { AttachmentsService } from "../attachments/attachments.service";
 
 function buildPortalServiceMock() {
   return { getAuthenticatedContact: vi.fn() };
@@ -36,11 +37,20 @@ function buildAiChatServiceMock() {
   };
 }
 
+function buildAttachmentsServiceMock() {
+  return {
+    uploadAttachmentForCustomer: vi.fn(),
+    listAttachmentsForCustomer: vi.fn(),
+    getDownloadUrlForCustomer: vi.fn(),
+  };
+}
+
 describe("PortalTicketsService", () => {
   let portalService: ReturnType<typeof buildPortalServiceMock>;
   let ticketsService: ReturnType<typeof buildTicketsServiceMock>;
   let ticketChannelService: ReturnType<typeof buildTicketChannelServiceMock>;
   let aiChatService: ReturnType<typeof buildAiChatServiceMock>;
+  let attachmentsService: ReturnType<typeof buildAttachmentsServiceMock>;
   let service: PortalTicketsService;
 
   beforeEach(() => {
@@ -49,11 +59,13 @@ describe("PortalTicketsService", () => {
     ticketsService = buildTicketsServiceMock();
     ticketChannelService = buildTicketChannelServiceMock();
     aiChatService = buildAiChatServiceMock();
+    attachmentsService = buildAttachmentsServiceMock();
     service = new PortalTicketsService(
       portalService as unknown as PortalService,
       ticketsService as unknown as TicketsService,
       ticketChannelService as unknown as TicketChannelService,
       aiChatService as unknown as AiChatService,
+      attachmentsService as unknown as AttachmentsService,
     );
   });
 
@@ -163,6 +175,57 @@ describe("PortalTicketsService", () => {
       "customer-1",
     );
     expect(result).toEqual([]);
+  });
+
+  // Story 103 — Customer Portal: Ticket Attachment Upload.
+  describe("uploadAttachment", () => {
+    it("resolves customerId, then delegates to AttachmentsService.uploadAttachmentForCustomer with the contact id", async () => {
+      portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
+      attachmentsService.uploadAttachmentForCustomer.mockResolvedValue({ id: "attachment-1" });
+      const file = { originalname: "a.png", size: 10, mimetype: "image/png", buffer: Buffer.from("x") };
+
+      const result = await service.uploadAttachment("contact-1", "ticket-1", file);
+
+      expect(portalService.getAuthenticatedContact).toHaveBeenCalledWith("contact-1");
+      expect(attachmentsService.uploadAttachmentForCustomer).toHaveBeenCalledWith(
+        "ticket-1",
+        "customer-1",
+        "contact-1",
+        file,
+      );
+      expect(result).toEqual({ id: "attachment-1" });
+    });
+  });
+
+  describe("listAttachments", () => {
+    it("resolves customerId, then delegates with the ticket id", async () => {
+      portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
+      attachmentsService.listAttachmentsForCustomer.mockResolvedValue([]);
+
+      const result = await service.listAttachments("contact-1", "ticket-1");
+
+      expect(attachmentsService.listAttachmentsForCustomer).toHaveBeenCalledWith(
+        "ticket-1",
+        "customer-1",
+      );
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("getAttachmentDownloadUrl", () => {
+    it("resolves customerId, then delegates with the ticket and attachment ids", async () => {
+      portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
+      attachmentsService.getDownloadUrlForCustomer.mockResolvedValue("https://example.test/presigned");
+
+      const result = await service.getAttachmentDownloadUrl("contact-1", "ticket-1", "attachment-1");
+
+      expect(attachmentsService.getDownloadUrlForCustomer).toHaveBeenCalledWith(
+        "ticket-1",
+        "customer-1",
+        "attachment-1",
+      );
+      expect(result).toBe("https://example.test/presigned");
+    });
   });
 
   // Story 85 — AI Chat: Escalate to a Human Ticket.

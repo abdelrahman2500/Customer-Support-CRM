@@ -5,6 +5,7 @@ import { KnowledgeBaseModule } from "../knowledge-base/knowledge-base.module";
 import { AiModule } from "../ai/ai.module";
 import { AdminModule } from "../admin/admin.module";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { AttachmentsModule } from "../attachments/attachments.module";
 import { PortalController } from "./portal.controller";
 import { PortalService } from "./portal.service";
 import { PortalTicketsController } from "./portal-tickets.controller";
@@ -56,9 +57,23 @@ import { PortalNotificationPreferencesController } from "./portal-notification-p
  * injects `NotificationsModule`'s now-additionally-exported
  * `PortalNotificationPreferencesService` directly, the same way
  * `PortalNotificationsController` already injects `NotificationsService`.
+ *
+ * Story 103 — `AttachmentsModule` imported the same way, so
+ * `PortalTicketsService` can inject the now-exported `AttachmentsService`
+ * directly to compose its new attachment methods with
+ * `PortalService.getAuthenticatedContact`, mirroring `sendMessage`'s own
+ * existing composition shape.
  */
 @Module({
-  imports: [AuthModule, TicketsModule, KnowledgeBaseModule, AiModule, AdminModule, NotificationsModule],
+  imports: [
+    AuthModule,
+    TicketsModule,
+    KnowledgeBaseModule,
+    AiModule,
+    AdminModule,
+    NotificationsModule,
+    AttachmentsModule,
+  ],
   controllers: [
     PortalController,
     PortalTicketsController,

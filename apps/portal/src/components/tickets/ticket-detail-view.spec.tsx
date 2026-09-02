@@ -9,6 +9,10 @@ import {
   useSendMyTicketMessageMutation,
   useSubmitMyTicketCsatMutation,
 } from "@/hooks/use-portal-tickets";
+import {
+  useMyTicketAttachmentsQuery,
+  useUploadMyTicketAttachmentMutation,
+} from "@/hooks/use-portal-attachments";
 import { ApiError } from "@/lib/api";
 
 vi.mock("next/navigation", () => ({
@@ -26,6 +30,14 @@ vi.mock("@/hooks/use-portal-tickets", () => ({
   useSubmitMyTicketCsatMutation: vi.fn(),
   useMyTicketMessagesQuery: vi.fn(),
   useSendMyTicketMessageMutation: vi.fn(),
+}));
+
+// Story 103 — `TicketAttachmentsCard`'s own behavior is covered by its
+// dedicated spec; this file only needs its two hooks swapped out so no
+// real `useQuery`/`useMutation` call ever runs without a `QueryClient`.
+vi.mock("@/hooks/use-portal-attachments", () => ({
+  useMyTicketAttachmentsQuery: vi.fn(),
+  useUploadMyTicketAttachmentMutation: vi.fn(),
 }));
 
 // Story 78 — this app's first realtime subscription; its own behavior is
@@ -77,6 +89,13 @@ describe("TicketDetailView", () => {
     );
     vi.mocked(useSendMyTicketMessageMutation).mockReturnValue({
       mutateAsync: vi.fn().mockResolvedValue({ id: "message-new" }),
+      isPending: false,
+    } as never);
+    vi.mocked(useMyTicketAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useUploadMyTicketAttachmentMutation).mockReturnValue({
+      mutateAsync: vi.fn(),
       isPending: false,
     } as never);
   });

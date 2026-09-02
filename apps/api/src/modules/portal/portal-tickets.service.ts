@@ -8,6 +8,8 @@ import type {
 import { TicketChannelService } from "../tickets/ticket-channel.service";
 import type { ChannelMessageSummary } from "../channels/channel-messages.service";
 import { AiChatService } from "../ai/ai-chat.service";
+import { AttachmentsService } from "../attachments/attachments.service";
+import type { AttachmentSummary, UploadedFile } from "../attachments/attachments.service";
 import { PortalService } from "./portal.service";
 import type { PortalCreateTicketDto } from "./dto/portal-create-ticket.dto";
 import type { SubmitCsatDto } from "./dto/submit-csat.dto";
@@ -41,6 +43,7 @@ export class PortalTicketsService {
     private readonly ticketsService: TicketsService,
     private readonly ticketChannelService: TicketChannelService,
     private readonly aiChatService: AiChatService,
+    private readonly attachmentsService: AttachmentsService,
   ) {}
 
   /** `createTicketForContact` resolves the Contact (and its Customer/branch)
@@ -101,6 +104,41 @@ export class PortalTicketsService {
   async getMessages(contactId: string, ticketId: string): Promise<ChannelMessageSummary[]> {
     const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
     return this.ticketChannelService.listMessagesForCustomer(ticketId, customerId);
+  }
+
+  /**
+   * Story 103 — Customer Portal: Ticket Attachment Upload. Composes
+   * `AttachmentsService`'s new customer-scoped methods exactly the way
+   * `sendMessage`/`getMessages` above compose `TicketChannelService`'s own
+   * — `contactId` doubles as the attachment's `uploadedByContactId`,
+   * `customerId` scopes ticket-ownership authorization.
+   */
+  async uploadAttachment(
+    contactId: string,
+    ticketId: string,
+    file: UploadedFile,
+  ): Promise<AttachmentSummary> {
+    const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
+    return this.attachmentsService.uploadAttachmentForCustomer(
+      ticketId,
+      customerId,
+      contactId,
+      file,
+    );
+  }
+
+  async listAttachments(contactId: string, ticketId: string): Promise<AttachmentSummary[]> {
+    const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
+    return this.attachmentsService.listAttachmentsForCustomer(ticketId, customerId);
+  }
+
+  async getAttachmentDownloadUrl(
+    contactId: string,
+    ticketId: string,
+    attachmentId: string,
+  ): Promise<string> {
+    const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
+    return this.attachmentsService.getDownloadUrlForCustomer(ticketId, customerId, attachmentId);
   }
 
   /**

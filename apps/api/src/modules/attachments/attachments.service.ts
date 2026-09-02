@@ -11,7 +11,11 @@ export interface AttachmentSummary {
   filename: string;
   size: number;
   mimeType: string;
-  uploadedByUserId: string;
+  /** Story 103 — nullable: exactly one of `uploadedByUserId`/
+   * `uploadedByContactId` is ever populated, mirroring `ChannelMessage`'s
+   * own `senderUserId`/`senderContactId` shape. */
+  uploadedByUserId: string | null;
+  uploadedByContactId: string | null;
   createdAt: Date;
 }
 
@@ -90,6 +94,66 @@ export class AttachmentsService {
 
   async getDownloadUrl(ticketId: string, attachmentId: string): Promise<string> {
     await this.findTicketInScope(ticketId);
+    const attachment = await this.prisma.ticketAttachment.findFirst({
+      where: { id: attachmentId, ticketId },
+    });
+    if (!attachment) {
+      throw new NotFoundException("Attachment not found");
+    }
+    return this.s3Storage.getPresignedDownloadUrl(attachment.key);
+  }
+
+  // ---------------------------------------------------------------------
+  // Story 103 — Customer Portal: Ticket Attachment Upload. Mirrors the
+  // three ticket-side methods above exactly, except the ownership check
+  // (`findTicketInCustomerScope`, not `findTicketInScope`) and the FK set
+  // on create (`uploadedByContactId`, not `uploadedByUserId`). None of the
+  // agent-facing methods above are touched.
+  // ---------------------------------------------------------------------
+
+  async uploadAttachmentForCustomer(
+    ticketId: string,
+    customerId: string,
+    contactId: string,
+    file: UploadedFile,
+  ): Promise<AttachmentSummary> {
+    await this.findTicketInCustomerScope(ticketId, customerId);
+    this.validateFile(file);
+
+    const key = `tickets/${ticketId}/${randomUUID()}`;
+    await this.s3Storage.uploadObject(key, file.buffer, file.mimetype);
+
+    const attachment = await this.prisma.ticketAttachment.create({
+      data: {
+        ticketId,
+        key,
+        filename: file.originalname,
+        size: file.size,
+        mimeType: file.mimetype,
+        uploadedByContactId: contactId,
+      },
+    });
+    return toAttachmentSummary(attachment);
+  }
+
+  async listAttachmentsForCustomer(
+    ticketId: string,
+    customerId: string,
+  ): Promise<AttachmentSummary[]> {
+    await this.findTicketInCustomerScope(ticketId, customerId);
+    const attachments = await this.prisma.ticketAttachment.findMany({
+      where: { ticketId },
+      orderBy: { createdAt: "desc" },
+    });
+    return attachments.map(toAttachmentSummary);
+  }
+
+  async getDownloadUrlForCustomer(
+    ticketId: string,
+    customerId: string,
+    attachmentId: string,
+  ): Promise<string> {
+    await this.findTicketInCustomerScope(ticketId, customerId);
     const attachment = await this.prisma.ticketAttachment.findFirst({
       where: { id: attachmentId, ticketId },
     });
@@ -181,6 +245,26 @@ export class AttachmentsService {
     return ticket;
   }
 
+  /** Story 103 — mirrors `TicketsService.findTicketInCustomerScope`'s
+   * exact shape (`this.prisma.ticket.findFirst({ where: { id, customerId
+   * } })`, no branch scoping needed — a `Customer` belongs to exactly one
+   * branch already). Not a call to `TicketsService` itself: this service
+   * deliberately avoids that import (see this file's own Story 66 doc
+   * comment) to sidestep a module dependency it doesn't otherwise need. */
+  private async findTicketInCustomerScope(
+    id: string,
+    customerId: string,
+  ): Promise<{ id: string }> {
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { id, customerId },
+      select: { id: true },
+    });
+    if (!ticket) {
+      throw new NotFoundException("Ticket not found");
+    }
+    return ticket;
+  }
+
   /** Mirrors `findTicketInScope` exactly, scoped to `Customer` instead. */
   private async findCustomerInScope(id: string): Promise<{ id: string }> {
     const { branchId } = this.tenantContext.requireBranchScope();
@@ -213,7 +297,8 @@ function toAttachmentSummary(attachment: {
   filename: string;
   size: number;
   mimeType: string;
-  uploadedByUserId: string;
+  uploadedByUserId: string | null;
+  uploadedByContactId: string | null;
   createdAt: Date;
 }): AttachmentSummary {
   return {
@@ -223,6 +308,7 @@ function toAttachmentSummary(attachment: {
     size: attachment.size,
     mimeType: attachment.mimeType,
     uploadedByUserId: attachment.uploadedByUserId,
+    uploadedByContactId: attachment.uploadedByContactId,
     createdAt: attachment.createdAt,
   };
 }

@@ -403,4 +403,122 @@ describe("Customer Portal — Tickets (e2e)", () => {
         .expect(404);
     });
   });
+
+  // Story 103 — Customer Portal: Ticket Attachment Upload. Mirrors
+  // "Live Chat messages" above and the agent-facing
+  // `attachments.e2e-spec.ts`'s own upload/list/download shape.
+  describe("Ticket attachments", () => {
+    let attachmentId: string;
+
+    it("rejects every route without a token", async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/attachments`)
+        .expect(401);
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/attachments`)
+        .attach("file", Buffer.from("hi"), "note.txt")
+        .expect(401);
+    });
+
+    it("returns [] for a ticket with no attachments yet", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/attachments`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(response.body).toEqual([]);
+    });
+
+    it("uploads a file as the authenticated contact, then lists it with uploadedByContactId set", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+      const fileContent = `portal attachment fixture ${randomUUID()}`;
+
+      const uploaded = await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/attachments`)
+        .set("Authorization", `Bearer ${token}`)
+        .attach("file", Buffer.from(fileContent), {
+          filename: "customer-notes.txt",
+          contentType: "text/plain",
+        })
+        .expect(201);
+
+      expect(uploaded.body).toMatchObject({
+        ticketId,
+        filename: "customer-notes.txt",
+        uploadedByContactId: contactId,
+        uploadedByUserId: null,
+      });
+      expect(uploaded.body.key).toBeUndefined();
+      attachmentId = uploaded.body.id;
+
+      const listed = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/attachments`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(listed.body.map((a: { id: string }) => a.id)).toContain(attachmentId);
+    });
+
+    it("downloads the just-uploaded attachment via a presigned URL", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const downloadResponse = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/attachments/${attachmentId}/download`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(downloadResponse.body.url).toContain("http");
+    });
+
+    it("is visible to an agent via GET /tickets/:id/attachments, proving one shared list", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/attachments`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(response.body.map((a: { id: string }) => a.id)).toContain(attachmentId);
+    });
+
+    it("an agent-uploaded attachment is visible to the portal contact", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const agentUpload = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/attachments`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .attach("file", Buffer.from("agent-side note"), "agent-notes.txt")
+        .expect(201);
+      expect(agentUpload.body.uploadedByContactId).toBeNull();
+
+      const listed = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/attachments`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(listed.body.map((a: { id: string }) => a.id)).toContain(agentUpload.body.id);
+    });
+
+    it("returns 404 for a ticket belonging to a different customer", async () => {
+      const otherToken = await loginAsPortalContact(otherContactEmail);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/attachments`)
+        .set("Authorization", `Bearer ${otherToken}`)
+        .expect(404);
+      await request(app.getHttpServer())
+        .post(`/api/v1/portal/tickets/${ticketId}/attachments`)
+        .set("Authorization", `Bearer ${otherToken}`)
+        .attach("file", Buffer.from("hi"), "note.txt")
+        .expect(404);
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/attachments/${attachmentId}/download`)
+        .set("Authorization", `Bearer ${otherToken}`)
+        .expect(404);
+    });
+
+    it("returns 404 for an unknown ticket id", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${randomUUID()}/attachments`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(404);
+    });
+  });
 });

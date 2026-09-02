@@ -11,6 +11,7 @@ import {
 } from "@/hooks/use-portal-tickets";
 import { usePortalTicketRealtime } from "@/hooks/use-portal-ticket-realtime";
 import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
+import { TicketAttachmentsCard } from "@/components/tickets/ticket-attachments-card";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
@@ -133,6 +134,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
       </div>
 
       <TicketChatCard ticketId={ticketId} />
+
+      <TicketAttachmentsCard ticketId={ticketId} />
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.historyHeading")}</h2>

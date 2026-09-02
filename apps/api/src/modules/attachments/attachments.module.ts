@@ -16,5 +16,9 @@ import { S3StorageService } from "./s3-storage.service";
 @Module({
   controllers: [AttachmentsController, CustomerAttachmentsController],
   providers: [AttachmentsService, S3StorageService, TenantContext],
+  // Story 103 — `PortalModule` imports this module so `PortalTicketsService`
+  // can inject `AttachmentsService` directly, mirroring how it already
+  // injects `TicketsService`/`TicketChannelService`/`AiChatService`.
+  exports: [AttachmentsService],
 })
 export class AttachmentsModule {}

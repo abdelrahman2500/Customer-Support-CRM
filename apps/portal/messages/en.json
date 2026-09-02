@@ -84,7 +84,12 @@
       "csatSubmitFailed": "Couldn't submit your feedback. Please try again.",
       "csatRatingLabel": "Your rating: {rating}/5",
       "csatSubmitted": "Thank you for your feedback!",
-      "actionForbidden": "You don't have permission to perform that action."
+      "actionForbidden": "You don't have permission to perform that action.",
+      "attachmentsHeading": "Attachments",
+      "attachmentsError": "Couldn't load attachments.",
+      "attachmentsEmpty": "No attachments yet.",
+      "attachmentsUploading": "Uploading...",
+      "attachmentsUploadFailed": "Couldn't upload the file. Please try again."
     }
   },
   "knowledgeBase": {

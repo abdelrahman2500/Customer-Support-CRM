@@ -1,5 +1,16 @@
-import { Body, Controller, Get, Param, Post, Req, Res } from "@nestjs/common";
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  Res,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { ApiBearerAuth, ApiConsumes, ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import type { JwtAccessTokenClaims } from "@crm/shared";
 import { PortalRoute } from "../../common/auth/portal-route.decorator";
@@ -12,6 +23,10 @@ import type {
   TicketSummary,
 } from "../tickets/tickets.service";
 import type { ChannelMessageSummary } from "../channels/channel-messages.service";
+import type {
+  AttachmentSummary,
+  UploadedFile as UploadedFileShape,
+} from "../attachments/attachments.service";
 import { PortalTicketsService } from "./portal-tickets.service";
 
 /**
@@ -123,5 +138,53 @@ export class PortalTicketsController {
   getMessages(@Req() request: Request, @Param("id") id: string): Promise<ChannelMessageSummary[]> {
     const contact = request.user as JwtAccessTokenClaims;
     return this.portalTicketsService.getMessages(contact.sub, id);
+  }
+
+  /**
+   * Story 103 — Customer Portal: Ticket Attachment Upload. Mirrors
+   * `AttachmentsController.create`'s exact shape (`FileInterceptor`,
+   * `multipart/form-data`) — the same file arrives through the same
+   * `AttachmentsService.validateFile` size/MIME check either way.
+   */
+  @PortalRoute()
+  @Post(":id/attachments")
+  @ApiConsumes("multipart/form-data")
+  @UseInterceptors(FileInterceptor("file"))
+  uploadAttachment(
+    @Req() request: Request,
+    @Param("id") id: string,
+    @UploadedFile() file: UploadedFileShape,
+  ): Promise<AttachmentSummary> {
+    const contact = request.user as JwtAccessTokenClaims;
+    return this.portalTicketsService.uploadAttachment(contact.sub, id, file);
+  }
+
+  @PortalRoute()
+  @Get(":id/attachments")
+  listAttachments(
+    @Req() request: Request,
+    @Param("id") id: string,
+  ): Promise<AttachmentSummary[]> {
+    const contact = request.user as JwtAccessTokenClaims;
+    return this.portalTicketsService.listAttachments(contact.sub, id);
+  }
+
+  /** Returns the presigned S3 URL as JSON, mirroring
+   * `AttachmentsController.getDownloadUrl`'s own doc comment for why
+   * (never a redirect). */
+  @PortalRoute()
+  @Get(":id/attachments/:attachmentId/download")
+  async getAttachmentDownloadUrl(
+    @Req() request: Request,
+    @Param("id") id: string,
+    @Param("attachmentId") attachmentId: string,
+  ): Promise<{ url: string }> {
+    const contact = request.user as JwtAccessTokenClaims;
+    const url = await this.portalTicketsService.getAttachmentDownloadUrl(
+      contact.sub,
+      id,
+      attachmentId,
+    );
+    return { url };
   }
 }
