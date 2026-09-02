@@ -17,6 +17,7 @@ function buildPrismaMock() {
       findMany: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
     };
+    $queryRaw: ReturnType<typeof vi.fn>;
     $transaction: ReturnType<typeof vi.fn>;
   } = {
     knowledgeBaseArticle: {
@@ -30,6 +31,11 @@ function buildPrismaMock() {
       findMany: vi.fn(),
       findFirst: vi.fn(),
     },
+    // Story 102 — `searchArticles`'s tagged-template `$queryRaw` calls.
+    // Mocked as a plain function: invoking it as a tagged template
+    // (`` prisma.$queryRaw`...${x}` ``) calls this mock with
+    // `(stringsArray, ...interpolatedValues)`, exactly like a real one.
+    $queryRaw: vi.fn(),
     // Story 65 — the interactive callback form: `tx` is the same mock
     // object as `prisma` itself, so assertions on
     // `prisma.knowledgeBaseArticleVersion.create` etc. see calls made
@@ -144,20 +150,39 @@ describe("KnowledgeBaseService", () => {
       expect(result).toEqual([]);
     });
 
-    // Story 64 — Article Search.
-    it("adds a title/body OR clause when search is given", async () => {
-      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+    // Story 102 — Full-Text Search.
+    it("matches via $queryRaw full-text search when search is given, bypassing findMany", async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
 
       await service.listArticles("password");
 
+      expect(prisma.knowledgeBaseArticle.findMany).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+      const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...unknown[],
+      ];
+      expect(values).toEqual(["branch-1", "password", "password"]);
+      expect(strings.join("")).toContain("websearch_to_tsquery");
+      expect(strings.join("")).not.toContain("'PUBLISHED'");
+    });
+
+    it("maps raw $queryRaw rows through the same shape as the plain-list path", async () => {
+      prisma.$queryRaw.mockResolvedValue([baseArticleRow]);
+
+      const result = await service.listArticles("password");
+
+      expect(result).toEqual([baseArticleRow]);
+    });
+
+    it("treats a whitespace-only search as no search at all", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listArticles("   ");
+
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
-        where: {
-          branchId: "branch-1",
-          OR: [
-            { title: { contains: "password", mode: "insensitive" } },
-            { body: { contains: "password", mode: "insensitive" } },
-          ],
-        },
+        where: { branchId: "branch-1" },
         orderBy: { updatedAt: "desc" },
       });
     });
@@ -394,21 +419,31 @@ describe("KnowledgeBaseService", () => {
       expect(result).toEqual([]);
     });
 
-    // Story 64 — Article Search.
-    it("adds a title/body OR clause when search is given", async () => {
-      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+    // Story 102 — Full-Text Search.
+    it("matches via $queryRaw full-text search, restricted to PUBLISHED, when search is given", async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
 
       await service.listPublishedArticlesForBranch("branch-1", "password");
 
+      expect(prisma.knowledgeBaseArticle.findMany).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+      const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...unknown[],
+      ];
+      expect(values).toEqual(["branch-1", "password", "password"]);
+      expect(strings.join("")).toContain("websearch_to_tsquery");
+      expect(strings.join("")).toContain("'PUBLISHED'");
+    });
+
+    it("treats a whitespace-only search as no search at all", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listPublishedArticlesForBranch("branch-1", "   ");
+
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
-        where: {
-          branchId: "branch-1",
-          status: "PUBLISHED",
-          OR: [
-            { title: { contains: "password", mode: "insensitive" } },
-            { body: { contains: "password", mode: "insensitive" } },
-          ],
-        },
+        where: { branchId: "branch-1", status: "PUBLISHED" },
         orderBy: { publishedAt: "desc" },
       });
     });

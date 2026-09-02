@@ -284,6 +284,104 @@ describe("Knowledge Base (e2e)", () => {
     expect(noMatch.body).toEqual([]);
   });
 
+  // Story 102 — Full-Text Search. Dedicated fixture articles (not the
+  // shared `articleId` above) so these don't interfere with, or depend
+  // on, the plain search test's own assertions.
+  describe("full-text search (Story 102)", () => {
+    let stemFixtureId: string;
+    let multiWordFixtureId: string;
+    let highRelevanceId: string;
+    let lowRelevanceId: string;
+    const marker = randomUUID().replace(/-/g, "");
+
+    beforeAll(async () => {
+      const stemFixture = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          title: `${marker} Connecting to the office VPN`,
+          body: "Instructions for joining the corporate network.",
+        })
+        .expect(201);
+      stemFixtureId = stemFixture.body.id;
+
+      const multiWordFixture = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          title: `${marker} Alpha Bravo widget setup`,
+          body: "Covers alpha and bravo configuration together.",
+        })
+        .expect(201);
+      multiWordFixtureId = multiWordFixture.body.id;
+
+      // Relevance: the search term appears in the title (a short,
+      // concentrated match) and repeatedly in the body of one article,
+      // and only once inside a much longer, unrelated body of the other —
+      // `ts_rank` weights title matches and match density higher, so the
+      // first should rank above the second when both match the same term.
+      const searchTerm = `${marker}zephyrqx`;
+      const highRelevance = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          title: `${searchTerm} overview`,
+          body: `${searchTerm} is our main topic here, and this article is all about ${searchTerm}.`,
+        })
+        .expect(201);
+      highRelevanceId = highRelevance.body.id;
+
+      const lowRelevance = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          title: "Unrelated maintenance notes",
+          body: `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Somewhere in this long paragraph there is a single passing mention of ${searchTerm} and nothing more.`,
+        })
+        .expect(201);
+      lowRelevanceId = lowRelevance.body.id;
+    });
+
+    it("matches a different inflection of the same word (stemming)", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: `${marker} connect` })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.map((a: { id: string }) => a.id)).toContain(stemFixtureId);
+    });
+
+    it("requires every word to match (AND semantics)", async () => {
+      const bothWords = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: `${marker} alpha bravo` })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(bothWords.body.map((a: { id: string }) => a.id)).toContain(multiWordFixtureId);
+
+      const oneMissingWord = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: `${marker} alpha nonexistentwordxyz` })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(oneMissingWord.body.map((a: { id: string }) => a.id)).not.toContain(
+        multiWordFixtureId,
+      );
+    });
+
+    it("orders results by relevance, not always by updatedAt/publishedAt", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: `${marker}zephyrqx` })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const ids = response.body.map((a: { id: string }) => a.id);
+      expect(ids).toEqual([highRelevanceId, lowRelevanceId]);
+    });
+  });
+
   // Story 100 — Agent's default seed grant now includes `kb:read`
   // (previously `[]`), so the two read routes below are now reachable;
   // only the write routes (`kb:create`/`kb:update`, still not granted)

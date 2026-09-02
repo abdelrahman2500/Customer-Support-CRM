@@ -890,6 +890,15 @@ model KnowledgeBaseArticle {
   publishedAt DateTime?                     @map("published_at")
   createdAt   DateTime                      @default(now()) @map("created_at")
   updatedAt   DateTime                      @updatedAt @map("updated_at")
+  /// Story 102 — generated column (see this story's own migration SQL):
+  /// `to_tsvector('english', title || ' ' || body)`, STORED, with a GIN
+  /// index. `Unsupported` because Prisma Client has no native `tsvector`
+  /// type — matched via `$queryRaw` in `KnowledgeBaseService`'s
+  /// `searchArticles` helper, never read or written through the client's
+  /// typed `create`/`update`/`findMany` API (Postgres maintains it
+  /// itself; `Unsupported` fields are automatically excluded from every
+  /// generated input type, so no existing call site needs to change).
+  searchVector Unsupported("tsvector")? @map("search_vector")
   versions    KnowledgeBaseArticleVersion[]
 
   @@index([branchId])

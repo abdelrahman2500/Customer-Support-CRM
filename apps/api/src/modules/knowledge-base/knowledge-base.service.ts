@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import type { KnowledgeBaseArticleStatus, Prisma } from "@prisma/client";
+import type { KnowledgeBaseArticleStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateArticleDto } from "./dto/create-article.dto";
@@ -39,13 +39,14 @@ export interface ArticleVersionSummary {
  * plan's Story Goal / Design items 3, 7.
  *
  * Story 64 — `listArticles`/`listPublishedArticlesForBranch` both take an
- * optional `search`, matching `title` or `body` via a plain `contains`/
- * `mode: "insensitive"` filter — not `tsvector`/GIN full-text search, which
- * this codebase has no existing raw-SQL precedent for (`$queryRaw` is used
- * exactly once, for a trivial healthcheck) and is deliberately deferred
- * until this simpler mechanism's relevance/performance is a measured
- * problem (mirrors `ReportingService`'s own "direct queries before
- * materialized views" precedent).
+ * optional `search`.
+ *
+ * Story 102 — `search` now matches via real PostgreSQL full-text search
+ * (`tsvector`/`websearch_to_tsquery`/`ts_rank`, see `searchArticles`
+ * below), not the plain `contains`/`mode: "insensitive"` filter Story 64
+ * originally shipped — see this story's own plan doc for why now (a
+ * generated, GIN-indexed column) and why not further (no vector/semantic
+ * search — a separate, later, AI-driven capability).
  *
  * Story 65 — every `PUBLISHED` transition in `updateArticle` also
  * snapshots the fully-merged post-update content into a new
@@ -77,8 +78,11 @@ export class KnowledgeBaseService {
 
   async listArticles(search?: string): Promise<ArticleSummary[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
+    if (search?.trim()) {
+      return this.searchArticles(branchId, search.trim());
+    }
     const articles = await this.prisma.knowledgeBaseArticle.findMany({
-      where: { branchId, ...searchWhereClause(search) },
+      where: { branchId },
       orderBy: { updatedAt: "desc" },
     });
     return articles.map(toArticleSummary);
@@ -181,8 +185,11 @@ export class KnowledgeBaseService {
     branchId: string,
     search?: string,
   ): Promise<ArticleSummary[]> {
+    if (search?.trim()) {
+      return this.searchArticles(branchId, search.trim(), { publishedOnly: true });
+    }
     const articles = await this.prisma.knowledgeBaseArticle.findMany({
-      where: { branchId, status: "PUBLISHED", ...searchWhereClause(search) },
+      where: { branchId, status: "PUBLISHED" },
       orderBy: { publishedAt: "desc" },
     });
     return articles.map(toArticleSummary);
@@ -224,25 +231,74 @@ export class KnowledgeBaseService {
     }
     return article;
   }
+
+  /**
+   * Story 102 — the actual full-text match, via `$queryRaw` (this
+   * codebase's own existing, if singular, raw-SQL precedent —
+   * `health.controller.ts`'s `$queryRaw\`SELECT 1\``). Prisma's typed
+   * query builder has no operator for `tsvector`/`@@` matching (the
+   * `fullTextSearch` preview feature is deliberately not enabled — see
+   * this story's own plan doc), so the whole query, including the branch
+   * scope and (for the portal caller) the published-only filter, runs as
+   * one parameterized raw statement — never `$queryRawUnsafe`.
+   *
+   * `websearch_to_tsquery` (not `plainto_tsquery`/`to_tsquery`): the
+   * standard choice for an unstructured, user-typed search box — handles
+   * multi-word AND-by-default matching and quoted phrases, and never
+   * throws on stray punctuation the way `to_tsquery`'s operator syntax
+   * would. Ordered by `ts_rank` descending — the one deliberate behavior
+   * upgrade over the old `contains` filter (which always ordered by
+   * `updatedAt`/`publishedAt` regardless of match quality): a real
+   * full-text search's core value is relevance ranking, and doing the
+   * whole query in raw SQL costs no extra complexity over a two-step
+   * id-then-refetch approach while actually preserving that order (a
+   * Prisma `findMany({ where: { id: { in: [...] } } })` re-fetch would
+   * not honor the original rank order).
+   */
+  private async searchArticles(
+    branchId: string,
+    search: string,
+    options: { publishedOnly?: boolean } = {},
+  ): Promise<ArticleSummary[]> {
+    const rows = options.publishedOnly
+      ? await this.prisma.$queryRaw<RawArticleRow[]>`
+          SELECT id, branch_id AS "branchId", title, body, category, status,
+                 published_at AS "publishedAt", created_at AS "createdAt",
+                 updated_at AS "updatedAt"
+          FROM knowledge_base.knowledge_base_articles
+          WHERE branch_id = ${branchId}
+            AND status = 'PUBLISHED'
+            AND search_vector @@ websearch_to_tsquery('english', ${search})
+          ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC
+        `
+      : await this.prisma.$queryRaw<RawArticleRow[]>`
+          SELECT id, branch_id AS "branchId", title, body, category, status,
+                 published_at AS "publishedAt", created_at AS "createdAt",
+                 updated_at AS "updatedAt"
+          FROM knowledge_base.knowledge_base_articles
+          WHERE branch_id = ${branchId}
+            AND search_vector @@ websearch_to_tsquery('english', ${search})
+          ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC
+        `;
+    return rows.map(toArticleSummary);
+  }
 }
 
-/** Empty object (no-op `where` clause addition) for an empty/missing
- * `search` — every existing caller sees the exact same unfiltered query it
- * always has. `OR` on `title`/`body`, case-insensitive substring — plain
- * Prisma `contains`, never raw SQL (see this file's own doc comment for
- * why `tsvector` is deliberately deferred). */
-function searchWhereClause(
-  search: string | undefined,
-): { OR: Prisma.KnowledgeBaseArticleWhereInput[] } | Record<string, never> {
-  if (!search) {
-    return {};
-  }
-  return {
-    OR: [
-      { title: { contains: search, mode: "insensitive" } },
-      { body: { contains: search, mode: "insensitive" } },
-    ],
-  };
+/** The raw column shape `searchArticles`'s `$queryRaw` selects — matches
+ * `toArticleSummary`'s existing input shape exactly. `status` arrives as a
+ * plain string from `$queryRaw` (Postgres enums have no special client-side
+ * type), safely narrowed since it always originates from this table's own
+ * `KnowledgeBaseArticleStatus` column. */
+interface RawArticleRow {
+  id: string;
+  branchId: string;
+  title: string;
+  body: string;
+  category: string | null;
+  status: KnowledgeBaseArticleStatus;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 function toArticleSummary(article: {
