@@ -1,28 +1,65 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomersQuery } from "@/hooks/use-tickets";
+import type { ListCustomersFilters } from "@/lib/tickets-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+const ALL_VALUE = "__all__";
+
 /**
- * Story 26 — Customer List. Mirrors `TicketListView`'s structure exactly,
- * minus filters/sort (plan Design item 4 — no search/pagination, matching
- * the Ticket List's own existing, accepted limitation; `CustomersController`
- * has no query parameters of any kind). Reuses the same `useCustomersQuery()`
- * cache Story 25's ticket-creation picker and every other workspace screen
- * already share — no new request shape.
+ * Story 26 — Customer List. Mirrors `TicketListView`'s structure exactly.
+ *
+ * Story 101 — the filter bar (search + isActive) and sortable
+ * name/created-at column headers mirror `TicketListView`'s own exact
+ * shapes (`FilterSelect`/blur-commit search `Input`/`toggleSort`),
+ * closing the gap this component's own doc comment used to disclose ("no
+ * search/pagination ... `CustomersController` has no query parameters of
+ * any kind"). `useCustomersQuery(filters)` gains an optional `filters`
+ * param — every other existing caller (the ticket-creation picker,
+ * `TicketListView`'s own customer-name lookup) keeps calling it with no
+ * arguments, reproducing today's exact all-customers request.
  */
 export function CustomerListView() {
   const t = useTranslations("customers");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
-  const customersQuery = useCustomersQuery();
+  const [filters, setFilters] = useState<ListCustomersFilters>({
+    sortBy: "createdAt",
+    sortDir: "asc",
+  });
+
+  const customersQuery = useCustomersQuery(filters);
+
+  function updateFilter<K extends keyof ListCustomersFilters>(key: K, value: string) {
+    setFilters((current) => ({
+      ...current,
+      [key]: value === ALL_VALUE ? undefined : (value as ListCustomersFilters[K]),
+    }));
+  }
+
+  function toggleSort(field: "displayName" | "createdAt") {
+    setFilters((current) => ({
+      ...current,
+      sortBy: field,
+      sortDir: current.sortBy === field && current.sortDir === "asc" ? "desc" : "asc",
+    }));
+  }
 
   return (
     <section className="flex flex-col gap-4">
@@ -31,6 +68,34 @@ export function CustomerListView() {
         <Button size="sm" onClick={() => router.push(`/${locale}/customers/new`)}>
           {t("list.createButton")}
         </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("list.searchLabel")}
+          <Input
+            className="min-w-[10rem]"
+            defaultValue={filters.search ?? ""}
+            placeholder={t("list.searchPlaceholder")}
+            onBlur={(event) => updateFilter("search", event.target.value.trim() || ALL_VALUE)}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("list.filterStatus")}
+          <Select
+            value={filters.isActive ?? ALL_VALUE}
+            onValueChange={(value) => updateFilter("isActive", value)}
+          >
+            <SelectTrigger className="min-w-[10rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_VALUE}>{t("list.filterAll")}</SelectItem>
+              <SelectItem value="true">{t("list.active")}</SelectItem>
+              <SelectItem value="false">{t("list.inactive")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
       </div>
 
       {customersQuery.isLoading && (
@@ -60,8 +125,27 @@ export function CustomerListView() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t("list.columns.name")}</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                  onClick={() => toggleSort("displayName")}
+                >
+                  {t("list.columns.name")}
+                  {filters.sortBy === "displayName" ? (filters.sortDir === "asc" ? " ▲" : " ▼") : ""}
+                </button>
+              </TableHead>
               <TableHead>{t("list.columns.status")}</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                  onClick={() => toggleSort("createdAt")}
+                >
+                  {t("list.columns.createdAt")}
+                  {filters.sortBy === "createdAt" ? (filters.sortDir === "asc" ? " ▲" : " ▼") : ""}
+                </button>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -83,6 +167,9 @@ export function CustomerListView() {
                   <Badge variant={customer.isActive ? "success" : "secondary"}>
                     {customer.isActive ? t("list.active") : t("list.inactive")}
                   </Badge>
+                </TableCell>
+                <TableCell className="text-slate-500">
+                  {new Date(customer.createdAt).toLocaleString(locale)}
                 </TableCell>
               </TableRow>
             ))}

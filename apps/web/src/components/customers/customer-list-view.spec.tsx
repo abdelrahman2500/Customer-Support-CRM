@@ -70,8 +70,18 @@ describe("CustomerListView", () => {
       queryResult({
         isSuccess: true,
         data: [
-          { id: "customer-1", displayName: "Acme Inc.", isActive: true },
-          { id: "customer-2", displayName: "Retired Co.", isActive: false },
+          {
+            id: "customer-1",
+            displayName: "Acme Inc.",
+            isActive: true,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "customer-2",
+            displayName: "Retired Co.",
+            isActive: false,
+            createdAt: "2026-01-02T00:00:00.000Z",
+          },
         ],
       }) as never,
     );
@@ -123,5 +133,91 @@ describe("CustomerListView", () => {
     fireEvent.keyDown(row!, { key: "Enter" });
 
     expect(push).toHaveBeenCalledWith("/en/customers/customer-1");
+  });
+
+  // Story 101 — Customer Management: List Search/Filter.
+  describe("filter bar (Story 101)", () => {
+    it("defaults to sorting by createdAt ascending, and commits a search on blur", () => {
+      mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+      render(<CustomerListView />);
+      expect(mockedUseCustomersQuery).toHaveBeenCalledWith({ sortBy: "createdAt", sortDir: "asc" });
+
+      const input = screen.getByPlaceholderText("list.searchPlaceholder");
+      fireEvent.change(input, { target: { value: "acme" } });
+      fireEvent.blur(input);
+
+      expect(mockedUseCustomersQuery).toHaveBeenCalledWith({
+        sortBy: "createdAt",
+        sortDir: "asc",
+        search: "acme",
+      });
+    });
+
+    it("clearing the search field on blur removes the filter rather than sending an empty string", () => {
+      mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+      render(<CustomerListView />);
+      const input = screen.getByPlaceholderText("list.searchPlaceholder");
+      fireEvent.change(input, { target: { value: "  " } });
+      fireEvent.blur(input);
+
+      expect(mockedUseCustomersQuery).toHaveBeenLastCalledWith({
+        sortBy: "createdAt",
+        sortDir: "asc",
+        search: undefined,
+      });
+    });
+
+    it("filters by isActive via the status select", async () => {
+      mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+
+      render(<CustomerListView />);
+      const statusCombobox = screen.getByRole("combobox");
+      fireEvent.click(statusCombobox);
+      fireEvent.click(await screen.findByRole("option", { name: "list.active" }));
+
+      expect(mockedUseCustomersQuery).toHaveBeenLastCalledWith({
+        sortBy: "createdAt",
+        sortDir: "asc",
+        isActive: "true",
+      });
+    });
+
+    it("toggles sort direction when the same column header is clicked twice", () => {
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [
+            {
+              id: "customer-1",
+              displayName: "Acme Inc.",
+              isActive: true,
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        }) as never,
+      );
+
+      render(<CustomerListView />);
+      // A regex name matcher, not `getByText`, because the header's own
+      // text content gains a trailing sort-direction arrow once it becomes
+      // the active sort column — the plain string would stop matching
+      // after the first click.
+      const nameHeader = screen.getByRole("button", { name: /list\.columns\.name/ });
+      fireEvent.click(nameHeader);
+
+      expect(mockedUseCustomersQuery).toHaveBeenLastCalledWith({
+        sortBy: "displayName",
+        sortDir: "asc",
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /list\.columns\.name/ }));
+
+      expect(mockedUseCustomersQuery).toHaveBeenLastCalledWith({
+        sortBy: "displayName",
+        sortDir: "desc",
+      });
+    });
   });
 });

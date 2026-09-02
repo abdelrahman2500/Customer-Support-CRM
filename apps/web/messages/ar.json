@@ -198,9 +198,14 @@
       "empty": "لا يوجد عملاء حتى الآن.",
       "active": "نشط",
       "inactive": "غير نشط",
+      "filterAll": "الكل",
+      "filterStatus": "الحالة",
+      "searchLabel": "بحث",
+      "searchPlaceholder": "ابحث بالاسم...",
       "columns": {
         "name": "الاسم",
-        "status": "الحالة"
+        "status": "الحالة",
+        "createdAt": "تاريخ الإنشاء"
       }
     },
     "detail": {

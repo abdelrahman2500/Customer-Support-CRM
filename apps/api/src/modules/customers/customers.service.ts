@@ -8,6 +8,7 @@ import type { UpdateCustomerDto } from "./dto/update-customer.dto";
 import type { CreateContactDto } from "./dto/create-contact.dto";
 import type { UpdateContactDto } from "./dto/update-contact.dto";
 import type { SetContactPortalPasswordDto } from "./dto/set-contact-portal-password.dto";
+import type { ListCustomersQueryDto } from "./dto/list-customers-query.dto";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -15,6 +16,9 @@ export interface CustomerSummary {
   id: string;
   displayName: string;
   isActive: boolean;
+  /** Story 101 — exposed so `CustomerListView`'s new sortable "Created"
+   * column has a real value to render, mirroring `TicketListItem.createdAt`. */
+  createdAt: Date;
 }
 
 export interface ContactSummary {
@@ -54,11 +58,28 @@ export class CustomersService {
     return toCustomerSummary(customer);
   }
 
-  async listCustomers(): Promise<CustomerSummary[]> {
+  /**
+   * Story 101 — `search`/`isActive`/`sortBy`/`sortDir` mirror
+   * `TicketsService.listTickets`'s exact pattern (`ListTicketsQueryDto`/
+   * `searchWhereClause`): `search` matches `displayName` via a plain
+   * `contains`/`mode: "insensitive"` filter (never `Contact` fields, never
+   * `tsvector` — see this story's own plan doc for why), `isActive` is an
+   * equality filter, and omitting every param reproduces this method's
+   * exact pre-Story-101 query/order byte-for-byte.
+   */
+  async listCustomers(query: ListCustomersQueryDto = {}): Promise<CustomerSummary[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
+    const sortBy = query.sortBy ?? "createdAt";
+    const sortDir = query.sortDir ?? "asc";
     const customers = await this.prisma.customer.findMany({
-      where: { branchId },
-      orderBy: { createdAt: "asc" },
+      where: {
+        branchId,
+        ...(query.search
+          ? { displayName: { contains: query.search, mode: "insensitive" } }
+          : {}),
+        ...(query.isActive !== undefined ? { isActive: query.isActive === "true" } : {}),
+      },
+      orderBy: { [sortBy]: sortDir },
     });
     return customers.map(toCustomerSummary);
   }
@@ -277,6 +298,7 @@ export class CustomersService {
     id: string;
     displayName: string;
     isActive: boolean;
+    createdAt: Date;
     contacts: Array<{
       id: string;
       fullName: string;
@@ -310,8 +332,14 @@ function toCustomerSummary(customer: {
   id: string;
   displayName: string;
   isActive: boolean;
+  createdAt: Date;
 }): CustomerSummary {
-  return { id: customer.id, displayName: customer.displayName, isActive: customer.isActive };
+  return {
+    id: customer.id,
+    displayName: customer.displayName,
+    isActive: customer.isActive,
+    createdAt: customer.createdAt,
+  };
 }
 
 function toContactSummary(contact: {

@@ -34,6 +34,7 @@ import type {
   CreateTicketInput,
   CreateTicketNoteInput,
   CreateUserInput,
+  ListCustomersFilters,
   ListTicketsFilters,
   ResetPasswordInput,
   SetContactPortalPasswordInput,
@@ -103,11 +104,22 @@ export function useTicketCsatQuery(id: string) {
 
 /** Long `staleTime`: a client-side name-resolution join over an
  * infrequently-changing list (Design item 9 of the plan) — not re-fetched
- * on every render. */
-export function useCustomersQuery() {
+ * on every render.
+ *
+ * Story 101 — gains an optional `filters` param, included in the query
+ * key (mirrors the reporting hooks' own Story 93 parameterized-query-key
+ * pattern: `useTicketVolumeQuery(range)` etc., which changed its own
+ * query keys the exact same way). Omitting it (every existing call site —
+ * the ticket-creation picker, `TicketListView`'s own customer-name
+ * lookup) reproduces the exact pre-Story-101 all-customers *request*;
+ * only the cache key's shape changes (`["customers"]` → `["customers",
+ * {}]`), which starts every caller with a fresh cache entry once, not a
+ * behavioral change.
+ */
+export function useCustomersQuery(filters: ListCustomersFilters = {}) {
   return useQuery({
-    queryKey: ["customers"],
-    queryFn: listCustomers,
+    queryKey: ["customers", filters],
+    queryFn: () => listCustomers(filters),
     staleTime: 5 * 60_000,
   });
 }

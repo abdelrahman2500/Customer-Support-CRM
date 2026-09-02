@@ -103,10 +103,70 @@ describe("CustomersService", () => {
       const result = await service.listCustomers();
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
-      expect(prisma.customer.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { branchId: "branch-1" } }),
-      );
+      expect(prisma.customer.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1" },
+        orderBy: { createdAt: "asc" },
+      });
       expect(result).toEqual([{ id: "customer-1", displayName: "Acme Corp", isActive: true }]);
+    });
+
+    // Story 101 — search/isActive/sort query params.
+    it("omitting every query param reproduces the exact pre-Story-101 query", async () => {
+      prisma.customer.findMany.mockResolvedValue([]);
+
+      await service.listCustomers({});
+
+      expect(prisma.customer.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1" },
+        orderBy: { createdAt: "asc" },
+      });
+    });
+
+    it("filters by displayName, case-insensitively, when search is given", async () => {
+      prisma.customer.findMany.mockResolvedValue([]);
+
+      await service.listCustomers({ search: "acme" });
+
+      expect(prisma.customer.findMany).toHaveBeenCalledWith({
+        where: {
+          branchId: "branch-1",
+          displayName: { contains: "acme", mode: "insensitive" },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+    });
+
+    it("filters by isActive: true", async () => {
+      prisma.customer.findMany.mockResolvedValue([]);
+
+      await service.listCustomers({ isActive: "true" });
+
+      expect(prisma.customer.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", isActive: true },
+        orderBy: { createdAt: "asc" },
+      });
+    });
+
+    it("filters by isActive: false", async () => {
+      prisma.customer.findMany.mockResolvedValue([]);
+
+      await service.listCustomers({ isActive: "false" });
+
+      expect(prisma.customer.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", isActive: false },
+        orderBy: { createdAt: "asc" },
+      });
+    });
+
+    it("sorts by displayName descending when requested", async () => {
+      prisma.customer.findMany.mockResolvedValue([]);
+
+      await service.listCustomers({ sortBy: "displayName", sortDir: "desc" });
+
+      expect(prisma.customer.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1" },
+        orderBy: { displayName: "desc" },
+      });
     });
   });
 

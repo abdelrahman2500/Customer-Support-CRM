@@ -74,6 +74,18 @@ export interface CustomerSummary {
   id: string;
   displayName: string;
   isActive: boolean;
+  /** Story 101 — mirrors `TicketListItem.createdAt`'s own shape. */
+  createdAt: string;
+}
+
+/** Story 101 — mirrors `ListTicketsFilters`'s own shape/`toQueryString`
+ * convention exactly (`search`/`isActive` matches `ListCustomersQueryDto`
+ * on the backend). */
+export interface ListCustomersFilters {
+  search?: string;
+  isActive?: "true" | "false";
+  sortBy?: "displayName" | "createdAt";
+  sortDir?: "asc" | "desc";
 }
 
 /** Mirrors `apps/api/src/modules/customers/customers.service.ts`'s `ContactSummary`. */
@@ -122,7 +134,10 @@ export interface ListTicketsFilters {
   sortDir?: "asc" | "desc";
 }
 
-function toQueryString(filters: ListTicketsFilters): string {
+/** Story 101 — widened from `ListTicketsFilters`-only to also accept
+ * `ListCustomersFilters`, so `listCustomers` can reuse it too rather than
+ * duplicating this exact same loop a second time in the same file. */
+function toQueryString(filters: ListTicketsFilters | ListCustomersFilters): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined && value !== "") {
@@ -222,8 +237,8 @@ export function updateTicket(id: string, input: UpdateTicketInput): Promise<{ id
   });
 }
 
-export function listCustomers(): Promise<CustomerSummary[]> {
-  return apiFetch<CustomerSummary[]>("/customers");
+export function listCustomers(filters: ListCustomersFilters = {}): Promise<CustomerSummary[]> {
+  return apiFetch<CustomerSummary[]>(`/customers${toQueryString(filters)}`);
 }
 
 export function getCustomer(id: string): Promise<CustomerDetail> {

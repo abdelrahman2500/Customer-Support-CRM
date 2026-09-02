@@ -198,9 +198,14 @@
       "empty": "No customers yet.",
       "active": "Active",
       "inactive": "Inactive",
+      "filterAll": "All",
+      "filterStatus": "Status",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by name...",
       "columns": {
         "name": "Name",
-        "status": "Status"
+        "status": "Status",
+        "createdAt": "Created"
       }
     },
     "detail": {
