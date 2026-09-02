@@ -260,6 +260,16 @@ describe("Ticketing (e2e)", () => {
     expect(updatedAts).toEqual(sorted);
   });
 
+  // Story 105 — Ticketing: List a Bounded Result Cap.
+  it("never returns more than 500 rows", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/tickets")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body.length).toBeLessThanOrEqual(500);
+  });
+
   // Story 70 — Ticket Search Foundation. Dedicated, self-contained fixture
   // tickets (random content) so these tests don't depend on other tests'
   // ordering or fixture state.

@@ -279,11 +279,47 @@ describe("TicketsService", () => {
       await service.listTickets();
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      // Story 105 — the DB fetch always requests `desc` (see that
+      // story's own doc comment on `listTickets`); the default `asc`
+      // result order is restored by reversing the (here, empty) array.
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
         include: { slaTarget: true },
+        take: 500,
       });
+    });
+
+    // Story 105 — a Bounded Result Cap.
+    it("caps every query at 500 rows, unconditionally", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ status: "OPEN" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 500 }),
+      );
+    });
+
+    it("fetches desc and reverses in memory for the default (asc) direction, reproducing the exact pre-Story-105 order", async () => {
+      const older = { ...baseTicketRow, id: "ticket-older", createdAt: new Date("2024-01-01T00:00:00.000Z") };
+      const newer = { ...baseTicketRow, id: "ticket-newer", createdAt: new Date("2024-01-05T00:00:00.000Z") };
+      // Prisma, asked for `desc`, would itself return newest-first.
+      prisma.ticket.findMany.mockResolvedValue([newer, older]);
+
+      const result = await service.listTickets();
+
+      expect(result.map((t) => t.id)).toEqual(["ticket-older", "ticket-newer"]);
+    });
+
+    it("does not reverse when sortDir is explicitly desc", async () => {
+      const older = { ...baseTicketRow, id: "ticket-older", createdAt: new Date("2024-01-01T00:00:00.000Z") };
+      const newer = { ...baseTicketRow, id: "ticket-newer", createdAt: new Date("2024-01-05T00:00:00.000Z") };
+      prisma.ticket.findMany.mockResolvedValue([newer, older]);
+
+      const result = await service.listTickets({ sortDir: "desc" });
+
+      expect(result.map((t) => t.id)).toEqual(["ticket-newer", "ticket-older"]);
     });
 
     it("applies status/priority/category/assignedToUserId filters independently and in combination", async () => {

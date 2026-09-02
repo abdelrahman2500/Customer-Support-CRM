@@ -33,6 +33,20 @@ import type {
  */
 const RESOLVED_STATUSES = new Set<TicketStatus>(["RESOLVED", "CLOSED"]);
 
+/** Story 105 — `Ticket` is this application's highest-write-volume table;
+ * an unfiltered `listTickets` call had no natural ceiling. Mirrors
+ * `AuditLogsService`'s own `MAX_AUDIT_LOG_ROWS` precedent (Story 104) —
+ * fixed, documented, unconditionally applied — set higher than that
+ * story's `200`: confirmed directly against this session's own dev
+ * database that a single seeded branch already holds 991 rows from
+ * accumulated e2e/test activity alone, so 500 comfortably covers a real
+ * team's day-to-day open+recent backlog without being a routinely-hit
+ * ceiling. Full pagination is deliberately out of scope (see this
+ * story's own plan doc) — narrowing via the existing `status`/
+ * `priority`/`category`/`assignedToUserId`/`search` filters is the tool
+ * for "I need to see a specific ticket," not paging deeper. */
+const MAX_TICKET_ROWS = 500;
+
 export interface TicketSummary {
   id: string;
   subject: string;
@@ -197,11 +211,29 @@ export class TicketsService {
         ? { assignedToUserId: query.assignedToUserId }
         : {}),
     };
+    // Story 105 — capping a `sortDir: "asc"` query as-written would fetch
+    // the OLDEST `MAX_TICKET_ROWS` rows and, once a branch ever exceeds
+    // the cap, freeze there forever: every ticket created afterward would
+    // silently never appear in the default (ascending, no-filter) view —
+    // the opposite of what a cap should protect against, and a real,
+    // reproducible regression (confirmed against this session's own dev
+    // database, which already holds 991 tickets in one branch). Instead,
+    // the DB fetch always requests the most-recent-`MAX_TICKET_ROWS`
+    // slice (`desc`), and a `sortDir: "asc"` request is restored by
+    // reversing that already-fetched, already-capped array in memory —
+    // when the true row count is at or under the cap, reversing a `desc`
+    // list reproduces the exact `asc` list a direct query would have
+    // returned, so this is behavior-identical to before Story 105 for
+    // every branch that hasn't hit the cap yet.
     const tickets = await this.prisma.ticket.findMany({
       where,
-      orderBy: { [sortBy]: sortDir },
+      orderBy: { [sortBy]: "desc" },
       include: { slaTarget: true },
+      take: MAX_TICKET_ROWS,
     });
+    if (sortDir === "asc") {
+      tickets.reverse();
+    }
     return tickets.map((ticket) => ({
       ...toTicketSummary(ticket),
       slaTarget: ticket.slaTarget
