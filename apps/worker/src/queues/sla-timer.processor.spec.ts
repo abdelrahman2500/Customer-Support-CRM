@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SlaTimerProcessor } from "./sla-timer.processor";
 import type { PrismaService } from "../prisma/prisma.service";
-import type { Queue } from "bullmq";
+import type { Job, Queue } from "bullmq";
+
+vi.mock("@sentry/node", () => ({ captureException: vi.fn() }));
+
+// Imported after the mock so the mocked module is what the processor sees.
+import * as Sentry from "@sentry/node";
+import { SLA_TIMERS_QUEUE, SlaTimerProcessor } from "./sla-timer.processor";
 
 function buildPrismaMock() {
   return {
@@ -129,6 +134,30 @@ describe("SlaTimerProcessor", () => {
 
       expect(prisma.slaTicketTarget.updateMany).not.toHaveBeenCalled();
       expect(handbackQueue.add).not.toHaveBeenCalled();
+    });
+  });
+
+  // Story 113 — Error tracking.
+  describe("onFailed", () => {
+    it("reports a failed job's error to Sentry, tagged with the queue and job id", () => {
+      const error = new Error("Prisma connection lost");
+      const job = { id: "job-7" } as Job;
+
+      processor.onFailed(job, error);
+
+      expect(Sentry.captureException).toHaveBeenCalledWith(error, {
+        tags: { queue: SLA_TIMERS_QUEUE, jobId: "job-7" },
+      });
+    });
+
+    it("tolerates an undefined job (BullMQ's own documented stalled-job case)", () => {
+      const error = new Error("stalled");
+
+      processor.onFailed(undefined, error);
+
+      expect(Sentry.captureException).toHaveBeenCalledWith(error, {
+        tags: { queue: SLA_TIMERS_QUEUE, jobId: undefined },
+      });
     });
   });
 });

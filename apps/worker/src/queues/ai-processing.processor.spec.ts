@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiCallResult, AiProvider } from "@crm/ai";
-import { AiProcessingProcessor } from "./ai-processing.processor";
 import type { AiProcessingJobPayload } from "./ai-processing.processor";
 import type { PrismaService } from "../prisma/prisma.service";
 import type { Job, Queue } from "bullmq";
 import { CorrelationIdStore } from "../common/logging/correlation-id.store";
+
+vi.mock("@sentry/node", () => ({ captureException: vi.fn() }));
+
+// Imported after the mock so the mocked module is what the processor sees.
+import * as Sentry from "@sentry/node";
+import { AiProcessingProcessor, AI_PROCESSING_QUEUE } from "./ai-processing.processor";
 
 function buildProviderMock() {
   return {
@@ -211,6 +216,40 @@ describe("AiProcessingProcessor", () => {
         "ai-completion",
         expect.objectContaining({ outcome: "ERROR" }),
       );
+    });
+
+    // Story 113 — Error tracking.
+    it("reports the provider's error to Sentry (the job itself never fails at the BullMQ level)", async () => {
+      const error = new Error("rate limited");
+      provider.summarize.mockRejectedValue(error);
+      const job = buildJob(PAYLOAD);
+
+      await processor.process(job);
+
+      expect(Sentry.captureException).toHaveBeenCalledWith(error);
+    });
+
+    describe("onFailed", () => {
+      it("reports a genuinely unhandled exception (e.g. outside the try/catch) to Sentry, tagged with the queue and job id", () => {
+        const error = new Error("Prisma connection lost");
+        const job = { id: "job-42" } as Job<AiProcessingJobPayload>;
+
+        processor.onFailed(job, error);
+
+        expect(Sentry.captureException).toHaveBeenCalledWith(error, {
+          tags: { queue: AI_PROCESSING_QUEUE, jobId: "job-42" },
+        });
+      });
+
+      it("tolerates an undefined job (BullMQ's own documented stalled-job case)", () => {
+        const error = new Error("stalled");
+
+        processor.onFailed(undefined, error);
+
+        expect(Sentry.captureException).toHaveBeenCalledWith(error, {
+          tags: { queue: AI_PROCESSING_QUEUE, jobId: undefined },
+        });
+      });
     });
 
     // Story 80 — AI Portal Chatbot.

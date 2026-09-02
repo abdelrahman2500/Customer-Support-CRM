@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -15,6 +16,11 @@ import { Button } from "@/components/ui/button";
  * states (Story 94's error-classification helpers) — this is a last-resort
  * reset boundary for a genuine render-time throw, not the everyday
  * "the API returned a 4xx/5xx" case those already handle.
+ *
+ * Story 113 — `Sentry.captureException` reports it (a no-op when
+ * `NEXT_PUBLIC_SENTRY_DSN` is unset, see `instrumentation-client.ts`),
+ * closing the gap this file's own doc comment used to note explicitly
+ * ("no analytics/reporting pipeline exists in this repository").
  */
 export default function LocaleError({
   error,
@@ -26,9 +32,9 @@ export default function LocaleError({
   const t = useTranslations("common");
 
   useEffect(() => {
-    // Logged for local diagnosis — no analytics/reporting pipeline exists
-    // in this repository to send it to.
+    // Logged for local diagnosis either way.
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

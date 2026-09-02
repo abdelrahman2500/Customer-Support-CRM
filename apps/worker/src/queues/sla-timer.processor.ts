@@ -1,7 +1,8 @@
-import { InjectQueue, Processor, WorkerHost } from "@nestjs/bullmq";
+import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from "@nestjs/bullmq";
 import { Injectable, Logger } from "@nestjs/common";
 import type { TicketStatus } from "@prisma/client";
 import type { Job, Queue } from "bullmq";
+import * as Sentry from "@sentry/node";
 import { PrismaService } from "../prisma/prisma.service";
 import { evaluateTransition } from "./sla-transition-evaluator";
 import {
@@ -168,5 +169,18 @@ export class SlaTimerProcessor extends WorkerHost {
       data: { resolutionBreachedNotifiedAt: now },
     });
     return result.count === 1;
+  }
+
+  /**
+   * Story 113 — `process()` above has no try/catch, so a genuinely
+   * unhandled exception (e.g. a Prisma error) propagates all the way up
+   * to BullMQ itself, which marks the job failed and emits this event —
+   * a real, actionable capture point, unlike `AiProcessingProcessor`'s
+   * own equivalent handler (see that file's own doc comment on why its
+   * job never actually fails at the BullMQ level).
+   */
+  @OnWorkerEvent("failed")
+  onFailed(job: Job | undefined, error: Error): void {
+    Sentry.captureException(error, { tags: { queue: SLA_TIMERS_QUEUE, jobId: job?.id } });
   }
 }

@@ -6,6 +6,11 @@ vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
 
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
+
+// Imported after the mock so the mocked module is what the component sees.
+import * as Sentry from "@sentry/nextjs";
+
 describe("LocaleError (Story 96)", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -28,5 +33,13 @@ describe("LocaleError (Story 96)", () => {
 
     expect(console.error).toHaveBeenCalledWith(error);
     expect(screen.queryByText("raw internal stack detail")).not.toBeInTheDocument();
+  });
+
+  // Story 113 — Error tracking.
+  it("reports the error to Sentry", () => {
+    const error = new Error("boom");
+    render(<LocaleError error={error} reset={vi.fn()} />);
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(error);
   });
 });

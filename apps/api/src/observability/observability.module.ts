@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
-import { APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
 import { HEALTH_CHECK_QUEUE } from "../queues/health-check.producer";
 import { SLA_TIMERS_QUEUE } from "../queues/sla-timers.producer";
 import { SLA_TIMER_EVENTS_QUEUE } from "../queues/sla-timer-events-bridge.processor";
@@ -9,10 +9,14 @@ import { AI_PROCESSING_EVENTS_QUEUE } from "../queues/ai-processing-events-bridg
 import { MetricsController } from "./metrics.controller";
 import { MetricsService } from "./metrics.service";
 import { MetricsInterceptor } from "./metrics.interceptor";
+import { SentryExceptionFilter } from "./sentry-exception.filter";
 
 /**
  * Story 112 — the Prometheus-metrics half of this app's Observability
  * story (see `apps/api/src/tracing.ts` for the OpenTelemetry half).
+ * Story 113 additionally registers `SentryExceptionFilter` here (see
+ * `../sentry.ts` for the Sentry-init half) — the same module boundary,
+ * not a new one, since it's the same Observability concern.
  *
  * Registers its own `BullModule.registerQueue(...)` calls for every queue
  * `QueuesModule` already owns, rather than importing `QueuesModule`
@@ -35,6 +39,10 @@ import { MetricsInterceptor } from "./metrics.interceptor";
     ),
   ],
   controllers: [MetricsController],
-  providers: [MetricsService, { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor }],
+  providers: [
+    MetricsService,
+    { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
+    { provide: APP_FILTER, useClass: SentryExceptionFilter },
+  ],
 })
 export class ObservabilityModule {}

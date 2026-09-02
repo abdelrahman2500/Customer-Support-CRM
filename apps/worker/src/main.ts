@@ -1,4 +1,5 @@
 import "./tracing";
+import "./sentry";
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { Logger } from "@nestjs/common";

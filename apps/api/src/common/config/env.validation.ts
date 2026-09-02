@@ -44,6 +44,18 @@ export const envSchema = z.object({
    * `http://localhost:3000`. No production origin is hard-coded here.
    */
   CORS_ORIGINS: z.string().optional(),
+
+  /**
+   * Story 113 — docs/architecture/11-quality-and-operations.md: "Sentry
+   * or self-hosted GlitchTip captures unhandled frontend and backend
+   * exceptions." Optional, mirroring `CORS_ORIGINS`'s own "unset is a
+   * valid, expected state" precedent: unhandled exceptions are still
+   * caught and logged either way (see `SentryExceptionFilter`); a set
+   * `SENTRY_DSN` additionally reports them. GlitchTip is Sentry-protocol-
+   * compatible, so the exact same DSN-based configuration works for
+   * either provider — no provider-specific code branches here.
+   */
+  SENTRY_DSN: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

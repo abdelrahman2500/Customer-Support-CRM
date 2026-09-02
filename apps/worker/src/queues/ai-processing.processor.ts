@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { InjectQueue, Processor, WorkerHost } from "@nestjs/bullmq";
+import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from "@nestjs/bullmq";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { AiCallResult, AiProvider } from "@crm/ai";
 import type { Job, Queue } from "bullmq";
+import * as Sentry from "@sentry/node";
 import { PrismaService } from "../prisma/prisma.service";
 import { AI_PROVIDER } from "../ai/ai.constants";
 import { AI_PROCESSING_EVENTS_QUEUE } from "./ai-processing-events.types";
@@ -109,6 +110,12 @@ export class AiProcessingProcessor extends WorkerHost {
       // future/misbehaving provider still shouldn't leave the durable log
       // row stuck in PENDING forever — mirrors `AiGatewayService`'s own
       // (pre-Story-76) defensive try/catch exactly.
+      //
+      // Story 113 — this catch means the job never actually fails at the
+      // BullMQ level (it "succeeds" with an ERROR outcome recorded on the
+      // AiPromptLog row instead), so the `onFailed` handler below would
+      // never see it. Report it to Sentry explicitly, right here, instead.
+      Sentry.captureException(error);
       result = {
         outcome: "ERROR",
         text: null,
@@ -159,5 +166,17 @@ export class AiProcessingProcessor extends WorkerHost {
       case "CHAT":
         return this.provider.chat({ sessionId: data.chatSessionId ?? "", message: data.body });
     }
+  }
+
+  /**
+   * Story 113 — catches a genuinely unhandled exception in `process()`
+   * itself (e.g. a Prisma error, not an `AiProvider` failure — those are
+   * already reported from the `catch` block above, since that path never
+   * lets the job actually fail). BullMQ's own retry/backoff behavior is
+   * unaffected by this handler; it only adds a Sentry report.
+   */
+  @OnWorkerEvent("failed")
+  onFailed(job: Job<AiProcessingJobPayload> | undefined, error: Error): void {
+    Sentry.captureException(error, { tags: { queue: AI_PROCESSING_QUEUE, jobId: job?.id } });
   }
 }

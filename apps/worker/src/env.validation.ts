@@ -25,6 +25,13 @@ export const envSchema = z.object({
    */
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5-20250929"),
+
+  /**
+   * Story 113 — mirrors `apps/api`'s own optional `SENTRY_DSN` exactly
+   * (same "unset is a valid, expected state" semantics — see that file's
+   * own doc comment).
+   */
+  SENTRY_DSN: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

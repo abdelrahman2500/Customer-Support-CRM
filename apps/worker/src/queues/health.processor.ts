@@ -1,6 +1,7 @@
-import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { OnWorkerEvent, Processor, WorkerHost } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import type { Job } from "bullmq";
+import * as Sentry from "@sentry/node";
 
 export const HEALTH_CHECK_QUEUE = "health-check";
 
@@ -18,5 +19,13 @@ export class HealthProcessor extends WorkerHost {
   async process(job: Job<{ pingedAt: string }>): Promise<{ pongedAt: string }> {
     this.logger.log(`Processed ${job.name} (pinged at ${job.data.pingedAt})`);
     return { pongedAt: new Date().toISOString() };
+  }
+
+  /** Story 113 — see `SlaTimerProcessor.onFailed`'s own doc comment for
+   * why this is a real, actionable capture point (this processor also
+   * has no try/catch). */
+  @OnWorkerEvent("failed")
+  onFailed(job: Job | undefined, error: Error): void {
+    Sentry.captureException(error, { tags: { queue: HEALTH_CHECK_QUEUE, jobId: job?.id } });
   }
 }
