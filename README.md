@@ -325,13 +325,15 @@ pnpm --filter @crm/web test        # unit/component tests (Vitest + Testing Libr
 pnpm --filter @crm/portal test     # unit/component tests (Vitest + Testing Library)
 pnpm --filter @crm/worker test     # unit tests (Vitest)
 pnpm --filter @crm/worker test:e2e # worker e2e (SLA timer processor)
-pnpm --filter @crm/e2e test        # browser E2E (Playwright) — boots real apps/api + apps/web
-                                    # (pre-built) + apps/portal (pre-built); needs real
-                                    # Postgres/Redis running and apps/web/apps/portal already
-                                    # built. Deliberately excluded from root `pnpm test`
-                                    # (turbo run test): it needs prerequisites (built web/portal,
-                                    # installed browsers) that the generic unit-test sweep does
-                                    # not provide — see the dedicated `browser-e2e` CI job.
+pnpm --filter @crm/e2e test        # browser E2E (Playwright) — boots pre-built apps/api +
+                                    # apps/web + apps/portal; needs real Postgres/Redis running
+                                    # and all three already built (`pnpm exec turbo run build
+                                    # --filter=<pkg>` for each — a bare `pnpm --filter <pkg>
+                                    # build` skips @crm/shared/@crm/ai's own build). Deliberately
+                                    # excluded from root `pnpm test` (turbo run test): it needs
+                                    # prerequisites (built apps, installed browsers) that the
+                                    # generic unit-test sweep does not provide — see the
+                                    # dedicated `browser-e2e` CI job.
 ```
 
 `apps/api/test/` currently holds 33 e2e spec files covering identity/RBAC,
@@ -343,8 +345,11 @@ full Customer Portal surface (auth, tickets, KB, chat, branding).
 CI (`.github/workflows/ci.yml`) runs on every PR and push to `main`:
 install → Prisma generate → lint → typecheck → build → unit tests
 (`pnpm test`) → API e2e tests against real Postgres/Redis/MinIO service
-containers. A separate `browser-e2e` job then builds `apps/web`/`apps/portal`,
-installs Chromium, and runs `pnpm --filter @crm/e2e test` against real
+containers. A separate `browser-e2e` job then builds `apps/api`/`apps/web`/
+`apps/portal`, installs Chromium, and runs `pnpm --filter @crm/e2e test`
+(pre-built apps only — `apps/api` boots via `node dist/main.js`, not `nest
+start --watch`, since the live compile measured close enough to Playwright's
+webServer timeout to genuinely time out on a real CI run) against real
 Postgres/Redis service containers with CI-provided env values. Another
 separate job builds (but does not push or deploy) a Docker image per app on
 pushes to `main`.

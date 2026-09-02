@@ -218,6 +218,17 @@ jobs:
       - name: Seed database
         run: pnpm --filter @crm/api prisma:seed
 
+      - name: Build API
+        # apps/e2e's playwright.config.ts now starts apps/api via its
+        # pre-built `start` script (`node dist/main.js`), not `dev`
+        # (`nest start --watch`) — that live `tsc --watch` compile
+        # (~48-50s on a plain dev machine, `deleteOutDir: true` forces a
+        # full recompile every run) genuinely exceeded this job's
+        # Playwright webServer timeout in a real CI run; the pre-built
+        # path measured ~7s to `/health` instead. Same `@crm/shared`/
+        # `@crm/ai` build-dependency reasoning as "Build web" below.
+        run: pnpm exec turbo run build --filter=@crm/api
+
       - name: Build web
         # `pnpm --filter @crm/web build` runs only apps/web's own `build`
         # script — it does not know about turbo.json's `build` task

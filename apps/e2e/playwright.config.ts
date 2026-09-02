@@ -42,20 +42,38 @@ apiEnv.CORS_ORIGINS = `http://localhost:${WEB_PORT},http://localhost:${PORTAL_PO
  * browser-testing framework for every screen; see this story's own plan
  * doc for the full list of what's out of scope.
  *
- * `webServer` starts all three backing services this suite needs.
- * `apps/api` uses its own `dev` script (`nest start --watch`) — a NestJS
- * backend has no dev/prod compile-timing distinction that matters here.
- * `apps/web`/`apps/portal` use `start` (a pre-built, production Next.js
- * server), NOT `dev`: `next dev`'s on-demand, per-route compilation
- * raced with this suite's own immediate `router.push()` right after
- * login, intermittently swallowing the navigation entirely (confirmed
- * while first authoring this suite — the login POST/cookie/response were
- * all genuinely correct; only the client-side navigation was lost, and
- * only in dev mode) — a `next dev`-specific class of flakiness that a
- * pre-built server doesn't have, and also a closer match to what a real
- * deployment actually runs. Requires `pnpm --filter @crm/web build` /
- * `pnpm --filter @crm/portal build` to have already run (see the CI job
- * this story adds, and this package's own README).
+ * `webServer` starts all three backing services this suite needs, and all
+ * three now use their pre-built `start` script, NOT a `dev`/watch one:
+ * - `apps/web`/`apps/portal`: `next dev`'s on-demand, per-route
+ *   compilation raced with this suite's own immediate `router.push()`
+ *   right after login, intermittently swallowing the navigation entirely
+ *   (confirmed while first authoring this suite — the login POST/cookie/
+ *   response were all genuinely correct; only the client-side navigation
+ *   was lost, and only in dev mode).
+ * - `apps/api`: originally used its own `dev` script (`nest start
+ *   --watch`) on the assumption that "a NestJS backend has no dev/prod
+ *   compile-timing distinction that matters here." That assumption was
+ *   wrong — `nest start --watch`'s cold `tsc` compile (`deleteOutDir:
+ *   true` in `nest-cli.json` forces a full recompile every run, no
+ *   incremental reuse) measured ~48-50s on a plain dev machine and, once,
+ *   genuinely exceeded this entry's 120s `timeout` in a real CI run
+ *   (`Error: Timed out waiting 120000ms from config.webServer.`) — a
+ *   slower/colder CI runner has less headroom, so this wasn't a one-off
+ *   fluke to shrug off. Switching to the pre-built `start` script (`node
+ *   dist/main.js`) measured ~7s to `/health` (compile time moved out of
+ *   the timed critical path entirely, into its own CI build step) —
+ *   confirmed while diagnosing this exact CI failure.
+ *
+ * Each pre-built app needs its own build to already exist: `pnpm --filter
+ * @crm/api build` / `pnpm --filter @crm/web build` / `pnpm --filter
+ * @crm/portal build` (see the CI job this story adds, and this package's
+ * own README). All three depend on `@crm/shared` (`apps/api` also on
+ * `@crm/ai`) — build via `pnpm exec turbo run build --filter=<pkg>`
+ * rather than the bare `pnpm --filter` command above so that dependency
+ * is actually satisfied (a bare `pnpm --filter <pkg> build` only runs
+ * that one package's own script, ignoring turbo.json's `dependsOn:
+ * ["^build"]` — the CI job's own steps use the turbo form for exactly
+ * this reason).
  *
  * `apps/worker` is deliberately NOT started: neither named flow depends
  * on an async side effect only the worker produces (SLA timers, AI
@@ -85,7 +103,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "pnpm --filter @crm/api dev",
+      command: "pnpm --filter @crm/api start",
       url: `http://localhost:${API_PORT}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
