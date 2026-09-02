@@ -9,6 +9,7 @@ import { AiProcessingProcessor, AI_PROCESSING_QUEUE } from "./queues/ai-processi
 import { AI_PROCESSING_EVENTS_QUEUE } from "./queues/ai-processing-events.types";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AiProviderModule } from "./ai/ai-provider.module";
+import { PinoLoggerService } from "./common/logging/pino-logger.service";
 
 @Module({
   imports: [
@@ -28,6 +29,12 @@ import { AiProviderModule } from "./ai/ai-provider.module";
     PrismaModule,
     AiProviderModule,
   ],
-  providers: [HealthProcessor, SlaTimerProcessor, AiProcessingProcessor],
+  providers: [
+    HealthProcessor,
+    SlaTimerProcessor,
+    AiProcessingProcessor,
+    // Story 111 — resolved via `app.get(PinoLoggerService)` in `main.ts`.
+    PinoLoggerService,
+  ],
 })
 export class WorkerModule {}

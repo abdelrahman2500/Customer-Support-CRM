@@ -5,6 +5,7 @@ import { TenantContext } from "../../common/tenant/tenant-context";
 import { AiGatewayService, promptRef } from "../ai/ai-gateway.service";
 import { AiSettingsService } from "../ai/ai-settings.service";
 import { AiProcessingProducer } from "../../queues/ai-processing.producer";
+import { CorrelationIdStore } from "../../common/logging/correlation-id.store";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TicketsService } from "./tickets.service";
 
@@ -156,6 +157,7 @@ export class TicketAiService {
       feature,
       subject: input.subject,
       body: input.body,
+      correlationId: CorrelationIdStore.get(),
     });
 
     return { id: log.id, outcome: "PENDING" };

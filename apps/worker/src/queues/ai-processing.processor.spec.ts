@@ -4,6 +4,7 @@ import { AiProcessingProcessor } from "./ai-processing.processor";
 import type { AiProcessingJobPayload } from "./ai-processing.processor";
 import type { PrismaService } from "../prisma/prisma.service";
 import type { Job, Queue } from "bullmq";
+import { CorrelationIdStore } from "../common/logging/correlation-id.store";
 
 function buildProviderMock() {
   return {
@@ -113,6 +114,35 @@ describe("AiProcessingProcessor", () => {
         feature: "SUMMARIZE",
         outcome: "SUCCESS",
       });
+    });
+
+    // Story 111 — Structured logging & correlation IDs.
+    it("binds the job's own correlationId for the lifetime of processing it", async () => {
+      let seenDuringProcessing: string | undefined;
+      provider.summarize.mockImplementation(async () => {
+        seenDuringProcessing = CorrelationIdStore.get();
+        return SUCCESS_RESULT;
+      });
+      const job = buildJob({ ...PAYLOAD, correlationId: "request-abc" });
+
+      await processor.process(job);
+
+      expect(seenDuringProcessing).toBe("request-abc");
+      expect(CorrelationIdStore.get()).toBeUndefined();
+    });
+
+    it("falls back to a freshly generated id when the job carries no correlationId", async () => {
+      let seenDuringProcessing: string | undefined;
+      provider.summarize.mockImplementation(async () => {
+        seenDuringProcessing = CorrelationIdStore.get();
+        return SUCCESS_RESULT;
+      });
+      const job = buildJob(PAYLOAD);
+
+      await processor.process(job);
+
+      expect(seenDuringProcessing).toBeTypeOf("string");
+      expect(seenDuringProcessing).not.toBe("");
     });
 
     it("calls provider.suggestReply for a SUGGEST_REPLY job", async () => {

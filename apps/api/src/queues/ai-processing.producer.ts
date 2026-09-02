@@ -15,7 +15,14 @@ export const AI_PROCESSING_QUEUE = "ai-processing";
  * ticket-scoped features. `ticketId`/`subject` are ticket-scoped-only
  * (optional); `chatSessionId` is `CHAT`-only (optional); `body` is always
  * present — the joined note text for ticket features, the customer's raw
- * chat message for `CHAT`. */
+ * chat message for `CHAT`.
+ *
+ * Story 111 — `correlationId` is the enqueuing HTTP request's own id
+ * (`CorrelationIdStore.get()`, set for the request's lifetime by
+ * `RequestIdMiddleware`), optional only because a caller outside an HTTP
+ * request (there is none today, but nothing enforces it) would have none
+ * to propagate. `apps/worker`'s `AiProcessingProcessor` falls back to a
+ * fresh id when absent — see that file's own doc comment. */
 export interface AiProcessingJobPayload {
   aiPromptLogId: string;
   branchId: string;
@@ -24,6 +31,7 @@ export interface AiProcessingJobPayload {
   subject?: string;
   body: string;
   chatSessionId?: string;
+  correlationId?: string;
 }
 
 /**

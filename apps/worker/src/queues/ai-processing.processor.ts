@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { InjectQueue, Processor, WorkerHost } from "@nestjs/bullmq";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { AiCallResult, AiProvider } from "@crm/ai";
@@ -6,6 +7,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AI_PROVIDER } from "../ai/ai.constants";
 import { AI_PROCESSING_EVENTS_QUEUE } from "./ai-processing-events.types";
 import type { AiCompletionJobPayload } from "./ai-processing-events.types";
+import { CorrelationIdStore } from "../common/logging/correlation-id.store";
 
 /**
  * Must stay identical to `AI_PROCESSING_QUEUE` in
@@ -18,7 +20,12 @@ export const AI_PROCESSING_QUEUE = "ai-processing";
  *
  * Story 80 — `feature` now includes `CHAT`. `ticketId`/`subject` are
  * ticket-scoped-only (optional); `chatSessionId` is `CHAT`-only
- * (optional); `body` is always present. */
+ * (optional); `body` is always present.
+ *
+ * Story 111 — `correlationId` is the enqueuing API request's own id.
+ * `AiProcessingProcessor.process()` binds it (or a fresh one when
+ * absent) for the lifetime of processing this job — see that class's own
+ * doc comment. */
 export interface AiProcessingJobPayload {
   aiPromptLogId: string;
   branchId: string;
@@ -27,6 +34,7 @@ export interface AiProcessingJobPayload {
   subject?: string;
   body: string;
   chatSessionId?: string;
+  correlationId?: string;
 }
 
 /**
@@ -60,6 +68,14 @@ export interface AiProcessingJobPayload {
  * conversation history's own source of truth; a failed/disabled turn is
  * never given a placeholder message (the caller learns of it via the
  * same `AiPromptLog` result-polling endpoint every other feature uses).
+ *
+ * Story 111 — `process()` binds `job.data.correlationId` (the enqueuing
+ * API request's own id) via `CorrelationIdStore` for the lifetime of
+ * processing this job, so every log line below — including the existing
+ * ones, unchanged — carries it automatically via `PinoLoggerService`. A
+ * job with no `correlationId` (there is none today, but nothing enforces
+ * it) still gets a fresh one rather than an `undefined` field, keeping
+ * every job's logs uniformly correlatable.
  */
 @Injectable()
 @Processor(AI_PROCESSING_QUEUE)
@@ -76,6 +92,12 @@ export class AiProcessingProcessor extends WorkerHost {
   }
 
   async process(job: Job<AiProcessingJobPayload>): Promise<void> {
+    return CorrelationIdStore.run(job.data.correlationId ?? randomUUID(), () =>
+      this.processJob(job),
+    );
+  }
+
+  private async processJob(job: Job<AiProcessingJobPayload>): Promise<void> {
     const { aiPromptLogId, ticketId, feature, chatSessionId } = job.data;
     const startedAt = Date.now();
 

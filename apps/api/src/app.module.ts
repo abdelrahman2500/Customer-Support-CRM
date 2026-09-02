@@ -10,6 +10,8 @@ import { AudienceGuard } from "./common/auth/audience.guard";
 import { PermissionsGuard } from "./common/auth/permissions.guard";
 import { AuditInterceptor } from "./common/audit/audit.interceptor";
 import { TenantMiddleware } from "./common/tenant/tenant.middleware";
+import { RequestIdMiddleware } from "./common/logging/request-id.middleware";
+import { PinoLoggerService } from "./common/logging/pino-logger.service";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
 import { QueuesModule } from "./queues/queues.module";
@@ -63,10 +65,16 @@ import { RealtimeModule } from "./realtime/realtime.module";
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+    // Story 111 — resolved via `app.get(PinoLoggerService)` in `main.ts`.
+    PinoLoggerService,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
+    // Story 111 — `RequestIdMiddleware` runs first so its
+    // `AsyncLocalStorage` correlation-id context wraps everything
+    // downstream, `TenantMiddleware` included.
+    consumer.apply(RequestIdMiddleware).forRoutes("*");
     consumer.apply(TenantMiddleware).forRoutes("*");
   }
 }

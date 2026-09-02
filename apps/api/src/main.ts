@@ -8,9 +8,15 @@ import { AppModule } from "./app.module";
 import type { EnvConfig } from "./common/config/env.validation";
 import { parseCorsOrigins } from "./common/config/cors-origins";
 import { RedisIoAdapter } from "./realtime/redis-io.adapter";
+import { PinoLoggerService } from "./common/logging/pino-logger.service";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // Story 111 — docs/architecture/11-quality-and-operations.md: "Structured
+  // JSON logs use pino." `bufferLogs: true` above holds Nest's own startup
+  // log lines until this is wired, so they go through pino too rather than
+  // the framework's default console logger.
+  app.useLogger(app.get(PinoLoggerService));
   const config = app.get(ConfigService<EnvConfig, true>);
 
   // Story 23 — env-configured allowed origins for both the REST API (here)

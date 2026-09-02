@@ -4,6 +4,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { AiGatewayService, promptRef } from "./ai-gateway.service";
 import { AiSettingsService } from "./ai-settings.service";
 import { AiProcessingProducer } from "../../queues/ai-processing.producer";
+import { CorrelationIdStore } from "../../common/logging/correlation-id.store";
 
 export interface ChatMessageSummary {
   id: string;
@@ -84,6 +85,7 @@ export class AiChatService {
       feature: "CHAT",
       body,
       chatSessionId: session.id,
+      correlationId: CorrelationIdStore.get(),
     });
 
     return { id: log.id, outcome: "PENDING" };

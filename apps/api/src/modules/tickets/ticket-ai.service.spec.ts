@@ -6,6 +6,7 @@ import type { AiProcessingProducer } from "../../queues/ai-processing.producer";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TicketsService } from "./tickets.service";
+import { CorrelationIdStore } from "../../common/logging/correlation-id.store";
 
 function buildTicketsServiceMock() {
   return {
@@ -112,6 +113,22 @@ describe("TicketAiService", () => {
         body: "Checked logs.\n\nReset password.",
       });
       expect(result).toEqual({ id: "log-1", outcome: "PENDING" });
+    });
+
+    // Story 111 — Structured logging & correlation IDs.
+    it("includes the active request's correlation id in the enqueued payload", async () => {
+      await CorrelationIdStore.run("request-abc", () => service.summarizeTicket("ticket-1"));
+
+      expect(producer.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ correlationId: "request-abc" }),
+      );
+    });
+
+    it("omits correlationId (undefined) when there is no active request context", async () => {
+      await service.summarizeTicket("ticket-1");
+
+      const [payload] = producer.enqueue.mock.calls[0] as [{ correlationId?: string }];
+      expect(payload.correlationId).toBeUndefined();
     });
 
     it("passes an empty body when the ticket has no notes yet", async () => {
