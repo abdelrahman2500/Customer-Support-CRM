@@ -28,6 +28,7 @@ const PERMISSION_CATALOG = [
   "role:assign-permissions",
   "permission:read",
   "branch:read",
+  "branch:create",
   "branch:update",
   "department:create",
   "department:update",

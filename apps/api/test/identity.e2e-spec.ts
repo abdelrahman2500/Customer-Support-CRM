@@ -23,13 +23,14 @@ import { PrismaService } from "../src/prisma/prisma.service";
  * logs in as the seed's bootstrap admin (`SEED_ADMIN_EMAIL`/
  * `SEED_ADMIN_PASSWORD`) rather than creating its own bootstrap user.
  *
- * Known scope limit: `prisma/seed.ts` creates exactly one Branch per
- * organization, and there is deliberately no branch-create endpoint (Story
- * 45's plan keeps branch creation out of scope), so this suite cannot
- * produce a second, colliding branch to exercise a duplicate BRANCH name
- * 409 end-to-end. That path is covered by
- * `identity.service.spec.ts`'s mocked-Prisma `updateBranch` P2002 test
- * (unit-only).
+ * Story 107 added `POST /identity/branches` (`branch:create`,
+ * SuperAdmin-only), so this suite now exercises a real, end-to-end
+ * duplicate BRANCH name 409 (previously only unit-testable against a
+ * mocked Prisma client — see `identity.service.spec.ts`'s own
+ * `updateBranch`/`createBranch` P2002 tests). `listBranches` itself stays
+ * scoped to the caller's own branch only (Story 35's design, unchanged by
+ * Story 107), so a created branch is verified via a direct Prisma read,
+ * not via that endpoint.
  */
 describe("Identity & Access (e2e)", () => {
   let app: INestApplication;
@@ -46,6 +47,7 @@ describe("Identity & Access (e2e)", () => {
   const secondAgentPassword = "agent2-test-password-123";
   let createdDepartmentId: string;
   let currentDepartmentName: string;
+  let createdBranchId: string;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -478,6 +480,71 @@ describe("Identity & Access (e2e)", () => {
     expect(defaultListing.body).toEqual([
       { id: adminBranchId, name: "Renamed Main Branch", isActive: true },
     ]);
+  });
+
+  // Story 107 — Branch creation.
+  describe("createBranch", () => {
+    it("rejects an unauthenticated request", async () => {
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/branches")
+        .send({ name: "Should Not Be Created", timezone: "UTC" })
+        .expect(401);
+    });
+
+    it("rejects the Agent user (no branch:create permission) with 403", async () => {
+      const loginResponse = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: secondAgentEmail, password: secondAgentPassword })
+        .expect(200);
+      const agentAccessToken = loginResponse.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/branches")
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .send({ name: "Should Not Be Created", timezone: "UTC" })
+        .expect(403);
+    });
+
+    it("creates a branch as the admin under the caller's own organization", async () => {
+      const branchName = `Second Branch ${randomUUID()}`;
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/identity/branches")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ name: branchName, timezone: "Africa/Cairo" })
+        .expect(201);
+
+      createdBranchId = response.body.id;
+      expect(createdBranchId).toBeTypeOf("string");
+
+      // `listBranches` intentionally stays scoped to the caller's own
+      // branch only (Story 35's design, unchanged here), so the created
+      // row is verified via a direct Prisma read instead.
+      const prisma = app.get(PrismaService);
+      const adminOwnBranch = await prisma.branch.findUniqueOrThrow({
+        where: { id: adminBranchId },
+        select: { organizationId: true },
+      });
+      const createdBranch = await prisma.branch.findUniqueOrThrow({
+        where: { id: createdBranchId },
+      });
+      expect(createdBranch).toMatchObject({
+        name: branchName,
+        timezone: "Africa/Cairo",
+        isActive: true,
+        organizationId: adminOwnBranch.organizationId,
+      });
+    });
+
+    it("rejects a duplicate branch name within the same organization with 409", async () => {
+      const prisma = app.get(PrismaService);
+      const created = await prisma.branch.findUniqueOrThrow({ where: { id: createdBranchId } });
+
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/branches")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ name: created.name, timezone: "UTC" })
+        .expect(409);
+    });
   });
 
   it("creates a department as the admin, ignoring any client-sent branchId", async () => {

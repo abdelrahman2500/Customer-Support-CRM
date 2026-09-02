@@ -20,6 +20,7 @@ import type { CreateUserDto } from "./dto/create-user.dto";
 import type { UpdateUserDto } from "./dto/update-user.dto";
 import type { ResetPasswordDto } from "./dto/reset-password.dto";
 import type { UpdateBranchDto } from "./dto/update-branch.dto";
+import type { CreateBranchDto } from "./dto/create-branch.dto";
 import type { CreateDepartmentDto } from "./dto/create-department.dto";
 import type { UpdateDepartmentDto } from "./dto/update-department.dto";
 import type { CreateRoleDto } from "./dto/create-role.dto";
@@ -535,11 +536,10 @@ export class IdentityService {
   }
 
   /**
-   * Renames/(de)activates the caller's own branch — never another branch,
-   * and never creates one (there is deliberately no `createBranch`; branch
-   * creation stays out of scope for this story). The scope check is a plain
-   * identity comparison against `TenantContext`, not a DB lookup: the
-   * caller's own branch id is already known and trusted.
+   * Renames/(de)activates the caller's own branch — never another branch
+   * (see `createBranch`, below, for creating a new one). The scope check is
+   * a plain identity comparison against `TenantContext`, not a DB lookup:
+   * the caller's own branch id is already known and trusted.
    */
   async updateBranch(id: string, dto: UpdateBranchDto): Promise<{ id: string }> {
     const { branchId } = this.tenantContext.requireBranchScope();
@@ -557,6 +557,45 @@ export class IdentityService {
         },
       });
       return { id };
+    } catch (error) {
+      throw translateDuplicateBranchName(error);
+    }
+  }
+
+  /**
+   * Story 107 — creates a new `Branch`. `organizationId` is resolved from
+   * the *caller's own* branch record, never accepted from the client —
+   * the same trust boundary `createDepartment`/`createUser` already apply
+   * to `branchId`. This codebase has exactly one real `Organization` row
+   * by design (see docs/architecture/04-data-and-multitenancy.md), so this
+   * always attaches the new branch to that same organization; it also
+   * means `createBranch` doesn't itself require the caller's active branch
+   * to be the *target* — `requireBranchScope()` here is only how the
+   * organization is looked up, not a same-branch check like `updateBranch`'s.
+   * Gated by its own `branch:create` permission (SuperAdmin-only — see
+   * `prisma/seed.ts`), unlike `branch:read`/`branch:update` which Agent's
+   * default grant already includes.
+   */
+  async createBranch(dto: CreateBranchDto): Promise<{ id: string }> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const callerBranch = await this.prisma.branch.findFirst({
+      where: { id: branchId },
+      select: { organizationId: true },
+    });
+    if (!callerBranch) {
+      throw new NotFoundException("Branch not found");
+    }
+
+    try {
+      const branch = await this.prisma.branch.create({
+        data: {
+          organizationId: callerBranch.organizationId,
+          name: dto.name,
+          timezone: dto.timezone,
+          ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        },
+      });
+      return { id: branch.id };
     } catch (error) {
       throw translateDuplicateBranchName(error);
     }

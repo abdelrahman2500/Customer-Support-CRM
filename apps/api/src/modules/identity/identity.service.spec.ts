@@ -43,6 +43,7 @@ function buildPrismaMock() {
     branch: {
       findFirst: vi.fn(),
       update: vi.fn(),
+      create: vi.fn(),
     },
     department: {
       findMany: vi.fn(),
@@ -1172,6 +1173,76 @@ describe("IdentityService", () => {
       await expect(service.updateBranch("branch-1", { name: "X" })).rejects.toThrow(
         /no active branch/,
       );
+    });
+  });
+
+  // Story 107 — Branch creation.
+  describe("createBranch", () => {
+    it("resolves organizationId from the caller's own branch, never from the DTO", async () => {
+      prisma.branch.findFirst.mockResolvedValue({ organizationId: "org-1" });
+      prisma.branch.create.mockResolvedValue({ id: "new-branch-id" });
+
+      const result = await service.createBranch({
+        name: "Second Branch",
+        timezone: "Africa/Cairo",
+      });
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.branch.findFirst).toHaveBeenCalledWith({
+        where: { id: "branch-1" },
+        select: { organizationId: true },
+      });
+      expect(prisma.branch.create).toHaveBeenCalledWith({
+        data: { organizationId: "org-1", name: "Second Branch", timezone: "Africa/Cairo" },
+      });
+      expect(result).toEqual({ id: "new-branch-id" });
+    });
+
+    it("includes isActive in the create call only when the DTO provides it", async () => {
+      prisma.branch.findFirst.mockResolvedValue({ organizationId: "org-1" });
+      prisma.branch.create.mockResolvedValue({ id: "new-branch-id" });
+
+      await service.createBranch({
+        name: "Second Branch",
+        timezone: "Africa/Cairo",
+        isActive: false,
+      });
+
+      expect(prisma.branch.create).toHaveBeenCalledWith({
+        data: {
+          organizationId: "org-1",
+          name: "Second Branch",
+          timezone: "Africa/Cairo",
+          isActive: false,
+        },
+      });
+    });
+
+    it("throws NotFoundException if the caller's own branch is somehow gone", async () => {
+      prisma.branch.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createBranch({ name: "Second Branch", timezone: "Africa/Cairo" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.branch.create).not.toHaveBeenCalled();
+    });
+
+    it("translates a P2002 unique-constraint violation into ConflictException", async () => {
+      prisma.branch.findFirst.mockResolvedValue({ organizationId: "org-1" });
+      prisma.branch.create.mockRejectedValue(buildUniqueConstraintError());
+
+      await expect(
+        service.createBranch({ name: "Duplicate Name", timezone: "Africa/Cairo" }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, jwtService, configService, tenantContext);
+
+      await expect(
+        service.createBranch({ name: "Second Branch", timezone: "Africa/Cairo" }),
+      ).rejects.toThrow(/no active branch/);
     });
   });
 

@@ -5,6 +5,7 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { UpdateBranchDto } from "./dto/update-branch.dto";
+import { CreateBranchDto } from "./dto/create-branch.dto";
 import { CreateDepartmentDto } from "./dto/create-department.dto";
 import { UpdateDepartmentDto } from "./dto/update-department.dto";
 import { CreateRoleDto } from "./dto/create-role.dto";
@@ -59,6 +60,11 @@ import { IdentityService } from "./identity.service";
  * separately-permissioned `user:reset-password`: a materially more
  * sensitive action that lets an admin set a new password for a user
  * directly, revoking every one of that user's existing refresh tokens.
+ *
+ * Story 107 adds `POST branches`, gated by its own `branch:create`
+ * permission (SuperAdmin-only, unlike `branch:read`/`branch:update`) —
+ * `listBranches` itself stays scoped to the caller's own branch only; a
+ * cross-branch listing/switching UI remains a separate, future story.
  */
 @ApiTags("identity")
 @ApiBearerAuth()
@@ -146,6 +152,12 @@ export class UsersController {
   @RequirePermissions("branch:read")
   listBranches(@Query("includeInactive") includeInactive?: string): Promise<BranchSummary[]> {
     return this.identityService.listBranches(includeInactive === "true");
+  }
+
+  @Post("branches")
+  @RequirePermissions("branch:create")
+  createBranch(@Body() dto: CreateBranchDto): Promise<{ id: string }> {
+    return this.identityService.createBranch(dto);
   }
 
   @Patch("branches/:id")
