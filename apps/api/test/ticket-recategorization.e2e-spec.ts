@@ -153,6 +153,7 @@ describe("Ticket Recategorization and SLA Target Recomputation (e2e)", () => {
     const initialTarget = await waitForSlaTarget(app.getHttpServer(), adminAccessToken, ticketId);
     expect(initialTarget.status).toBe(200);
     const initialResponseTargetAt = new Date(initialTarget.body.responseTargetAt).getTime();
+    const initialResolutionTargetAt = new Date(initialTarget.body.resolutionTargetAt).getTime();
 
     await request(app.getHttpServer())
       .patch(`/api/v1/tickets/${ticketId}`)
@@ -184,10 +185,24 @@ describe("Ticket Recategorization and SLA Target Recomputation (e2e)", () => {
     // (30/240) — the recomputed target must be strictly tighter than the
     // original, proving recomputation used Policy B, not a stale Policy A
     // target left untouched.
+    //
+    // Both the initial and recomputed resolution targets are walked forward
+    // from the SAME anchor (`ticket.createdAt`) by the same business-hours
+    // -aware calculator (Story 13) — a smaller minute count from a fixed
+    // anchor can never land later than a larger one, so comparing the two
+    // resolution targets directly is a safe, time-of-day-independent
+    // invariant. A fixed wall-clock gap between the response and resolution
+    // targets is NOT safe: business-hours walk-forward can push either
+    // target across a closed-hours/weekend boundary independently of the
+    // other, so their difference is unbounded in general (reproduced: this
+    // assertion previously failed when the ticket was created close enough
+    // to the end of business hours that the 60-minute resolution target
+    // rolled into the next open window while the 10-minute response target
+    // did not). Mirrors `sla-targets.e2e-spec.ts`'s own
+    // `resolutionTargetAt >= responseTargetAt` business-hours-safe pattern.
     expect(recomputedResponseTargetAt).not.toBe(initialResponseTargetAt);
-    expect(recomputedResolutionTargetAt - recomputedResponseTargetAt).toBeLessThanOrEqual(
-      (60 - 10) * 60_000,
-    );
+    expect(recomputedResolutionTargetAt).toBeLessThan(initialResolutionTargetAt);
+    expect(recomputedResolutionTargetAt).toBeGreaterThanOrEqual(recomputedResponseTargetAt);
   });
 
   it("removes the SLA target when recategorized into a category no active policy matches", async () => {
