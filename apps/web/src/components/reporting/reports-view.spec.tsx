@@ -1,13 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ReportsView } from "./reports-view";
 import {
   useAgentPerformanceQuery,
+  useCreateDashboardMutation,
   useCsatSummaryQuery,
+  useDashboardsQuery,
+  useDeleteDashboardMutation,
   useResolutionTimeQuery,
   useSlaComplianceQuery,
   useTicketAgingQuery,
   useTicketVolumeQuery,
+  useUpdateDashboardMutation,
 } from "@/hooks/use-reporting";
 import { ApiError } from "@/lib/api";
 
@@ -23,6 +27,10 @@ vi.mock("@/hooks/use-reporting", () => ({
   useAgentPerformanceQuery: vi.fn(),
   useTicketAgingQuery: vi.fn(),
   useResolutionTimeQuery: vi.fn(),
+  useDashboardsQuery: vi.fn(),
+  useCreateDashboardMutation: vi.fn(),
+  useUpdateDashboardMutation: vi.fn(),
+  useDeleteDashboardMutation: vi.fn(),
 }));
 
 const mockedUseTicketVolumeQuery = vi.mocked(useTicketVolumeQuery);
@@ -31,6 +39,10 @@ const mockedUseCsatSummaryQuery = vi.mocked(useCsatSummaryQuery);
 const mockedUseAgentPerformanceQuery = vi.mocked(useAgentPerformanceQuery);
 const mockedUseTicketAgingQuery = vi.mocked(useTicketAgingQuery);
 const mockedUseResolutionTimeQuery = vi.mocked(useResolutionTimeQuery);
+const mockedUseDashboardsQuery = vi.mocked(useDashboardsQuery);
+const mockedUseCreateDashboardMutation = vi.mocked(useCreateDashboardMutation);
+const mockedUseUpdateDashboardMutation = vi.mocked(useUpdateDashboardMutation);
+const mockedUseDeleteDashboardMutation = vi.mocked(useDeleteDashboardMutation);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -74,6 +86,19 @@ describe("ReportsView", () => {
     mockedUseResolutionTimeQuery.mockReturnValue(
       queryResult({ data: { resolvedCount: 0, averageResolutionMs: null }, isSuccess: true }) as never,
     );
+    mockedUseDashboardsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseCreateDashboardMutation.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: "new-dashboard" }),
+      isPending: false,
+    } as never);
+    mockedUseUpdateDashboardMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as never);
+    mockedUseDeleteDashboardMutation.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: "deleted" }),
+      isPending: false,
+    } as never);
   });
 
   it("renders each card's empty state when there is no data yet", () => {
@@ -332,6 +357,160 @@ describe("ReportsView", () => {
       });
 
       expect(mockedUseResolutionTimeQuery).toHaveBeenLastCalledWith({ from: "2026-01-01" });
+    });
+  });
+
+  // Story 110 — Saved Dashboards.
+  describe("saved dashboards (Story 110)", () => {
+    it("renders all six report cards under the 'All reports' default, unaffected by an empty dashboard list", () => {
+      render(<ReportsView />);
+
+      expect(screen.getByText("ticketVolume.heading")).toBeInTheDocument();
+      expect(screen.getByText("slaCompliance.heading")).toBeInTheDocument();
+      expect(screen.getByText("csat.heading")).toBeInTheDocument();
+      expect(screen.getByText("agentPerformance.heading")).toBeInTheDocument();
+      expect(screen.getByText("ticketAging.heading")).toBeInTheDocument();
+      expect(screen.getByText("resolutionTime.heading")).toBeInTheDocument();
+      // No owner-only actions are shown for the default, dashboard-less view.
+      expect(screen.queryByText("dashboards.share")).not.toBeInTheDocument();
+      expect(screen.queryByText("dashboards.delete")).not.toBeInTheDocument();
+    });
+
+    it("lists the caller's own and shared dashboards in the picker", () => {
+      mockedUseDashboardsQuery.mockReturnValue(
+        queryResult({
+          data: [
+            { id: "dash-1", name: "My Dashboard", isShared: false, isOwner: true, widgets: [] },
+            { id: "dash-2", name: "Team Dashboard", isShared: true, isOwner: false, widgets: [] },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+
+      expect(screen.getByText("My Dashboard")).toBeInTheDocument();
+      expect(screen.getByText('dashboards.sharedOptionLabel:{"name":"Team Dashboard"}')).toBeInTheDocument();
+    });
+
+    it("renders only a selected dashboard's saved widgets, in saved order", () => {
+      mockedUseDashboardsQuery.mockReturnValue(
+        queryResult({
+          data: [
+            {
+              id: "dash-1",
+              name: "Subset Dashboard",
+              isShared: false,
+              isOwner: true,
+              widgets: [
+                { widgetType: "CSAT", position: 0 },
+                { widgetType: "TICKET_VOLUME", position: 1 },
+              ],
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+      fireEvent.change(screen.getByLabelText("dashboards.pickerLabel"), {
+        target: { value: "dash-1" },
+      });
+
+      expect(screen.getByText("csat.heading")).toBeInTheDocument();
+      expect(screen.getByText("ticketVolume.heading")).toBeInTheDocument();
+      expect(screen.queryByText("slaCompliance.heading")).not.toBeInTheDocument();
+      expect(screen.queryByText("agentPerformance.heading")).not.toBeInTheDocument();
+      expect(screen.queryByText("ticketAging.heading")).not.toBeInTheDocument();
+      expect(screen.queryByText("resolutionTime.heading")).not.toBeInTheDocument();
+    });
+
+    it("shows owner-only share/delete actions only for a dashboard the caller owns", () => {
+      mockedUseDashboardsQuery.mockReturnValue(
+        queryResult({
+          data: [
+            { id: "dash-1", name: "Owned", isShared: false, isOwner: true, widgets: [] },
+            { id: "dash-2", name: "Not owned", isShared: true, isOwner: false, widgets: [] },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+      const picker = screen.getByLabelText("dashboards.pickerLabel");
+
+      fireEvent.change(picker, { target: { value: "dash-2" } });
+      expect(screen.queryByText("dashboards.share")).not.toBeInTheDocument();
+      expect(screen.queryByText("dashboards.delete")).not.toBeInTheDocument();
+
+      fireEvent.change(picker, { target: { value: "dash-1" } });
+      expect(screen.getByText("dashboards.share")).toBeInTheDocument();
+      expect(screen.getByText("dashboards.delete")).toBeInTheDocument();
+    });
+
+    it("creates a dashboard with every widget type, in this screen's default order, when saving the current view", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "new-dashboard" });
+      mockedUseCreateDashboardMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
+
+      render(<ReportsView />);
+      fireEvent.click(screen.getByText("dashboards.saveCurrentView"));
+      fireEvent.change(screen.getByLabelText("dashboards.nameLabel"), {
+        target: { value: "New dashboard" },
+      });
+      fireEvent.click(screen.getByText("dashboards.save"));
+
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalledOnce());
+      expect(mutateAsync).toHaveBeenCalledWith({
+        name: "New dashboard",
+        isShared: false,
+        widgetTypes: [
+          "TICKET_VOLUME",
+          "SLA_COMPLIANCE",
+          "CSAT",
+          "AGENT_PERFORMANCE",
+          "TICKET_AGING",
+          "RESOLUTION_TIME",
+        ],
+      });
+    });
+
+    it("toggles isShared for the owned, selected dashboard", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateDashboardMutation.mockReturnValue({ mutate, isPending: false } as never);
+      mockedUseDashboardsQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "dash-1", name: "Owned", isShared: false, isOwner: true, widgets: [] }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+      fireEvent.change(screen.getByLabelText("dashboards.pickerLabel"), {
+        target: { value: "dash-1" },
+      });
+      fireEvent.click(screen.getByText("dashboards.share"));
+
+      expect(mutate).toHaveBeenCalledWith({ isShared: true });
+    });
+
+    it("deletes the owned, selected dashboard and resets to 'All reports'", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "dash-1" });
+      mockedUseDeleteDashboardMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
+      mockedUseDashboardsQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "dash-1", name: "Owned", isShared: false, isOwner: true, widgets: [] }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+      fireEvent.change(screen.getByLabelText("dashboards.pickerLabel"), {
+        target: { value: "dash-1" },
+      });
+      fireEvent.click(screen.getByText("dashboards.delete"));
+
+      await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith("dash-1"));
+      expect(screen.getByLabelText("dashboards.pickerLabel")).toHaveValue("");
     });
   });
 });

@@ -16,7 +16,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   extensions = [pgvector(map: "vector"), pg_trgm]
-  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base", "ai", "channels"]
+  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base", "ai", "channels", "reporting"]
 }
 
 // ---------------------------------------------------------------------------
@@ -54,6 +54,7 @@ model Branch {
   chatSessions          ChatSession[]
   aiSettings            AiSettings?
   quickReplies          QuickReply[]
+  reportDashboards      ReportDashboard[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -100,6 +101,7 @@ model User {
   /// `NotificationsService.getUnreadCount`'s own doc comment). `null` means
   /// "never marked read" — every matching row counts as unread.
   notificationsReadAt         DateTime?                @map("notifications_read_at")
+  reportDashboards            ReportDashboard[]
   createdAt                   DateTime                 @default(now()) @map("created_at")
   updatedAt                   DateTime                 @updatedAt @map("updated_at")
 
@@ -1236,4 +1238,68 @@ model QuickReply {
   @@index([branchId])
   @@map("quick_replies")
   @@schema("channels")
+}
+
+// ---------------------------------------------------------------------------
+// reporting schema
+// ---------------------------------------------------------------------------
+
+/// Story 110 — the first table Reporting & Analytics actually owns
+/// (`ReportingService`, Story 56, only ever reads tables other domains
+/// own). One value per existing `ReportingService` method — a widget is a
+/// saved reference to one of these, verbatim; no chart-type/visualization
+/// config exists anywhere in this codebase.
+enum ReportWidgetType {
+  TICKET_VOLUME
+  SLA_COMPLIANCE
+  CSAT
+  AGENT_PERFORMANCE
+  TICKET_AGING
+  RESOLUTION_TIME
+
+  @@schema("reporting")
+}
+
+/// Story 110 — closes docs/architecture/03-domain-boundaries.md's named
+/// gap ("saved dashboards"). `isShared` is the entire sharing model — no
+/// per-user/per-role ACL exists anywhere in this codebase (see this
+/// story's own plan doc for why). No saved date range: dashboards reuse
+/// `apps/web`'s existing shared, page-level `{from, to}` control
+/// (Story 93) uniformly across every widget, unchanged.
+model ReportDashboard {
+  id          String                  @id @default(uuid())
+  branchId    String                  @map("branch_id")
+  branch      Branch                  @relation(fields: [branchId], references: [id])
+  ownerUserId String                  @map("owner_user_id")
+  owner       User                    @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  name        String
+  isShared    Boolean                 @default(false) @map("is_shared")
+  widgets     ReportDashboardWidget[]
+  createdAt   DateTime                @default(now()) @map("created_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
+
+  @@index([branchId, isShared])
+  @@index([ownerUserId])
+  @@map("report_dashboards")
+  @@schema("reporting")
+}
+
+/// Story 110 — layout is an ordered list (`position`), rendered through
+/// the existing `ReportCard` component/grid — not a free-form x/y/w/h
+/// grid (no grid-layout library exists in this codebase).
+/// `@@unique([dashboardId, widgetType])`: a widget type can appear at
+/// most once per dashboard (also checked, with a clearer message, by the
+/// `CreateDashboardDto`'s own `@ArrayUnique`).
+model ReportDashboardWidget {
+  id          String           @id @default(uuid())
+  dashboardId String           @map("dashboard_id")
+  dashboard   ReportDashboard  @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  widgetType  ReportWidgetType @map("widget_type")
+  position    Int
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@unique([dashboardId, position])
+  @@unique([dashboardId, widgetType])
+  @@map("report_dashboard_widgets")
+  @@schema("reporting")
 }

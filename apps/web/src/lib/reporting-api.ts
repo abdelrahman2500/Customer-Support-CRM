@@ -91,3 +91,73 @@ export function getTicketAging(range: ReportDateRange = {}): Promise<TicketAging
 export function getResolutionTime(range: ReportDateRange = {}): Promise<ResolutionTimeSummary> {
   return apiFetch<ResolutionTimeSummary>(`/reports/resolution-time${toQueryString(range)}`);
 }
+
+/**
+ * Story 110 — Saved Dashboards. `widgetType` mirrors the backend's
+ * `ReportWidgetType` enum values exactly — one per existing report
+ * function above. A dashboard has no saved date range: it reuses
+ * whichever `{from, to}` this page's own shared control currently has
+ * (Story 93's own explicit decision against per-card independent
+ * controls).
+ */
+export type ReportWidgetType =
+  | "TICKET_VOLUME"
+  | "SLA_COMPLIANCE"
+  | "CSAT"
+  | "AGENT_PERFORMANCE"
+  | "TICKET_AGING"
+  | "RESOLUTION_TIME";
+
+export interface DashboardWidgetSummary {
+  widgetType: ReportWidgetType;
+  position: number;
+}
+
+export interface DashboardSummary {
+  id: string;
+  name: string;
+  isShared: boolean;
+  isOwner: boolean;
+  widgets: DashboardWidgetSummary[];
+}
+
+export interface CreateDashboardInput {
+  name: string;
+  isShared?: boolean;
+  widgetTypes: ReportWidgetType[];
+}
+
+export interface UpdateDashboardInput {
+  name?: string;
+  isShared?: boolean;
+  widgetTypes?: ReportWidgetType[];
+}
+
+export function listDashboards(): Promise<DashboardSummary[]> {
+  return apiFetch<DashboardSummary[]>("/reports/dashboards");
+}
+
+export function getDashboard(id: string): Promise<DashboardSummary> {
+  return apiFetch<DashboardSummary>(`/reports/dashboards/${id}`);
+}
+
+export function createDashboard(input: CreateDashboardInput): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>("/reports/dashboards", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateDashboard(
+  id: string,
+  input: UpdateDashboardInput,
+): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/reports/dashboards/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteDashboard(id: string): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/reports/dashboards/${id}`, { method: "DELETE" });
+}

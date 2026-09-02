@@ -667,6 +667,19 @@
       "heading": "Average Resolution Time",
       "empty": "No tickets resolved yet.",
       "detail": "based on {count} resolved tickets"
+    },
+    "dashboards": {
+      "pickerLabel": "Dashboard",
+      "allReports": "All reports",
+      "sharedOptionLabel": "{name} (shared)",
+      "saveCurrentView": "Save current view as dashboard…",
+      "share": "Share with branch",
+      "unshare": "Stop sharing",
+      "delete": "Delete dashboard",
+      "nameLabel": "Dashboard name",
+      "shareLabel": "Share with branch",
+      "save": "Save",
+      "cancel": "Cancel"
     }
   },
   "automationRules": {

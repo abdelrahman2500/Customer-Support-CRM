@@ -1,22 +1,38 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import {
   useAgentPerformanceQuery,
+  useCreateDashboardMutation,
   useCsatSummaryQuery,
+  useDashboardsQuery,
+  useDeleteDashboardMutation,
   useResolutionTimeQuery,
   useSlaComplianceQuery,
   useTicketAgingQuery,
   useTicketVolumeQuery,
+  useUpdateDashboardMutation,
 } from "@/hooks/use-reporting";
-import type { ReportDateRange } from "@/lib/reporting-api";
+import type { ReportDateRange, ReportWidgetType } from "@/lib/reporting-api";
 import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+
+/** Every existing report, in the same order this screen has always shown
+ * them — also the "All reports" default and the widget set a brand-new
+ * "save current view" dashboard is created with. */
+const ALL_WIDGET_TYPES: ReportWidgetType[] = [
+  "TICKET_VOLUME",
+  "SLA_COMPLIANCE",
+  "CSAT",
+  "AGENT_PERFORMANCE",
+  "TICKET_AGING",
+  "RESOLUTION_TIME",
+];
 
 /**
  * Story 56 — Reporting & Analytics Foundation. Independent cards over
@@ -47,10 +63,23 @@ import { Skeleton } from "@/components/ui/skeleton";
  * way; shares the same date-range state. Its populated body reuses
  * `apps/web/src/lib/sla.ts`'s existing `formatRemaining(ms)` rather than a
  * new duration formatter (see that card's own comment below for why).
+ *
+ * Story 110 — Saved Dashboards. A picker above the grid switches between
+ * "All reports" (this exact, always-available six-card view, unchanged)
+ * and any dashboard the caller owns or that is shared in their branch —
+ * selecting one renders only its saved widgets, in its saved order,
+ * through this same `renderWidget`/`ReportCard`. No saved date range: a
+ * dashboard's widgets still use this page's one shared `{from, to}`
+ * control, exactly like "All reports" always has (Story 93's own explicit
+ * decision against per-card independent controls).
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
   const [range, setRange] = useState<ReportDateRange>({});
+  const [selectedDashboardId, setSelectedDashboardId] = useState<string | null>(null);
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  const [newDashboardName, setNewDashboardName] = useState("");
+  const [newDashboardShared, setNewDashboardShared] = useState(false);
 
   const ticketVolumeQuery = useTicketVolumeQuery(range);
   const slaComplianceQuery = useSlaComplianceQuery(range);
@@ -58,6 +87,199 @@ export function ReportsView() {
   const agentPerformanceQuery = useAgentPerformanceQuery(range);
   const resolutionTimeQuery = useResolutionTimeQuery(range);
   const ticketAgingQuery = useTicketAgingQuery(range);
+
+  const dashboardsQuery = useDashboardsQuery();
+  const createDashboardMutation = useCreateDashboardMutation();
+  const updateDashboardMutation = useUpdateDashboardMutation(selectedDashboardId ?? "");
+  const deleteDashboardMutation = useDeleteDashboardMutation();
+
+  const dashboards = dashboardsQuery.data ?? [];
+  const selectedDashboard = dashboards.find((dashboard) => dashboard.id === selectedDashboardId);
+  const widgetTypesToRender = selectedDashboard
+    ? selectedDashboard.widgets.map((widget) => widget.widgetType)
+    : ALL_WIDGET_TYPES;
+
+  async function handleSaveCurrentView() {
+    const name = newDashboardName.trim();
+    if (!name) {
+      return;
+    }
+    const created = await createDashboardMutation.mutateAsync({
+      name,
+      isShared: newDashboardShared,
+      widgetTypes: ALL_WIDGET_TYPES,
+    });
+    setSelectedDashboardId(created.id);
+    setShowSaveForm(false);
+    setNewDashboardName("");
+    setNewDashboardShared(false);
+  }
+
+  function handleToggleShare() {
+    if (!selectedDashboard) {
+      return;
+    }
+    updateDashboardMutation.mutate({ isShared: !selectedDashboard.isShared });
+  }
+
+  async function handleDelete() {
+    if (!selectedDashboard) {
+      return;
+    }
+    await deleteDashboardMutation.mutateAsync(selectedDashboard.id);
+    setSelectedDashboardId(null);
+  }
+
+  function renderWidget(widgetType: ReportWidgetType): ReactNode {
+    switch (widgetType) {
+      case "TICKET_VOLUME":
+        return (
+          <ReportCard
+            heading={t("ticketVolume.heading")}
+            query={ticketVolumeQuery}
+            t={t}
+            skeleton="list"
+          >
+            {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length === 0 && (
+              <p className="text-sm text-slate-500">{t("ticketVolume.empty")}</p>
+            )}
+            {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length > 0 && (
+              <ul className="flex flex-col gap-1 text-sm">
+                {ticketVolumeQuery.data.map((row) => (
+                  <li key={row.status} className="flex items-center justify-between">
+                    <span className="text-slate-600">{row.status}</span>
+                    <span className="font-medium text-slate-900">{row.count}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ReportCard>
+        );
+
+      case "SLA_COMPLIANCE":
+        return (
+          <ReportCard
+            heading={t("slaCompliance.heading")}
+            query={slaComplianceQuery}
+            t={t}
+            skeleton="stat"
+          >
+            {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget === 0 && (
+              <p className="text-sm text-slate-500">{t("slaCompliance.empty")}</p>
+            )}
+            {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget > 0 && (
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="text-2xl font-semibold text-slate-900">
+                  {Math.round((slaComplianceQuery.data.complianceRate ?? 0) * 100)}%
+                </span>
+                <span className="text-slate-500">
+                  {t("slaCompliance.detail", {
+                    compliant: slaComplianceQuery.data.compliantCount,
+                    total: slaComplianceQuery.data.totalWithTarget,
+                  })}
+                </span>
+              </div>
+            )}
+          </ReportCard>
+        );
+
+      case "CSAT":
+        return (
+          <ReportCard heading={t("csat.heading")} query={csatQuery} t={t} skeleton="stat">
+            {csatQuery.isSuccess && csatQuery.data.responseCount === 0 && (
+              <p className="text-sm text-slate-500">{t("csat.empty")}</p>
+            )}
+            {csatQuery.isSuccess && csatQuery.data.responseCount > 0 && (
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="text-2xl font-semibold text-slate-900">
+                  {csatQuery.data.averageRating?.toFixed(1)}/5
+                </span>
+                <span className="text-slate-500">
+                  {t("csat.detail", { count: csatQuery.data.responseCount })}
+                </span>
+              </div>
+            )}
+          </ReportCard>
+        );
+
+      case "AGENT_PERFORMANCE":
+        return (
+          <ReportCard
+            heading={t("agentPerformance.heading")}
+            query={agentPerformanceQuery}
+            t={t}
+            skeleton="list"
+          >
+            {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length === 0 && (
+              <p className="text-sm text-slate-500">{t("agentPerformance.empty")}</p>
+            )}
+            {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length > 0 && (
+              <ul className="flex flex-col gap-2 text-sm">
+                {agentPerformanceQuery.data.map((row) => (
+                  <li key={row.userId} className="flex flex-col">
+                    <span className="font-medium text-slate-900">{row.fullName}</span>
+                    <span className="text-slate-500">
+                      {t("agentPerformance.detail", {
+                        open: row.openCount,
+                        resolved: row.resolvedCount,
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ReportCard>
+        );
+
+      case "TICKET_AGING":
+        return (
+          <ReportCard heading={t("ticketAging.heading")} query={ticketAgingQuery} t={t} skeleton="list">
+            {ticketAgingQuery.isSuccess && (
+              <ul className="flex flex-col gap-1 text-sm">
+                {ticketAgingQuery.data.map((row) => (
+                  <li key={row.bucket} className="flex items-center justify-between">
+                    <span className="text-slate-600">{row.bucket}</span>
+                    <span className="font-medium text-slate-900">{row.count}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ReportCard>
+        );
+
+      case "RESOLUTION_TIME":
+        // Story 99 — reuses `formatRemaining(ms)` (`apps/web/src/lib/sla.ts`)
+        // rather than a new duration formatter: its logic (floor to
+        // minutes, split into hours/minutes) is generic duration
+        // formatting, not inherently a countdown, despite the function's
+        // name predating this use case. A multi-day resolution time
+        // renders as e.g. "52h 30m" rather than "2d 4h 30m" — a minor,
+        // accepted readability trade-off in exchange for zero new
+        // formatting code.
+        return (
+          <ReportCard
+            heading={t("resolutionTime.heading")}
+            query={resolutionTimeQuery}
+            t={t}
+            skeleton="stat"
+          >
+            {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount === 0 && (
+              <p className="text-sm text-slate-500">{t("resolutionTime.empty")}</p>
+            )}
+            {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount > 0 && (
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="text-2xl font-semibold text-slate-900">
+                  {formatRemaining(resolutionTimeQuery.data.averageResolutionMs ?? 0)}
+                </span>
+                <span className="text-slate-500">
+                  {t("resolutionTime.detail", { count: resolutionTimeQuery.data.resolvedCount })}
+                </span>
+              </div>
+            )}
+          </ReportCard>
+        );
+    }
+  }
 
   return (
     <section className="flex flex-col gap-6">
@@ -92,135 +314,74 @@ export function ReportsView() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          {t("dashboards.pickerLabel")}
+          <select
+            className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+            value={selectedDashboardId ?? ""}
+            onChange={(event) => setSelectedDashboardId(event.target.value || null)}
+          >
+            <option value="">{t("dashboards.allReports")}</option>
+            {dashboards.map((dashboard) => (
+              <option key={dashboard.id} value={dashboard.id}>
+                {dashboard.isShared
+                  ? t("dashboards.sharedOptionLabel", { name: dashboard.name })
+                  : dashboard.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button variant="outline" size="sm" onClick={() => setShowSaveForm(true)}>
+          {t("dashboards.saveCurrentView")}
+        </Button>
+        {selectedDashboard?.isOwner && (
+          <>
+            <Button variant="outline" size="sm" onClick={handleToggleShare}>
+              {selectedDashboard.isShared ? t("dashboards.unshare") : t("dashboards.share")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void handleDelete()}>
+              {t("dashboards.delete")}
+            </Button>
+          </>
+        )}
+      </div>
+
+      {showSaveForm && (
+        <div className="flex flex-wrap items-end gap-2 rounded-md border border-slate-200 bg-white p-3">
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
+            {t("dashboards.nameLabel")}
+            <Input
+              value={newDashboardName}
+              onChange={(event) => setNewDashboardName(event.target.value)}
+              className="w-56"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              checked={newDashboardShared}
+              onChange={(event) => setNewDashboardShared(event.target.checked)}
+            />
+            {t("dashboards.shareLabel")}
+          </label>
+          <Button
+            size="sm"
+            onClick={() => void handleSaveCurrentView()}
+            disabled={!newDashboardName.trim() || createDashboardMutation.isPending}
+          >
+            {t("dashboards.save")}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowSaveForm(false)}>
+            {t("dashboards.cancel")}
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        <ReportCard
-          heading={t("ticketVolume.heading")}
-          query={ticketVolumeQuery}
-          t={t}
-          skeleton="list"
-        >
-          {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length === 0 && (
-            <p className="text-sm text-slate-500">{t("ticketVolume.empty")}</p>
-          )}
-          {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length > 0 && (
-            <ul className="flex flex-col gap-1 text-sm">
-              {ticketVolumeQuery.data.map((row) => (
-                <li key={row.status} className="flex items-center justify-between">
-                  <span className="text-slate-600">{row.status}</span>
-                  <span className="font-medium text-slate-900">{row.count}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </ReportCard>
-
-        <ReportCard
-          heading={t("slaCompliance.heading")}
-          query={slaComplianceQuery}
-          t={t}
-          skeleton="stat"
-        >
-          {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget === 0 && (
-            <p className="text-sm text-slate-500">{t("slaCompliance.empty")}</p>
-          )}
-          {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget > 0 && (
-            <div className="flex flex-col gap-1 text-sm">
-              <span className="text-2xl font-semibold text-slate-900">
-                {Math.round((slaComplianceQuery.data.complianceRate ?? 0) * 100)}%
-              </span>
-              <span className="text-slate-500">
-                {t("slaCompliance.detail", {
-                  compliant: slaComplianceQuery.data.compliantCount,
-                  total: slaComplianceQuery.data.totalWithTarget,
-                })}
-              </span>
-            </div>
-          )}
-        </ReportCard>
-
-        <ReportCard heading={t("csat.heading")} query={csatQuery} t={t} skeleton="stat">
-          {csatQuery.isSuccess && csatQuery.data.responseCount === 0 && (
-            <p className="text-sm text-slate-500">{t("csat.empty")}</p>
-          )}
-          {csatQuery.isSuccess && csatQuery.data.responseCount > 0 && (
-            <div className="flex flex-col gap-1 text-sm">
-              <span className="text-2xl font-semibold text-slate-900">
-                {csatQuery.data.averageRating?.toFixed(1)}/5
-              </span>
-              <span className="text-slate-500">
-                {t("csat.detail", { count: csatQuery.data.responseCount })}
-              </span>
-            </div>
-          )}
-        </ReportCard>
-
-        <ReportCard
-          heading={t("agentPerformance.heading")}
-          query={agentPerformanceQuery}
-          t={t}
-          skeleton="list"
-        >
-          {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length === 0 && (
-            <p className="text-sm text-slate-500">{t("agentPerformance.empty")}</p>
-          )}
-          {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length > 0 && (
-            <ul className="flex flex-col gap-2 text-sm">
-              {agentPerformanceQuery.data.map((row) => (
-                <li key={row.userId} className="flex flex-col">
-                  <span className="font-medium text-slate-900">{row.fullName}</span>
-                  <span className="text-slate-500">
-                    {t("agentPerformance.detail", {
-                      open: row.openCount,
-                      resolved: row.resolvedCount,
-                    })}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </ReportCard>
-
-        <ReportCard heading={t("ticketAging.heading")} query={ticketAgingQuery} t={t} skeleton="list">
-          {ticketAgingQuery.isSuccess && (
-            <ul className="flex flex-col gap-1 text-sm">
-              {ticketAgingQuery.data.map((row) => (
-                <li key={row.bucket} className="flex items-center justify-between">
-                  <span className="text-slate-600">{row.bucket}</span>
-                  <span className="font-medium text-slate-900">{row.count}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </ReportCard>
-
-        {/* Story 99 — reuses `formatRemaining(ms)` (`apps/web/src/lib/sla.ts`)
-            rather than a new duration formatter: its logic (floor to
-            minutes, split into hours/minutes) is generic duration
-            formatting, not inherently a countdown, despite the function's
-            name predating this use case. A multi-day resolution time
-            renders as e.g. "52h 30m" rather than "2d 4h 30m" — a minor,
-            accepted readability trade-off in exchange for zero new
-            formatting code. */}
-        <ReportCard
-          heading={t("resolutionTime.heading")}
-          query={resolutionTimeQuery}
-          t={t}
-          skeleton="stat"
-        >
-          {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount === 0 && (
-            <p className="text-sm text-slate-500">{t("resolutionTime.empty")}</p>
-          )}
-          {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount > 0 && (
-            <div className="flex flex-col gap-1 text-sm">
-              <span className="text-2xl font-semibold text-slate-900">
-                {formatRemaining(resolutionTimeQuery.data.averageResolutionMs ?? 0)}
-              </span>
-              <span className="text-slate-500">
-                {t("resolutionTime.detail", { count: resolutionTimeQuery.data.resolvedCount })}
-              </span>
-            </div>
-          )}
-        </ReportCard>
+        {widgetTypesToRender.map((widgetType) => (
+          <Fragment key={widgetType}>{renderWidget(widgetType)}</Fragment>
+        ))}
       </div>
     </section>
   );

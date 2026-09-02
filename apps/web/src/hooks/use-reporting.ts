@@ -1,12 +1,21 @@
-import { useQuery } from "@tanstack/react-query";
-import type { ReportDateRange } from "@/lib/reporting-api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  CreateDashboardInput,
+  ReportDateRange,
+  UpdateDashboardInput,
+} from "@/lib/reporting-api";
 import {
+  createDashboard,
+  deleteDashboard,
   getAgentPerformance,
   getCsatSummary,
+  getDashboard,
   getResolutionTime,
   getSlaCompliance,
   getTicketAging,
   getTicketVolumeByStatus,
+  listDashboards,
+  updateDashboard,
 } from "@/lib/reporting-api";
 
 /**
@@ -60,5 +69,53 @@ export function useResolutionTimeQuery(range: ReportDateRange = {}) {
   return useQuery({
     queryKey: ["reports", "resolution-time", range],
     queryFn: () => getResolutionTime(range),
+  });
+}
+
+/**
+ * Story 110 — Saved Dashboards. Mirrors `use-quick-replies.ts`'s
+ * never-optimistic, invalidate-on-success mutation convention exactly.
+ */
+export const dashboardsQueryKey = ["reports", "dashboards"] as const;
+
+export function useDashboardsQuery() {
+  return useQuery({ queryKey: dashboardsQueryKey, queryFn: listDashboards });
+}
+
+export function useDashboardQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: [...dashboardsQueryKey, id],
+    queryFn: () => getDashboard(id as string),
+    enabled: id !== undefined,
+  });
+}
+
+export function useCreateDashboardMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateDashboardInput) => createDashboard(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: dashboardsQueryKey });
+    },
+  });
+}
+
+export function useUpdateDashboardMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateDashboardInput) => updateDashboard(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: dashboardsQueryKey });
+    },
+  });
+}
+
+export function useDeleteDashboardMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteDashboard(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: dashboardsQueryKey });
+    },
   });
 }

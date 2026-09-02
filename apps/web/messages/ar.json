@@ -659,6 +659,19 @@
       "heading": "متوسط وقت الحل",
       "empty": "لم يتم حل أي تذاكر بعد.",
       "detail": "استناداً إلى {count} تذكرة تم حلها"
+    },
+    "dashboards": {
+      "pickerLabel": "لوحة المعلومات",
+      "allReports": "كل التقارير",
+      "sharedOptionLabel": "{name} (مشتركة)",
+      "saveCurrentView": "حفظ العرض الحالي كلوحة معلومات…",
+      "share": "المشاركة مع الفرع",
+      "unshare": "إيقاف المشاركة",
+      "delete": "حذف لوحة المعلومات",
+      "nameLabel": "اسم لوحة المعلومات",
+      "shareLabel": "المشاركة مع الفرع",
+      "save": "حفظ",
+      "cancel": "إلغاء"
     }
   },
   "automationRules": {
