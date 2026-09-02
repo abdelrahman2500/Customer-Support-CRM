@@ -12,6 +12,13 @@ import type { ListCustomersQueryDto } from "./dto/list-customers-query.dto";
 
 const BCRYPT_ROUNDS = 12;
 
+/** Story 106 — mirrors `TicketsService`'s own `MAX_TICKET_ROWS` precedent
+ * (Story 105): `Customer` is now this codebase's single largest
+ * unbounded table (confirmed at 1182 rows in this session's dev
+ * database, a comparable operational scale to `Ticket`), so the same
+ * fixed cap applies at the same size. */
+const MAX_CUSTOMER_ROWS = 500;
+
 export interface CustomerSummary {
   id: string;
   displayName: string;
@@ -67,6 +74,16 @@ export class CustomersService {
    * equality filter, and omitting every param reproduces this method's
    * exact pre-Story-101 query/order byte-for-byte.
    */
+  /** Story 106 — the DB fetch always requests `desc` on the chosen
+   * `sortBy`, regardless of the caller's requested `sortDir`; a requested
+   * `sortDir: "asc"` (the default) is restored by reversing the
+   * already-fetched, already-capped array in memory. Mirrors
+   * `TicketsService.listTickets`'s own identical fix (Story 105) and its
+   * exact reasoning: capping a literal `sortDir: "asc"` query as-written
+   * would fetch the *oldest* `MAX_CUSTOMER_ROWS` rows and, once a branch
+   * exceeds the cap, freeze there forever — reversing a `desc`-fetched,
+   * capped array reproduces the exact `asc` list a direct query would
+   * have returned whenever the true row count is at or under the cap. */
   async listCustomers(query: ListCustomersQueryDto = {}): Promise<CustomerSummary[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const sortBy = query.sortBy ?? "createdAt";
@@ -79,8 +96,12 @@ export class CustomersService {
           : {}),
         ...(query.isActive !== undefined ? { isActive: query.isActive === "true" } : {}),
       },
-      orderBy: { [sortBy]: sortDir },
+      orderBy: { [sortBy]: "desc" },
+      take: MAX_CUSTOMER_ROWS,
     });
+    if (sortDir === "asc") {
+      customers.reverse();
+    }
     return customers.map(toCustomerSummary);
   }
 

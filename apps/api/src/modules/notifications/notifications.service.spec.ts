@@ -161,6 +161,17 @@ describe("NotificationsService", () => {
 
       await expect(service.listNotifications()).rejects.toThrow(/no active branch/);
     });
+
+    // Story 106 — Bounded Result Caps.
+    it("caps every query at 200 rows, unconditionally", async () => {
+      prisma.notificationLog.findMany.mockResolvedValue([]);
+
+      await service.listNotifications();
+
+      expect(prisma.notificationLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 200 }),
+      );
+    });
   });
 
   describe("listNotificationsForCustomer", () => {

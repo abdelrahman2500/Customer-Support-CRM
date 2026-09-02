@@ -139,6 +139,7 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
         orderBy: { updatedAt: "desc" },
+        take: 200,
       });
     });
 
@@ -148,6 +149,17 @@ describe("KnowledgeBaseService", () => {
       const result = await service.listArticles();
 
       expect(result).toEqual([]);
+    });
+
+    // Story 106 — Bounded Result Caps.
+    it("caps every plain-path query at 200 rows, unconditionally", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listArticles();
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 200 }),
+      );
     });
 
     // Story 102 — Full-Text Search.
@@ -162,9 +174,10 @@ describe("KnowledgeBaseService", () => {
         TemplateStringsArray,
         ...unknown[],
       ];
-      expect(values).toEqual(["branch-1", "password", "password"]);
+      expect(values).toEqual(["branch-1", "password", "password", 200]);
       expect(strings.join("")).toContain("websearch_to_tsquery");
       expect(strings.join("")).not.toContain("'PUBLISHED'");
+      expect(strings.join("")).toContain("LIMIT");
     });
 
     it("maps raw $queryRaw rows through the same shape as the plain-list path", async () => {
@@ -184,6 +197,7 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
         orderBy: { updatedAt: "desc" },
+        take: 200,
       });
     });
 
@@ -195,6 +209,7 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
         orderBy: { updatedAt: "desc" },
+        take: 200,
       });
     });
   });
@@ -408,6 +423,7 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", status: "PUBLISHED" },
         orderBy: { publishedAt: "desc" },
+        take: 200,
       });
     });
 
@@ -417,6 +433,17 @@ describe("KnowledgeBaseService", () => {
       const result = await service.listPublishedArticlesForBranch("branch-1");
 
       expect(result).toEqual([]);
+    });
+
+    // Story 106 — Bounded Result Caps.
+    it("caps every plain-path query at 200 rows, unconditionally", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listPublishedArticlesForBranch("branch-1");
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 200 }),
+      );
     });
 
     // Story 102 — Full-Text Search.
@@ -431,9 +458,10 @@ describe("KnowledgeBaseService", () => {
         TemplateStringsArray,
         ...unknown[],
       ];
-      expect(values).toEqual(["branch-1", "password", "password"]);
+      expect(values).toEqual(["branch-1", "password", "password", 200]);
       expect(strings.join("")).toContain("websearch_to_tsquery");
       expect(strings.join("")).toContain("'PUBLISHED'");
+      expect(strings.join("")).toContain("LIMIT");
     });
 
     it("treats a whitespace-only search as no search at all", async () => {
@@ -445,6 +473,7 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", status: "PUBLISHED" },
         orderBy: { publishedAt: "desc" },
+        take: 200,
       });
     });
 
@@ -456,6 +485,7 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", status: "PUBLISHED" },
         orderBy: { publishedAt: "desc" },
+        take: 200,
       });
     });
   });

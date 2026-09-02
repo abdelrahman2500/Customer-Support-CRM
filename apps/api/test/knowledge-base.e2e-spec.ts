@@ -98,6 +98,16 @@ describe("Knowledge Base (e2e)", () => {
     expect(ids).toContain(articleId);
   });
 
+  // Story 106 — Bounded Result Caps.
+  it("never returns more than 200 rows", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/knowledge-base/articles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body.length).toBeLessThanOrEqual(200);
+  });
+
   it("gets a single article", async () => {
     const response = await request(app.getHttpServer())
       .get(`/api/v1/knowledge-base/articles/${articleId}`)

@@ -114,6 +114,16 @@ describe("Notifications — read endpoint (e2e)", () => {
     expect(Array.isArray(response.body)).toBe(true);
   });
 
+  // Story 106 — Bounded Result Caps.
+  it("never returns more than 200 rows", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/notifications")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body.length).toBeLessThanOrEqual(200);
+  });
+
   it("surfaces a real, freshly-created sla.at_risk notification, scoped to the admin's branch", async () => {
     const ticketId = await createTicket();
     const targetAt = new Date("2030-01-01T00:00:00.000Z");

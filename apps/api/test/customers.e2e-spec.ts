@@ -84,6 +84,16 @@ describe("Customer Management (e2e)", () => {
     expect(ids).toContain(customerId);
   });
 
+  // Story 106 — Bounded Result Caps.
+  it("never returns more than 500 rows", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/customers")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body.length).toBeLessThanOrEqual(500);
+  });
+
   it("gets a single customer with an empty contacts array", async () => {
     const response = await request(app.getHttpServer())
       .get(`/api/v1/customers/${customerId}`)

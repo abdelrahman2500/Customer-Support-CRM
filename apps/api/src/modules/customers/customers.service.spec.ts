@@ -96,6 +96,7 @@ describe("CustomersService", () => {
 
   describe("listCustomers", () => {
     it("scopes the query to the caller's active branch", async () => {
+      // Story 106 — fetched `desc`, then reversed for the default `asc`.
       prisma.customer.findMany.mockResolvedValue([
         { id: "customer-1", displayName: "Acme Corp", isActive: true },
       ]);
@@ -105,20 +106,22 @@ describe("CustomersService", () => {
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
+        take: 500,
       });
       expect(result).toEqual([{ id: "customer-1", displayName: "Acme Corp", isActive: true }]);
     });
 
     // Story 101 — search/isActive/sort query params.
-    it("omitting every query param reproduces the exact pre-Story-101 query", async () => {
+    it("omitting every query param reproduces the exact pre-Story-101 query, now capped", async () => {
       prisma.customer.findMany.mockResolvedValue([]);
 
       await service.listCustomers({});
 
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
+        take: 500,
       });
     });
 
@@ -132,7 +135,8 @@ describe("CustomersService", () => {
           branchId: "branch-1",
           displayName: { contains: "acme", mode: "insensitive" },
         },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
+        take: 500,
       });
     });
 
@@ -143,7 +147,8 @@ describe("CustomersService", () => {
 
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", isActive: true },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
+        take: 500,
       });
     });
 
@@ -154,7 +159,8 @@ describe("CustomersService", () => {
 
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", isActive: false },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
+        take: 500,
       });
     });
 
@@ -166,7 +172,40 @@ describe("CustomersService", () => {
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
         orderBy: { displayName: "desc" },
+        take: 500,
       });
+    });
+
+    // Story 106 — a Bounded Result Cap (mirrors Story 105's own fix).
+    it("fetches desc and reverses in memory for the default (asc) direction, reproducing the exact pre-Story-106 order", async () => {
+      const older = { id: "customer-older", displayName: "Alpha", isActive: true };
+      const newer = { id: "customer-newer", displayName: "Beta", isActive: true };
+      // Prisma, asked for `desc`, would itself return newest-first.
+      prisma.customer.findMany.mockResolvedValue([newer, older]);
+
+      const result = await service.listCustomers();
+
+      expect(result.map((c) => c.id)).toEqual(["customer-older", "customer-newer"]);
+    });
+
+    it("does not reverse when sortDir is explicitly desc", async () => {
+      const older = { id: "customer-older", displayName: "Alpha", isActive: true };
+      const newer = { id: "customer-newer", displayName: "Beta", isActive: true };
+      prisma.customer.findMany.mockResolvedValue([newer, older]);
+
+      const result = await service.listCustomers({ sortDir: "desc" });
+
+      expect(result.map((c) => c.id)).toEqual(["customer-newer", "customer-older"]);
+    });
+
+    it("caps every query at 500 rows, unconditionally", async () => {
+      prisma.customer.findMany.mockResolvedValue([]);
+
+      await service.listCustomers({ isActive: "true" });
+
+      expect(prisma.customer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 500 }),
+      );
     });
   });
 

@@ -5,6 +5,16 @@ import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateArticleDto } from "./dto/create-article.dto";
 import type { UpdateArticleDto } from "./dto/update-article.dto";
 
+/** Story 106 — mirrors `AuditLogsService`'s own `MAX_AUDIT_LOG_ROWS`
+ * precedent (Story 104): a KB article library is a "generous page for a
+ * human reader" concern, not a per-interaction record like `Ticket`/
+ * `Customer` — 200 mirrors that same rationale. `listArticles`/
+ * `listPublishedArticlesForBranch` already order by a fixed, already-
+ * `desc` timestamp with no user-configurable direction, so a plain
+ * `take`/`LIMIT` is sufficient here — no fetch-desc-then-reverse fix
+ * needed (unlike `Ticket`/`Customer`'s configurable `sortDir`). */
+const MAX_ARTICLE_ROWS = 200;
+
 export interface ArticleSummary {
   id: string;
   branchId: string;
@@ -84,6 +94,7 @@ export class KnowledgeBaseService {
     const articles = await this.prisma.knowledgeBaseArticle.findMany({
       where: { branchId },
       orderBy: { updatedAt: "desc" },
+      take: MAX_ARTICLE_ROWS,
     });
     return articles.map(toArticleSummary);
   }
@@ -191,6 +202,7 @@ export class KnowledgeBaseService {
     const articles = await this.prisma.knowledgeBaseArticle.findMany({
       where: { branchId, status: "PUBLISHED" },
       orderBy: { publishedAt: "desc" },
+      take: MAX_ARTICLE_ROWS,
     });
     return articles.map(toArticleSummary);
   }
@@ -270,6 +282,7 @@ export class KnowledgeBaseService {
             AND status = 'PUBLISHED'
             AND search_vector @@ websearch_to_tsquery('english', ${search})
           ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC
+          LIMIT ${MAX_ARTICLE_ROWS}
         `
       : await this.prisma.$queryRaw<RawArticleRow[]>`
           SELECT id, branch_id AS "branchId", title, body, category, status,
@@ -279,6 +292,7 @@ export class KnowledgeBaseService {
           WHERE branch_id = ${branchId}
             AND search_vector @@ websearch_to_tsquery('english', ${search})
           ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC
+          LIMIT ${MAX_ARTICLE_ROWS}
         `;
     return rows.map(toArticleSummary);
   }

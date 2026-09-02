@@ -19,6 +19,15 @@ export interface NotificationSummary {
   loggedAt: Date;
 }
 
+/** Story 106 — mirrors `AuditLogsService`'s own `MAX_AUDIT_LOG_ROWS`
+ * precedent (Story 104): an agent-facing activity feed, the same
+ * "recent activity, not a full archive" semantics as the audit trail.
+ * `listNotifications` already orders by a fixed `loggedAt: "desc"` with
+ * no user-configurable direction, so a plain `take` is sufficient — no
+ * fetch-desc-then-reverse fix needed (unlike `Ticket`/`Customer`'s
+ * configurable `sortDir`). */
+const MAX_NOTIFICATION_ROWS = 200;
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -52,6 +61,7 @@ export class NotificationsService {
       where: { ticket: { branchId }, customerId: null },
       include: { ticket: { select: { branchId: true } } },
       orderBy: { loggedAt: "desc" },
+      take: MAX_NOTIFICATION_ROWS,
     });
 
     return notifications.map((notification) => ({
