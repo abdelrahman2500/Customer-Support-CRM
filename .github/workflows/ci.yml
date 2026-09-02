@@ -115,6 +115,102 @@ jobs:
       - name: Integration tests
         run: pnpm --filter @crm/api test:e2e
 
+  browser-e2e:
+    name: Browser E2E (Playwright)
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    # Story 114 — docs/architecture/11-quality-and-operations.md's named
+    # "small set of critical flows" (an agent resolves a ticket, a
+    # customer submits one through the portal), driven through a real
+    # Chromium browser against apps/api + apps/web + apps/portal all
+    # actually running. Kept as its own job (not folded into
+    # build-and-test's "Integration tests" step) since it boots three
+    # long-running servers and installs a browser — a materially
+    # different runtime shape/cost than the API-level e2e suite.
+    #
+    # NOTE: this job has not been verified by an actual GitHub Actions
+    # run from the environment that authored it — see this story's
+    # completion report. It mirrors build-and-test's proven
+    # services/MinIO/migrate+seed pattern as closely as possible.
+    env:
+      # Overrides the workflow-level CORS_ORIGINS (which only allows
+      # apps/web's own origin) so apps/portal's origin is allowed too —
+      # both apps/web and apps/portal run against this same apps/api
+      # instance in this job. Mirrors apps/e2e/playwright.config.ts's own
+      # local-dev override, done here at the workflow-env level instead
+      # since CI sets real env vars directly rather than loading a `.env`
+      # file.
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:3002"
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: crm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @crm/api prisma:generate
+
+      - name: Run migrations
+        run: pnpm --filter @crm/api exec prisma migrate deploy
+
+      - name: Seed database
+        run: pnpm --filter @crm/api prisma:seed
+
+      - name: Build web
+        run: pnpm --filter @crm/web build
+
+      - name: Build portal
+        run: pnpm --filter @crm/portal build
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @crm/e2e exec playwright install --with-deps chromium
+
+      - name: Browser E2E tests
+        run: pnpm --filter @crm/e2e test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/e2e/playwright-report/
+          retention-days: 7
+
   docker-images:
     name: Build Docker images
     needs: build-and-test
