@@ -110,13 +110,37 @@ describe("AnthropicAiProvider", () => {
       expect(createMock).toHaveBeenCalledOnce();
     });
 
-    it("chat sends the raw message as the prompt", async () => {
+    it("chat sends the raw message as the prompt when there is no prior history", async () => {
       const provider = createProvider();
-      const result = await provider.chat({ sessionId: "sess-1", message: "hello" });
+      const result = await provider.chat({ sessionId: "sess-1", message: "hello", history: [] });
       expect(result.outcome).toBe("SUCCESS");
       expect(createMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          messages: [expect.objectContaining({ content: "hello" })],
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      );
+    });
+
+    // Story 116 — conversation memory.
+    it("chat includes prior history, oldest-first, before the current message", async () => {
+      const provider = createProvider();
+      const result = await provider.chat({
+        sessionId: "sess-1",
+        message: "And then what happened?",
+        history: [
+          { role: "user", content: "I ordered a widget last week." },
+          { role: "assistant", content: "I can help with that. What's the order number?" },
+        ],
+      });
+
+      expect(result.outcome).toBe("SUCCESS");
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            { role: "user", content: "I ordered a widget last week." },
+            { role: "assistant", content: "I can help with that. What's the order number?" },
+            { role: "user", content: "And then what happened?" },
+          ],
         }),
       );
     });

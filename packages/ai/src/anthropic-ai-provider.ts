@@ -51,33 +51,54 @@ export class AnthropicAiProvider implements AiProvider {
   }
 
   async summarize(ticket: AiTicketInput): Promise<AiCallResult> {
-    return this.complete(
-      `Summarize the following support ticket in 2-3 sentences.\n\nSubject: ${ticket.subject}\n\n${ticket.body}`,
-    );
+    return this.complete([
+      {
+        role: "user",
+        content: `Summarize the following support ticket in 2-3 sentences.\n\nSubject: ${ticket.subject}\n\n${ticket.body}`,
+      },
+    ]);
   }
 
   async suggestReply(ticket: AiTicketInput): Promise<AiCallResult> {
-    return this.complete(
-      `Draft a helpful, professional reply to the following support ticket.\n\nSubject: ${ticket.subject}\n\n${ticket.body}`,
-    );
+    return this.complete([
+      {
+        role: "user",
+        content: `Draft a helpful, professional reply to the following support ticket.\n\nSubject: ${ticket.subject}\n\n${ticket.body}`,
+      },
+    ]);
   }
 
   async categorize(ticket: AiTicketInput): Promise<AiCallResult> {
-    return this.complete(
-      `Suggest a short (1-3 word) category for the following support ticket. Respond with only the category.\n\nSubject: ${ticket.subject}\n\n${ticket.body}`,
-    );
+    return this.complete([
+      {
+        role: "user",
+        content: `Suggest a short (1-3 word) category for the following support ticket. Respond with only the category.\n\nSubject: ${ticket.subject}\n\n${ticket.body}`,
+      },
+    ]);
   }
 
+  /** Story 116 — includes the session's prior turns (oldest-first, fetched
+   * and capped by the caller — see `AiProcessingProcessor`) before the
+   * current message, so the model actually has conversation context
+   * instead of treating every turn as a fresh, isolated prompt. */
   async chat(input: AiChatMessageInput): Promise<AiCallResult> {
-    return this.complete(input.message);
+    return this.complete([
+      ...input.history.map((turn) => ({ role: turn.role, content: turn.content })),
+      { role: "user", content: input.message },
+    ]);
   }
 
-  private async complete(prompt: string): Promise<AiCallResult> {
+  /** Story 116 — generalized from a single prompt string to a full
+   * message array so `chat()` can include prior turns; `summarize`/
+   * `suggestReply`/`categorize` each wrap their existing single prompt as
+   * a one-element array — an identical resulting API call, just
+   * expressed as the general case. */
+  private async complete(messages: Anthropic.MessageParam[]): Promise<AiCallResult> {
     try {
       const response = await this.client.messages.create({
         model: this.model,
         max_tokens: MAX_TOKENS,
-        messages: [{ role: "user", content: prompt }],
+        messages,
       });
       const text = response.content
         .filter((block): block is Anthropic.TextBlock => block.type === "text")

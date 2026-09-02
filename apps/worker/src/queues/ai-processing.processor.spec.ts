@@ -27,6 +27,13 @@ function buildPrismaMock() {
     },
     chatMessage: {
       create: vi.fn().mockResolvedValue({}),
+      // Story 116 — defaults to "no prior history" (just the current
+      // customer message, dropped by `fetchChatHistory`'s own
+      // `.slice(1)`), matching the pre-Story-116 CHAT_PAYLOAD tests below
+      // that never set up any chat history explicitly.
+      findMany: vi.fn().mockResolvedValue([
+        { id: "current-message", role: "CUSTOMER", body: "Hi, I need help", createdAt: new Date() },
+      ]),
     },
   };
 }
@@ -262,7 +269,7 @@ describe("AiProcessingProcessor", () => {
         chatSessionId: "session-1",
       };
 
-      it("calls provider.chat with { sessionId, message } and never the ticket-scoped methods", async () => {
+      it("calls provider.chat with { sessionId, message, history } and never the ticket-scoped methods", async () => {
         provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
         const job = buildJob(CHAT_PAYLOAD);
 
@@ -271,10 +278,65 @@ describe("AiProcessingProcessor", () => {
         expect(provider.chat).toHaveBeenCalledWith({
           sessionId: "session-1",
           message: "Hi, I need help",
+          history: [],
         });
         expect(provider.summarize).not.toHaveBeenCalled();
         expect(provider.suggestReply).not.toHaveBeenCalled();
         expect(provider.categorize).not.toHaveBeenCalled();
+      });
+
+      // Story 116 — conversation memory.
+      describe("chat history (Story 116)", () => {
+        it("fetches history scoped to the session, bounded to CHAT_HISTORY_LIMIT + 1 rows, newest-first", async () => {
+          provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+          const job = buildJob(CHAT_PAYLOAD);
+
+          await processor.process(job);
+
+          expect(prisma.chatMessage.findMany).toHaveBeenCalledWith({
+            where: { sessionId: "session-1" },
+            orderBy: { createdAt: "desc" },
+            take: 21,
+          });
+        });
+
+        it("excludes the current (just-persisted) customer message and orders the rest oldest-first, role-mapped", async () => {
+          provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+          prisma.chatMessage.findMany.mockResolvedValue([
+            // newest-first, as a real `orderBy: desc` query returns.
+            { id: "3", role: "CUSTOMER", body: "And then what happened?", createdAt: new Date() },
+            { id: "2", role: "ASSISTANT", body: "What's your order number?", createdAt: new Date() },
+            { id: "1", role: "CUSTOMER", body: "I ordered a widget.", createdAt: new Date() },
+          ]);
+          const job = buildJob(CHAT_PAYLOAD);
+
+          await processor.process(job);
+
+          expect(provider.chat).toHaveBeenCalledWith({
+            sessionId: "session-1",
+            message: "Hi, I need help",
+            history: [
+              { role: "user", content: "I ordered a widget." },
+              { role: "assistant", content: "What's your order number?" },
+            ],
+          });
+        });
+
+        it("passes an empty history array for a session's first-ever message", async () => {
+          provider.chat.mockResolvedValue({ ...SUCCESS_RESULT, text: "How can I help?" });
+          prisma.chatMessage.findMany.mockResolvedValue([
+            { id: "current-message", role: "CUSTOMER", body: "Hi, I need help", createdAt: new Date() },
+          ]);
+          const job = buildJob(CHAT_PAYLOAD);
+
+          await processor.process(job);
+
+          expect(provider.chat).toHaveBeenCalledWith({
+            sessionId: "session-1",
+            message: "Hi, I need help",
+            history: [],
+          });
+        });
       });
 
       it("on SUCCESS, persists the reply as a ChatMessage(ASSISTANT) row", async () => {

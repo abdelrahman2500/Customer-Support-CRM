@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from "@nestjs/bullmq";
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import type { AiCallResult, AiProvider } from "@crm/ai";
+import type { AiCallResult, AiChatTurn, AiProvider } from "@crm/ai";
 import type { Job, Queue } from "bullmq";
 import * as Sentry from "@sentry/node";
 import { PrismaService } from "../prisma/prisma.service";
@@ -15,6 +15,12 @@ import { CorrelationIdStore } from "../common/logging/correlation-id.store";
  * apps/api/src/queues/ai-processing.producer.ts.
  */
 export const AI_PROCESSING_QUEUE = "ai-processing";
+
+/** Story 116 — bounds how much prior conversation is sent to the model on
+ * every turn (token/cost growth, docs/architecture/12-risks-tradeoffs-and-
+ * scope.md's disclosed AI-cost risk). A plain constant, not a per-branch
+ * `AiSettings` field — no story has disclosed a need to tune this. */
+const CHAT_HISTORY_LIMIT = 20;
 
 /** Must stay identical to `AiProcessingJobPayload` in
  * apps/api/src/queues/ai-processing.producer.ts.
@@ -155,7 +161,7 @@ export class AiProcessingProcessor extends WorkerHost {
     this.logger.log(`Completed ${feature} (${result.outcome}) for ${ticketId ?? chatSessionId}`);
   }
 
-  private call(data: AiProcessingJobPayload): Promise<AiCallResult> {
+  private async call(data: AiProcessingJobPayload): Promise<AiCallResult> {
     switch (data.feature) {
       case "SUMMARIZE":
         return this.provider.summarize({ subject: data.subject ?? "", body: data.body });
@@ -163,9 +169,39 @@ export class AiProcessingProcessor extends WorkerHost {
         return this.provider.suggestReply({ subject: data.subject ?? "", body: data.body });
       case "CATEGORIZE":
         return this.provider.categorize({ subject: data.subject ?? "", body: data.body });
-      case "CHAT":
-        return this.provider.chat({ sessionId: data.chatSessionId ?? "", message: data.body });
+      case "CHAT": {
+        const chatSessionId = data.chatSessionId ?? "";
+        const history = await this.fetchChatHistory(chatSessionId);
+        return this.provider.chat({ sessionId: chatSessionId, message: data.body, history });
+      }
     }
+  }
+
+  /**
+   * Story 116 — the session's prior turns, oldest-first, excluding the
+   * current customer message. A bounded query (`take: CHAT_HISTORY_LIMIT
+   * + 1`), not "fetch the whole session then slice": `orderBy: { createdAt:
+   * "desc" }` gets the most recent `CHAT_HISTORY_LIMIT + 1` rows; the
+   * first of those (most recent) is always the current customer message
+   * `AiChatService.sendMessage` persisted immediately before enqueueing
+   * this very job — the assistant's reply, if any, is only ever created
+   * *after* this job completes (see the `chatMessage.create` call below,
+   * in `processJob`) — so it's dropped before reversing the remainder
+   * back into chronological order.
+   */
+  private async fetchChatHistory(sessionId: string): Promise<AiChatTurn[]> {
+    const rows = await this.prisma.chatMessage.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: "desc" },
+      take: CHAT_HISTORY_LIMIT + 1,
+    });
+    return rows
+      .slice(1)
+      .reverse()
+      .map((row) => ({
+        role: row.role === "CUSTOMER" ? "user" : "assistant",
+        content: row.body,
+      }));
   }
 
   /**

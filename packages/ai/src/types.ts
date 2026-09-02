@@ -35,7 +35,26 @@ export interface AiTicketInput {
   body: string;
 }
 
+/** Story 116 — one prior turn in the same chat session, oldest-to-newest
+ * order, excluding the current `AiChatMessageInput.message`. `"user"`/
+ * `"assistant"` (not `ChatMessageRole`'s own `CUSTOMER`/`ASSISTANT`
+ * values) — this package must not depend on `@prisma/client`, and these
+ * are also the exact role labels the Anthropic Messages API itself
+ * expects. */
+export interface AiChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** Story 116 — `history` is required, not optional: this interface has
+ * exactly three call sites in this repository (`AnthropicAiProvider`,
+ * `NullAiProvider`, `AiProcessingProcessor`), all updated together in
+ * that same story — there is no external consumer of this internal
+ * package's types to stay backward compatible with by making it
+ * optional. A session's first-ever message passes an empty array, not a
+ * missing field. */
 export interface AiChatMessageInput {
   sessionId: string;
   message: string;
+  history: AiChatTurn[];
 }

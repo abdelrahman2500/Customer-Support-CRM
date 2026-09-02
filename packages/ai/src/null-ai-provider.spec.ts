@@ -25,6 +25,8 @@ describe("NullAiProvider", () => {
   });
 
   it("chat returns a DISABLED result", async () => {
-    await expect(provider.chat({ sessionId: "s", message: "m" })).resolves.toEqual(DISABLED);
+    await expect(
+      provider.chat({ sessionId: "s", message: "m", history: [] }),
+    ).resolves.toEqual(DISABLED);
   });
 });
