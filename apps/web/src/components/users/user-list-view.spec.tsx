@@ -10,8 +10,37 @@ import {
   useUsersQuery,
 } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
-import { ApiError } from "@/lib/api";
+import { io } from "socket.io-client";
+import { ApiError, getAccessToken } from "@/lib/api";
 import enMessages from "../../../messages/en.json";
+
+// Story 108 — Agent Presence UI. `UserListView` now also renders through
+// `useAgentPresence` (a real socket.io connection); mocked here the exact
+// same way `use-agent-presence.spec.ts`/`use-branch-notifications.spec.ts`
+// mock it, so this file's own tests can simulate a live presence event
+// without an actual network connection.
+vi.mock("socket.io-client", () => ({ io: vi.fn() }));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    getAccessToken: vi.fn(() => "test-token"),
+    getSocketBaseUrl: () => "http://localhost:3001",
+  };
+});
+
+function buildSocketMock() {
+  const handlers = new Map<string, (...args: unknown[]) => void>();
+  return {
+    on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+      handlers.set(event, handler);
+    }),
+    off: vi.fn(),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+    _trigger: (event: string, ...args: unknown[]) => handlers.get(event)?.(...args),
+  };
+}
 
 /**
  * Story 47 — the previously read-only `roles: string[]` badge is replaced by
@@ -137,8 +166,13 @@ function renderView() {
 }
 
 describe("UserListView", () => {
+  let socket: ReturnType<typeof buildSocketMock>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    socket = buildSocketMock();
+    vi.mocked(io).mockReturnValue(socket as never);
+    vi.mocked(getAccessToken).mockReturnValue("test-token");
     mockedUseUpdateUserMutation.mockReturnValue(mutationResult() as never);
     mockedUseUpdateUserAssignmentMutation.mockReturnValue(mutationResult() as never);
     mockedUseResetPasswordMutation.mockReturnValue(mutationResult() as never);
@@ -195,6 +229,55 @@ describe("UserListView", () => {
     expect(screen.getByDisplayValue("Ada Lovelace")).toBeInTheDocument();
     expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.getByText("Deactivate")).toBeInTheDocument();
+    // Story 108 — before any agent.presence.changed event has arrived,
+    // presence is unknown and renders as the safe default, Offline.
+    expect(screen.getByText("Offline")).toBeInTheDocument();
+  });
+
+  // Story 108 — Agent Presence UI.
+  describe("presence", () => {
+    it("joins agent:{id}:presence for every listed user", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+
+      renderView();
+      act(() => {
+        socket._trigger("connect");
+      });
+
+      expect(socket.emit).toHaveBeenCalledWith("join", { room: "agent:user-1:presence" });
+    });
+
+    it("shows Online once the socket relays an online transition for that user", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+
+      renderView();
+      act(() => {
+        socket._trigger("agent.presence.changed", { userId: "user-1", status: "online" });
+      });
+
+      expect(screen.getByText("Online")).toBeInTheDocument();
+      expect(screen.queryByText("Offline")).not.toBeInTheDocument();
+    });
+
+    it("keeps each user's presence independent", () => {
+      const secondUser = { ...baseUser, id: "user-2", email: "second@example.com" };
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser, secondUser] }) as never,
+      );
+
+      renderView();
+      act(() => {
+        socket._trigger("agent.presence.changed", { userId: "user-1", status: "online" });
+      });
+
+      const [, firstUserRow, secondUserRow] = screen.getAllByRole("row");
+      expect(within(firstUserRow!).getByText("Online")).toBeInTheDocument();
+      expect(within(secondUserRow!).getByText("Offline")).toBeInTheDocument();
+    });
   });
 
   it("renders the Role select pre-populated with the user's current role", () => {

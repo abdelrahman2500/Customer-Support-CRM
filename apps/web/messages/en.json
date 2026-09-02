@@ -280,7 +280,8 @@
         "email": "Email",
         "fullName": "Name",
         "roles": "Roles",
-        "status": "Status"
+        "status": "Status",
+        "presence": "Presence"
       },
       "roleLabel": "Role",
       "departmentLabel": "Department",
@@ -292,7 +293,9 @@
       "passwordResetSubmit": "Reset password",
       "passwordResetSubmitting": "Resetting...",
       "passwordResetSuccess": "Password reset.",
-      "optionsLoading": "Loading…"
+      "optionsLoading": "Loading…",
+      "online": "Online",
+      "offline": "Offline"
     },
     "create": {
       "title": "New user",

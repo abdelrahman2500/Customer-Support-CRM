@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -11,6 +11,7 @@ import {
   useUsersQuery,
 } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
+import { useAgentPresence, type PresenceStatus } from "@/hooks/use-agent-presence";
 import type { UserSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
@@ -67,12 +68,27 @@ const UNSET_DEPARTMENT = "__unset__";
  * `useResetPasswordMutation(user.id)` — commits on click (not blur), clears
  * on success, and shows a brief inline confirmation. No dialog — this
  * codebase has no modal primitive (plan Design item 6).
+ *
+ * Story 108 — Agent Presence UI. A new "Presence" column shows each
+ * listed user's live online/offline status via `useAgentPresence`, the
+ * first real consumer of Story 71's `agent:{id}:presence` room. `userIds`
+ * is memoized off `usersQuery.data` (which TanStack Query already keeps
+ * referentially stable via structural sharing across refetches) rather
+ * than derived inline, so the hook's own socket effect — keyed on plain
+ * reference equality, mirroring `useBranchNotifications`'s own `branchId`
+ * dependency — doesn't tear down and reconnect on every unrelated
+ * re-render. A user not yet reported by the socket (still connecting, or
+ * the connection failed) renders as offline — the same "unknown reads as
+ * the safe default" choice `isActive`'s own Badge would make if presence
+ * had a genuine third state, which it doesn't.
  */
 export function UserListView() {
   const t = useTranslations("users");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const usersQuery = useUsersQuery();
+  const userIds = useMemo(() => (usersQuery.data ?? []).map((user) => user.id), [usersQuery.data]);
+  const presence = useAgentPresence(userIds);
 
   return (
     <section className="flex flex-col gap-4">
@@ -114,11 +130,12 @@ export function UserListView() {
               <TableHead>{t("list.columns.fullName")}</TableHead>
               <TableHead>{t("list.columns.roles")}</TableHead>
               <TableHead>{t("list.columns.status")}</TableHead>
+              <TableHead>{t("list.columns.presence")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {usersQuery.data.map((user) => (
-              <UserRow key={user.id} user={user} />
+              <UserRow key={user.id} user={user} presence={presence[user.id]} />
             ))}
           </TableBody>
         </Table>
@@ -127,7 +144,7 @@ export function UserListView() {
   );
 }
 
-function UserRow({ user }: { user: UserSummary }) {
+function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStatus | undefined }) {
   const t = useTranslations("users");
   const errorMessage = useErrorMessage();
   const mutation = useUpdateUserMutation(user.id);
@@ -383,6 +400,11 @@ function UserRow({ user }: { user: UserSummary }) {
             isPending={mutation.isPending}
           />
         </div>
+      </TableCell>
+      <TableCell>
+        <Badge variant={presence === "online" ? "success" : "secondary"}>
+          {presence === "online" ? t("list.online") : t("list.offline")}
+        </Badge>
       </TableCell>
     </TableRow>
   );

@@ -276,7 +276,8 @@
         "email": "البريد الإلكتروني",
         "fullName": "الاسم",
         "roles": "الأدوار",
-        "status": "الحالة"
+        "status": "الحالة",
+        "presence": "الحضور"
       },
       "roleLabel": "الدور",
       "departmentLabel": "القسم",
@@ -288,7 +289,9 @@
       "passwordResetSubmit": "إعادة تعيين كلمة المرور",
       "passwordResetSubmitting": "جارٍ إعادة التعيين...",
       "passwordResetSuccess": "تمت إعادة تعيين كلمة المرور.",
-      "optionsLoading": "جارٍ التحميل…"
+      "optionsLoading": "جارٍ التحميل…",
+      "online": "متصل",
+      "offline": "غير متصل"
     },
     "create": {
       "title": "مستخدم جديد",
