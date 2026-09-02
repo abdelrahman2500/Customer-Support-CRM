@@ -42,6 +42,13 @@
       "label": "Switch branch",
       "branchAndDepartment": "{branch} — {department}"
     },
+    "languageSwitcher": {
+      "label": "Language",
+      "options": {
+        "en": "English",
+        "ar": "العربية"
+      }
+    },
     "nav": {
       "label": "Workspace navigation",
       "dashboard": "Dashboard",

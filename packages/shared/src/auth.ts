@@ -9,6 +9,9 @@ export interface AuthenticatedUser {
   branchId: string | null;
   departmentId: string | null;
   roles: string[];
+  /** Story 119 — `null` means no explicit choice has been made yet
+   * (the frontend falls back to the URL's own `[locale]` segment). */
+  preferredLocale: string | null;
 }
 
 /**
@@ -23,4 +26,6 @@ export interface AuthenticatedContact {
   email: string;
   fullName: string;
   customerId: string;
+  /** Story 119 — mirrors `AuthenticatedUser.preferredLocale` exactly. */
+  preferredLocale: string | null;
 }

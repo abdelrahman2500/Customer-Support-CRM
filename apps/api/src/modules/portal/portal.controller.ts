@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
@@ -18,6 +19,7 @@ import { Public } from "../../common/auth/public.decorator";
 import { PortalRoute } from "../../common/auth/portal-route.decorator";
 import type { EnvConfig } from "../../common/config/env.validation";
 import { PortalLoginDto } from "./dto/portal-login.dto";
+import { UpdatePortalLocaleDto } from "./dto/update-portal-locale.dto";
 import { PortalService } from "./portal.service";
 
 const REFRESH_COOKIE_NAME = "crm_portal_refresh_token";
@@ -94,6 +96,17 @@ export class PortalController {
   async me(@Req() request: Request): Promise<AuthenticatedContact> {
     const contact = request.user as JwtAccessTokenClaims;
     return this.portalService.getAuthenticatedContact(contact.sub);
+  }
+
+  /** Story 119 — mirrors `IdentityController.updateLocale` exactly. */
+  @PortalRoute()
+  @Patch("locale")
+  async updateLocale(
+    @Req() request: Request,
+    @Body() dto: UpdatePortalLocaleDto,
+  ): Promise<{ id: string }> {
+    const contact = request.user as JwtAccessTokenClaims;
+    return this.portalService.updatePreferredLocale(contact.sub, dto.locale);
   }
 
   private setRefreshCookie(response: Response, token: string): void {

@@ -4,7 +4,7 @@ import { WorkspaceNav } from "./workspace-nav";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
-import { clearAccessToken, logout, switchBranch } from "@/lib/api";
+import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
 const push = vi.fn();
@@ -26,6 +26,7 @@ vi.mock("@/lib/api", () => ({
   logout: vi.fn(),
   clearAccessToken: vi.fn(),
   switchBranch: vi.fn(),
+  updatePreferredLocale: vi.fn(),
 }));
 
 // Story 95 — Authentication Recovery.
@@ -51,6 +52,7 @@ vi.mock("@/hooks/use-branch-memberships", () => ({
 const mockedLogout = vi.mocked(logout);
 const mockedClearAccessToken = vi.mocked(clearAccessToken);
 const mockedSwitchBranch = vi.mocked(switchBranch);
+const mockedUpdatePreferredLocale = vi.mocked(updatePreferredLocale);
 const mockedClearQueryCache = vi.mocked(clearQueryCache);
 const mockedUseBrandingQuery = vi.mocked(useBrandingQuery);
 const mockedUseUnreadNotificationCountQuery = vi.mocked(useUnreadNotificationCountQuery);
@@ -63,6 +65,7 @@ const user = {
   branchId: "branch-1",
   departmentId: null,
   roles: ["Agent"],
+  preferredLocale: null,
 };
 
 describe("WorkspaceNav", () => {
@@ -91,6 +94,7 @@ describe("WorkspaceNav", () => {
         },
       ],
     } as never);
+    mockedUpdatePreferredLocale.mockResolvedValue({ id: "user-1" });
   });
 
   it("renders the app name and the signed-in user's name", () => {
@@ -394,6 +398,60 @@ describe("WorkspaceNav", () => {
       await waitFor(() =>
         expect(mockedSwitchBranch).toHaveBeenCalledWith("branch-2", "dept-2"),
       );
+    });
+  });
+
+  // Story 119 — i18n/RTL: Persisted locale preference + language switcher.
+  describe("language switcher (Story 119)", () => {
+    it("renders a switcher pre-selecting the current URL locale", () => {
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.getByLabelText("languageSwitcher.label")).toHaveValue("en");
+    });
+
+    it("persists the new locale and navigates to the same page under the new locale segment", async () => {
+      render(<WorkspaceNav user={user} />);
+
+      fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
+        target: { value: "ar" },
+      });
+
+      await waitFor(() => expect(mockedUpdatePreferredLocale).toHaveBeenCalledWith("ar"));
+      expect(push).toHaveBeenCalledWith("/ar/tickets");
+    });
+
+    it("still navigates when persisting the preference rejects", async () => {
+      mockedUpdatePreferredLocale.mockRejectedValue(new Error("network down"));
+
+      render(<WorkspaceNav user={user} />);
+      fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
+        target: { value: "ar" },
+      });
+
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/ar/tickets"));
+    });
+
+    it("does nothing when re-selecting the already-active locale", async () => {
+      render(<WorkspaceNav user={user} />);
+
+      fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
+        target: { value: "en" },
+      });
+
+      await Promise.resolve();
+      expect(mockedUpdatePreferredLocale).not.toHaveBeenCalled();
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("preserves a nested path when switching locale", async () => {
+      pathname = "/en/tickets/ticket-1";
+
+      render(<WorkspaceNav user={user} />);
+      fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
+        target: { value: "ar" },
+      });
+
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/ar/tickets/ticket-1"));
     });
   });
 });

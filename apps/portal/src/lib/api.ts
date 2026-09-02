@@ -116,6 +116,17 @@ export async function logout(): Promise<void> {
   }
 }
 
+/** Story 119 — persists the caller's own locale preference, mirroring
+ * `apps/web`'s own `updatePreferredLocale` exactly: an ordinary
+ * Bearer-authenticated `PATCH` through `apiFetch` (locale isn't a JWT
+ * claim). */
+export function updatePreferredLocale(locale: "en" | "ar"): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>("/portal/auth/locale", {
+    method: "PATCH",
+    body: JSON.stringify({ locale }),
+  });
+}
+
 /** Performs one real request and turns a non-2xx response into a typed
  * `ApiError` — mirrors `apps/web`'s own `attempt` exactly. */
 async function attempt<T>(path: string, init: RequestInit, token: string | null): Promise<T> {

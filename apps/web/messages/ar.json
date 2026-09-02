@@ -42,6 +42,13 @@
       "label": "تبديل الفرع",
       "branchAndDepartment": "{branch} — {department}"
     },
+    "languageSwitcher": {
+      "label": "اللغة",
+      "options": {
+        "en": "English",
+        "ar": "العربية"
+      }
+    },
     "nav": {
       "label": "التنقل في مساحة العمل",
       "dashboard": "لوحة التحكم",

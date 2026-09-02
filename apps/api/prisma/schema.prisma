@@ -114,6 +114,14 @@ model User {
   /// `branchRoles[0]`) if the stored membership no longer exists.
   activeBranchId              String?                  @map("active_branch_id")
   activeDepartmentId          String?                  @map("active_department_id")
+  /// Story 119 — docs/architecture/10-i18n-and-rtl.md: "Users have a
+  /// stored locale preference with a session override." Plain nullable
+  /// string, no enum (Prisma enums cannot cross schemas, and `KbLocale`,
+  /// Story 109, is a distinct KB-content-translation concern) — validated
+  /// against `apps/web/src/i18n/routing.ts`'s configured locales
+  /// (`"en"`/`"ar"`) at the DTO layer only. `null` (every user before
+  /// this story) means "no explicit choice yet".
+  preferredLocale             String?                  @map("preferred_locale")
   createdAt                   DateTime                 @default(now()) @map("created_at")
   updatedAt                   DateTime                 @updatedAt @map("updated_at")
 
@@ -323,6 +331,10 @@ model Contact {
   /// `NotificationsService.getUnreadCountForCustomer`'s own doc comment.
   /// `null` means "never marked read".
   notificationsReadAt     DateTime?                      @map("notifications_read_at")
+  /// Story 119 — mirrors `User.preferredLocale`'s own doc comment
+  /// exactly: docs/architecture/10-i18n-and-rtl.md's "portal customers
+  /// choose their locale independently."
+  preferredLocale         String?                        @map("preferred_locale")
   createdAt               DateTime                       @default(now()) @map("created_at")
 
   @@unique([customerId, email])

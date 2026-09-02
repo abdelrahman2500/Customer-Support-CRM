@@ -34,6 +34,13 @@
     "myTicketsLink": "View my tickets",
     "placeholder": "This page confirms you're securely signed in.",
     "logoAlt": "Company logo",
+    "languageSwitcher": {
+      "label": "Language",
+      "options": {
+        "en": "English",
+        "ar": "العربية"
+      }
+    },
     "nav": {
       "label": "Portal navigation"
     }

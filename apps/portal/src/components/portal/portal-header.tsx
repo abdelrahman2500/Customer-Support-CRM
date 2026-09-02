@@ -6,8 +6,20 @@ import { useTranslations } from "next-intl";
 import type { AuthenticatedContact } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
-import { clearAccessToken, logout } from "@/lib/api";
+import { clearAccessToken, logout, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
+
+/** Story 119 — mirrors `apps/web`'s own `WorkspaceNav` constants/helper
+ * exactly; see that file's own doc comment. */
+const LOCALES = ["en", "ar"] as const;
+
+function buildLocalePath(pathname: string, currentLocale: string, targetLocale: string): string {
+  const prefix = `/${currentLocale}`;
+  if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+    return `/${targetLocale}${pathname.slice(prefix.length)}`;
+  }
+  return `/${targetLocale}`;
+}
 
 /**
  * Story 52 — the Customer Portal's minimal authenticated header, mirroring
@@ -64,6 +76,21 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
     clearAccessToken();
     clearQueryCache();
     router.push(`/${locale}/login`);
+  }
+
+  /** Story 119 — mirrors `WorkspaceNav.handleSwitchLocale` exactly: a
+   * best-effort persist (never blocks the actual switch), then a plain
+   * `router.push()` into the new locale. */
+  async function handleSwitchLocale(targetLocale: string) {
+    if (targetLocale === locale) {
+      return;
+    }
+    try {
+      await updatePreferredLocale(targetLocale as "en" | "ar");
+    } catch {
+      // Best-effort — the language switch below always proceeds regardless.
+    }
+    router.push(buildLocalePath(pathname ?? `/${locale}`, locale, targetLocale));
   }
 
   // Story 96 — Navigation & Route Robustness. A plain object keyed by
@@ -125,13 +152,27 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
           )}
         </a>
       </nav>
-      <button
-        type="button"
-        onClick={handleSignOut}
-        className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-      >
-        {t("signOut")}
-      </button>
+      <div className="flex items-center gap-2">
+        <select
+          aria-label={t("languageSwitcher.label")}
+          className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+          value={locale}
+          onChange={(event) => void handleSwitchLocale(event.target.value)}
+        >
+          {LOCALES.map((localeOption) => (
+            <option key={localeOption} value={localeOption}>
+              {t(`languageSwitcher.options.${localeOption}`)}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        >
+          {t("signOut")}
+        </button>
+      </div>
     </header>
   );
 }

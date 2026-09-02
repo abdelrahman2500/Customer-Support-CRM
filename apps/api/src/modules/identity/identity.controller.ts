@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
@@ -18,6 +19,7 @@ import { Public } from "../../common/auth/public.decorator";
 import type { EnvConfig } from "../../common/config/env.validation";
 import { LoginDto } from "./dto/login.dto";
 import { SwitchBranchDto } from "./dto/switch-branch.dto";
+import { UpdateLocaleDto } from "./dto/update-locale.dto";
 import type { BranchMembershipSummary } from "./identity.service";
 import { IdentityService } from "./identity.service";
 
@@ -93,6 +95,19 @@ export class IdentityController {
   async me(@Req() request: Request): Promise<AuthenticatedUser> {
     const user = request.user as JwtAccessTokenClaims;
     return this.identityService.getAuthenticatedUser(user.sub);
+  }
+
+  /** Story 119 — persists the caller's own locale preference. Ordinary
+   * `AuthGuard`, no extra permission (a personal presentation setting,
+   * mirrors `me` above's own no-extra-permission precedent). No token
+   * reissue: locale is not a `JwtAccessTokenClaims` field. */
+  @Patch("locale")
+  async updateLocale(
+    @Req() request: Request,
+    @Body() dto: UpdateLocaleDto,
+  ): Promise<{ id: string }> {
+    const user = request.user as JwtAccessTokenClaims;
+    return this.identityService.updatePreferredLocale(user.sub, dto.locale);
   }
 
   /** Story 118 — the caller's own branch/department/role memberships,

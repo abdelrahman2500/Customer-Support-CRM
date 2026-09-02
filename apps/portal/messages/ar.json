@@ -34,6 +34,13 @@
     "myTicketsLink": "عرض تذاكري",
     "placeholder": "هذه الصفحة تؤكد فقط أنك مسجّل الدخول بأمان.",
     "logoAlt": "شعار الشركة",
+    "languageSwitcher": {
+      "label": "اللغة",
+      "options": {
+        "en": "English",
+        "ar": "العربية"
+      }
+    },
     "nav": {
       "label": "التنقل في البوابة"
     }

@@ -9,8 +9,25 @@ import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { clearAccessToken, logout, switchBranch } from "@/lib/api";
+import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
+
+/** Story 119 — `apps/web/src/i18n/routing.ts`'s own configured locales. */
+const LOCALES = ["en", "ar"] as const;
+
+/** Swaps the leading `/{locale}` segment of `pathname` for `targetLocale`
+ * — a plain string operation, mirroring this codebase's own "no
+ * `next-intl/navigation` helper anywhere" convention (confirmed by grep
+ * while authoring this story). Falls back to just `/{targetLocale}` if
+ * `pathname` doesn't start with the expected segment (should not happen
+ * in practice — every route here is locale-prefixed). */
+function buildLocalePath(pathname: string, currentLocale: string, targetLocale: string): string {
+  const prefix = `/${currentLocale}`;
+  if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+    return `/${targetLocale}${pathname.slice(prefix.length)}`;
+  }
+  return `/${targetLocale}`;
+}
 
 /**
  * Story 44 — the top-level Agent Workspace screens, in a fixed,
@@ -68,6 +85,13 @@ import { clearQueryCache } from "@/lib/query-client-registry";
  * components (`user`/`AuthenticatedUser` above is fetched server-side by
  * the parent layout, `fetchCurrentUser()`) actually re-render with the
  * new active branch too.
+ *
+ * Story 119 — a language `<select>` next to the branch switcher, always
+ * rendered (unlike the branch switcher, every user has exactly one of
+ * exactly two locales at all times — there's no "only one option"
+ * case to hide it for). Persists the choice (best-effort — a failed
+ * `PATCH` never blocks the actual switch) and navigates into the same
+ * page under the new locale segment.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -137,6 +161,23 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
     router.refresh();
   }
 
+  /** Story 119 — best-effort persist (a failed `PATCH` never blocks the
+   * actual language switch, mirroring `handleSignOut`'s own `logout()`
+   * try/catch for a non-critical side effect), then a plain
+   * `router.push()` into the new locale — no token/cache implications,
+   * unlike `handleSwitchBranch` above. */
+  async function handleSwitchLocale(targetLocale: string) {
+    if (targetLocale === locale) {
+      return;
+    }
+    try {
+      await updatePreferredLocale(targetLocale as "en" | "ar");
+    } catch {
+      // Best-effort — the language switch below always proceeds regardless.
+    }
+    router.push(buildLocalePath(pathname ?? `/${locale}`, locale, targetLocale));
+  }
+
   return (
     <>
       <header
@@ -177,6 +218,18 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
               ))}
             </select>
           )}
+          <select
+            aria-label={t("languageSwitcher.label")}
+            className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm"
+            value={locale}
+            onChange={(event) => void handleSwitchLocale(event.target.value)}
+          >
+            {LOCALES.map((localeOption) => (
+              <option key={localeOption} value={localeOption}>
+                {t(`languageSwitcher.options.${localeOption}`)}
+              </option>
+            ))}
+          </select>
           <Button variant="outline" size="sm" onClick={handleSignOut}>
             {t("signOut")}
           </Button>

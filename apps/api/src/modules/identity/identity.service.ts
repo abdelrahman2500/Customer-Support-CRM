@@ -376,7 +376,20 @@ export class IdentityService {
           (br) => br.branchId === active?.branchId && br.departmentId === active?.departmentId,
         )
         .map((br) => br.role.name),
+      preferredLocale: user.preferredLocale,
     };
+  }
+
+  /**
+   * Story 119 — `PATCH auth/locale`. A plain preference update, not the
+   * same trust tier as `user.reassigned`/`auth.branch_switched` — no
+   * audit-log entry, mirroring `NotificationPreference`'s own toggle
+   * (a personal presentation setting, not an access-affecting change).
+   * No token reissue: locale is not a `JwtAccessTokenClaims` field.
+   */
+  async updatePreferredLocale(userId: string, locale: string): Promise<{ id: string }> {
+    await this.prisma.user.update({ where: { id: userId }, data: { preferredLocale: locale } });
+    return { id: userId };
   }
 
   /**

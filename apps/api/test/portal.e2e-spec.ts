@@ -137,6 +137,55 @@ describe("Customer Portal (e2e)", () => {
     });
   });
 
+  // Story 119 — locale preference.
+  it("persists a locale preference and reflects it on a subsequent /portal/auth/me", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/portal/auth/login")
+      .send({ email: contactEmail, password: portalPassword })
+      .expect(200);
+    const portalAccessToken = loginResponse.body.accessToken as string;
+
+    const before = await request(app.getHttpServer())
+      .get("/api/v1/portal/auth/me")
+      .set("Authorization", `Bearer ${portalAccessToken}`)
+      .expect(200);
+    expect(before.body.preferredLocale).toBeNull();
+
+    await request(app.getHttpServer())
+      .patch("/api/v1/portal/auth/locale")
+      .set("Authorization", `Bearer ${portalAccessToken}`)
+      .send({ locale: "ar" })
+      .expect(200);
+
+    const after = await request(app.getHttpServer())
+      .get("/api/v1/portal/auth/me")
+      .set("Authorization", `Bearer ${portalAccessToken}`)
+      .expect(200);
+    expect(after.body.preferredLocale).toBe("ar");
+  });
+
+  it("rejects a locale outside en/ar with 400", async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post("/api/v1/portal/auth/login")
+      .send({ email: contactEmail, password: portalPassword })
+      .expect(200);
+    const portalAccessToken = loginResponse.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .patch("/api/v1/portal/auth/locale")
+      .set("Authorization", `Bearer ${portalAccessToken}`)
+      .send({ locale: "fr" })
+      .expect(400);
+  });
+
+  it("rejects an agent-audience token on the portal-only /portal/auth/locale route", async () => {
+    await request(app.getHttpServer())
+      .patch("/api/v1/portal/auth/locale")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ locale: "ar" })
+      .expect(401);
+  });
+
   it("rotates the refresh token and revokes the old one", async () => {
     const loginResponse = await request(app.getHttpServer())
       .post("/api/v1/portal/auth/login")

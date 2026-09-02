@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { PortalHeader } from "./portal-header";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
-import { clearAccessToken, logout } from "@/lib/api";
+import { clearAccessToken, logout, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
 const push = vi.fn();
@@ -23,6 +23,7 @@ vi.mock("next-intl", () => ({
 vi.mock("@/lib/api", () => ({
   logout: vi.fn(),
   clearAccessToken: vi.fn(),
+  updatePreferredLocale: vi.fn(),
 }));
 
 // Story 95 — Authentication Recovery.
@@ -43,6 +44,7 @@ vi.mock("@/hooks/use-portal-notification-history", () => ({
 const mockedLogout = vi.mocked(logout);
 const mockedClearAccessToken = vi.mocked(clearAccessToken);
 const mockedClearQueryCache = vi.mocked(clearQueryCache);
+const mockedUpdatePreferredLocale = vi.mocked(updatePreferredLocale);
 const mockedUseBrandingQuery = vi.mocked(useBrandingQuery);
 const mockedUseUnreadNotificationCountQuery = vi.mocked(useUnreadNotificationCountQuery);
 
@@ -51,6 +53,7 @@ const contact = {
   email: "jane@example.com",
   fullName: "Jane Doe",
   customerId: "customer-1",
+  preferredLocale: null,
 };
 
 describe("PortalHeader", () => {
@@ -63,6 +66,7 @@ describe("PortalHeader", () => {
       data: undefined,
       isSuccess: false,
     } as never);
+    mockedUpdatePreferredLocale.mockResolvedValue({ id: "contact-1" });
   });
 
   it("renders the signed-in contact's name", () => {
@@ -223,6 +227,51 @@ describe("PortalHeader", () => {
       const links = screen.getAllByRole("link", { name: "nav" });
       const ticketsLink = links.find((link) => link.getAttribute("href") === "/en/tickets")!;
       expect(ticketsLink).toHaveAttribute("aria-current", "page");
+    });
+  });
+
+  // Story 119 — i18n/RTL: Persisted locale preference + language switcher.
+  describe("language switcher (Story 119)", () => {
+    it("renders a switcher pre-selecting the current URL locale", () => {
+      render(<PortalHeader contact={contact} />);
+
+      expect(screen.getByLabelText("languageSwitcher.label")).toHaveValue("en");
+    });
+
+    it("persists the new locale and navigates to the same page under the new locale segment", async () => {
+      pathname = "/en/tickets";
+      render(<PortalHeader contact={contact} />);
+
+      fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
+        target: { value: "ar" },
+      });
+
+      await waitFor(() => expect(mockedUpdatePreferredLocale).toHaveBeenCalledWith("ar"));
+      expect(push).toHaveBeenCalledWith("/ar/tickets");
+    });
+
+    it("still navigates when persisting the preference rejects", async () => {
+      mockedUpdatePreferredLocale.mockRejectedValue(new Error("network down"));
+      pathname = "/en/tickets";
+
+      render(<PortalHeader contact={contact} />);
+      fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
+        target: { value: "ar" },
+      });
+
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/ar/tickets"));
+    });
+
+    it("does nothing when re-selecting the already-active locale", async () => {
+      render(<PortalHeader contact={contact} />);
+
+      fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
+        target: { value: "en" },
+      });
+
+      await Promise.resolve();
+      expect(mockedUpdatePreferredLocale).not.toHaveBeenCalled();
+      expect(push).not.toHaveBeenCalled();
     });
   });
 });

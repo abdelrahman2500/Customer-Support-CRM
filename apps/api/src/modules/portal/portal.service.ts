@@ -120,7 +120,18 @@ export class PortalService {
       email: contact.email ?? "",
       fullName: contact.fullName,
       customerId: contact.customerId,
+      preferredLocale: contact.preferredLocale,
     };
+  }
+
+  /** Story 119 — mirrors `IdentityService.updatePreferredLocale`
+   * field-for-field; see that method's own doc comment. */
+  async updatePreferredLocale(contactId: string, locale: string): Promise<{ id: string }> {
+    await this.prisma.contact.update({
+      where: { id: contactId },
+      data: { preferredLocale: locale },
+    });
+    return { id: contactId };
   }
 
   // ---------------------------------------------------------------------

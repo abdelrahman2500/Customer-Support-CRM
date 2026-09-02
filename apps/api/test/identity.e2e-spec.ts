@@ -211,6 +211,70 @@ describe("Identity & Access (e2e)", () => {
     expect(adminBranchId).toBeTypeOf("string");
   });
 
+  // Story 119 — locale preference. Uses a dedicated, freshly created user
+  // (not the shared seeded admin) so this never persistently mutates a
+  // row every other e2e spec file also logs in as.
+  describe("locale preference (Story 119)", () => {
+    it("PATCH auth/locale persists a valid locale, reflected by a subsequent GET auth/me", async () => {
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const email = `locale-pref-${randomUUID()}@example.com`;
+      const password = "locale-pref-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email,
+          password,
+          fullName: "Locale Preference Test User",
+          branchId: adminBranchId,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+      const login = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email, password })
+        .expect(200);
+      const accessToken = login.body.accessToken as string;
+
+      const before = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${accessToken}`)
+        .expect(200);
+      expect(before.body.preferredLocale).toBeNull();
+
+      await request(app.getHttpServer())
+        .patch("/api/v1/auth/locale")
+        .set("Authorization", `Bearer ${accessToken}`)
+        .send({ locale: "ar" })
+        .expect(200);
+
+      const after = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${accessToken}`)
+        .expect(200);
+      expect(after.body.preferredLocale).toBe("ar");
+    });
+
+    it("rejects a locale outside en/ar with 400", async () => {
+      await request(app.getHttpServer())
+        .patch("/api/v1/auth/locale")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ locale: "fr" })
+        .expect(400);
+    });
+
+    it("rejects an unauthenticated request", async () => {
+      await request(app.getHttpServer())
+        .patch("/api/v1/auth/locale")
+        .send({ locale: "ar" })
+        .expect(401);
+    });
+  });
+
   it("rejects an identity route with no token", async () => {
     await request(app.getHttpServer()).get("/api/v1/identity/users").expect(401);
   });

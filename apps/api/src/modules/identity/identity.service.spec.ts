@@ -464,12 +464,59 @@ describe("IdentityService", () => {
       expect(result.departmentId).toBe("dept-1");
     });
 
+    // Story 119 — locale preference.
+    it("passes preferredLocale through unchanged", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        email: "admin@example.com",
+        fullName: "Admin User",
+        activeBranchId: null,
+        activeDepartmentId: null,
+        preferredLocale: "ar",
+        branchRoles: [activeBranchRole],
+      });
+
+      const result = await service.getAuthenticatedUser("user-1");
+
+      expect(result.preferredLocale).toBe("ar");
+    });
+
+    it("returns null preferredLocale for a user who has never set one", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        email: "admin@example.com",
+        fullName: "Admin User",
+        activeBranchId: null,
+        activeDepartmentId: null,
+        preferredLocale: null,
+        branchRoles: [activeBranchRole],
+      });
+
+      const result = await service.getAuthenticatedUser("user-1");
+
+      expect(result.preferredLocale).toBeNull();
+    });
+
     it("throws UnauthorizedException when the user no longer exists", async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
       await expect(service.getAuthenticatedUser("gone-user")).rejects.toBeInstanceOf(
         UnauthorizedException,
       );
+    });
+  });
+
+  describe("updatePreferredLocale", () => {
+    it("persists the given locale for the given user", async () => {
+      prisma.user.update.mockResolvedValue({ id: "user-1" });
+
+      const result = await service.updatePreferredLocale("user-1", "ar");
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { preferredLocale: "ar" },
+      });
+      expect(result).toEqual({ id: "user-1" });
     });
   });
 

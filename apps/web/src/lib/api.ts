@@ -117,6 +117,21 @@ export async function switchBranch(branchId: string, departmentId?: string): Pro
 }
 
 /**
+ * Story 119 — persists the caller's own locale preference. Unlike
+ * `switchBranch` above, this is an ordinary Bearer-authenticated call
+ * through `apiFetch` (locale isn't a JWT claim, so no cookie/token
+ * dance is needed) — defined here, not in a separate file, since it's a
+ * one-line addition to the same auth surface `switchBranch`/`logout`
+ * already live in.
+ */
+export function updatePreferredLocale(locale: "en" | "ar"): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>("/auth/locale", {
+    method: "PATCH",
+    body: JSON.stringify({ locale }),
+  });
+}
+
+/**
  * Story 41 — module-level in-flight-refresh guard. `POST /auth/refresh`
  * rotates and revokes the presented refresh token server-side
  * (`identity.service.ts`), so two independent, concurrent refresh calls

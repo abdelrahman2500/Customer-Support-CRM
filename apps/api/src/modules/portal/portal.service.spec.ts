@@ -19,6 +19,7 @@ function buildPrismaMock() {
     contact: {
       findFirst: vi.fn(),
       findUnique: vi.fn(),
+      update: vi.fn(),
     },
     contactRefreshToken: {
       findUnique: vi.fn(),
@@ -277,6 +278,51 @@ describe("PortalService", () => {
       await expect(service.getAuthenticatedContact("contact-1")).rejects.toBeInstanceOf(
         UnauthorizedException,
       );
+    });
+
+    // Story 119 — locale preference.
+    it("passes preferredLocale through unchanged", async () => {
+      prisma.contact.findUnique.mockResolvedValue({
+        id: "contact-1",
+        email: "jane@example.com",
+        fullName: "Jane Doe",
+        customerId: "customer-1",
+        passwordHash: "hashed:whatever",
+        preferredLocale: "ar",
+      });
+
+      const result = await service.getAuthenticatedContact("contact-1");
+
+      expect(result.preferredLocale).toBe("ar");
+    });
+
+    it("returns null preferredLocale for a contact who has never set one", async () => {
+      prisma.contact.findUnique.mockResolvedValue({
+        id: "contact-1",
+        email: "jane@example.com",
+        fullName: "Jane Doe",
+        customerId: "customer-1",
+        passwordHash: "hashed:whatever",
+        preferredLocale: null,
+      });
+
+      const result = await service.getAuthenticatedContact("contact-1");
+
+      expect(result.preferredLocale).toBeNull();
+    });
+  });
+
+  describe("updatePreferredLocale", () => {
+    it("persists the given locale for the given contact", async () => {
+      prisma.contact.update.mockResolvedValue({ id: "contact-1" });
+
+      const result = await service.updatePreferredLocale("contact-1", "ar");
+
+      expect(prisma.contact.update).toHaveBeenCalledWith({
+        where: { id: "contact-1" },
+        data: { preferredLocale: "ar" },
+      });
+      expect(result).toEqual({ id: "contact-1" });
     });
   });
 });
