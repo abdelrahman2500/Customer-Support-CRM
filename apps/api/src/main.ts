@@ -1,3 +1,4 @@
+import "./tracing";
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { Logger, ValidationPipe } from "@nestjs/common";
@@ -33,7 +34,7 @@ async function bootstrap(): Promise<void> {
   app.useWebSocketAdapter(redisIoAdapter);
 
   app.use(cookieParser());
-  app.setGlobalPrefix("api/v1", { exclude: ["health", "health/ready"] });
+  app.setGlobalPrefix("api/v1", { exclude: ["health", "health/ready", "metrics"] });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

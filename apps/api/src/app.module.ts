@@ -14,6 +14,7 @@ import { RequestIdMiddleware } from "./common/logging/request-id.middleware";
 import { PinoLoggerService } from "./common/logging/pino-logger.service";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
+import { ObservabilityModule } from "./observability/observability.module";
 import { QueuesModule } from "./queues/queues.module";
 import { IdentityModule } from "./modules/identity/identity.module";
 import { AdminModule } from "./modules/admin/admin.module";
@@ -41,6 +42,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
     PrismaModule,
     AuthModule,
     HealthModule,
+    ObservabilityModule,
     QueuesModule,
     IdentityModule,
     AdminModule,
