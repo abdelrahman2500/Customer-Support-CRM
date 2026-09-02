@@ -82,6 +82,16 @@ jobs:
         run: pnpm build
 
       - name: Test
+        # Root `pnpm test` (turbo run test) now excludes `@crm/e2e` — see
+        # its script in the root package.json. `@crm/e2e`'s Playwright
+        # browser suite needs apps/web/apps/portal already built and
+        # Chromium installed (neither is true yet at this point in the
+        # job), and turbo's default strict env mode strips ambient env
+        # vars (DATABASE_URL/REDIS_URL/JWT_*) from tasks it runs unless
+        # they're declared in turbo.json, which broke apps/api's Nest
+        # bootstrap when Playwright tried to start it here. The
+        # `browser-e2e` job below runs `pnpm --filter @crm/e2e test`
+        # directly (bypassing turbo) with real prerequisites and env.
         run: pnpm test
 
       - name: Start MinIO

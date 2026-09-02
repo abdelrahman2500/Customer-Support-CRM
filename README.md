@@ -306,7 +306,7 @@ pnpm dev         # turbo run dev — all apps
 pnpm build       # turbo run build — all apps/packages
 pnpm lint        # turbo run lint
 pnpm typecheck   # turbo run typecheck
-pnpm test        # turbo run test — unit/component tests only, every package
+pnpm test        # turbo run test — unit/component tests only, every package except @crm/e2e
 pnpm format      # prettier --write .
 ```
 
@@ -325,6 +325,13 @@ pnpm --filter @crm/web test        # unit/component tests (Vitest + Testing Libr
 pnpm --filter @crm/portal test     # unit/component tests (Vitest + Testing Library)
 pnpm --filter @crm/worker test     # unit tests (Vitest)
 pnpm --filter @crm/worker test:e2e # worker e2e (SLA timer processor)
+pnpm --filter @crm/e2e test        # browser E2E (Playwright) — boots real apps/api + apps/web
+                                    # (pre-built) + apps/portal (pre-built); needs real
+                                    # Postgres/Redis running and apps/web/apps/portal already
+                                    # built. Deliberately excluded from root `pnpm test`
+                                    # (turbo run test): it needs prerequisites (built web/portal,
+                                    # installed browsers) that the generic unit-test sweep does
+                                    # not provide — see the dedicated `browser-e2e` CI job.
 ```
 
 `apps/api/test/` currently holds 33 e2e spec files covering identity/RBAC,
@@ -336,8 +343,11 @@ full Customer Portal surface (auth, tickets, KB, chat, branding).
 CI (`.github/workflows/ci.yml`) runs on every PR and push to `main`:
 install → Prisma generate → lint → typecheck → build → unit tests
 (`pnpm test`) → API e2e tests against real Postgres/Redis/MinIO service
-containers. A separate job builds (but does not push or deploy) a Docker
-image per app on pushes to `main`.
+containers. A separate `browser-e2e` job then builds `apps/web`/`apps/portal`,
+installs Chromium, and runs `pnpm --filter @crm/e2e test` against real
+Postgres/Redis service containers with CI-provided env values. Another
+separate job builds (but does not push or deploy) a Docker image per app on
+pushes to `main`.
 
 Run `pnpm test`/`test:e2e` yourself to establish current pass/fail status —
 this README does not assert a specific pass count. One disclosed,
