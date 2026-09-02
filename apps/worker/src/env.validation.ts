@@ -16,6 +16,15 @@ export const envSchema = z.object({
   REDIS_URL: z.string().min(1, "REDIS_URL is required"),
 
   /**
+   * Story 115 — mirrors `apps/api`'s own `APP_DATABASE_URL` exactly (same
+   * doc comment content, same "optional, falls back to DATABASE_URL"
+   * semantics): `apps/worker`'s actual runtime Postgres connection
+   * (`PrismaService`) uses this when set — the restricted `crm_app` role
+   * — rather than the migration/owner role `DATABASE_URL` names.
+   */
+  APP_DATABASE_URL: z.string().optional(),
+
+  /**
    * Architecture-boundary refactor — mirrors `apps/api`'s own optional
    * `ANTHROPIC_API_KEY`/`ANTHROPIC_MODEL` exactly (same default model,
    * same "unset is a valid, expected state" semantics). Added only so

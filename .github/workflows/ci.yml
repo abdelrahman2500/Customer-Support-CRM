@@ -113,6 +113,16 @@ jobs:
           exit 1
 
       - name: Integration tests
+        # Story 115 — `test:e2e:prepare` (`prisma migrate reset --force`)
+        # applies every migration from scratch, including
+        # `add_runtime_db_role_grants`, which provisions the restricted
+        # `crm_app` role — it does not exist yet during any earlier step
+        # in this job, so APP_DATABASE_URL is scoped to this step only
+        # (not the workflow-level env) to actually exercise the real app
+        # running under crm_app end to end, proving no legitimate
+        # operation was accidentally under-granted.
+        env:
+          APP_DATABASE_URL: "postgresql://crm_app:crm_app_dev_password@localhost:5432/crm?schema=public"
         run: pnpm --filter @crm/api test:e2e
 
   browser-e2e:
@@ -141,6 +151,13 @@ jobs:
       # since CI sets real env vars directly rather than loading a `.env`
       # file.
       CORS_ORIGINS: "http://localhost:3000,http://localhost:3002"
+      # Story 115 — by the time apps/api's dev server actually starts
+      # (after this job's own "Run migrations" step below), the
+      # restricted crm_app role already exists, so it's safe to set this
+      # at job level: apps/api runs under crm_app for the whole browser
+      # E2E suite too, exercising the exact restricted role Playwright
+      # drives.
+      APP_DATABASE_URL: "postgresql://crm_app:crm_app_dev_password@localhost:5432/crm?schema=public"
     services:
       postgres:
         image: pgvector/pgvector:pg16

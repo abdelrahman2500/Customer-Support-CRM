@@ -20,6 +20,23 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   REDIS_URL: z.string().min(1, "REDIS_URL is required"),
 
+  /**
+   * Story 115 — `DATABASE_URL` keeps meaning "the migration/owner role"
+   * (used by `prisma migrate deploy`/`prisma db seed`/`prisma generate`,
+   * unaffected by this variable — the Prisma CLI reads its own
+   * `env("DATABASE_URL")` datasource declaration directly). This app's
+   * actual runtime Postgres connection (`PrismaService`) uses
+   * `APP_DATABASE_URL` when set — the restricted `crm_app` role a
+   * `add_runtime_db_role_grants`-family migration provisions, which
+   * cannot alter schema and is denied UPDATE/DELETE on
+   * `admin.audit_logs` (docs/architecture/05-auth-and-security.md).
+   * Optional, falling back to `DATABASE_URL`: a required addition here
+   * would fail startup for every already-configured environment that
+   * hasn't set it yet — see this variable's own story plan for why that
+   * would violate this project's backward-compatibility rules.
+   */
+  APP_DATABASE_URL: z.string().optional(),
+
   JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
   JWT_ACCESS_TTL: z.string().default("15m"),
   JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),

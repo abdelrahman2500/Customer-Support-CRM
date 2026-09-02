@@ -196,11 +196,12 @@ model RefreshToken {
 // admin schema
 // ---------------------------------------------------------------------------
 
-/// Append-only audit log. The application's runtime DB role must be granted
-/// INSERT/SELECT only on this table (no UPDATE/DELETE) — see
-/// docs/architecture/05-auth-and-security.md. Enforcing that grant is a
-/// deployment/DBA task tracked as a follow-up (see Story 02 plan's Done
-/// Criteria); Prisma itself cannot express column/row privileges.
+/// Append-only audit log. The application's runtime DB role (`crm_app`) is
+/// granted INSERT/SELECT only on this table (no UPDATE/DELETE) — enforced
+/// at the DB level by the `add_runtime_db_role_grants` migration (Story
+/// 115), not by Prisma (which cannot express column/row privileges) or by
+/// application code. See docs/architecture/05-auth-and-security.md and
+/// test/audit-log-db-grants.e2e-spec.ts.
 model AuditLog {
   id         String   @id @default(uuid())
   actorId    String?  @map("actor_id")
