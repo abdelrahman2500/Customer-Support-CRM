@@ -115,6 +115,7 @@ const NAV_ITEMS = [
   { href: "ai-settings", labelKey: "nav.aiSettings" },
   { href: "quick-replies", labelKey: "nav.quickReplies" },
   { href: "ticket-categories", labelKey: "nav.ticketCategories" },
+  { href: "my-sessions", labelKey: "nav.mySessions" },
 ] as const;
 
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {

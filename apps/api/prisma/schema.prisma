@@ -223,8 +223,20 @@ model RefreshToken {
   revokedAt  DateTime? @map("revoked_at")
   replacedBy String?   @map("replaced_by")
   createdAt  DateTime  @default(now()) @map("created_at")
+  // Story 124 — Session/Device Management. `sessionId` is generated once at
+  // login and carried forward unchanged across every rotation in this
+  // token's lineage, so a "session" (one continuous logged-in
+  // device/browser) survives `refresh()`'s rotate-and-revoke-the-old-row
+  // behavior instead of looking like a new session on every silent
+  // refresh. Nullable: pre-existing rows issued before this migration have
+  // none and are simply excluded from `listMySessions`.
+  sessionId        String?   @map("session_id")
+  sessionCreatedAt DateTime? @map("session_created_at")
+  userAgent        String?   @map("user_agent")
+  ipAddress        String?   @map("ip_address")
 
   @@index([userId])
+  @@index([sessionId])
   @@map("refresh_tokens")
   @@schema("identity")
 }

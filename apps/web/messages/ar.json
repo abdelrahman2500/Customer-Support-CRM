@@ -69,6 +69,7 @@
       "aiSettings": "إعدادات الذكاء الاصطناعي",
       "quickReplies": "الردود السريعة",
       "ticketCategories": "فئات التذاكر",
+      "mySessions": "جلساتي",
       "unreadNotificationsLabel": "{count} إشعارات غير مقروءة"
     }
   },
@@ -829,5 +830,25 @@
     "categorizeLabel": "التصنيف",
     "chatLabel": "روبوت المحادثة في البوابة",
     "saveFailed": "تعذّر حفظ هذا الإعداد. حاول مرة أخرى."
+  },
+  "mySessions": {
+    "title": "جلساتي",
+    "description": "كل جهاز مسجّل دخوله حاليًا إلى حسابك. سجّل الخروج من أي جهاز لا تتعرف عليه.",
+    "error": "تعذّر تحميل جلساتك.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد جلسات نشطة.",
+    "columns": {
+      "device": "الجهاز",
+      "ipAddress": "عنوان IP",
+      "lastActive": "آخر نشاط",
+      "signedInSince": "تاريخ تسجيل الدخول"
+    },
+    "unknownDevice": "جهاز غير معروف",
+    "thisDevice": "هذا الجهاز",
+    "signOut": "تسجيل الخروج",
+    "signOutConfirmTitle": "تسجيل الخروج من هذا الجهاز؟",
+    "signOutConfirmDescription": "سيتم تسجيل خروج هذا الجهاز فورًا وسيحتاج إلى تسجيل الدخول مرة أخرى.",
+    "actionForbidden": "ليس لديك صلاحية لتنفيذ هذا الإجراء.",
+    "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى."
   }
 }

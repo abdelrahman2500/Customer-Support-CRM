@@ -1,4 +1,4 @@
-import { randomBytes, createHmac } from "node:crypto";
+import { randomBytes, randomUUID, createHmac } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
@@ -99,6 +99,25 @@ export interface BranchMembershipSummary {
   isActive: boolean;
 }
 
+/**
+ * Story 124 — Session/Device Management. One row per continuously
+ * logged-in device/browser (a `sessionId` lineage), not per historical
+ * `RefreshToken` row — `refresh()`/`switchActiveBranch()` rotate the
+ * underlying row on every call but carry `sessionId`/`sessionCreatedAt`
+ * forward unchanged, so this stays stable across silent refreshes.
+ * `lastActiveAt` is the current (most recently rotated) row's own
+ * `createdAt`. `GET auth/sessions` — no extra permission gate, the
+ * caller's own data, mirrors `me`/`myBranches`'s identical precedent.
+ */
+export interface SessionSummary {
+  sessionId: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  sessionCreatedAt: Date;
+  lastActiveAt: Date;
+  isCurrent: boolean;
+}
+
 /** Story 35 — every department within the caller's own branch (same
  * branch-scoping rule as `BranchSummary`). */
 export interface DepartmentSummary {
@@ -173,6 +192,7 @@ export class IdentityService {
     email: string,
     password: string,
     ipAddress: string | null = null,
+    userAgent: string | null = null,
   ): Promise<AuthTokenPair> {
     const user = await this.prisma.user.findUnique({
       where: { email },
@@ -245,7 +265,10 @@ export class IdentityService {
       branchId: user.activeBranchId,
       departmentId: user.activeDepartmentId,
     });
-    const { raw: refreshToken } = await this.createRefreshTokenRecord(user.id);
+    const { raw: refreshToken } = await this.createRefreshTokenRecord(user.id, {
+      ipAddress,
+      userAgent,
+    });
     await this.recordAuditLog({
       actorId: user.id,
       action: "auth.login",
@@ -294,10 +317,19 @@ export class IdentityService {
    * token is a signal of a possibly stolen token, so it fails closed rather
    * than silently reissuing).
    */
-  async refresh(presentedToken: string): Promise<AuthTokenPair> {
+  async refresh(
+    presentedToken: string,
+    ipAddress: string | null = null,
+    userAgent: string | null = null,
+  ): Promise<AuthTokenPair> {
     const { record, user } = await this.validateAndLoadRefreshSubject(presentedToken);
 
-    const { raw: newRawToken, id: newTokenId } = await this.createRefreshTokenRecord(user.id);
+    const { raw: newRawToken, id: newTokenId } = await this.createRefreshTokenRecord(user.id, {
+      ipAddress,
+      userAgent,
+      sessionId: record.sessionId ?? undefined,
+      sessionCreatedAt: record.sessionCreatedAt ?? undefined,
+    });
     await this.prisma.refreshToken.update({
       where: { id: record.id },
       data: { revokedAt: new Date(), replacedBy: newTokenId },
@@ -331,6 +363,8 @@ export class IdentityService {
     presentedToken: string,
     branchId: string,
     departmentId: string | null,
+    ipAddress: string | null = null,
+    userAgent: string | null = null,
   ): Promise<AuthTokenPair> {
     const { record, user } = await this.validateAndLoadRefreshSubject(presentedToken);
 
@@ -347,7 +381,12 @@ export class IdentityService {
       data: { activeBranchId: branchId, activeDepartmentId: departmentId },
     });
 
-    const { raw: newRawToken, id: newTokenId } = await this.createRefreshTokenRecord(user.id);
+    const { raw: newRawToken, id: newTokenId } = await this.createRefreshTokenRecord(user.id, {
+      ipAddress,
+      userAgent,
+      sessionId: record.sessionId ?? undefined,
+      sessionCreatedAt: record.sessionCreatedAt ?? undefined,
+    });
     await this.prisma.refreshToken.update({
       where: { id: record.id },
       data: { revokedAt: new Date(), replacedBy: newTokenId },
@@ -377,7 +416,12 @@ export class IdentityService {
    * refresh token (unknown/expired/revoked all fail identically) and
    * loads its owning, still-active user with every branch membership. */
   private async validateAndLoadRefreshSubject(presentedToken: string): Promise<{
-    record: { id: string; userId: string };
+    record: {
+      id: string;
+      userId: string;
+      sessionId: string | null;
+      sessionCreatedAt: Date | null;
+    };
     user: {
       id: string;
       isActive: boolean;
@@ -523,6 +567,68 @@ export class IdentityService {
   }
 
   /**
+   * Story 124 — Session/Device Management. One row per `sessionId` lineage
+   * with a currently live (unrevoked, unexpired) `RefreshToken` — because
+   * `refresh()`/`switchActiveBranch()` always revoke the prior row in the
+   * same lineage when creating the next, there is at most one such row per
+   * `sessionId` at any instant, so this is a real device/browser list, not
+   * a rotation history. Pre-existing rows issued before this Story's
+   * migration have no `sessionId` and are excluded (no backfill; see the
+   * `RefreshToken.sessionId` doc comment). No extra permission gate — the
+   * caller's own data, mirrors `listMyBranchMemberships`'s precedent.
+   */
+  async listMySessions(presentedRefreshToken: string | null): Promise<SessionSummary[]> {
+    const userId = this.tenantContext.userId;
+    if (!userId) {
+      throw new UnauthorizedException("No authenticated user on this request");
+    }
+
+    const currentTokenHash = presentedRefreshToken
+      ? this.hashRefreshToken(presentedRefreshToken)
+      : null;
+
+    const sessions = await this.prisma.refreshToken.findMany({
+      where: { userId, sessionId: { not: null }, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return sessions.map((session) => ({
+      sessionId: session.sessionId!,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      sessionCreatedAt: session.sessionCreatedAt ?? session.createdAt,
+      lastActiveAt: session.createdAt,
+      isCurrent: currentTokenHash !== null && session.tokenHash === currentTokenHash,
+    }));
+  }
+
+  /**
+   * Story 124 — revokes every currently-live `RefreshToken` row for one
+   * `sessionId` belonging to the caller (in practice, at most one — see
+   * `listMySessions`), immediately preventing that device from refreshing
+   * again. 404s if the caller never had ANY row (live or already revoked)
+   * with this `sessionId` — never operates on another user's session —
+   * but silently no-ops (like `revoke`/`revokeAllRefreshTokens`) if it was
+   * already revoked.
+   */
+  async revokeSession(sessionId: string): Promise<void> {
+    const userId = this.tenantContext.userId;
+    if (!userId) {
+      throw new UnauthorizedException("No authenticated user on this request");
+    }
+
+    const existing = await this.prisma.refreshToken.findFirst({ where: { userId, sessionId } });
+    if (!existing) {
+      throw new NotFoundException("Session not found");
+    }
+
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, sessionId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  /**
    * Creates a user scoped to a branch (and optionally a department) with a
    * given role. The target branch is whatever the caller specifies in the
    * DTO — an admin managing several branches is expected to pick one —
@@ -661,7 +767,11 @@ export class IdentityService {
         entityType: "user",
         entityId: userId,
         branchId: callerBranchId,
-        diff: { branchId: dto.branchId, departmentId: dto.departmentId ?? null, roleId: dto.roleId },
+        diff: {
+          branchId: dto.branchId,
+          departmentId: dto.departmentId ?? null,
+          roleId: dto.roleId,
+        },
       });
       return { id: membership.id };
     } catch (error) {
@@ -1219,9 +1329,10 @@ export class IdentityService {
    * the first assignment by creation order, exactly this codebase's
    * pre-Story-118 behavior.
    */
-  private resolveActiveMembership<
-    T extends { branchId: string; departmentId: string | null },
-  >(branchRoles: T[], active: { branchId: string | null; departmentId: string | null }): T | undefined {
+  private resolveActiveMembership<T extends { branchId: string; departmentId: string | null }>(
+    branchRoles: T[],
+    active: { branchId: string | null; departmentId: string | null },
+  ): T | undefined {
     return (
       (active.branchId !== null
         ? branchRoles.find(
@@ -1264,7 +1375,23 @@ export class IdentityService {
     return this.jwtService.signAsync(claims);
   }
 
-  private async createRefreshTokenRecord(userId: string): Promise<{ raw: string; id: string }> {
+  /**
+   * Story 124 — Session/Device Management. `sessionId`/`sessionCreatedAt`
+   * are carried forward unchanged by `refresh()`/`switchActiveBranch()` (the
+   * lineage's existing session survives rotation); `login()` omits them,
+   * so a brand-new session starts fresh. `ipAddress`/`userAgent` always
+   * reflect the CURRENT request, so a session's "last active" device info
+   * stays current across rotations.
+   */
+  private async createRefreshTokenRecord(
+    userId: string,
+    session: {
+      ipAddress: string | null;
+      userAgent: string | null;
+      sessionId?: string;
+      sessionCreatedAt?: Date;
+    },
+  ): Promise<{ raw: string; id: string }> {
     const raw = randomBytes(48).toString("base64url");
     const tokenHash = this.hashRefreshToken(raw);
     const ttlDays = this.configService.get("JWT_REFRESH_TTL_DAYS", { infer: true });
@@ -1273,6 +1400,10 @@ export class IdentityService {
         userId,
         tokenHash,
         expiresAt: new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000),
+        sessionId: session.sessionId ?? randomUUID(),
+        sessionCreatedAt: session.sessionCreatedAt ?? new Date(),
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent,
       },
     });
     return { raw, id: record.id };

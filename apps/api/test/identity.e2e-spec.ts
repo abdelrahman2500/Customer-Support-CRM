@@ -440,6 +440,108 @@ describe("Identity & Access (e2e)", () => {
     });
   });
 
+  // Story 124 — Session/Device Management. Uses a dedicated, freshly
+  // created user (never the shared seeded admin) for the same reason as
+  // "account lockout (Story 122)" above: exercising session revoke here
+  // must never touch a row every other e2e spec file also logs in as.
+  describe("session/device management (Story 124)", () => {
+    let foreignSessionId: string;
+
+    async function createDisposableAgentUser(): Promise<{ email: string; password: string }> {
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const email = `session-mgmt-${randomUUID()}@example.com`;
+      const password = "session-mgmt-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email,
+          password,
+          fullName: "Session Management Test User",
+          branchId: adminBranchId,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+      return { email, password };
+    }
+
+    it("captures a distinct session per login (device A vs. device B), lists both with the presented device flagged current, then revoking device B's session blocks only its own refresh — device A's session survives untouched", async () => {
+      const { email, password } = await createDisposableAgentUser();
+
+      const loginA = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .set("User-Agent", "Mozilla/5.0 (Device A)")
+        .send({ email, password })
+        .expect(200);
+      const accessTokenA = loginA.body.accessToken as string;
+      const cookieHeaderA = loginA.headers["set-cookie"] as unknown as string[];
+      const refreshCookieA = cookieHeaderA.find((cookie) => cookie.startsWith("refreshToken="))!;
+
+      const loginB = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .set("User-Agent", "Mozilla/5.0 (Device B)")
+        .send({ email, password })
+        .expect(200);
+      const cookieHeaderB = loginB.headers["set-cookie"] as unknown as string[];
+      const refreshCookieB = cookieHeaderB.find((cookie) => cookie.startsWith("refreshToken="))!;
+
+      // GET auth/sessions, presenting device A's own refresh cookie —
+      // ordinary AuthGuard only, no permission grant needed (Agent role,
+      // zero permissions by default).
+      const sessionsResponse = await request(app.getHttpServer())
+        .get("/api/v1/auth/sessions")
+        .set("Authorization", `Bearer ${accessTokenA}`)
+        .set("Cookie", refreshCookieA)
+        .expect(200);
+      expect(sessionsResponse.body).toHaveLength(2);
+      const sessionA = sessionsResponse.body.find(
+        (session: { userAgent: string }) => session.userAgent === "Mozilla/5.0 (Device A)",
+      );
+      const sessionB = sessionsResponse.body.find(
+        (session: { userAgent: string }) => session.userAgent === "Mozilla/5.0 (Device B)",
+      );
+      expect(sessionA.isCurrent).toBe(true);
+      expect(sessionB.isCurrent).toBe(false);
+      foreignSessionId = sessionA.sessionId; // reused by the 404 test below
+
+      // Revoking device B's session, authenticated as device A.
+      await request(app.getHttpServer())
+        .delete(`/api/v1/auth/sessions/${sessionB.sessionId}`)
+        .set("Authorization", `Bearer ${accessTokenA}`)
+        .expect(204);
+
+      // Device B's refresh cookie is now dead...
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/refresh")
+        .set("Cookie", refreshCookieB)
+        .expect(401);
+
+      // ...while device A's own session is completely unaffected.
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/refresh")
+        .set("Cookie", refreshCookieA)
+        .expect(200);
+    });
+
+    it("returns 404 revoking a sessionId that exists but never belonged to the caller (never operates on another user's session)", async () => {
+      await request(app.getHttpServer())
+        .delete(`/api/v1/auth/sessions/${foreignSessionId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("rejects unauthenticated requests to both session endpoints (401)", async () => {
+      await request(app.getHttpServer()).get("/api/v1/auth/sessions").expect(401);
+      await request(app.getHttpServer())
+        .delete(`/api/v1/auth/sessions/${randomUUID()}`)
+        .expect(401);
+    });
+  });
+
   it("rejects an identity route with no token", async () => {
     await request(app.getHttpServer()).get("/api/v1/identity/users").expect(401);
   });

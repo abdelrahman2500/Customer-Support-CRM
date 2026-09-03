@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
   Post,
   Req,
@@ -20,7 +22,7 @@ import type { EnvConfig } from "../../common/config/env.validation";
 import { LoginDto } from "./dto/login.dto";
 import { SwitchBranchDto } from "./dto/switch-branch.dto";
 import { UpdateLocaleDto } from "./dto/update-locale.dto";
-import type { BranchMembershipSummary } from "./identity.service";
+import type { BranchMembershipSummary, SessionSummary } from "./identity.service";
 import { IdentityService } from "./identity.service";
 
 const REFRESH_COOKIE_NAME = "refreshToken";
@@ -58,6 +60,7 @@ export class IdentityController {
       dto.email,
       dto.password,
       request.ip ?? null,
+      request.headers["user-agent"] ?? null,
     );
     this.setRefreshCookie(response, refreshToken);
     return { accessToken };
@@ -75,7 +78,11 @@ export class IdentityController {
     if (!presented) {
       throw new UnauthorizedException("Missing refresh token");
     }
-    const { accessToken, refreshToken } = await this.identityService.refresh(presented);
+    const { accessToken, refreshToken } = await this.identityService.refresh(
+      presented,
+      request.ip ?? null,
+      request.headers["user-agent"] ?? null,
+    );
     this.setRefreshCookie(response, refreshToken);
     return { accessToken };
   }
@@ -121,6 +128,25 @@ export class IdentityController {
     return this.identityService.listMyBranchMemberships();
   }
 
+  /** Story 124 — the caller's own active sessions (one per logged-in
+   * device/browser), flagging which one is the current request's own.
+   * No extra permission gate — the caller's own data, mirrors `me`/
+   * `myBranches`'s identical precedent. */
+  @Get("sessions")
+  async sessions(@Req() request: Request): Promise<SessionSummary[]> {
+    const presented = request.cookies?.[REFRESH_COOKIE_NAME] as string | undefined;
+    return this.identityService.listMySessions(presented ?? null);
+  }
+
+  /** Story 124 — revokes one of the caller's own sessions by id,
+   * immediately preventing that device from refreshing again without
+   * affecting any of their other sessions. */
+  @Delete("sessions/:sessionId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async revokeSession(@Param("sessionId") sessionId: string): Promise<void> {
+    await this.identityService.revokeSession(sessionId);
+  }
+
   /**
    * Story 118 — switches the caller's active branch/department to one
    * of their OTHER existing memberships (granted via `POST
@@ -149,6 +175,8 @@ export class IdentityController {
       presented,
       dto.branchId,
       dto.departmentId ?? null,
+      request.ip ?? null,
+      request.headers["user-agent"] ?? null,
     );
     this.setRefreshCookie(response, refreshToken);
     return { accessToken };

@@ -69,6 +69,7 @@
       "aiSettings": "AI Settings",
       "quickReplies": "Quick Replies",
       "ticketCategories": "Ticket Categories",
+      "mySessions": "My Sessions",
       "unreadNotificationsLabel": "{count} unread notifications"
     }
   },
@@ -837,5 +838,25 @@
     "categorizeLabel": "Categorize",
     "chatLabel": "Portal AI Chatbot",
     "saveFailed": "Couldn't save this setting. Please try again."
+  },
+  "mySessions": {
+    "title": "My Sessions",
+    "description": "Every device currently signed into your account. Sign out of any device you don't recognize.",
+    "error": "Couldn't load your sessions.",
+    "retry": "Retry",
+    "empty": "No active sessions.",
+    "columns": {
+      "device": "Device",
+      "ipAddress": "IP address",
+      "lastActive": "Last active",
+      "signedInSince": "Signed in since"
+    },
+    "unknownDevice": "Unknown device",
+    "thisDevice": "This device",
+    "signOut": "Sign out",
+    "signOutConfirmTitle": "Sign out of this device?",
+    "signOutConfirmDescription": "That device will be signed out immediately and will need to sign in again.",
+    "actionForbidden": "You don't have permission to perform that action.",
+    "actionFailed": "That change couldn't be saved. Please try again."
   }
 }

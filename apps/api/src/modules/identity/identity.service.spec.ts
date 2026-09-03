@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   BadRequestException,
@@ -53,6 +54,8 @@ function buildPrismaMock() {
     },
     refreshToken: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
@@ -300,6 +303,31 @@ describe("IdentityService", () => {
       });
     });
 
+    // Story 124 — Session/Device Management.
+    it("starts a brand-new session (a freshly generated sessionId + ipAddress/userAgent) on login", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        isActive: true,
+        passwordHash: "hashed:correct-password",
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        branchRoles: [activeBranchRole],
+      });
+      vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+      prisma.refreshToken.create.mockResolvedValue({ id: "rt-1" });
+
+      await service.login("admin@example.com", "correct-password", "203.0.113.1", "Mozilla/5.0");
+
+      expect(prisma.refreshToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          ipAddress: "203.0.113.1",
+          userAgent: "Mozilla/5.0",
+          sessionId: expect.any(String),
+          sessionCreatedAt: expect.any(Date),
+        }),
+      });
+    });
+
     it("never throws when the audit write itself fails", async () => {
       prisma.user.findUnique.mockResolvedValue({
         id: "user-1",
@@ -516,6 +544,52 @@ describe("IdentityService", () => {
       expect(prisma.refreshToken.update).toHaveBeenCalledWith({
         where: { id: "rt-1" },
         data: expect.objectContaining({ replacedBy: "rt-2" }),
+      });
+    });
+
+    // Story 124 — Session/Device Management.
+    it("carries the existing session's sessionId/sessionCreatedAt forward unchanged, while updating ipAddress/userAgent to the current request", async () => {
+      const sessionCreatedAt = new Date("2026-01-01T00:00:00.000Z");
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        ...validRecord,
+        sessionId: "session-abc",
+        sessionCreatedAt,
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        isActive: true,
+        branchRoles: [activeBranchRole],
+      });
+      prisma.refreshToken.create.mockResolvedValue({ id: "rt-2" });
+
+      await service.refresh("presented-raw-token", "203.0.113.9", "Mozilla/5.0 (new device)");
+
+      expect(prisma.refreshToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          sessionId: "session-abc",
+          sessionCreatedAt,
+          ipAddress: "203.0.113.9",
+          userAgent: "Mozilla/5.0 (new device)",
+        }),
+      });
+    });
+
+    it("starts a brand-new session when the presented token predates Story 124 (no stored sessionId)", async () => {
+      prisma.refreshToken.findUnique.mockResolvedValue(validRecord); // no sessionId field
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        isActive: true,
+        branchRoles: [activeBranchRole],
+      });
+      prisma.refreshToken.create.mockResolvedValue({ id: "rt-2" });
+
+      await service.refresh("presented-raw-token");
+
+      expect(prisma.refreshToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          sessionId: expect.any(String),
+          sessionCreatedAt: expect.any(Date),
+        }),
       });
     });
 
@@ -766,6 +840,144 @@ describe("IdentityService", () => {
     });
   });
 
+  // Story 124 — Session/Device Management.
+  describe("listMySessions", () => {
+    // Mirrors `hashRefreshToken`'s own HMAC-SHA256 implementation exactly,
+    // using the same `JWT_REFRESH_SECRET` `buildConfigServiceMock` supplies,
+    // so this test can present a raw token that genuinely hashes to a
+    // specific session's stored `tokenHash`.
+    function hashLikeService(raw: string): string {
+      return createHmac("sha256", "unit-test-refresh-secret-at-least-32-chars-long")
+        .update(raw)
+        .digest("hex");
+    }
+
+    it("lists one row per live session, newest first, with the presented token's session flagged current", async () => {
+      const currentRawToken = "presented-raw-token";
+      const sessionA = {
+        sessionId: "session-a",
+        tokenHash: hashLikeService(currentRawToken),
+        ipAddress: "203.0.113.1",
+        userAgent: "Mozilla/5.0 (device A)",
+        sessionCreatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        createdAt: new Date("2026-01-02T00:00:00.000Z"),
+      };
+      const sessionB = {
+        sessionId: "session-b",
+        tokenHash: "hash-of-other-token",
+        ipAddress: "203.0.113.2",
+        userAgent: "Mozilla/5.0 (device B)",
+        sessionCreatedAt: new Date("2026-01-03T00:00:00.000Z"),
+        createdAt: new Date("2026-01-03T00:00:00.000Z"),
+      };
+      prisma.refreshToken.findMany.mockResolvedValue([sessionB, sessionA]);
+
+      const result = await service.listMySessions(currentRawToken);
+
+      expect(prisma.refreshToken.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: "actor-1",
+          sessionId: { not: null },
+          revokedAt: null,
+          expiresAt: { gt: expect.any(Date) },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(result).toEqual([
+        {
+          sessionId: "session-b",
+          ipAddress: "203.0.113.2",
+          userAgent: "Mozilla/5.0 (device B)",
+          sessionCreatedAt: sessionB.sessionCreatedAt,
+          lastActiveAt: sessionB.createdAt,
+          isCurrent: false,
+        },
+        {
+          sessionId: "session-a",
+          ipAddress: "203.0.113.1",
+          userAgent: "Mozilla/5.0 (device A)",
+          sessionCreatedAt: sessionA.sessionCreatedAt,
+          lastActiveAt: sessionA.createdAt,
+          isCurrent: true,
+        },
+      ]);
+    });
+
+    it("flags isCurrent false for every session when no refresh token was presented", async () => {
+      prisma.refreshToken.findMany.mockResolvedValue([
+        {
+          sessionId: "session-a",
+          tokenHash: "hash-of-a",
+          ipAddress: null,
+          userAgent: null,
+          sessionCreatedAt: new Date(),
+          createdAt: new Date(),
+        },
+      ]);
+
+      const result = await service.listMySessions(null);
+
+      expect(result[0]!.isCurrent).toBe(false);
+    });
+
+    it("throws UnauthorizedException when no authenticated user exists on TenantContext", async () => {
+      tenantContext = buildTenantContextMock("branch-1", null);
+      service = createService(prisma, jwtService, configService, tenantContext);
+
+      await expect(service.listMySessions(null)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+  });
+
+  describe("revokeSession", () => {
+    it("revokes the caller's own live session", async () => {
+      prisma.refreshToken.findFirst.mockResolvedValue({
+        id: "rt-1",
+        userId: "actor-1",
+        sessionId: "session-a",
+      });
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.revokeSession("session-a");
+
+      expect(prisma.refreshToken.findFirst).toHaveBeenCalledWith({
+        where: { userId: "actor-1", sessionId: "session-a" },
+      });
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: "actor-1", sessionId: "session-a", revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+
+    it("silently no-ops when the session is already revoked", async () => {
+      prisma.refreshToken.findFirst.mockResolvedValue({
+        id: "rt-1",
+        userId: "actor-1",
+        sessionId: "session-a",
+        revokedAt: new Date(),
+      });
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.revokeSession("session-a")).resolves.toBeUndefined();
+    });
+
+    it("throws NotFoundException when the caller never had any row with this sessionId (never operates on another user's session)", async () => {
+      prisma.refreshToken.findFirst.mockResolvedValue(null);
+
+      await expect(service.revokeSession("someone-elses-session")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it("throws UnauthorizedException when no authenticated user exists on TenantContext", async () => {
+      tenantContext = buildTenantContextMock("branch-1", null);
+      service = createService(prisma, jwtService, configService, tenantContext);
+
+      await expect(service.revokeSession("session-a")).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    });
+  });
+
   describe("switchActiveBranch", () => {
     const validRecord = {
       id: "rt-1",
@@ -820,6 +1032,43 @@ describe("IdentityService", () => {
         service.switchActiveBranch("presented-raw-token", "branch-never-granted", null),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    // Story 124 — Session/Device Management. A branch switch rotates the
+    // refresh token exactly like `refresh()` does, and must carry the same
+    // session's identity forward unchanged.
+    it("carries the existing session's sessionId/sessionCreatedAt forward unchanged", async () => {
+      const sessionCreatedAt = new Date("2026-01-01T00:00:00.000Z");
+      prisma.refreshToken.findUnique.mockResolvedValue({
+        ...validRecord,
+        sessionId: "session-abc",
+        sessionCreatedAt,
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        isActive: true,
+        activeBranchId: null,
+        activeDepartmentId: null,
+        branchRoles: [activeBranchRole, otherBranchRole],
+      });
+      prisma.refreshToken.create.mockResolvedValue({ id: "rt-2" });
+
+      await service.switchActiveBranch(
+        "presented-raw-token",
+        "branch-2",
+        null,
+        "203.0.113.9",
+        "Mozilla/5.0 (new device)",
+      );
+
+      expect(prisma.refreshToken.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          sessionId: "session-abc",
+          sessionCreatedAt,
+          ipAddress: "203.0.113.9",
+          userAgent: "Mozilla/5.0 (new device)",
+        }),
+      });
     });
 
     it("rejects an unknown/expired/revoked token exactly like refresh()", async () => {
