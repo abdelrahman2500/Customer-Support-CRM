@@ -120,6 +120,18 @@ export class UsersController {
   }
 
   /**
+   * Story 122 — clears a user's failed-login counter/lock immediately,
+   * without waiting for the 15-minute auto-expiry. Reuses `user:update`
+   * rather than a new permission key — see `IdentityService.unlockUser`'s
+   * own doc comment for why this is the right risk tier.
+   */
+  @Post("users/:id/unlock")
+  @RequirePermissions("user:update")
+  unlockUser(@Param("id") id: string): Promise<{ id: string }> {
+    return this.identityService.unlockUser(id);
+  }
+
+  /**
    * Story 118 — grants an EXISTING user an additional
    * branch/department/role membership, in a DIFFERENT branch than
    * `updateUserAssignment` above ever touches. Its own,

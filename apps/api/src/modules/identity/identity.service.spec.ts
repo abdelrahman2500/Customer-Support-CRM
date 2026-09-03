@@ -177,6 +177,8 @@ describe("IdentityService", () => {
         id: "user-1",
         isActive: true,
         passwordHash: "hashed:correct-password",
+        failedLoginAttempts: 0,
+        lockedUntil: null,
         branchRoles: [activeBranchRole],
       });
       vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
@@ -203,6 +205,8 @@ describe("IdentityService", () => {
         id: "user-1",
         isActive: false,
         passwordHash: "hashed:whatever",
+        failedLoginAttempts: 0,
+        lockedUntil: null,
         branchRoles: [],
       });
 
@@ -216,6 +220,8 @@ describe("IdentityService", () => {
         id: "user-1",
         isActive: true,
         passwordHash: "hashed:correct-password",
+        failedLoginAttempts: 0,
+        lockedUntil: null,
         branchRoles: [],
       });
       vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
@@ -248,6 +254,8 @@ describe("IdentityService", () => {
         id: "user-1",
         isActive: true,
         passwordHash: "hashed:correct-password",
+        failedLoginAttempts: 0,
+        lockedUntil: null,
         branchRoles: [],
       });
       vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
@@ -271,6 +279,8 @@ describe("IdentityService", () => {
         id: "user-1",
         isActive: true,
         passwordHash: "hashed:correct-password",
+        failedLoginAttempts: 0,
+        lockedUntil: null,
         branchRoles: [activeBranchRole],
       });
       vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
@@ -295,6 +305,8 @@ describe("IdentityService", () => {
         id: "user-1",
         isActive: true,
         passwordHash: "hashed:correct-password",
+        failedLoginAttempts: 0,
+        lockedUntil: null,
         branchRoles: [activeBranchRole],
       });
       vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
@@ -304,6 +316,180 @@ describe("IdentityService", () => {
       await expect(
         service.login("admin@example.com", "correct-password"),
       ).resolves.toEqual(expect.objectContaining({ accessToken: "signed.access.token" }));
+    });
+
+    // Story 122 — Account Lockout.
+    describe("account lockout", () => {
+      it("increments failedLoginAttempts by one on a wrong password, without locking below the threshold", async () => {
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user-1",
+          isActive: true,
+          passwordHash: "hashed:correct-password",
+          failedLoginAttempts: 3,
+          lockedUntil: null,
+          branchRoles: [],
+        });
+        vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
+
+        await expect(
+          service.login("admin@example.com", "wrong-password"),
+        ).rejects.toBeInstanceOf(UnauthorizedException);
+
+        expect(prisma.user.update).toHaveBeenCalledWith({
+          where: { id: "user-1" },
+          data: { failedLoginAttempts: 4 },
+        });
+      });
+
+      it("locks the account once failedLoginAttempts reaches the threshold (5), setting lockedUntil ~15 minutes out", async () => {
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user-1",
+          isActive: true,
+          passwordHash: "hashed:correct-password",
+          failedLoginAttempts: 4,
+          lockedUntil: null,
+          branchRoles: [],
+        });
+        vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
+        const before = Date.now();
+
+        await expect(
+          service.login("admin@example.com", "wrong-password"),
+        ).rejects.toBeInstanceOf(UnauthorizedException);
+
+        expect(prisma.user.update).toHaveBeenCalledWith({
+          where: { id: "user-1" },
+          data: { failedLoginAttempts: 5, lockedUntil: expect.any(Date) },
+        });
+        const lockedUntil = prisma.user.update.mock.calls[0]![0].data.lockedUntil as Date;
+        const deltaMs = lockedUntil.getTime() - before;
+        expect(deltaMs).toBeGreaterThan(14 * 60 * 1000);
+        expect(deltaMs).toBeLessThanOrEqual(15 * 60 * 1000 + 1000);
+      });
+
+      it("records a distinct auth.account_locked audit entry only on the locking attempt", async () => {
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user-1",
+          isActive: true,
+          passwordHash: "hashed:correct-password",
+          failedLoginAttempts: 4,
+          lockedUntil: null,
+          branchRoles: [],
+        });
+        vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
+
+        await expect(
+          service.login("admin@example.com", "wrong-password"),
+        ).rejects.toBeInstanceOf(UnauthorizedException);
+
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            action: "auth.account_locked",
+            entityType: "user",
+            entityId: "user-1",
+          }),
+        });
+      });
+
+      it("rejects a login attempt against a currently-locked account with the identical generic message, without touching bcrypt or the failed-attempt counter", async () => {
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user-1",
+          isActive: true,
+          passwordHash: "hashed:correct-password",
+          failedLoginAttempts: 5,
+          lockedUntil: new Date(Date.now() + 10 * 60 * 1000),
+          branchRoles: [],
+        });
+
+        // Even the CORRECT password must be rejected while locked.
+        await expect(
+          service.login("admin@example.com", "correct-password"),
+        ).rejects.toThrow("Invalid email or password");
+
+        expect(bcrypt.compare).not.toHaveBeenCalled();
+        expect(prisma.user.update).not.toHaveBeenCalled();
+      });
+
+      it("records auth.login_blocked (not auth.login_failed) for a locked-account attempt", async () => {
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user-1",
+          isActive: true,
+          passwordHash: "hashed:correct-password",
+          failedLoginAttempts: 5,
+          lockedUntil: new Date(Date.now() + 10 * 60 * 1000),
+          branchRoles: [],
+        });
+
+        await expect(service.login("admin@example.com", "correct-password")).rejects.toBeInstanceOf(
+          UnauthorizedException,
+        );
+
+        expect(prisma.auditLog.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            actorId: null,
+            action: "auth.login_blocked",
+            entityType: "user",
+            entityId: "user-1",
+          }),
+        });
+        expect(prisma.auditLog.create).not.toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ action: "auth.login_failed" }) }),
+        );
+      });
+
+      it("allows login once an expired lock has passed, evaluating the attempt normally", async () => {
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user-1",
+          isActive: true,
+          passwordHash: "hashed:correct-password",
+          failedLoginAttempts: 5,
+          lockedUntil: new Date(Date.now() - 60_000), // expired one minute ago
+          branchRoles: [activeBranchRole],
+        });
+        vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+        prisma.refreshToken.create.mockResolvedValue({ id: "rt-1" });
+
+        const result = await service.login("admin@example.com", "correct-password");
+
+        expect(result.accessToken).toBe("signed.access.token");
+      });
+
+      it("resets failedLoginAttempts/lockedUntil to their unlocked defaults on a successful login", async () => {
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user-1",
+          isActive: true,
+          passwordHash: "hashed:correct-password",
+          failedLoginAttempts: 3,
+          lockedUntil: null,
+          branchRoles: [activeBranchRole],
+        });
+        vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+        prisma.refreshToken.create.mockResolvedValue({ id: "rt-1" });
+
+        await service.login("admin@example.com", "correct-password");
+
+        expect(prisma.user.update).toHaveBeenCalledWith({
+          where: { id: "user-1" },
+          data: { failedLoginAttempts: 0, lockedUntil: null },
+        });
+      });
+
+      it("does not call user.update on a successful login when the counter is already 0 and unlocked", async () => {
+        prisma.user.findUnique.mockResolvedValue({
+          id: "user-1",
+          isActive: true,
+          passwordHash: "hashed:correct-password",
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          branchRoles: [activeBranchRole],
+        });
+        vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
+        prisma.refreshToken.create.mockResolvedValue({ id: "rt-1" });
+
+        await service.login("admin@example.com", "correct-password");
+
+        expect(prisma.user.update).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -927,6 +1113,7 @@ describe("IdentityService", () => {
           email: "a@example.com",
           fullName: "A",
           isActive: true,
+          lockedUntil: null,
           branchRoles: [{ branchId: "branch-1", role: { name: "Agent" } }],
         },
       ]);
@@ -940,7 +1127,46 @@ describe("IdentityService", () => {
         }),
       );
       expect(result).toEqual([
-        { id: "user-1", email: "a@example.com", fullName: "A", isActive: true, roles: ["Agent"] },
+        {
+          id: "user-1",
+          email: "a@example.com",
+          fullName: "A",
+          isActive: true,
+          roles: ["Agent"],
+          isLocked: false,
+          lockedUntil: null,
+        },
+      ]);
+    });
+
+    // Story 122 — Account Lockout.
+    it("computes isLocked true for a user with a still-future lockedUntil, false once it has passed", async () => {
+      const future = new Date(Date.now() + 10 * 60 * 1000);
+      const past = new Date(Date.now() - 60 * 1000);
+      prisma.user.findMany.mockResolvedValue([
+        {
+          id: "user-locked",
+          email: "locked@example.com",
+          fullName: "Locked User",
+          isActive: true,
+          lockedUntil: future,
+          branchRoles: [{ branchId: "branch-1", role: { name: "Agent" } }],
+        },
+        {
+          id: "user-expired",
+          email: "expired@example.com",
+          fullName: "Expired Lock User",
+          isActive: true,
+          lockedUntil: past,
+          branchRoles: [{ branchId: "branch-1", role: { name: "Agent" } }],
+        },
+      ]);
+
+      const result = await service.listUsers();
+
+      expect(result).toEqual([
+        expect.objectContaining({ id: "user-locked", isLocked: true, lockedUntil: future }),
+        expect.objectContaining({ id: "user-expired", isLocked: false, lockedUntil: past }),
       ]);
     });
 
@@ -1112,6 +1338,45 @@ describe("IdentityService", () => {
         data: expect.objectContaining({
           actorId: "actor-1",
           action: "user.password_reset",
+          entityType: "user",
+          entityId: "user-1",
+        }),
+      });
+    });
+  });
+
+  // Story 122 — Account Lockout.
+  describe("unlockUser", () => {
+    it("clears failedLoginAttempts/lockedUntil and returns { id }", async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+      prisma.user.update.mockResolvedValue({ id: "user-1" });
+
+      const result = await service.unlockUser("user-1");
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
+      expect(result).toEqual({ id: "user-1" });
+    });
+
+    it("throws NotFoundException for an unknown user id, never calling update", async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.unlockUser("missing-id")).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("records user.unlocked with the caller's actorId", async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: "user-1" });
+      prisma.user.update.mockResolvedValue({ id: "user-1" });
+
+      await service.unlockUser("user-1");
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actorId: "actor-1",
+          action: "user.unlocked",
           entityType: "user",
           entityId: "user-1",
         }),

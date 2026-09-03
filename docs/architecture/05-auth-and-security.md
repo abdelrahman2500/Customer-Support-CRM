@@ -23,5 +23,6 @@
 - In real environments `apps/api` is behind a reverse proxy/WAF. Only auth, portal, and webhook routes are internet-facing.
 - Secrets are environment variables validated at boot with `@nestjs/config` and `zod`; missing or malformed secrets fail startup.
 - Every controller input is a `class-validator` DTO. NestJS Throttler protects auth, portal, and inbound webhook endpoints.
+- Account lockout: 5 consecutive failed login attempts locks the account for 15 minutes (or until an admin manually unlocks it via `POST identity/users/:id/unlock`) — per-account, independent of source IP, complementing the IP-based Throttler above. A locked account's login attempt returns the same generic 401 as any other failure.
 - The runtime DB role cannot alter schema; a separate migration role is used only by CI/deploy.
 - Provider signatures verify inbound email/WhatsApp/SMS/ERP webhooks before processing; requests are rate-limited and logged.

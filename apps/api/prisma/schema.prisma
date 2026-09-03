@@ -123,6 +123,20 @@ model User {
   /// (`"en"`/`"ar"`) at the DTO layer only. `null` (every user before
   /// this story) means "no explicit choice yet".
   preferredLocale             String?                  @map("preferred_locale")
+  /// Story 122 — brute-force account lockout (closes the explicit
+  /// non-goal Story 100 deferred: "No account lockout... throttling
+  /// only"). `failedLoginAttempts` counts consecutive failed password
+  /// checks since the last successful login or manual unlock — never
+  /// incremented while already locked (`IdentityService.login`'s
+  /// lock-check runs before the password comparison). `lockedUntil` is a
+  /// plain nullable timestamp mirroring `RefreshToken.expiresAt`'s own
+  /// natural-expiry pattern (`lockedUntil !== null && lockedUntil > now()`
+  /// means "currently locked") — no scheduled job clears it; the next
+  /// login attempt, or an admin's manual `POST identity/users/:id/unlock`,
+  /// re-evaluates/clears it directly. Per-user only, never per-IP — see
+  /// docs/architecture/05-auth-and-security.md.
+  failedLoginAttempts         Int                      @default(0) @map("failed_login_attempts")
+  lockedUntil                 DateTime?                @map("locked_until")
   createdAt                   DateTime                 @default(now()) @map("created_at")
   updatedAt                   DateTime                 @updatedAt @map("updated_at")
 

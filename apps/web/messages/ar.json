@@ -286,6 +286,8 @@
       "inactive": "غير نشط",
       "activate": "تفعيل",
       "deactivate": "إلغاء التفعيل",
+      "locked": "مقفل",
+      "unlock": "إلغاء القفل",
       "noRoles": "—",
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
       "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",

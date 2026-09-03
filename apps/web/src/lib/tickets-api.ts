@@ -113,6 +113,10 @@ export interface CustomerDetail extends CustomerSummary {
  * both derived server-side from the user's `branchRoles[0]` (the same
  * "active" membership `login`/`refresh`/`getAuthenticatedUser` already key
  * off of) — needed so an edit control can know what to pre-select. */
+/** Story 122 — `isLocked`/`lockedUntil` mirror the backend's own
+ * server-computed lock state (`IdentityService.listUsers`) exactly —
+ * never recomputed on this side from a raw timestamp against this
+ * browser's own clock. */
 export interface UserSummary {
   id: string;
   email: string;
@@ -121,6 +125,8 @@ export interface UserSummary {
   roles: string[];
   roleId: string;
   departmentId: string | null;
+  isLocked: boolean;
+  lockedUntil: string | null;
 }
 
 export interface ListTicketsFilters {
@@ -402,6 +408,14 @@ export function resetPassword(id: string, input: ResetPasswordInput): Promise<{ 
     method: "PATCH",
     body: JSON.stringify(input),
   });
+}
+
+/** Story 122 — clears a locked user's failed-login counter/lock
+ * immediately, without waiting for the 15-minute auto-expiry. Gated by
+ * `user:update` (mirrors the backend's own permission choice — see
+ * `IdentityService.unlockUser`'s doc comment). No request body. */
+export function unlockUser(id: string): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/identity/users/${id}/unlock`, { method: "POST" });
 }
 
 /** Story 47 — mirrors the existing `UpdateUserAssignmentDto` exactly

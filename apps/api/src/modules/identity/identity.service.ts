@@ -32,6 +32,16 @@ import type { GrantBranchAssignmentDto } from "./dto/grant-branch-assignment.dto
 const BCRYPT_ROUNDS = 12;
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
 
+/** Story 122 — Account Lockout. Closes Story 100's own explicit non-goal
+ * ("No account lockout... throttling only"). 5 sits well below
+ * `AUTH_THROTTLE`'s 80-requests/60s per-IP budget (`identity.controller.ts`)
+ * — the IP throttle alone cannot stop an attacker rotating source IPs
+ * against one target account, which is exactly the gap this constant
+ * closes. 15 minutes is a standard, no-configuration-needed cooldown; an
+ * admin can also clear a lock immediately via `unlockUser`. */
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+
 /**
  * Story 46 — the two seeded roles `seed.ts` keys its reconciliation logic
  * on by literal name. Renaming either would cause the next `prisma:seed`
@@ -49,6 +59,11 @@ export interface UserSummary {
   roles: string[];
   roleId: string;
   departmentId: string | null;
+  /** Story 122 — `lockedUntil !== null && lockedUntil > now` computed
+   * here, server-side, rather than shipping the raw timestamp for the
+   * frontend to compare against its own (possibly skewed) clock. */
+  isLocked: boolean;
+  lockedUntil: Date | null;
 }
 
 /**
@@ -139,6 +154,20 @@ export class IdentityService {
    * found, the raw attempted email otherwise) — never exposed via the
    * HTTP response, only through the already `audit:read`-gated
    * `GET /audit-logs`.
+   *
+   * Story 122 — Account Lockout. The lock check runs BEFORE the password
+   * comparison, and rejects with the exact same generic message as every
+   * other failure (`auth.login_blocked`, a new/distinct audit action, is
+   * recorded instead of `auth.login_failed`) — a locked account must stay
+   * indistinguishable from a wrong password or an unregistered email,
+   * even to a caller who has since guessed/obtained the correct password.
+   * `failedLoginAttempts` is only ever incremented on a genuine wrong-
+   * password attempt (never while already locked, and never for the
+   * `!user`/`!isActive` branch above, which has nothing to increment) —
+   * reaching `MAX_FAILED_LOGIN_ATTEMPTS` on that same write also sets
+   * `lockedUntil` and records a second, distinct `auth.account_locked`
+   * audit entry. A successful login resets both fields to their unlocked
+   * defaults.
    */
   async login(
     email: string,
@@ -163,8 +192,28 @@ export class IdentityService {
     // const passworde = await hashPassword("password");
     // console.log(passworde);
 
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      await this.recordAuditLog({
+        actorId: null,
+        action: "auth.login_blocked",
+        entityType: "user",
+        entityId: user.id,
+        ipAddress,
+      });
+      throw new UnauthorizedException("Invalid email or password");
+    }
+
     const passwordMatches = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatches) {
+      const failedLoginAttempts = user.failedLoginAttempts + 1;
+      const nowLocked = failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts,
+          ...(nowLocked ? { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) } : {}),
+        },
+      });
       await this.recordAuditLog({
         actorId: null,
         action: "auth.login_failed",
@@ -172,7 +221,24 @@ export class IdentityService {
         entityId: user.id,
         ipAddress,
       });
+      if (nowLocked) {
+        await this.recordAuditLog({
+          actorId: null,
+          action: "auth.account_locked",
+          entityType: "user",
+          entityId: user.id,
+          diff: { failedLoginAttempts },
+          ipAddress,
+        });
+      }
       throw new UnauthorizedException("Invalid email or password");
+    }
+
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
     }
 
     const accessToken = await this.issueAccessToken(user.id, user.branchRoles, {
@@ -189,6 +255,35 @@ export class IdentityService {
       ipAddress,
     });
     return { accessToken, refreshToken };
+  }
+
+  /**
+   * Story 122 — clears a user's failed-login counter/lock immediately,
+   * without waiting for `LOCKOUT_DURATION_MS` to elapse. Mirrors
+   * `resetPassword`'s exact shape. Gated by `user:update` (`UsersController`)
+   * — unlocking is a plain state-restoring flip, no credential material
+   * touched, the same risk tier as the existing `isActive` toggle
+   * `user:update` already gates (unlike `resetPassword`'s own, separately
+   * -permissioned, materially more sensitive `user:reset-password`).
+   */
+  async unlockUser(id: string): Promise<{ id: string }> {
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("User not found");
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
+    });
+    await this.recordAuditLog({
+      actorId: this.tenantContext.userId,
+      action: "user.unlocked",
+      entityType: "user",
+      entityId: id,
+    });
+
+    return { id };
   }
 
   /**
@@ -616,6 +711,8 @@ export class IdentityService {
           roles: [...new Set(user.branchRoles.map((br) => br.role.name))],
           roleId: active.roleId,
           departmentId: active.departmentId,
+          isLocked: user.lockedUntil !== null && user.lockedUntil > new Date(),
+          lockedUntil: user.lockedUntil,
         },
       ];
     });

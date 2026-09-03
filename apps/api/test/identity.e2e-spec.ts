@@ -276,6 +276,170 @@ describe("Identity & Access (e2e)", () => {
     });
   });
 
+  // Story 122 — Account Lockout. Uses a dedicated, freshly created user
+  // (never the shared seeded admin) so driving 5 consecutive failures here
+  // can never accumulate into a persistent lock on a row every other e2e
+  // spec file also logs in as — mirrors "locale preference (Story 119)"'s
+  // own precedent immediately above.
+  describe("account lockout (Story 122)", () => {
+    async function createDisposableUser(): Promise<{ email: string; password: string }> {
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const email = `lockout-${randomUUID()}@example.com`;
+      const password = "lockout-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email,
+          password,
+          fullName: "Account Lockout Test User",
+          branchId: adminBranchId,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+      return { email, password };
+    }
+
+    // Consolidated into one test (rather than one test each for
+    // "below threshold" / "resets on success" / "locks at threshold" /
+    // "identical message while locked") to keep this suite's total
+    // `/auth/login` call count comfortably within `AUTH_THROTTLE`'s
+    // per-IP budget (`identity.controller.ts`) — see that constant's own
+    // doc comment, updated by this story to account for the extra volume
+    // a real, end-to-end lockout test necessarily adds.
+    it("does not lock below the threshold, resets the counter on a successful login, then genuinely locks at the threshold with an identical generic message while locked", async () => {
+      const { email, password } = await createDisposableUser();
+
+      // 4 wrong attempts — below the 5-attempt threshold.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await request(app.getHttpServer())
+          .post("/api/v1/auth/login")
+          .send({ email, password: "definitely-the-wrong-password" })
+          .expect(401);
+      }
+      // A 5th, correct-password login succeeds (not locked) and resets
+      // the counter to 0.
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email, password })
+        .expect(200);
+
+      // 4 more wrong attempts — if the counter had NOT actually reset,
+      // this branch alone (4 + 4 = 8 total) would already be locked.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await request(app.getHttpServer())
+          .post("/api/v1/auth/login")
+          .send({ email, password: "definitely-the-wrong-password" })
+          .expect(401);
+      }
+      // Still unlocked — proves the reset above was real, not merely delayed.
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email, password })
+        .expect(200);
+
+      // One 5th-in-a-row wrong attempt now genuinely locks the account.
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await request(app.getHttpServer())
+          .post("/api/v1/auth/login")
+          .send({ email, password: "definitely-the-wrong-password" })
+          .expect(401);
+      }
+      // Even the CORRECT password is now rejected, with the exact same
+      // generic message as a plain wrong password — a locked account
+      // must never be distinguishable from any other login failure.
+      const lockedResponse = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email, password })
+        .expect(401);
+      expect(lockedResponse.body.message).toBe("Invalid email or password");
+    });
+
+    it("an admin can manually unlock a locked account immediately via POST identity/users/:id/unlock", async () => {
+      const { email, password } = await createDisposableUser();
+      const usersBefore = await request(app.getHttpServer())
+        .get("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const userId = usersBefore.body.find((user: { email: string }) => user.email === email).id;
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await request(app.getHttpServer())
+          .post("/api/v1/auth/login")
+          .send({ email, password: "definitely-the-wrong-password" })
+          .expect(401);
+      }
+
+      const usersLocked = await request(app.getHttpServer())
+        .get("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const lockedUser = usersLocked.body.find((user: { email: string }) => user.email === email);
+      expect(lockedUser.isLocked).toBe(true);
+      expect(lockedUser.lockedUntil).toBeTypeOf("string");
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/identity/users/${userId}/unlock`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      const usersAfterUnlock = await request(app.getHttpServer())
+        .get("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const unlockedUser = usersAfterUnlock.body.find((user: { email: string }) => user.email === email);
+      expect(unlockedUser.isLocked).toBe(false);
+      expect(unlockedUser.lockedUntil).toBeNull();
+
+      // Immediately usable again — no need to wait for the 15-minute auto-expiry.
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email, password })
+        .expect(200);
+    });
+
+    it("rejects an Agent-role user (lacking user:update) from unlocking another user (403)", async () => {
+      const { email } = await createDisposableUser();
+      const usersBefore = await request(app.getHttpServer())
+        .get("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const targetUserId = usersBefore.body.find((user: { email: string }) => user.email === email).id;
+
+      // A second, freshly created disposable Agent — NOT the suite's
+      // `secondAgentEmail`/`secondAgentPassword` outer-scope user, which
+      // this describe block runs before it exists (that user is created
+      // later in the file, in the Story 45 section below).
+      const { email: agentEmail, password: agentPassword } = await createDisposableUser();
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/identity/users/${targetUserId}/unlock`)
+        .set("Authorization", `Bearer ${agentLogin.body.accessToken}`)
+        .expect(403);
+    });
+
+    it("returns 404 for an unknown user id on unlock", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/identity/users/${randomUUID()}/unlock`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("rejects an unauthenticated unlock request", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/identity/users/${randomUUID()}/unlock`)
+        .expect(401);
+    });
+  });
+
   it("rejects an identity route with no token", async () => {
     await request(app.getHttpServer()).get("/api/v1/identity/users").expect(401);
   });

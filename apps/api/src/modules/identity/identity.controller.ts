@@ -27,12 +27,15 @@ const REFRESH_COOKIE_NAME = "refreshToken";
 
 // Story 100 — tighter than the global default (100/60s, `app.module.ts`),
 // mirroring `WebFormIntakeController`'s own `@Throttle` override precedent.
-// 40 sits comfortably above `identity.e2e-spec.ts`'s own real usage (25
-// login calls within its single run — the highest of any existing spec
-// file), so this does not break any existing test's own login/refresh
-// budget while still being a meaningfully stricter, dedicated limit on the
-// exact endpoints a credential-stuffing/brute-force attempt would target.
-const AUTH_THROTTLE = { default: { limit: 40, ttl: 60_000 } };
+// Story 122 (account lockout) added a real, end-to-end e2e lockout test
+// that itself drives several accounts to their 5-attempt threshold, pushing
+// `identity.e2e-spec.ts`'s own real usage from ~25 up to ~48 login calls
+// within its single run — still the highest of any existing spec file. 80
+// sits comfortably above that (with headroom for future coverage) while
+// remaining a meaningfully stricter, dedicated limit than the global
+// default on the exact endpoints a credential-stuffing/brute-force attempt
+// would target.
+const AUTH_THROTTLE = { default: { limit: 80, ttl: 60_000 } };
 
 @ApiTags("auth")
 @Controller("auth")

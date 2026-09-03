@@ -5,6 +5,7 @@ import { UserListView } from "./user-list-view";
 import {
   useDepartmentsQuery,
   useResetPasswordMutation,
+  useUnlockUserMutation,
   useUpdateUserAssignmentMutation,
   useUpdateUserMutation,
   useUsersQuery,
@@ -102,6 +103,7 @@ vi.mock("@/hooks/use-tickets", () => ({
   useDepartmentsQuery: vi.fn(),
   useUpdateUserAssignmentMutation: vi.fn(),
   useResetPasswordMutation: vi.fn(),
+  useUnlockUserMutation: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-roles", () => ({
@@ -113,6 +115,7 @@ const mockedUseUpdateUserMutation = vi.mocked(useUpdateUserMutation);
 const mockedUseDepartmentsQuery = vi.mocked(useDepartmentsQuery);
 const mockedUseUpdateUserAssignmentMutation = vi.mocked(useUpdateUserAssignmentMutation);
 const mockedUseResetPasswordMutation = vi.mocked(useResetPasswordMutation);
+const mockedUseUnlockUserMutation = vi.mocked(useUnlockUserMutation);
 const mockedUseRolesQuery = vi.mocked(useRolesQuery);
 
 function queryResult(overrides: Record<string, unknown> = {}) {
@@ -155,6 +158,8 @@ const baseUser = {
   roles: ["Agent"],
   roleId: "role-1",
   departmentId: "dept-1",
+  isLocked: false,
+  lockedUntil: null,
 };
 
 function renderView() {
@@ -176,6 +181,7 @@ describe("UserListView", () => {
     mockedUseUpdateUserMutation.mockReturnValue(mutationResult() as never);
     mockedUseUpdateUserAssignmentMutation.mockReturnValue(mutationResult() as never);
     mockedUseResetPasswordMutation.mockReturnValue(mutationResult() as never);
+    mockedUseUnlockUserMutation.mockReturnValue(mutationResult() as never);
     mockedUseRolesQuery.mockReturnValue(queryResult({ data: oneRole, isSuccess: true }) as never);
     mockedUseDepartmentsQuery.mockReturnValue(
       queryResult({ data: oneDepartment, isSuccess: true }) as never,
@@ -920,6 +926,112 @@ describe("UserListView", () => {
       );
       expect(renameMutate).not.toHaveBeenCalled();
       expect(assignmentMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  // Story 122 — Account Lockout.
+  describe("account lockout", () => {
+    it("does not render a Locked badge or Unlock button for an unlocked user", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+
+      renderView();
+
+      expect(screen.queryByText("Locked")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Unlock" })).not.toBeInTheDocument();
+    });
+
+    it("renders a Locked badge and an Unlock button for a locked user", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+        }) as never,
+      );
+
+      renderView();
+
+      expect(screen.getByText("Locked")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Unlock" })).toBeInTheDocument();
+    });
+
+    it("clicking Unlock immediately calls the unlock mutation, with no confirmation dialog", () => {
+      const unlockMutate = vi.fn();
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+        }) as never,
+      );
+      mockedUseUnlockUserMutation.mockReturnValue(mutationResult({ mutate: unlockMutate }) as never);
+
+      renderView();
+      fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+      expect(unlockMutate).toHaveBeenCalledWith();
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    it("disables the Unlock button while the unlock mutation is pending", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+        }) as never,
+      );
+      mockedUseUnlockUserMutation.mockReturnValue(mutationResult({ isPending: true }) as never);
+
+      renderView();
+
+      expect(screen.getByRole("button", { name: "Unlock" })).toBeDisabled();
+    });
+
+    it("renders a forbidden message when the unlock mutation is rejected with 403", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+        }) as never,
+      );
+      mockedUseUnlockUserMutation.mockReturnValue(
+        mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
+      );
+
+      renderView();
+
+      expect(
+        screen.getByText("You don't have permission to perform that action."),
+      ).toBeInTheDocument();
+    });
+
+    it("does not call the rename/activate, assignment, or reset-password mutations when unlocking", () => {
+      const renameMutate = vi.fn();
+      const assignmentMutate = vi.fn();
+      const resetPasswordMutate = vi.fn();
+      const unlockMutate = vi.fn();
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+        }) as never,
+      );
+      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+      mockedUseUpdateUserAssignmentMutation.mockReturnValue(
+        mutationResult({ mutate: assignmentMutate }) as never,
+      );
+      mockedUseResetPasswordMutation.mockReturnValue(
+        mutationResult({ mutate: resetPasswordMutate }) as never,
+      );
+      mockedUseUnlockUserMutation.mockReturnValue(mutationResult({ mutate: unlockMutate }) as never);
+
+      renderView();
+      fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+      expect(unlockMutate).toHaveBeenCalledOnce();
+      expect(renameMutate).not.toHaveBeenCalled();
+      expect(assignmentMutate).not.toHaveBeenCalled();
+      expect(resetPasswordMutate).not.toHaveBeenCalled();
     });
   });
 });

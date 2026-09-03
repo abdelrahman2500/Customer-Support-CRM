@@ -288,6 +288,8 @@
       "deactivate": "Deactivate",
       "deactivateConfirmTitle": "Deactivate this user?",
       "deactivateConfirmDescription": "\"{name}\" will no longer be able to sign in.",
+      "locked": "Locked",
+      "unlock": "Unlock",
       "passwordResetConfirmTitle": "Reset this user's password?",
       "passwordResetConfirmDescription": "Their current password will stop working immediately.",
       "noRoles": "—",

@@ -22,6 +22,7 @@ import {
   resetPassword,
   revokeContactPortalAccess,
   setContactPortalPassword,
+  unlockUser,
   updateContact,
   updateCustomer,
   updateTicket,
@@ -326,6 +327,22 @@ export function useResetPasswordMutation(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ResetPasswordInput) => resetPassword(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+/**
+ * Story 122 — never applies optimistically, same convention as every
+ * other mutation here: only a successful `POST /identity/users/:id/unlock`
+ * invalidates `["users"]`, so the list re-fetches the real, authoritative
+ * `isLocked`/`lockedUntil` state.
+ */
+export function useUnlockUserMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => unlockUser(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["users"] });
     },

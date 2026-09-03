@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import {
   useDepartmentsQuery,
   useResetPasswordMutation,
+  useUnlockUserMutation,
   useUpdateUserAssignmentMutation,
   useUpdateUserMutation,
   useUsersQuery,
@@ -81,6 +82,14 @@ const UNSET_DEPARTMENT = "__unset__";
  * the connection failed) renders as offline — the same "unknown reads as
  * the safe default" choice `isActive`'s own Badge would make if presence
  * had a genuine third state, which it doesn't.
+ *
+ * Story 122 — Account Lockout. A "Locked" `Badge` (the existing, previously
+ * unused `"warning"` variant) plus an "Unlock" button appear in the status
+ * cell only when `user.isLocked` — immediate-commit on click, no
+ * `ConfirmDialog` (clearing a lock is not destructive, mirrors the
+ * "activate" button's own no-confirm precedent, the inverse of
+ * "deactivate"'s confirm-gated one), wired to the new
+ * `useUnlockUserMutation(user.id)`.
  */
 export function UserListView() {
   const t = useTranslations("users");
@@ -150,6 +159,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
   const mutation = useUpdateUserMutation(user.id);
   const assignmentMutation = useUpdateUserAssignmentMutation(user.id);
   const resetPasswordMutation = useResetPasswordMutation(user.id);
+  const unlockMutation = useUnlockUserMutation(user.id);
   const rolesQuery = useRolesQuery();
   const departmentsQuery = useDepartmentsQuery();
   const [fullNameDraft, setFullNameDraft] = useState(user.fullName);
@@ -378,27 +388,50 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
         </div>
       </TableCell>
       <TableCell>
-        <div className="flex items-center gap-2">
-          <Badge variant={user.isActive ? "success" : "secondary"}>
-            {user.isActive ? t("list.active") : t("list.inactive")}
-          </Badge>
-          <Button
-            variant={user.isActive ? "destructive" : "outline"}
-            size="sm"
-            disabled={mutation.isPending}
-            onClick={handleToggleActiveClick}
-          >
-            {user.isActive ? t("list.deactivate") : t("list.activate")}
-          </Button>
-          <ConfirmDialog
-            open={confirmDeactivateOpen}
-            onOpenChange={setConfirmDeactivateOpen}
-            title={t("list.deactivateConfirmTitle")}
-            description={t("list.deactivateConfirmDescription", { name: user.fullName })}
-            confirmLabel={t("list.deactivate")}
-            onConfirm={confirmDeactivate}
-            isPending={mutation.isPending}
-          />
+        <div className="flex flex-col items-start gap-2">
+          <div className="flex items-center gap-2">
+            <Badge variant={user.isActive ? "success" : "secondary"}>
+              {user.isActive ? t("list.active") : t("list.inactive")}
+            </Badge>
+            <Button
+              variant={user.isActive ? "destructive" : "outline"}
+              size="sm"
+              disabled={mutation.isPending}
+              onClick={handleToggleActiveClick}
+            >
+              {user.isActive ? t("list.deactivate") : t("list.activate")}
+            </Button>
+            <ConfirmDialog
+              open={confirmDeactivateOpen}
+              onOpenChange={setConfirmDeactivateOpen}
+              title={t("list.deactivateConfirmTitle")}
+              description={t("list.deactivateConfirmDescription", { name: user.fullName })}
+              confirmLabel={t("list.deactivate")}
+              onConfirm={confirmDeactivate}
+              isPending={mutation.isPending}
+            />
+          </div>
+          {user.isLocked && (
+            <div className="flex items-center gap-2">
+              <Badge variant="warning">{t("list.locked")}</Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={unlockMutation.isPending}
+                onClick={() => unlockMutation.mutate()}
+              >
+                {t("list.unlock")}
+              </Button>
+            </div>
+          )}
+          {unlockMutation.isError && (
+            <p className="text-xs text-red-600">
+              {errorMessage(unlockMutation.error, {
+                forbidden: t("list.actionForbidden"),
+                generic: t("list.actionFailed"),
+              })}
+            </p>
+          )}
         </div>
       </TableCell>
       <TableCell>
