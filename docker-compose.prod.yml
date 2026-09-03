@@ -114,6 +114,10 @@ services:
       APP_DATABASE_URL: ${APP_DATABASE_URL:-}
       REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Paired with the key above — passed through so a deployment can pin a
+      # model without editing this file. Blank falls back to the default in
+      # apps/worker/src/env.validation.ts.
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
     restart: unless-stopped
 

@@ -34,6 +34,20 @@ const optionalString = z.preprocess(
   z.string().optional(),
 );
 
+/**
+ * The same blank-is-unset coercion for a field that has a *default* rather
+ * than being optional. `z.string().default(x)` only applies `x` when the
+ * value is `undefined`, so a blank value silently defeats the default and
+ * the app runs with `""` — for `JWT_ACCESS_TTL` that means signing tokens
+ * with an empty `expiresIn`. Fields defaulted with a `.min(1)` (the `S3_*`
+ * group) do not need this: they reject blank loudly instead.
+ */
+const defaultedString = (fallback: string) =>
+  z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().default(fallback),
+  );
+
 const baseEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3001),
@@ -63,7 +77,7 @@ const baseEnvSchema = z.object({
   APP_DATABASE_URL: optionalString,
 
   JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
-  JWT_ACCESS_TTL: z.string().default("15m"),
+  JWT_ACCESS_TTL: defaultedString("15m"),
   JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
   JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
@@ -71,7 +85,14 @@ const baseEnvSchema = z.object({
    * local MinIO defaults here so test/CI bootstraps do not fail when the
    * per-app `.env` file is not present yet; production and local overrides
    * still win because `ConfigModule.forRoot()` reads the actual environment
-   * values before validation. */
+   * values before validation.
+   *
+   * Deployment-configuration hardening — those defaults are local-only, so
+   * `NODE_ENV=production` additionally requires the endpoint and both
+   * credentials to be supplied explicitly (see
+   * `PRODUCTION_REQUIRED_LOCAL_DEFAULTS` below). `S3_BUCKET` keeps its
+   * default: a bucket *name* is not environment-specific, and
+   * `S3StorageService` creates it if absent. */
   S3_ENDPOINT: z.string().min(1, "S3_ENDPOINT is required").default("http://localhost:9000"),
   S3_ACCESS_KEY: z.string().min(1, "S3_ACCESS_KEY is required").default("minioadmin"),
   S3_SECRET_KEY: z.string().min(1, "S3_SECRET_KEY is required").default("minioadmin"),
@@ -195,13 +216,68 @@ export const envSchema = baseEnvSchema.superRefine((env, ctx) => {
 
 export type EnvConfig = z.infer<typeof baseEnvSchema>;
 
+/**
+ * Deployment-configuration hardening — variables whose *default* above is a
+ * local-development value that is never correct in production, and which
+ * therefore have to be supplied explicitly there.
+ *
+ * They cannot be enforced inside the schema's own `superRefine`: zod applies
+ * defaults before refinements run, so by then a defaulted value is
+ * indistinguishable from one the operator actually set. The check therefore
+ * inspects the *raw* environment in `validateEnv` below.
+ *
+ * Without it, a production deployment that forgets these boots with
+ * `http://localhost:9000` and MinIO's well-known `minioadmin`/`minioadmin`
+ * dev credentials. `S3StorageService.onModuleInit` calls the endpoint
+ * unconditionally at bootstrap, so the container crash-loops on an
+ * `ECONNREFUSED` stack trace that names localhost — a confusing symptom for
+ * what is a missing-configuration problem. It also made this file contradict
+ * `docs/deployment.md` and `docker-compose.prod.yml`, which both already
+ * declared these required in production.
+ */
+const PRODUCTION_REQUIRED_LOCAL_DEFAULTS: Record<string, string> = {
+  S3_ENDPOINT: "the object-storage endpoint — the default points at the local MinIO container",
+  S3_ACCESS_KEY: "the object-storage access key — the default is MinIO's dev credential",
+  S3_SECRET_KEY: "the object-storage secret key — the default is MinIO's dev credential",
+};
+
+function findMissingProductionValues(
+  config: Record<string, unknown>,
+  keysAlreadyReported: ReadonlySet<string>,
+): string[] {
+  // Read NODE_ENV from the raw environment: the parsed value is not
+  // available yet, and an absent NODE_ENV defaults to development.
+  if (config.NODE_ENV !== "production") {
+    return [];
+  }
+  return Object.entries(PRODUCTION_REQUIRED_LOCAL_DEFAULTS)
+    .filter(([key]) => {
+      // An empty string already fails the schema's own `.min(1)` — skip it
+      // so one mistake is not reported twice. A whitespace-only value does
+      // *not* (its length is non-zero), so it is still caught here.
+      if (keysAlreadyReported.has(key)) {
+        return false;
+      }
+      const raw = config[key];
+      return typeof raw !== "string" || raw.trim() === "";
+    })
+    .map(([key, what]) => `  - ${key}: must be set explicitly in production — ${what}.`);
+}
+
 export function validateEnv(config: Record<string, unknown>): EnvConfig {
   const result = envSchema.safeParse(config);
-  if (!result.success) {
-    const issues = result.error.issues
-      .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
-      .join("\n");
-    throw new Error(`Invalid environment configuration:\n${issues}`);
+  const issues = result.success
+    ? []
+    : result.error.issues.map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`);
+  const reportedKeys = new Set(
+    result.success ? [] : result.error.issues.map((issue) => String(issue.path[0])),
+  );
+  const missing = findMissingProductionValues(config, reportedKeys);
+
+  if (issues.length > 0 || missing.length > 0) {
+    throw new Error(`Invalid environment configuration:\n${[...issues, ...missing].join("\n")}`);
   }
-  return result.data;
+  // `result.success` is necessarily true here — `issues` is only empty when
+  // the parse succeeded.
+  return (result as { success: true; data: EnvConfig }).data;
 }

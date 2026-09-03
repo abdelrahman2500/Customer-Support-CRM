@@ -24,6 +24,18 @@ const optionalString = z.preprocess(
   z.string().optional(),
 );
 
+/**
+ * The same coercion for a field that has a *default* — mirrors `apps/api`'s
+ * own `defaultedString`. `z.string().default(x)` only applies `x` when the
+ * value is `undefined`, so a blank `ANTHROPIC_MODEL` would otherwise defeat
+ * the default and send an empty model id to the provider.
+ */
+const defaultedString = (fallback: string) =>
+  z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().default(fallback),
+  );
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
@@ -47,7 +59,7 @@ export const envSchema = z.object({
    * `ai-processing` queue/consumer exists yet (a separate future story).
    */
   ANTHROPIC_API_KEY: optionalString,
-  ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5-20250929"),
+  ANTHROPIC_MODEL: defaultedString("claude-sonnet-4-5-20250929"),
 
   /**
    * Story 113 — mirrors `apps/api`'s own optional `SENTRY_DSN` exactly
