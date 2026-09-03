@@ -10,6 +10,20 @@ import { z } from "zod";
  * still added by the feature stories that need them; see
  * docs/architecture/06-communication-and-realtime.md.
  */
+/**
+ * Deployment-configuration hardening — mirrors `apps/api`'s own
+ * `optionalString` exactly (see that file's doc comment): deployment
+ * platforms routinely materialize an unset variable as the empty string, and
+ * `z.string().optional()` treats `""` as present, which defeats every
+ * `?? fallback` downstream — most consequentially `PrismaService`'s
+ * `APP_DATABASE_URL ?? DATABASE_URL`, which would construct a Prisma client
+ * with `url: ""` instead of falling back.
+ */
+const optionalString = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().optional(),
+);
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
@@ -22,7 +36,7 @@ export const envSchema = z.object({
    * (`PrismaService`) uses this when set — the restricted `crm_app` role
    * — rather than the migration/owner role `DATABASE_URL` names.
    */
-  APP_DATABASE_URL: z.string().optional(),
+  APP_DATABASE_URL: optionalString,
 
   /**
    * Architecture-boundary refactor — mirrors `apps/api`'s own optional
@@ -32,7 +46,7 @@ export const envSchema = z.object({
    * (`src/ai/ai-provider.factory.ts`) from its own validated env — no
    * `ai-processing` queue/consumer exists yet (a separate future story).
    */
-  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: optionalString,
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5-20250929"),
 
   /**
@@ -40,7 +54,7 @@ export const envSchema = z.object({
    * (same "unset is a valid, expected state" semantics — see that file's
    * own doc comment).
    */
-  SENTRY_DSN: z.string().optional(),
+  SENTRY_DSN: optionalString,
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

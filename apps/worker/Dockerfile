@@ -1,7 +1,15 @@
 # syntax=docker/dockerfile:1
 FROM node:20-slim AS base
 WORKDIR /repo
+# Same shared corepack cache as apps/api/Dockerfile — see its own comment.
+ENV COREPACK_HOME=/opt/corepack
 RUN corepack enable
+# Same reason as apps/api/Dockerfile: Prisma's query engine needs OpenSSL,
+# which node:20-slim does not ship, and the failure only appears at connect
+# time.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
@@ -33,8 +41,14 @@ RUN pnpm --filter @crm/shared build && pnpm --filter @crm/ai build && pnpm --fil
 
 FROM base AS runtime
 ENV NODE_ENV=production
+# The workspace root manifests, mirroring apps/api/Dockerfile — see its own
+# comment. This worker never runs migrations itself; it reads the same
+# APP_DATABASE_URL/DATABASE_URL contract apps/api does.
+COPY --from=build /repo/package.json /repo/pnpm-workspace.yaml ./
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/packages ./packages
 COPY --from=build /repo/apps/worker ./apps/worker
+COPY --from=build --chown=node:node /opt/corepack /opt/corepack
 WORKDIR /repo/apps/worker
+USER node
 CMD ["node", "dist/main.js"]

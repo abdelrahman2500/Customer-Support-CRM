@@ -1,0 +1,160 @@
+name: customer-support-crm-prod
+
+# Deployment manifest for the four application containers.
+#
+# This is the repository's reference deployment topology: it is what a
+# single-host / self-hosted deployment can run directly, and it is the
+# executable specification of *what any other platform must reproduce*
+# (Kubernetes manifests, ECS task definitions, a PaaS's service definitions).
+# Read it together with docs/deployment.md, which explains every value.
+#
+# It deliberately does NOT define Postgres, Redis or object storage. Those
+# are supplied by the environment — a managed service, or the datastore
+# containers in the sibling `docker-compose.yml`. Nothing here invents a
+# hostname, a credential or a URL: every deployment-specific value comes
+# from the env file below, and Compose fails loudly on any that is missing.
+#
+# Usage:
+#   cp .env.production.example .env.production   # then fill it in
+#   docker compose --env-file .env.production -f docker-compose.prod.yml build
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+#
+# The `${VAR:?...}` syntax below is deliberate: Compose refuses to start
+# when a required variable is unset, instead of substituting an empty string
+# and producing a deployment that boots and then misbehaves.
+
+services:
+  # ---------------------------------------------------------------------------
+  # One-shot schema migration.
+  #
+  # docs/architecture/11-quality-and-operations.md: "`prisma migrate deploy`
+  # runs explicitly before API/worker startup in non-local environments;
+  # migrations never run implicitly at app boot." This service is that
+  # explicit step — `api` and `worker` below wait for it to *complete
+  # successfully* before they start, so a failed migration stops the rollout
+  # rather than leaving the API serving against a half-migrated schema.
+  #
+  # It runs as DATABASE_URL (the owner/migration role), which is the only
+  # role permitted to alter the schema. APP_DATABASE_URL is deliberately NOT
+  # passed here: the Prisma CLI reads schema.prisma's own
+  # `env("DATABASE_URL")` datasource, and the restricted runtime role cannot
+  # run DDL at all.
+  # ---------------------------------------------------------------------------
+  migrate:
+    image: ${API_IMAGE:-crm-api:latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["pnpm", "--filter", "@crm/api", "exec", "prisma", "migrate", "deploy"]
+    working_dir: /repo
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required — the migration/owner role}
+    restart: "no"
+
+  api:
+    image: ${API_IMAGE:-crm-api:latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      # The migration/owner role. Still required at runtime: it is the
+      # fallback APP_DATABASE_URL falls back to, and it is what the boot-time
+      # database diagnostic compares against (see
+      # apps/api/src/common/config/database-url.ts).
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      # The restricted `crm_app` runtime role. Optional — leave it empty and
+      # the app connects as DATABASE_URL. It MUST name the same database as
+      # DATABASE_URL, or the API queries a schema `migrate` never touched;
+      # the API logs a warning at boot when the two disagree.
+      APP_DATABASE_URL: ${APP_DATABASE_URL:-}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
+      # Two independent secrets. The API refuses to start if they are equal:
+      # one shared value would let a refresh token be presented as an access
+      # token.
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required (min 32 chars)}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required (min 32 chars, must differ from JWT_ACCESS_SECRET)}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-7}
+      # Every deployed browser origin that calls this API — the agent
+      # workspace and, where deployed, the customer portal. Required in
+      # production: with none set, the API rejects every cross-origin
+      # request, which presents in the browser as an unreachable API.
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required in production — list the web and portal origins}
+      # `strict` (the default) is correct when the browser origins and the
+      # API share one registrable domain. Set `none` when they do not, or
+      # the refresh-token cookie is never sent and sessions die at the first
+      # access-token expiry. See docs/deployment.md.
+      AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-strict}
+      S3_ENDPOINT: ${S3_ENDPOINT:?S3_ENDPOINT is required}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?S3_ACCESS_KEY is required}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+      S3_BUCKET: ${S3_BUCKET:-crm-attachments}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    ports:
+      - "${API_PORT:-3001}:3001"
+    restart: unless-stopped
+
+  worker:
+    image: ${WORKER_IMAGE:-crm-worker:latest}
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      APP_DATABASE_URL: ${APP_DATABASE_URL:-}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # NEXT_PUBLIC_API_URL is a `build.args` entry for both frontends, NOT an
+  # `environment` entry. `next build` substitutes every `NEXT_PUBLIC_*`
+  # reference with a string literal in the browser bundle, so the value is
+  # fixed when the image is built and a runtime `environment:` entry would
+  # be silently ignored. Changing the deployed API URL therefore requires a
+  # rebuild of these two images, not just a restart.
+  #
+  # Both Dockerfiles refuse to build without it and assert afterwards that
+  # the localhost development fallback is not present in the output (see
+  # scripts/assert-public-api-url.mjs).
+  # ---------------------------------------------------------------------------
+  web:
+    image: ${WEB_IMAGE:-crm-web:latest}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required at BUILD time — the public API base URL a browser will call, including the /api/v1 suffix}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    restart: unless-stopped
+
+  portal:
+    image: ${PORTAL_IMAGE:-crm-portal:latest}
+    build:
+      context: .
+      dockerfile: apps/portal/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required at BUILD time}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "${PORTAL_PORT:-3002}:3002"
+    restart: unless-stopped

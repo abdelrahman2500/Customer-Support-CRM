@@ -161,6 +161,14 @@ jobs:
       # since CI sets real env vars directly rather than loading a `.env`
       # file.
       CORS_ORIGINS: "http://localhost:3000,http://localhost:3002"
+      # Explicit rather than relying on apps/web's and apps/portal's own
+      # `?? "http://localhost:3001/api/v1"` fallback. Both `next build`
+      # steps below compile this into their browser bundles, so this job
+      # exercises the same build-time mechanism a real deployment uses —
+      # just pointed at the apps/api instance Playwright starts locally.
+      # turbo.json declares NEXT_PUBLIC_API_URL in the `build` task's `env`,
+      # which is what makes it visible through turbo's strict env mode.
+      NEXT_PUBLIC_API_URL: "http://localhost:3001/api/v1"
       # Story 115 — by the time apps/api's dev server actually starts
       # (after this job's own "Run migrations" step below), the
       # restricted crm_app role already exists, so it's safe to set this
@@ -317,6 +325,50 @@ jobs:
           file: apps/${{ matrix.app }}/Dockerfile
           push: false
           tags: crm-${{ matrix.app }}:ci
-          # No registry push / deploy step — production deployment is
-          # explicitly out of scope for this feature, see
-          # docs/architecture/12-risks-tradeoffs-and-scope.md.
+          load: true
+          # NEXT_PUBLIC_API_URL is compiled into the browser bundle by
+          # `next build`, so apps/web and apps/portal cannot be built
+          # without it — both Dockerfiles fail fast when it is empty, and
+          # then assert the localhost development fallback is absent from
+          # the output (scripts/assert-public-api-url.mjs). See
+          # docs/deployment.md.
+          #
+          # `vars.NEXT_PUBLIC_API_URL` is an optional repository variable:
+          # set it and CI builds images carrying the real deployed API URL;
+          # leave it unset and the placeholder below keeps this job a
+          # genuine test of the build-arg wiring (it is not a real
+          # hostname, and these images are never pushed anywhere). The
+          # api/worker Dockerfiles ignore the arg.
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ci.invalid/api/v1' }}
+
+      # A second, independent check — this one against the *built runtime
+      # image* rather than against the build stage, proving that what
+      # actually shipped in the final layer points at the configured API
+      # URL. The Dockerfile's own assertion runs in the `build` stage; this
+      # one inspects the `.next` output as the container really carries it.
+      # The script is bind-mounted rather than baked into the image, so the
+      # runtime image stays free of build tooling.
+      #
+      # No registry push / deploy step: no container registry has been
+      # chosen for this project, so pushing would mean inventing deployment
+      # infrastructure. docs/deployment.md ("Supplied by the deployment
+      # platform") lists exactly what enabling it would require.
+      #
+      # NOTE: `load: true` above plus this step have not been exercised by
+      # an actual GitHub Actions run from the environment that authored
+      # them — same disclosure as the browser-e2e job's own note. Both
+      # commands were verified locally against the real images
+      # (`docker build -f apps/web/Dockerfile --build-arg
+      # NEXT_PUBLIC_API_URL=... .` followed by this exact `docker run`).
+      - name: Assert ${{ matrix.app }} image has no localhost API fallback
+        if: matrix.app == 'web' || matrix.app == 'portal'
+        env:
+          EXPECTED_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://api.ci.invalid/api/v1' }}
+        run: >-
+          docker run --rm --entrypoint node
+          -v "$PWD/scripts:/scripts:ro"
+          -w /repo
+          crm-${{ matrix.app }}:ci
+          /scripts/assert-public-api-url.mjs
+          apps/${{ matrix.app }} "$EXPECTED_API_URL"

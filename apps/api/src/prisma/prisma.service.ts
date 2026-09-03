@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/commo
 import { ConfigService } from "@nestjs/config";
 import { PrismaClient } from "@prisma/client";
 import type { EnvConfig } from "../common/config/env.validation";
+import { resolveRuntimeDatabaseUrl } from "../common/config/database-url";
 
 /**
  * Thin wrapper around the generated Prisma client, managed by Nest's
@@ -27,9 +28,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     super({
       datasources: {
         db: {
-          url:
-            configService.get("APP_DATABASE_URL", { infer: true }) ??
+          // `resolveRuntimeDatabaseUrl`, not `??` — a blank APP_DATABASE_URL
+          // has to fall back too. `ConfigService.get()` falls through to raw
+          // `process.env` when the validated value is `undefined`, so a
+          // deployment platform that materializes the variable as the empty
+          // string handed `""` straight through `??` into Prisma and
+          // crash-looped the container. See that helper's own doc comment.
+          url: resolveRuntimeDatabaseUrl(
             configService.get("DATABASE_URL", { infer: true }),
+            configService.get("APP_DATABASE_URL", { infer: true }),
+          ).url,
         },
       },
     });

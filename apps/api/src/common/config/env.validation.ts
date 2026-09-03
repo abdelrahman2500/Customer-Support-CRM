@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseCorsOriginsDetailed } from "./cors-origins";
 
 /**
  * Every environment variable `apps/api` reads, validated once at boot.
@@ -13,7 +14,27 @@ import { z } from "zod";
  * at all (see `AiModule`'s own doc comment) — only `apps/worker`'s own
  * `env.validation.ts` reads them now.
  */
-export const envSchema = z.object({
+
+/**
+ * Deployment-configuration hardening — deployment platforms (Kubernetes
+ * `env:` entries, Compose `environment:` maps, hosted-platform variable
+ * editors, GitHub Actions `env:`) routinely materialize an unset variable as
+ * the *empty string* rather than omitting it. `z.string().optional()` treats
+ * `""` as a present value, which turns every `?? fallback` in this app into
+ * a no-op: `APP_DATABASE_URL=""` made `PrismaService` construct a client
+ * with `url: ""` (Prisma then fails with an opaque "the URL must start with
+ * the protocol postgresql://" instead of falling back to `DATABASE_URL` as
+ * intended), and `CORS_ORIGINS=""` is indistinguishable from a deliberately
+ * empty allow-list. Coercing blank to `undefined` here means "set to
+ * nothing" and "not set" behave identically, which is what every consumer of
+ * these values already assumes.
+ */
+const optionalString = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().optional(),
+);
+
+const baseEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3001),
 
@@ -34,8 +55,12 @@ export const envSchema = z.object({
    * would fail startup for every already-configured environment that
    * hasn't set it yet — see this variable's own story plan for why that
    * would violate this project's backward-compatibility rules.
+   *
+   * See `database-url.ts` for the boot-time diagnostic that reports which
+   * of the two URLs the runtime connection actually came from, and warns
+   * when the two name different databases.
    */
-  APP_DATABASE_URL: z.string().optional(),
+  APP_DATABASE_URL: optionalString,
 
   JWT_ACCESS_SECRET: z.string().min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
   JWT_ACCESS_TTL: z.string().default("15m"),
@@ -59,8 +84,43 @@ export const envSchema = z.object({
    * deployment explicitly opts in (see `parseCorsOrigins`,
    * `common/config/cors-origins.ts`). Local development value:
    * `http://localhost:3000`. No production origin is hard-coded here.
+   *
+   * Deployment-configuration hardening — required, non-empty, and
+   * individually well-formed when `NODE_ENV=production` (see the refinement
+   * below). A production API with no allowed origins compiles, boots and
+   * passes both health checks while every browser request from the deployed
+   * web app and portal fails at the preflight, which reads to a user as
+   * "login is broken" rather than as a configuration error.
    */
-  CORS_ORIGINS: z.string().optional(),
+  CORS_ORIGINS: optionalString,
+
+  /**
+   * Deployment-configuration hardening — `SameSite` for the httpOnly
+   * refresh-token cookie `identity.controller.ts` and `portal.controller.ts`
+   * set. Defaults to `strict`, which is exactly what those controllers
+   * hard-coded before this variable existed, so no already-working
+   * deployment changes behavior.
+   *
+   * It has to be configurable because `SameSite` is decided by *deployment
+   * topology*, not by application code. A browser only sends a
+   * `SameSite=strict` cookie on same-site requests, and "same site" means
+   * the same registrable domain — so:
+   *
+   *   - `crm.example.com` (web) calling `api.example.com` (API) is same-site.
+   *     `strict` works; keep the default.
+   *   - a deployment where the browser origin and the API origin sit on
+   *     different registrable domains is *cross-site*. The refresh-token
+   *     cookie is then never sent, so `POST /auth/refresh` and
+   *     `POST /auth/switch-branch` 401 — login appears to succeed and the
+   *     session then silently dies at the first access-token expiry. Such a
+   *     deployment must set `none`.
+   *
+   * `none` is only accepted alongside `Secure` cookies, which this app ties
+   * to `NODE_ENV=production` — browsers reject `SameSite=None` without
+   * `Secure`, so allowing it in development would produce a cookie the
+   * browser drops outright.
+   */
+  AUTH_COOKIE_SAMESITE: z.enum(["strict", "lax", "none"]).default("strict"),
 
   /**
    * Story 113 — docs/architecture/11-quality-and-operations.md: "Sentry
@@ -72,10 +132,68 @@ export const envSchema = z.object({
    * compatible, so the exact same DSN-based configuration works for
    * either provider — no provider-specific code branches here.
    */
-  SENTRY_DSN: z.string().optional(),
+  SENTRY_DSN: optionalString,
 });
 
-export type EnvConfig = z.infer<typeof envSchema>;
+export const envSchema = baseEnvSchema.superRefine((env, ctx) => {
+  /**
+   * Deployment-configuration hardening — the two JWT secrets must be
+   * independent. Both are HMAC keys for the same algorithm, so reusing one
+   * value for both makes a refresh token a structurally valid access token
+   * and vice versa: `JwtStrategy` would accept a refresh token as a bearer
+   * credential, defeating both the short access-token TTL and the
+   * server-side refresh-token revocation the identity module relies on.
+   * Cheap to get wrong (one copy-paste in a secrets manager) and invisible
+   * at runtime, so it is rejected at boot.
+   */
+  if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["JWT_REFRESH_SECRET"],
+      message:
+        "JWT_REFRESH_SECRET must differ from JWT_ACCESS_SECRET — reusing one " +
+        "secret for both lets a refresh token be presented as an access token. " +
+        "Generate two independent values (e.g. run `openssl rand -base64 48` twice).",
+    });
+  }
+
+  if (env.AUTH_COOKIE_SAMESITE === "none" && env.NODE_ENV !== "production") {
+    ctx.addIssue({
+      code: "custom",
+      path: ["AUTH_COOKIE_SAMESITE"],
+      message:
+        'AUTH_COOKIE_SAMESITE="none" requires NODE_ENV=production, because ' +
+        "browsers reject a SameSite=None cookie that is not also Secure and " +
+        "this app only marks the refresh cookie Secure in production.",
+    });
+  }
+
+  const { origins, invalid } = parseCorsOriginsDetailed(env.CORS_ORIGINS);
+
+  for (const entry of invalid) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["CORS_ORIGINS"],
+      message: `"${entry.value}" is not a usable browser origin — ${entry.reason}`,
+    });
+  }
+
+  if (env.NODE_ENV === "production" && origins.length === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["CORS_ORIGINS"],
+      message:
+        "CORS_ORIGINS is required in production and must list every deployed " +
+        "browser origin that calls this API — the agent workspace (apps/web) " +
+        "and, where deployed, the customer portal (apps/portal), e.g. " +
+        '"https://crm.example.com,https://portal.example.com". With none set, ' +
+        "this API rejects every cross-origin request, which presents in the " +
+        "browser as an unreachable API rather than as a configuration error.",
+    });
+  }
+});
+
+export type EnvConfig = z.infer<typeof baseEnvSchema>;
 
 export function validateEnv(config: Record<string, unknown>): EnvConfig {
   const result = envSchema.safeParse(config);

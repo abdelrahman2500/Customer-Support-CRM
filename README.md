@@ -283,7 +283,16 @@ Values below are read from `apps/api/.env` and `apps/worker/.env` (see
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | Read only by `prisma/seed.ts`, to create the initial SuperAdmin. |
 | `ANTHROPIC_API_KEY` (optional) | Enables the real Anthropic AI provider (`apps/worker`). Absent = AI features fall back to a no-op "disabled" provider that still logs the request but never calls out. Not present in `.env.example` — add it yourself to enable AI. |
 | `ANTHROPIC_MODEL` (optional) | Model id for the Anthropic provider; defaults to `claude-sonnet-4-5-20250929`. |
-| `NEXT_PUBLIC_API_URL` | Base API URL used by both `apps/web` and `apps/portal` (`http://localhost:3001/api/v1` locally). |
+| `AUTH_COOKIE_SAMESITE` (optional) | `SameSite` for the httpOnly refresh-token cookie: `strict` (default), `lax`, or `none`. Only needs changing when the deployed frontends and the API sit on different registrable domains — see [`docs/deployment.md`](./docs/deployment.md). |
+| `NEXT_PUBLIC_API_URL` | Base API URL used by both `apps/web` and `apps/portal` (`http://localhost:3001/api/v1` locally). **Compiled into the browser bundle at build time** — for a container image it must be passed as a `--build-arg`, not a runtime variable. |
+
+> **Deploying?** `CORS_ORIGINS` is required in production, the two JWT
+> secrets must differ, and `NEXT_PUBLIC_API_URL` must be set when the
+> frontend images are *built*. All three are enforced now (startup
+> validation for the first two; a build-time guard plus
+> `scripts/assert-public-api-url.mjs` for the third). See
+> [`docs/deployment.md`](./docs/deployment.md) and
+> [`.env.production.example`](./.env.production.example).
 
 ## Application URLs
 
@@ -471,6 +480,11 @@ For the detailed, story-by-story implementation history, see
   overview, domain boundaries, data/multitenancy, auth/security,
   communication/realtime, SLA/automation/AI, supporting domains,
   integrations, i18n/RTL, quality/operations, risks/scope).
+- [`docs/deployment.md`](./docs/deployment.md) — how to deploy so a real
+  browser reaches the deployed API and stays signed in: the build-time vs
+  runtime configuration split, CORS and cookie `SameSite`, the
+  migration/runtime database contract, and exactly which values the
+  deployment platform must supply.
 - [`.squad/plans/`](./.squad/plans/) — per-feature implementation plans.
 - [`.squad/stories/`](./.squad/stories/) — per-story intake documents.
 - `CLAUDE.md` (repository root) — the autonomous development-loop

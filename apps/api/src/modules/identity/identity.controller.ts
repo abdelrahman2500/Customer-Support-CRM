@@ -19,6 +19,7 @@ import type { Request, Response } from "express";
 import type { AuthenticatedUser, JwtAccessTokenClaims } from "@crm/shared";
 import { Public } from "../../common/auth/public.decorator";
 import type { EnvConfig } from "../../common/config/env.validation";
+import { buildRefreshCookieOptions } from "../../common/config/refresh-cookie";
 import { LoginDto } from "./dto/login.dto";
 import { SwitchBranchDto } from "./dto/switch-branch.dto";
 import { UpdateLocaleDto } from "./dto/update-locale.dto";
@@ -183,14 +184,15 @@ export class IdentityController {
   }
 
   private setRefreshCookie(response: Response, token: string): void {
-    const isProduction = this.configService.get("NODE_ENV", { infer: true }) === "production";
-    const ttlDays = this.configService.get("JWT_REFRESH_TTL_DAYS", { infer: true });
-    response.cookie(REFRESH_COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "strict",
-      path: "/api/v1/auth",
-      maxAge: ttlDays * 24 * 60 * 60 * 1000,
-    });
+    response.cookie(
+      REFRESH_COOKIE_NAME,
+      token,
+      buildRefreshCookieOptions({
+        nodeEnv: this.configService.get("NODE_ENV", { infer: true }),
+        sameSite: this.configService.get("AUTH_COOKIE_SAMESITE", { infer: true }),
+        refreshTtlDays: this.configService.get("JWT_REFRESH_TTL_DAYS", { infer: true }),
+        path: "/api/v1/auth",
+      }),
+    );
   }
 }

@@ -1,0 +1,63 @@
+# Everything below is excluded from every image build context. All four
+# Dockerfiles (apps/{api,web,portal,worker}/Dockerfile) do a `COPY . .` in
+# their `build` stage, so without this file a build run from a developer
+# machine copies the host's own artifacts straight into the image:
+#
+#   - `node_modules/` (and every per-package `node_modules/`) would overwrite
+#     the Linux dependency tree the `deps` stage just installed with the
+#     host's — on Windows/macOS that means native binaries (esbuild, @swc,
+#     Prisma engines, sharp) built for the wrong platform.
+#   - `.env` / `.env.local` are gitignored *secrets*; `COPY . .` would bake
+#     them into a published image layer. Worse, Next.js loads `.env.local`
+#     during `next build`, so a stale local `NEXT_PUBLIC_API_URL` could end
+#     up compiled into a production browser bundle.
+#   - `.next/`, `dist/`, `.turbo/`, `*.tsbuildinfo` are stale build output
+#     that either gets rebuilt anyway or silently shadows the real build.
+#
+# CI builds from a fresh `actions/checkout` and therefore never had any of
+# these, which is exactly why the problem was invisible there.
+
+# --- Dependencies -----------------------------------------------------------
+node_modules
+**/node_modules
+.pnpm-store
+
+# --- Secrets / local environment -------------------------------------------
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# --- Build output ----------------------------------------------------------
+**/.next
+**/dist
+**/build
+**/out
+**/.turbo
+.turbo
+**/*.tsbuildinfo
+apps/api/generated
+
+# --- VCS / tooling ---------------------------------------------------------
+.git
+.gitignore
+.github
+.claude
+.squad
+.vscode
+.idea
+
+# --- Tests / reports -------------------------------------------------------
+**/coverage
+**/playwright-report
+**/test-results
+
+# --- Docs & local-only compose --------------------------------------------
+docs
+*.md
+!README.md
+docker-compose.yml
+docker-compose.prod.yml
+.dockerignore

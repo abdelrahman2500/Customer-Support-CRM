@@ -9,6 +9,7 @@ import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 import type { EnvConfig } from "./common/config/env.validation";
 import { parseCorsOrigins } from "./common/config/cors-origins";
+import { describeRuntimeDatabase } from "./common/config/database-url";
 import { RedisIoAdapter } from "./realtime/redis-io.adapter";
 import { PinoLoggerService } from "./common/logging/pino-logger.service";
 
@@ -29,6 +30,33 @@ async function bootstrap(): Promise<void> {
   // needs the refresh-token cookie.
   const corsOrigins = parseCorsOrigins(config.get("CORS_ORIGINS", { infer: true }));
   app.enableCors({ origin: corsOrigins, credentials: true });
+
+  // Deployment-configuration hardening — the three boot facts that decide
+  // whether a *deployed* browser can actually talk to this API and stay
+  // signed in. All three fail silently otherwise: a CORS rejection, a
+  // dropped SameSite cookie and a query against an unmigrated database all
+  // surface to the user as "login is broken" while the API logs look
+  // perfectly healthy. Logging them once at boot makes each one checkable
+  // from the deployment's own logs, with no access to the running process.
+  // See docs/deployment.md.
+  const bootLogger = new Logger("Bootstrap");
+  bootLogger.log(
+    corsOrigins.length > 0
+      ? `CORS allowed origins: ${corsOrigins.join(", ")}`
+      : "CORS allowed origins: none — every cross-origin browser request will be rejected",
+  );
+  bootLogger.log(
+    `Refresh cookie: SameSite=${config.get("AUTH_COOKIE_SAMESITE", { infer: true })}; ` +
+      `Secure=${config.get("NODE_ENV", { infer: true }) === "production"}`,
+  );
+  const runtimeDatabase = describeRuntimeDatabase(
+    config.get("DATABASE_URL", { infer: true }),
+    config.get("APP_DATABASE_URL", { infer: true }),
+  );
+  bootLogger.log(`Runtime database (from ${runtimeDatabase.source}): ${runtimeDatabase.redacted}`);
+  if (runtimeDatabase.warning) {
+    bootLogger.warn(runtimeDatabase.warning);
+  }
 
   const redisIoAdapter = new RedisIoAdapter(app);
   await redisIoAdapter.connectToRedis();
@@ -59,7 +87,7 @@ async function bootstrap(): Promise<void> {
 
   const port = config.get("PORT", { infer: true });
   await app.listen(port);
-  new Logger("Bootstrap").log(`apps/api listening on http://localhost:${port}`);
+  bootLogger.log(`apps/api listening on port ${port}`);
 }
 
 void bootstrap();

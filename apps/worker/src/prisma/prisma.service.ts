@@ -15,6 +15,28 @@ import type { EnvConfig } from "../env.validation";
  * `env.validation.ts`'s own doc comment and
  * `apps/api/src/prisma/prisma.service.ts`'s identical pattern.
  */
+/**
+ * Deployment-configuration hardening — mirrors
+ * `apps/api/src/common/config/database-url.ts`'s own
+ * `resolveRuntimeDatabaseUrl` exactly (duplicated rather than imported for
+ * the same reason `env.validation.ts` is: `apps/worker` must not depend on
+ * `apps/api`, and there is only one other consumer).
+ *
+ * A **blank** `APP_DATABASE_URL` counts as absent. `env.validation.ts`
+ * already normalizes `""` to `undefined`, but `@nestjs/config`'s
+ * `ConfigService.get()` falls through to raw `process.env` when the
+ * validated value is `undefined` — so a platform that materializes the
+ * variable as the empty string still hands `""` back, and `??` does not
+ * replace it. Prisma then fails with "Error validating datasource `db`: You
+ * must provide a nonempty URL" and the container crash-loops.
+ */
+function resolveRuntimeDatabaseUrl(
+  databaseUrl: string,
+  appDatabaseUrl: string | undefined,
+): string {
+  return appDatabaseUrl?.trim() || databaseUrl;
+}
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
@@ -23,9 +45,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     super({
       datasources: {
         db: {
-          url:
-            configService.get("APP_DATABASE_URL", { infer: true }) ??
+          url: resolveRuntimeDatabaseUrl(
             configService.get("DATABASE_URL", { infer: true }),
+            configService.get("APP_DATABASE_URL", { infer: true }),
+          ),
         },
       },
     });

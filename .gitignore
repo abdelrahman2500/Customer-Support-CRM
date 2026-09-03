@@ -30,10 +30,13 @@ apps/api/prisma/migrations/dev.db
 apps/api/generated/
 
 # Environment
+# Deliberately broad: `.env.*` catches the real deployment env files
+# (`.env.production`, `.env.staging`, ...) that docker-compose.prod.yml reads
+# via `--env-file`. Only the committed *templates* are re-admitted below.
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+!.env.production.example
 
 # Logs
 *.log
