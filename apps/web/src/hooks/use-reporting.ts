@@ -14,6 +14,7 @@ import {
   getResolutionTime,
   getSlaCompliance,
   getTicketAging,
+  getTicketVolumeByCategory,
   getTicketVolumeByStatus,
   listDashboards,
   updateDashboard,
@@ -78,6 +79,14 @@ export function useAiUsageQuery(range: ReportDateRange = {}) {
   return useQuery({
     queryKey: ["reports", "ai-usage", range],
     queryFn: () => getAiUsage(range),
+  });
+}
+
+/** Story 126 — same parameterized-query-key pattern as every other hook here. */
+export function useTicketVolumeByCategoryQuery(range: ReportDateRange = {}) {
+  return useQuery({
+    queryKey: ["reports", "ticket-volume-by-category", range],
+    queryFn: () => getTicketVolumeByCategory(range),
   });
 }
 

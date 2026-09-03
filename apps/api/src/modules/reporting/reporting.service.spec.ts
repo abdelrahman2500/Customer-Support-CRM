@@ -25,6 +25,9 @@ function buildPrismaMock() {
       groupBy: vi.fn(),
       count: vi.fn(),
     },
+    ticketCategory: {
+      findMany: vi.fn(),
+    },
   };
 }
 
@@ -440,6 +443,109 @@ describe("ReportingService", () => {
         /from must not be after to/,
       );
       expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getTicketVolumeByCategory", () => {
+    it("scopes the groupBy query by branch and groups by categoryId, without excluding null", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByCategory();
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["categoryId"],
+        where: { branchId: "branch-1" },
+        _count: { _all: true },
+      });
+    });
+
+    it("returns [] and skips the category lookup when the branch has no tickets", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      const result = await service.getTicketVolumeByCategory();
+
+      expect(result).toEqual([]);
+      expect(prisma.ticketCategory.findMany).not.toHaveBeenCalled();
+    });
+
+    it("looks up only the distinct, non-null category ids", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([
+        { categoryId: "category-1", _count: { _all: 2 } },
+        { categoryId: null, _count: { _all: 1 } },
+      ]);
+      prisma.ticketCategory.findMany.mockResolvedValue([
+        { id: "category-1", name: "Billing" },
+      ]);
+
+      await service.getTicketVolumeByCategory();
+
+      expect(prisma.ticketCategory.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["category-1"] } },
+        select: { id: true, name: true },
+      });
+    });
+
+    it("maps grouped rows to {categoryId, categoryName, count}, sorted by name with the null (Uncategorized) row last", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([
+        { categoryId: "category-2", _count: { _all: 4 } },
+        { categoryId: null, _count: { _all: 7 } },
+        { categoryId: "category-1", _count: { _all: 2 } },
+      ]);
+      prisma.ticketCategory.findMany.mockResolvedValue([
+        { id: "category-1", name: "Billing" },
+        { id: "category-2", name: "Technical" },
+      ]);
+
+      const result = await service.getTicketVolumeByCategory();
+
+      expect(result).toEqual([
+        { categoryId: "category-1", categoryName: "Billing", count: 2 },
+        { categoryId: "category-2", categoryName: "Technical", count: 4 },
+        { categoryId: null, categoryName: null, count: 7 },
+      ]);
+    });
+
+    it("falls back to the raw category id when the category can't be resolved", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([
+        { categoryId: "category-unknown", _count: { _all: 1 } },
+      ]);
+      prisma.ticketCategory.findMany.mockResolvedValue([]);
+
+      const result = await service.getTicketVolumeByCategory();
+
+      expect(result).toEqual([
+        { categoryId: "category-unknown", categoryName: "category-unknown", count: 1 },
+      ]);
+    });
+
+    // Story 93-style date-range filtering, same convention as every other method here.
+    it("filters by Ticket.createdAt when a range is supplied", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByCategory("2026-01-01", "2026-01-31");
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["categoryId"],
+        where: {
+          branchId: "branch-1",
+          createdAt: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2026-02-01T00:00:00.000Z") },
+        },
+        _count: { _all: true },
+      });
+    });
+
+    it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
+      await expect(
+        service.getTicketVolumeByCategory("2026-02-01", "2026-01-01"),
+      ).rejects.toThrow(/from must not be after to/);
+      expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, tenantContext);
+
+      await expect(service.getTicketVolumeByCategory()).rejects.toThrow(/no active branch/);
     });
   });
 

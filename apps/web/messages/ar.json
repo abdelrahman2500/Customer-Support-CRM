@@ -693,6 +693,11 @@
       "costUnknown": "التكلفة غير معروفة",
       "unpricedWarning": "{count} طلب (طلبات) ناجحة استخدمت نموذجًا غير مدرج في جدول الأسعار واستُبعدت من إجمالي التكلفة."
     },
+    "ticketVolumeByCategory": {
+      "heading": "حجم التذاكر حسب الفئة",
+      "empty": "لا توجد تذاكر حتى الآن.",
+      "uncategorized": "بدون فئة"
+    },
     "dashboards": {
       "pickerLabel": "لوحة المعلومات",
       "allReports": "كل التقارير",

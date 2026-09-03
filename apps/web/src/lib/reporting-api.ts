@@ -98,6 +98,25 @@ export function getTicketVolumeByStatus(range: ReportDateRange = {}): Promise<Ti
   return apiFetch<TicketVolumeByStatus[]>(`/reports/ticket-volume${toQueryString(range)}`);
 }
 
+/**
+ * Story 126 — mirrors the backend's own `TicketVolumeByCategory` exactly.
+ * `categoryName` is `null` for the `categoryId: null` row — this codebase's
+ * "backend returns raw data, frontend supplies the user-facing label"
+ * split (see `ReportsView`'s own render for the localized "Uncategorized"
+ * label it renders for that row).
+ */
+export interface TicketVolumeByCategory {
+  categoryId: string | null;
+  categoryName: string | null;
+  count: number;
+}
+
+export function getTicketVolumeByCategory(
+  range: ReportDateRange = {},
+): Promise<TicketVolumeByCategory[]> {
+  return apiFetch<TicketVolumeByCategory[]>(`/reports/ticket-volume-by-category${toQueryString(range)}`);
+}
+
 export function getSlaCompliance(range: ReportDateRange = {}): Promise<SlaComplianceSummary> {
   return apiFetch<SlaComplianceSummary>(`/reports/sla-compliance${toQueryString(range)}`);
 }
@@ -132,7 +151,8 @@ export type ReportExportPath =
   | "agent-performance"
   | "ticket-aging"
   | "resolution-time"
-  | "ai-usage";
+  | "ai-usage"
+  | "ticket-volume-by-category";
 
 /**
  * Story 125 — Reporting Export. A raw, dedicated `fetch` — not routed
@@ -179,7 +199,8 @@ export type ReportWidgetType =
   | "AGENT_PERFORMANCE"
   | "TICKET_AGING"
   | "RESOLUTION_TIME"
-  | "AI_USAGE";
+  | "AI_USAGE"
+  | "TICKET_VOLUME_BY_CATEGORY";
 
 export interface DashboardWidgetSummary {
   widgetType: ReportWidgetType;

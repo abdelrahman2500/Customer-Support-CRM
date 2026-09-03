@@ -1381,6 +1381,9 @@ enum ReportWidgetType {
   RESOLUTION_TIME
   /// Story 121 — AI Usage/Cost Reporting.
   AI_USAGE
+  /// Story 126 — Ticket Volume by Category (unblocked once Story 120's
+  /// `Ticket.categoryId` FK landed).
+  TICKET_VOLUME_BY_CATEGORY
 
   @@schema("reporting")
 }

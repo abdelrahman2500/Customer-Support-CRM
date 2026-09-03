@@ -11,6 +11,7 @@ import {
   useResolutionTimeQuery,
   useSlaComplianceQuery,
   useTicketAgingQuery,
+  useTicketVolumeByCategoryQuery,
   useTicketVolumeQuery,
   useUpdateDashboardMutation,
 } from "@/hooks/use-reporting";
@@ -41,6 +42,7 @@ vi.mock("@/hooks/use-reporting", () => ({
   useTicketAgingQuery: vi.fn(),
   useResolutionTimeQuery: vi.fn(),
   useAiUsageQuery: vi.fn(),
+  useTicketVolumeByCategoryQuery: vi.fn(),
   useDashboardsQuery: vi.fn(),
   useCreateDashboardMutation: vi.fn(),
   useUpdateDashboardMutation: vi.fn(),
@@ -54,6 +56,7 @@ const mockedUseAgentPerformanceQuery = vi.mocked(useAgentPerformanceQuery);
 const mockedUseTicketAgingQuery = vi.mocked(useTicketAgingQuery);
 const mockedUseResolutionTimeQuery = vi.mocked(useResolutionTimeQuery);
 const mockedUseAiUsageQuery = vi.mocked(useAiUsageQuery);
+const mockedUseTicketVolumeByCategoryQuery = vi.mocked(useTicketVolumeByCategoryQuery);
 const mockedUseDashboardsQuery = vi.mocked(useDashboardsQuery);
 const mockedUseCreateDashboardMutation = vi.mocked(useCreateDashboardMutation);
 const mockedUseUpdateDashboardMutation = vi.mocked(useUpdateDashboardMutation);
@@ -114,6 +117,9 @@ describe("ReportsView", () => {
         isSuccess: true,
       }) as never,
     );
+    mockedUseTicketVolumeByCategoryQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
     mockedUseDashboardsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     mockedUseCreateDashboardMutation.mockReturnValue({
       mutateAsync: vi.fn().mockResolvedValue({ id: "new-dashboard" }),
@@ -141,6 +147,24 @@ describe("ReportsView", () => {
     expect(screen.getByText("csat.empty")).toBeInTheDocument();
     expect(screen.getByText("agentPerformance.empty")).toBeInTheDocument();
     expect(screen.getByText("resolutionTime.empty")).toBeInTheDocument();
+    expect(screen.getByText("ticketVolumeByCategory.empty")).toBeInTheDocument();
+  });
+
+  it("renders a null categoryId row using the localized 'Uncategorized' label, not a blank/null value", () => {
+    mockedUseTicketVolumeByCategoryQuery.mockReturnValue(
+      queryResult({
+        data: [
+          { categoryId: "category-1", categoryName: "Billing", count: 3 },
+          { categoryId: null, categoryName: null, count: 5 },
+        ],
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<ReportsView />);
+
+    expect(screen.getByText("Billing")).toBeInTheDocument();
+    expect(screen.getByText("ticketVolumeByCategory.uncategorized")).toBeInTheDocument();
   });
 
   it("renders the ticket-aging card's four buckets, even when all are zero", () => {
@@ -603,6 +627,7 @@ describe("ReportsView", () => {
           "TICKET_AGING",
           "RESOLUTION_TIME",
           "AI_USAGE",
+          "TICKET_VOLUME_BY_CATEGORY",
         ],
       });
     });
@@ -652,7 +677,7 @@ describe("ReportsView", () => {
     it("renders one export button per report card", () => {
       render(<ReportsView />);
 
-      expect(screen.getAllByText("export.button")).toHaveLength(7);
+      expect(screen.getAllByText("export.button")).toHaveLength(8);
     });
 
     it("does not render an export button for a card whose query has not succeeded yet", () => {
@@ -660,7 +685,7 @@ describe("ReportsView", () => {
 
       render(<ReportsView />);
 
-      expect(screen.getAllByText("export.button")).toHaveLength(6);
+      expect(screen.getAllByText("export.button")).toHaveLength(7);
     });
 
     it("clicking a card's export button downloads that report with the correct path and current range", async () => {

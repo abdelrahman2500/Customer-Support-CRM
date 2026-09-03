@@ -187,6 +187,17 @@ describe("Reporting & Analytics (e2e)", () => {
     return response.body;
   }
 
+  /** Story 126 — Ticket Volume by Category. */
+  async function getTicketVolumeByCategory(
+    range?: DateRange,
+  ): Promise<{ categoryId: string | null; categoryName: string | null; count: number }[]> {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/reports/ticket-volume-by-category${toQueryString(range)}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    return response.body;
+  }
+
   async function getTicketAging(range?: DateRange): Promise<{ bucket: string; count: number }[]> {
     const response = await request(app.getHttpServer())
       .get(`/api/v1/reports/ticket-aging${toQueryString(range)}`)
@@ -274,6 +285,9 @@ describe("Reporting & Analytics (e2e)", () => {
     await request(app.getHttpServer()).get("/api/v1/reports/ticket-aging").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/resolution-time").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/ai-usage").expect(401);
+    await request(app.getHttpServer())
+      .get("/api/v1/reports/ticket-volume-by-category")
+      .expect(401);
   });
 
   it("rejects an Agent-role user lacking report:read on every route (403)", async () => {
@@ -337,6 +351,10 @@ describe("Reporting & Analytics (e2e)", () => {
       .get("/api/v1/reports/ai-usage")
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(403);
+    await request(app.getHttpServer())
+      .get("/api/v1/reports/ticket-volume-by-category")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .expect(403);
   });
 
   // Story 125 — Reporting Export.
@@ -349,6 +367,7 @@ describe("Reporting & Analytics (e2e)", () => {
       "ticket-aging",
       "resolution-time",
       "ai-usage",
+      "ticket-volume-by-category",
     ];
 
     it("rejects unauthenticated requests on every export route (401)", async () => {
@@ -475,6 +494,26 @@ describe("Reporting & Analytics (e2e)", () => {
       expect(summarizeLine).toBe(
         `SUMMARIZE,${summarizeRow!.callCount},${summarizeRow!.successCount},${summarizeRow!.errorCount},${summarizeRow!.totalInputTokens},${summarizeRow!.totalOutputTokens},${summarizeRow!.totalCostUsd}`,
       );
+    });
+
+    it("ticket-volume-by-category/export returns a CSV whose data matches the JSON route", async () => {
+      const categoryId = await createTicketCategory();
+      await createTicket(categoryId);
+      const jsonRows = await getTicketVolumeByCategory();
+      const row = jsonRows.find((r) => r.categoryId === categoryId);
+      expect(row).toBeDefined();
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/reports/ticket-volume-by-category/export")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.headers["content-type"]).toMatch(/^text\/csv/);
+      const lines = (response.text as string).trim().split("\r\n");
+      expect(lines[0]).toBe("Category ID,Category Name,Count");
+      expect(lines).toHaveLength(jsonRows.length + 1);
+      const categoryLine = lines.find((line) => line.startsWith(`${categoryId},`));
+      expect(categoryLine).toBe(`${categoryId},${row!.categoryName},${row!.count}`);
     });
   });
 
@@ -1085,6 +1124,67 @@ describe("Reporting & Analytics (e2e)", () => {
 
       const afterYesterday = await getAiUsage({ from: yesterday(), to: yesterday() });
       expect(afterYesterday.totalCalls).toBe(beforeYesterday.totalCalls);
+    });
+  });
+
+  // Story 126 — Ticket Volume by Category.
+  describe("ticket-volume-by-category", () => {
+    it("reflects a real, newly-created ticket's category in the volume-by-category delta", async () => {
+      const categoryId = await createTicketCategory();
+      const before = await getTicketVolumeByCategory();
+      const beforeCount = before.find((row) => row.categoryId === categoryId)?.count ?? 0;
+
+      await createTicket(categoryId);
+
+      const after = await getTicketVolumeByCategory();
+      const afterRow = after.find((row) => row.categoryId === categoryId);
+      expect(afterRow?.count).toBe(beforeCount + 1);
+      expect(afterRow?.categoryName).not.toBeNull();
+    });
+
+    it("reflects a real, uncategorized ticket in the categoryId: null (Uncategorized) row", async () => {
+      const before = await getTicketVolumeByCategory();
+      const beforeUncategorized = before.find((row) => row.categoryId === null)?.count ?? 0;
+
+      await createTicket();
+
+      const after = await getTicketVolumeByCategory();
+      const afterUncategorized = after.find((row) => row.categoryId === null);
+      expect(afterUncategorized?.count).toBe(beforeUncategorized + 1);
+      expect(afterUncategorized?.categoryName).toBeNull();
+    });
+
+    it("sorts named categories by name ascending, with the Uncategorized row always last", async () => {
+      await createTicket();
+      const result = await getTicketVolumeByCategory();
+
+      const namedCategoryNames = result
+        .filter((row) => row.categoryId !== null)
+        .map((row) => row.categoryName as string);
+      expect(namedCategoryNames).toEqual([...namedCategoryNames].sort((a, b) => a.localeCompare(b)));
+      expect(result[result.length - 1]?.categoryId).toBeNull();
+    });
+
+    it("a [today, today] range includes a freshly-created ticket; a [yesterday, yesterday] range excludes it", async () => {
+      const categoryId = await createTicketCategory();
+      const beforeToday = await getTicketVolumeByCategory({ from: today(), to: today() });
+      const beforeTodayCount =
+        beforeToday.find((row) => row.categoryId === categoryId)?.count ?? 0;
+
+      await createTicket(categoryId);
+
+      const afterToday = await getTicketVolumeByCategory({ from: today(), to: today() });
+      const afterTodayCount = afterToday.find((row) => row.categoryId === categoryId)?.count ?? 0;
+      expect(afterTodayCount).toBe(beforeTodayCount + 1);
+
+      const yesterdayOnly = await getTicketVolumeByCategory({ from: yesterday(), to: yesterday() });
+      expect(yesterdayOnly.find((row) => row.categoryId === categoryId)).toBeUndefined();
+    });
+
+    it("omitting from/to entirely reproduces the exact all-time response (backward compatibility)", async () => {
+      const allTime = await getTicketVolumeByCategory();
+      const explicitlyUnfiltered = await getTicketVolumeByCategory({});
+      expect(explicitlyUnfiltered).toEqual(allTime);
     });
   });
 });

@@ -90,6 +90,26 @@ export interface AiUsageSummary {
   byFeature: AiUsageByFeature[];
 }
 
+/**
+ * Story 126 — one row per `TicketCategory` with at least one ticket in the
+ * caller's branch (in this window), plus one final `categoryId: null` row
+ * for tickets with no category assigned — deliberately not the "only what
+ * exists" sparse-and-drop convention `TicketVolumeByStatus` uses for its
+ * enum-backed status: `Ticket.categoryId` is a genuinely-optional FK (Story
+ * 120), not an always-set enum, so a ticket with none is a real, common,
+ * ongoing cohort ("Uncategorized"), not a value that "doesn't exist" the
+ * way `getAgentPerformance` treats an unassigned ticket as having no agent
+ * to attribute at all. `categoryName` is `null` for that row — the caller
+ * (`ReportsView`) renders its own localized "Uncategorized" label, the same
+ * "backend returns raw data, frontend supplies any user-facing label" split
+ * every other report here already follows (e.g. `AGE_BUCKET_LABELS`).
+ */
+export interface TicketVolumeByCategory {
+  categoryId: string | null;
+  categoryName: string | null;
+  count: number;
+}
+
 /** Fixed age buckets for currently-open tickets, always returned in this
  * order regardless of counts (Design decision 1 of the plan — a small,
  * always-complete distribution reads more naturally than a sparse list). */
@@ -289,6 +309,61 @@ export class ReportingService {
         ...counts,
       }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }
+
+  /**
+   * Story 126 — Ticket Volume by Category. Unblocked by Story 120's
+   * `Ticket.categoryId` FK (previously free-text `category`, ungroupable).
+   * Filters on `Ticket.createdAt`, the same field/table
+   * `getTicketVolumeByStatus`/`getTicketAging` already use — "how many
+   * tickets, by category, were created in this window." A `groupBy` over
+   * the nullable `categoryId` itself (not `categoryId: { not: null }`
+   * first, unlike `getAgentPerformance`'s exclusion of unassigned tickets):
+   * here, "no category" is exactly the cohort this report exists to
+   * surface, not a value with no meaning to attribute counts to.
+   *
+   * Category names are looked up in a second query, mirroring
+   * `getAgentPerformance`'s own `prisma.user.findMany` name-lookup shape —
+   * `groupBy` only returns the FK, never the related row. Sorted by
+   * `categoryName` ascending, with the `categoryId: null` ("Uncategorized")
+   * row always last regardless of its count — a stable, predictable
+   * position for the one row with no name to sort by, rather than an
+   * arbitrary spot wherever `null` happens to collate.
+   */
+  async getTicketVolumeByCategory(
+    from?: string,
+    to?: string,
+  ): Promise<TicketVolumeByCategory[]> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const range = resolveReportDateRange(from, to);
+    const grouped = await this.prisma.ticket.groupBy({
+      by: ["categoryId"],
+      where: { branchId, ...(hasDateRange(range) ? { createdAt: range } : {}) },
+      _count: { _all: true },
+    });
+
+    const categoryIds = grouped
+      .map((row) => row.categoryId)
+      .filter((categoryId): categoryId is string => categoryId !== null);
+    const categories = categoryIds.length
+      ? await this.prisma.ticketCategory.findMany({
+          where: { id: { in: categoryIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const nameById = new Map(categories.map((category) => [category.id, category.name]));
+
+    return grouped
+      .map((row) => ({
+        categoryId: row.categoryId,
+        categoryName: row.categoryId === null ? null : (nameById.get(row.categoryId) ?? row.categoryId),
+        count: row._count._all,
+      }))
+      .sort((a, b) => {
+        if (a.categoryName === null) return 1;
+        if (b.categoryName === null) return -1;
+        return a.categoryName.localeCompare(b.categoryName);
+      });
   }
 
   /**

@@ -13,6 +13,7 @@ import type {
   ResolutionTimeSummary,
   SlaComplianceSummary,
   TicketAgingBucket,
+  TicketVolumeByCategory,
   TicketVolumeByStatus,
 } from "./reporting.service";
 import { ReportingService } from "./reporting.service";
@@ -51,6 +52,12 @@ const RESOLUTION_TIME_COLUMNS: Array<CsvColumn<ResolutionTimeSummary>> = [
   { key: "averageResolutionMs", header: "Average Resolution (ms)" },
 ];
 
+const TICKET_VOLUME_BY_CATEGORY_COLUMNS: Array<CsvColumn<TicketVolumeByCategory>> = [
+  { key: "categoryId", header: "Category ID" },
+  { key: "categoryName", header: "Category Name" },
+  { key: "count", header: "Count" },
+];
+
 const AI_USAGE_COLUMNS: Array<CsvColumn<AiUsageByFeature>> = [
   { key: "feature", header: "Feature" },
   { key: "callCount", header: "Call Count" },
@@ -83,6 +90,9 @@ const AI_USAGE_COLUMNS: Array<CsvColumn<AiUsageByFeature>> = [
  *
  * Story 121 — `GET /reports/ai-usage` added the same way; no new
  * permission (reuses `report:read`).
+ *
+ * Story 126 — `GET /reports/ticket-volume-by-category` added the same way;
+ * no new permission (reuses `report:read`).
  *
  * Story 125 — Reporting Export. Every report above gains a sibling
  * `GET /reports/<name>/export` route (a dedicated sub-route, not a
@@ -211,6 +221,30 @@ export class ReportingController {
   ): Promise<void> {
     const summary = await this.reportingService.getResolutionTime(from, to);
     sendCsv(response, "resolution-time", from, to, toCsv([summary], RESOLUTION_TIME_COLUMNS));
+  }
+
+  @Get("ticket-volume-by-category")
+  @RequirePermissions("report:read")
+  getTicketVolumeByCategory(
+    @Query() { from, to }: ReportDateRangeQueryDto,
+  ): Promise<TicketVolumeByCategory[]> {
+    return this.reportingService.getTicketVolumeByCategory(from, to);
+  }
+
+  @Get("ticket-volume-by-category/export")
+  @RequirePermissions("report:read")
+  async exportTicketVolumeByCategory(
+    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Res() response: Response,
+  ): Promise<void> {
+    const rows = await this.reportingService.getTicketVolumeByCategory(from, to);
+    sendCsv(
+      response,
+      "ticket-volume-by-category",
+      from,
+      to,
+      toCsv(rows, TICKET_VOLUME_BY_CATEGORY_COLUMNS),
+    );
   }
 
   @Get("ai-usage")

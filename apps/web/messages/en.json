@@ -701,6 +701,11 @@
       "costUnknown": "Cost unknown",
       "unpricedWarning": "{count} successful call(s) used a model not in the price table and are excluded from the cost total."
     },
+    "ticketVolumeByCategory": {
+      "heading": "Ticket Volume by Category",
+      "empty": "No tickets yet.",
+      "uncategorized": "Uncategorized"
+    },
     "dashboards": {
       "pickerLabel": "Dashboard",
       "allReports": "All reports",

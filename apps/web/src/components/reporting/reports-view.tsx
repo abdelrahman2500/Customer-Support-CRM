@@ -12,6 +12,7 @@ import {
   useResolutionTimeQuery,
   useSlaComplianceQuery,
   useTicketAgingQuery,
+  useTicketVolumeByCategoryQuery,
   useTicketVolumeQuery,
   useUpdateDashboardMutation,
 } from "@/hooks/use-reporting";
@@ -35,6 +36,7 @@ const ALL_WIDGET_TYPES: ReportWidgetType[] = [
   "TICKET_AGING",
   "RESOLUTION_TIME",
   "AI_USAGE",
+  "TICKET_VOLUME_BY_CATEGORY",
 ];
 
 /** Story 121 — no currency-formatting precedent exists anywhere else in
@@ -97,6 +99,12 @@ function formatUsd(amount: number): string {
  * Total cost plus a per-`AiFeature` breakdown, with an explicit caveat
  * when some successful calls used an unpriced/unrecognized model (see
  * `AiUsageSummary.unpricedCallCount`'s own doc comment).
+ *
+ * Story 126 — an eighth card, `GET /reports/ticket-volume-by-category`,
+ * added the same way. The backend's `categoryId: null` row (a real ticket
+ * cohort — "no category assigned" — not a value with nothing to display)
+ * renders with this screen's own localized `ticketVolumeByCategory.
+ * uncategorized` label rather than the raw `null`.
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
@@ -113,6 +121,7 @@ export function ReportsView() {
   const resolutionTimeQuery = useResolutionTimeQuery(range);
   const ticketAgingQuery = useTicketAgingQuery(range);
   const aiUsageQuery = useAiUsageQuery(range);
+  const ticketVolumeByCategoryQuery = useTicketVolumeByCategoryQuery(range);
 
   const dashboardsQuery = useDashboardsQuery();
   const createDashboardMutation = useCreateDashboardMutation();
@@ -377,6 +386,34 @@ export function ReportsView() {
                   </p>
                 )}
               </div>
+            )}
+          </ReportCard>
+        );
+
+      case "TICKET_VOLUME_BY_CATEGORY":
+        return (
+          <ReportCard
+            heading={t("ticketVolumeByCategory.heading")}
+            query={ticketVolumeByCategoryQuery}
+            t={t}
+            skeleton="list"
+            exportPath="ticket-volume-by-category"
+            range={range}
+          >
+            {ticketVolumeByCategoryQuery.isSuccess && ticketVolumeByCategoryQuery.data.length === 0 && (
+              <p className="text-sm text-slate-500">{t("ticketVolumeByCategory.empty")}</p>
+            )}
+            {ticketVolumeByCategoryQuery.isSuccess && ticketVolumeByCategoryQuery.data.length > 0 && (
+              <ul className="flex flex-col gap-1 text-sm">
+                {ticketVolumeByCategoryQuery.data.map((row) => (
+                  <li key={row.categoryId ?? "uncategorized"} className="flex items-center justify-between">
+                    <span className="text-slate-600">
+                      {row.categoryName ?? t("ticketVolumeByCategory.uncategorized")}
+                    </span>
+                    <span className="font-medium text-slate-900">{row.count}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </ReportCard>
         );
