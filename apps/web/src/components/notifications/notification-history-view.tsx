@@ -13,7 +13,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
 
 /** The real, backend-defined event-type strings this history can ever show
@@ -86,12 +93,16 @@ function NotificationRow({
         <Badge variant="outline">{eventLabel}</Badge>
       </TableCell>
       <TableCell>
-        <button type="button" className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" onClick={onOpenTicket}>
+        <button
+          type="button"
+          className="rounded-sm hover:underline focus-ring"
+          onClick={onOpenTicket}
+        >
           {ticketSubject ?? notification.ticketId}
         </button>
       </TableCell>
       <TableCell className="text-slate-500">
-        {customerName ?? <span className="text-slate-400">{t("unknownCustomer")}</span>}
+        {customerName ?? <span className="text-ink-subtle">{t("unknownCustomer")}</span>}
       </TableCell>
       <TableCell className="text-slate-500">
         {notification.targetType && notification.targetAt ? (
@@ -101,7 +112,7 @@ function NotificationRow({
             {new Date(notification.targetAt).toLocaleString(locale)}
           </>
         ) : (
-          <span className="text-slate-400">{t("noTarget")}</span>
+          <span className="text-ink-subtle">{t("noTarget")}</span>
         )}
       </TableCell>
       <TableCell className="text-slate-500">

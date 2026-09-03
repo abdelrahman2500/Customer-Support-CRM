@@ -69,7 +69,7 @@ export function CreateArticleView() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.body")}
           <textarea
-            className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
             rows={6}
             value={body}
             onChange={(event) => setBody(event.target.value)}

@@ -126,11 +126,12 @@ describe("TicketListView", () => {
     fireEvent.click(screen.getByText("list.createSubmit"));
 
     await waitFor(() =>
-      expect(mutateAsync).toHaveBeenCalledWith({ subject: "Billing question", category: "billing" }),
+      expect(mutateAsync).toHaveBeenCalledWith({
+        subject: "Billing question",
+        category: "billing",
+      }),
     );
-    await waitFor(() =>
-      expect(screen.getByLabelText("list.createSubjectLabel")).toHaveValue(""),
-    );
+    await waitFor(() => expect(screen.getByLabelText("list.createSubjectLabel")).toHaveValue(""));
   });
 
   it("submits without a category when left blank", async () => {
@@ -144,9 +145,7 @@ describe("TicketListView", () => {
     });
     fireEvent.click(screen.getByText("list.createSubmit"));
 
-    await waitFor(() =>
-      expect(mutateAsync).toHaveBeenCalledWith({ subject: "Billing question" }),
-    );
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ subject: "Billing question" }));
   });
 
   it("renders the backend's own message inline when the submission fails", async () => {
@@ -177,7 +176,7 @@ describe("TicketListView", () => {
 
     render(<TicketListView />);
 
-    expect(screen.getByText("OPEN")).toHaveClass("bg-amber-100");
-    expect(screen.getByText("RESOLVED")).toHaveClass("bg-emerald-100");
+    expect(screen.getByText("OPEN")).toHaveClass("bg-warning-surface");
+    expect(screen.getByText("RESOLVED")).toHaveClass("bg-success-surface");
   });
 });

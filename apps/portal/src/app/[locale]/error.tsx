@@ -37,7 +37,7 @@ export default function LocaleError({
         <button
           type="button"
           onClick={reset}
-          className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 focus-ring"
         >
           {t("errorBoundary.retry")}
         </button>

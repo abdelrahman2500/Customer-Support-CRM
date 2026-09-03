@@ -15,7 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
@@ -138,7 +145,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
       <label className="flex flex-col gap-1 text-xs text-slate-600">
         {t("detail.bodyLabel")}
         <textarea
-          className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
           rows={10}
           defaultValue={article.body}
           onChange={(event) => setBodyDraft(event.target.value)}
@@ -172,9 +179,7 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
 
       {versionsQuery.isLoading && <Skeleton className="h-10 w-full" />}
 
-      {versionsQuery.isError && (
-        <Alert variant="destructive">{t("detail.versions.error")}</Alert>
-      )}
+      {versionsQuery.isError && <Alert variant="destructive">{t("detail.versions.error")}</Alert>}
 
       {versionsQuery.isSuccess && versionsQuery.data.length === 0 && (
         <p className="text-sm text-slate-500">{t("detail.versions.empty")}</p>

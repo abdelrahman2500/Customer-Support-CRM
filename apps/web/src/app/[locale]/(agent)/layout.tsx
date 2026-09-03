@@ -33,7 +33,7 @@ export default async function AgentWorkspaceLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-surface-sunk">
       <WorkspaceNav user={user} />
       <main className="flex-1 p-6">{children}</main>
       {/* Story 24 — one branch-wide notification consumer for the whole

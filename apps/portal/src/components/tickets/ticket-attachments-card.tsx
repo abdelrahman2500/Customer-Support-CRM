@@ -56,7 +56,7 @@ export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
             >
               <button
                 type="button"
-                className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-ring"
                 onClick={() => void handleDownload(attachment.id)}
               >
                 {attachment.filename}
@@ -89,9 +89,7 @@ function AddAttachmentForm({ ticketId }: { ticketId: string }) {
       await mutation.mutateAsync(file);
     } catch (uploadError) {
       setError(
-        uploadError instanceof ApiError
-          ? uploadError.message
-          : t("detail.attachmentsUploadFailed"),
+        uploadError instanceof ApiError ? uploadError.message : t("detail.attachmentsUploadFailed"),
       );
     }
   }

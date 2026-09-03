@@ -186,8 +186,10 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
   return (
     <>
       <header
-        style={{ "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties}
-        className="flex items-center justify-between border-b-2 border-[var(--brand-primary,theme(colors.slate.200))] bg-white px-6 py-3"
+        style={
+          { "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties
+        }
+        className="flex items-center justify-between border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
       >
         {brandingQuery.data?.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -255,21 +257,19 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
               key={item.href}
               href={href}
               aria-current={isActive ? "page" : undefined}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${
+              className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-slate-100 hover:text-slate-900 focus-ring ${
                 isActive ? "bg-slate-100 font-medium text-slate-900" : ""
               }`}
             >
               {t(item.labelKey)}
-              {item.href === "notifications" &&
-                unreadCountQuery.isSuccess &&
-                unreadCount > 0 && (
-                  <Badge
-                    variant="destructive"
-                    aria-label={t("nav.unreadNotificationsLabel", { count: unreadCount })}
-                  >
-                    {unreadCount}
-                  </Badge>
-                )}
+              {item.href === "notifications" && unreadCountQuery.isSuccess && unreadCount > 0 && (
+                <Badge
+                  variant="destructive"
+                  aria-label={t("nav.unreadNotificationsLabel", { count: unreadCount })}
+                >
+                  {unreadCount}
+                </Badge>
+              )}
             </a>
           );
         })}

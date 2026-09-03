@@ -49,7 +49,7 @@ export function NotificationPreferencesSection() {
           <button
             type="button"
             onClick={() => preferencesQuery.refetch()}
-            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
           >
             {t("preferences.retry")}
           </button>
@@ -101,7 +101,7 @@ function PreferenceRow({ preference }: { preference: PortalNotificationPreferenc
           type="button"
           disabled={mutation.isPending}
           onClick={toggle}
-          className="inline-flex h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="inline-flex h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 focus-ring"
         >
           {preference.inAppEnabled ? t("preferences.disable") : t("preferences.enable")}
         </button>

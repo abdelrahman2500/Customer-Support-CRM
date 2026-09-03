@@ -29,7 +29,7 @@ export default async function CustomerLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-surface-sunk">
       <PortalHeader contact={contact} />
       <PortalNotifications customerId={contact.customerId} />
       <main className="flex-1 p-6">{children}</main>

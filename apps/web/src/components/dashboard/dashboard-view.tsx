@@ -68,13 +68,15 @@ function SlaPresentation({ ticket, now }: { ticket: TicketListItem; now: Date })
   const t = useTranslations("tickets");
   const status = deriveSlaStatus(ticket.slaTarget, now);
   if (status.kind === "none") {
-    return <span className="text-slate-400">{t("sla.none")}</span>;
+    return <span className="text-ink-subtle">{t("sla.none")}</span>;
   }
   if (status.kind === "breached") {
     return <Badge variant="destructive">{t("sla.breached")}</Badge>;
   }
   return (
-    <span className="text-slate-700">{t("sla.remaining", { time: formatRemaining(status.remainingMs) })}</span>
+    <span className="text-slate-700">
+      {t("sla.remaining", { time: formatRemaining(status.remainingMs) })}
+    </span>
   );
 }
 
@@ -123,7 +125,7 @@ function UnclaimedTicketRow({
         <span className="font-medium text-slate-800">{ticket.subject}</span>
         <button
           type="button"
-          className="w-fit rounded-sm text-xs text-slate-500 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="w-fit rounded-sm text-xs text-slate-500 hover:underline focus-ring"
           onClick={(event) => {
             event.stopPropagation();
             router.push(`/${locale}/customers/${ticket.customerId}`);
@@ -250,7 +252,7 @@ export function DashboardView({ userId }: { userId: string }) {
             <p>{t("empty")}</p>
             <button
               type="button"
-              className="rounded-sm font-medium text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              className="rounded-sm font-medium text-slate-700 hover:underline focus-ring"
               onClick={() => router.push(`/${locale}/tickets`)}
             >
               {t("browseAllTicketsLink")}
@@ -277,7 +279,7 @@ export function DashboardView({ userId }: { userId: string }) {
                   <span className="font-medium text-slate-800">{ticket.subject}</span>
                   <button
                     type="button"
-                    className="w-fit rounded-sm text-xs text-slate-500 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                    className="w-fit rounded-sm text-xs text-slate-500 hover:underline focus-ring"
                     onClick={(event) => {
                       event.stopPropagation();
                       router.push(`/${locale}/customers/${ticket.customerId}`);

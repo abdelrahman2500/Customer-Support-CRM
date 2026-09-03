@@ -75,7 +75,7 @@ export default function LoginPage() {
             {t("email")}
             <input
               type="email"
-              className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-ring"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
@@ -86,7 +86,7 @@ export default function LoginPage() {
             {t("password")}
             <input
               type="password"
-              className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-ring"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required

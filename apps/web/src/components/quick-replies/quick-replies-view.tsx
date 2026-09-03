@@ -14,7 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
@@ -126,7 +133,10 @@ function QuickReplyRow({ quickReply }: { quickReply: QuickReplySummary }) {
         </div>
         {mutation.isError && (
           <p className="mt-1 text-xs text-red-600">
-            {errorMessage(mutation.error, { forbidden: t("actionForbidden"), generic: t("actionFailed") })}
+            {errorMessage(mutation.error, {
+              forbidden: t("actionForbidden"),
+              generic: t("actionFailed"),
+            })}
           </p>
         )}
       </TableCell>
@@ -152,7 +162,9 @@ function AddQuickReplyForm() {
       setTitle("");
       setBody("");
     } catch (submitError) {
-      setError(errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }));
+      setError(
+        errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }),
+      );
     }
   }
 
@@ -173,7 +185,7 @@ function AddQuickReplyForm() {
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("bodyLabel")}
           <textarea
-            className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
             rows={3}
             value={body}
             onChange={(event) => setBody(event.target.value)}

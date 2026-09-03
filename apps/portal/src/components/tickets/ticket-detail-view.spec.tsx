@@ -159,7 +159,7 @@ describe("TicketDetailView", () => {
 
     render(<TicketDetailView ticketId="ticket-1" />);
 
-    expect(screen.getByText("OPEN")).toHaveClass("bg-amber-100");
+    expect(screen.getByText("OPEN")).toHaveClass("bg-warning-surface");
   });
 
   it("renders the empty history message when there are no entries", () => {

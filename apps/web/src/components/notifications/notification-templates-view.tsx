@@ -105,21 +105,19 @@ function TemplateForm({
 
   return (
     <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">
-        {labelKey ? t(labelKey) : eventType}
-      </h2>
+      <h2 className="text-sm font-semibold text-slate-900">{labelKey ? t(labelKey) : eventType}</h2>
       <form className="mt-2 flex flex-col gap-2" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("templateLabel")}
           <textarea
-            className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
             rows={2}
             value={text}
             placeholder={t("templatePlaceholder")}
             onChange={(inputEvent) => setText(inputEvent.target.value)}
           />
         </label>
-        <p className="text-xs text-slate-400">{t("placeholderHint")}</p>
+        <p className="text-xs text-ink-subtle">{t("placeholderHint")}</p>
         <div>
           <Button type="submit" size="sm" disabled={mutation.isPending || !text.trim()}>
             {mutation.isPending ? t("saving") : t("save")}

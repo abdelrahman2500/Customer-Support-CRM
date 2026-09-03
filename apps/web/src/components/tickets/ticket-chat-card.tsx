@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useCreateTicketMessageMutation, useTicketMessagesQuery } from "@/hooks/use-ticket-messages";
+import {
+  useCreateTicketMessageMutation,
+  useTicketMessagesQuery,
+} from "@/hooks/use-ticket-messages";
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { ApiError } from "@/lib/api";
@@ -80,7 +83,8 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
         >
           {messagesQuery.data.map((message) => {
             const isMine =
-              message.direction === "OUTBOUND" && message.senderUserId === currentUserQuery.data?.id;
+              message.direction === "OUTBOUND" &&
+              message.senderUserId === currentUserQuery.data?.id;
             // Story 85 — an AI_CHAT-channel OUTBOUND message replayed from a
             // chat escalation has no senderUserId at all (the AI wrote it,
             // not a signed-in agent) — without this branch it would
@@ -204,7 +208,7 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
         </Select>
       )}
       <textarea
-        className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
         rows={2}
         value={body}
         placeholder={t("detail.chatPlaceholder")}

@@ -9,7 +9,7 @@ describe("Skeleton (portal, Story 97)", () => {
     const element = container.firstElementChild as HTMLElement;
     expect(element).toHaveClass("animate-pulse");
     expect(element).toHaveClass("rounded-md");
-    expect(element).toHaveClass("bg-slate-100");
+    expect(element).toHaveClass("bg-surface-muted");
   });
 
   it("merges a caller-supplied className onto the base classes", () => {

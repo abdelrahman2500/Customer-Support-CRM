@@ -11,7 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
@@ -136,7 +143,7 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
       <TableCell>
         <button
           type="button"
-          className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-ring"
           onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
         >
           {article.title}

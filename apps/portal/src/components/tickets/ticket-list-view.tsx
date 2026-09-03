@@ -15,10 +15,12 @@ import { showSuccessToast } from "@/lib/toast-store";
  */
 function statusPillClassName(status: string): string {
   const base = "rounded-full border px-2 py-0.5 text-xs";
-  if (status === "OPEN") return `${base} border-transparent bg-amber-100 text-amber-800`;
-  if (status === "RESOLVED") return `${base} border-transparent bg-emerald-100 text-emerald-800`;
-  if (status === "CLOSED") return `${base} border-slate-300 text-slate-700`;
-  return `${base} border-transparent bg-slate-100 text-slate-900`; // IN_PROGRESS
+  if (status === "OPEN")
+    return `${base} border-transparent bg-warning-surface text-warning-foreground`;
+  if (status === "RESOLVED")
+    return `${base} border-transparent bg-success-surface text-success-foreground`;
+  if (status === "CLOSED") return `${base} border-rule-strong text-ink-strong`;
+  return `${base} border-transparent bg-surface-muted text-ink`; // IN_PROGRESS
 }
 
 /**
@@ -55,7 +57,7 @@ export function TicketListView() {
             <button
               type="button"
               onClick={() => ticketsQuery.refetch()}
-              className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
             >
               {t("list.retry")}
             </button>
@@ -117,7 +119,12 @@ function CreateTicketForm() {
       setCategory("");
       showSuccessToast(t("list.createSuccess"));
     } catch (submitError) {
-      setError(errorMessage(submitError, { forbidden: t("list.actionForbidden"), generic: t("list.createFailed") }));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("list.actionForbidden"),
+          generic: t("list.createFailed"),
+        }),
+      );
     }
   }
 
@@ -128,7 +135,7 @@ function CreateTicketForm() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("list.createSubjectLabel")}
           <input
-            className="flex h-9 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="flex h-9 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-ring"
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
             required
@@ -137,7 +144,7 @@ function CreateTicketForm() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("list.createCategoryLabel")}
           <input
-            className="flex h-9 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="flex h-9 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-ring"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
           />
@@ -150,7 +157,7 @@ function CreateTicketForm() {
         <button
           type="submit"
           disabled={mutation.isPending || !subject.trim()}
-          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
         >
           {mutation.isPending ? t("list.createSubmitting") : t("list.createSubmit")}
         </button>

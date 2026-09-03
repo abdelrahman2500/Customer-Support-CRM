@@ -40,7 +40,7 @@ export function ArticleListView() {
         placeholder={t("list.searchPlaceholder")}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
-        className="mt-3 w-full max-w-sm rounded-md border border-slate-300 px-3 py-1.5 text-sm shadow-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        className="mt-3 w-full max-w-sm rounded-md border border-slate-300 px-3 py-1.5 text-sm shadow-sm placeholder:text-ink-subtle focus-ring"
       />
 
       {articlesQuery.isLoading && (
@@ -57,7 +57,7 @@ export function ArticleListView() {
           <button
             type="button"
             onClick={() => articlesQuery.refetch()}
-            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
           >
             {t("list.retry")}
           </button>

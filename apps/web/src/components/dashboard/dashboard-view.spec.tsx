@@ -88,7 +88,10 @@ describe("DashboardView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedUseCustomersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [{ id: "customer-1", displayName: "Acme Inc." }] }) as never,
+      queryResult({
+        isSuccess: true,
+        data: [{ id: "customer-1", displayName: "Acme Inc." }],
+      }) as never,
     );
     mockTicketQueries({});
     mockedUseUpdateTicketMutation.mockReturnValue({
@@ -173,8 +176,8 @@ describe("DashboardView", () => {
 
       renderWithLocale();
 
-      expect(screen.getByText("OPEN")).toHaveClass("bg-amber-100");
-      expect(screen.getByText("IN_PROGRESS")).toHaveClass("bg-slate-100");
+      expect(screen.getByText("OPEN")).toHaveClass("bg-warning-surface");
+      expect(screen.getByText("IN_PROGRESS")).toHaveClass("bg-surface-muted");
     });
 
     it("orders tickets breached-first, then soonest-remaining, then no-target-last", () => {
@@ -182,7 +185,12 @@ describe("DashboardView", () => {
       mockTicketQueries({
         mine: {
           data: [
-            ticket({ id: "ticket-none", subject: "No target", status: "IN_PROGRESS", slaTarget: null }),
+            ticket({
+              id: "ticket-none",
+              subject: "No target",
+              status: "IN_PROGRESS",
+              slaTarget: null,
+            }),
             ticket({
               id: "ticket-soon",
               subject: "Due soon",
@@ -263,8 +271,18 @@ describe("DashboardView", () => {
       mockTicketQueries({
         all: {
           data: [
-            ticket({ id: "t-unassigned-open", subject: "Unassigned open", assignedToUserId: null, status: "OPEN" }),
-            ticket({ id: "t-assigned", subject: "Already assigned", assignedToUserId: "agent-9", status: "OPEN" }),
+            ticket({
+              id: "t-unassigned-open",
+              subject: "Unassigned open",
+              assignedToUserId: null,
+              status: "OPEN",
+            }),
+            ticket({
+              id: "t-assigned",
+              subject: "Already assigned",
+              assignedToUserId: "agent-9",
+              status: "OPEN",
+            }),
             ticket({
               id: "t-unassigned-resolved",
               subject: "Unassigned resolved",
@@ -331,7 +349,9 @@ describe("DashboardView", () => {
 
       renderWithLocale();
 
-      expect(screen.getByText("You don't have permission to claim this ticket.")).toBeInTheDocument();
+      expect(
+        screen.getByText("You don't have permission to claim this ticket."),
+      ).toBeInTheDocument();
     });
 
     it("shows a generic failure message when a claim is rejected with a non-403 error", () => {
@@ -354,7 +374,12 @@ describe("DashboardView", () => {
       mockTicketQueries({
         all: {
           data: [
-            ticket({ id: "unassigned-1", subject: "Needs a home", assignedToUserId: null, status: "OPEN" }),
+            ticket({
+              id: "unassigned-1",
+              subject: "Needs a home",
+              assignedToUserId: null,
+              status: "OPEN",
+            }),
           ],
         },
       });

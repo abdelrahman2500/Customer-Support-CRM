@@ -12,7 +12,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
@@ -72,7 +79,11 @@ export function SlaPolicyListView() {
       {policiesQuery.isSuccess && policiesQuery.data.length === 0 && (
         <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
           <p className="text-sm text-slate-500">{t("list.empty")}</p>
-          <Button size="sm" className="mt-3" onClick={() => router.push(`/${locale}/sla-policies/new`)}>
+          <Button
+            size="sm"
+            className="mt-3"
+            onClick={() => router.push(`/${locale}/sla-policies/new`)}
+          >
             {t("list.createButton")}
           </Button>
         </div>
@@ -167,15 +178,19 @@ function SlaPolicyRow({
 
   return (
     <TableRow>
-      <TableCell className="text-slate-500">{policy.departmentId ?? t("list.noDepartment")}</TableCell>
       <TableCell className="text-slate-500">
-        {policy.categoryId ? (categoryNameById.get(policy.categoryId) ?? policy.categoryId) : t("list.noCategory")}
+        {policy.departmentId ?? t("list.noDepartment")}
+      </TableCell>
+      <TableCell className="text-slate-500">
+        {policy.categoryId
+          ? (categoryNameById.get(policy.categoryId) ?? policy.categoryId)
+          : t("list.noCategory")}
       </TableCell>
       <TableCell>
         {policy.priority ? (
           <Badge variant="outline">{policy.priority}</Badge>
         ) : (
-          <span className="text-slate-400">{t("list.noPriority")}</span>
+          <span className="text-ink-subtle">{t("list.noPriority")}</span>
         )}
       </TableCell>
       <TableCell>

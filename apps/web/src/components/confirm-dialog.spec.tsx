@@ -101,7 +101,9 @@ describe("ConfirmDialog", () => {
     renderDialog();
 
     await waitFor(() => {
-      expect(screen.getByRole("alertdialog")).toContainElement(document.activeElement as HTMLElement);
+      expect(screen.getByRole("alertdialog")).toContainElement(
+        document.activeElement as HTMLElement,
+      );
     });
   });
 
@@ -144,6 +146,6 @@ describe("ConfirmDialog", () => {
     renderDialog({ destructive: false, confirmLabel: "Save" });
 
     const confirmButton = screen.getByRole("button", { name: "Save" });
-    expect(confirmButton.className).not.toContain("bg-red-600");
+    expect(confirmButton.className).not.toContain("bg-danger-solid");
   });
 });

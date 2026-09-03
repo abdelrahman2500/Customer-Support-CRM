@@ -153,10 +153,10 @@ describe("TicketListView", () => {
     }
 
     it.each([
-      ["OPEN", "bg-amber-100"],
-      ["IN_PROGRESS", "bg-slate-100"],
-      ["RESOLVED", "bg-emerald-100"],
-      ["CLOSED", "border-slate-300"],
+      ["OPEN", "bg-warning-surface"],
+      ["IN_PROGRESS", "bg-surface-muted"],
+      ["RESOLVED", "bg-success-surface"],
+      ["CLOSED", "border-rule-strong"],
     ])("gives %s status a distinct visual treatment", (status, expectedClass) => {
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [ticketWith(status)] }) as never,

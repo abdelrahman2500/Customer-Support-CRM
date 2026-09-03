@@ -70,13 +70,15 @@ export function NotificationToaster() {
           >
             <div className="flex items-start justify-between gap-2">
               <span className="text-sm font-semibold text-slate-900">
-                {t(`eventLabel.${notification.eventType === "ticket.updated" ? "ticketUpdated" : "newReply"}`)}
+                {t(
+                  `eventLabel.${notification.eventType === "ticket.updated" ? "ticketUpdated" : "newReply"}`,
+                )}
               </span>
               <button
                 type="button"
                 aria-label={t("dismiss")}
                 onClick={() => dismiss(notification.id)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-ink-subtle hover:text-slate-600"
               >
                 ×
               </button>

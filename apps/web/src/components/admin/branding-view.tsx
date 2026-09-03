@@ -101,7 +101,10 @@ function BrandingForm({
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <form className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4" onSubmit={handleSubmit}>
+      <form
+        className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4"
+        onSubmit={handleSubmit}
+      >
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("logoUrlLabel")}
           <Input
@@ -153,7 +156,7 @@ function BrandingForm({
               className="h-12 w-auto max-w-full object-contain"
             />
           ) : (
-            <p className="text-sm text-slate-400">{t("noLogo")}</p>
+            <p className="text-sm text-ink-subtle">{t("noLogo")}</p>
           )}
           <div className="flex items-center gap-2 text-sm">
             <span

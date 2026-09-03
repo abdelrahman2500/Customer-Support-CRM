@@ -329,7 +329,9 @@ describe("UserListView", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [baseUser] }) as never,
       );
-      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+      mockedUseUpdateUserMutation.mockReturnValue(
+        mutationResult({ mutate: renameMutate }) as never,
+      );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({ mutate: assignmentMutate }) as never,
       );
@@ -447,7 +449,9 @@ describe("UserListView", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [baseUser] }) as never,
       );
-      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+      mockedUseUpdateUserMutation.mockReturnValue(
+        mutationResult({ mutate: renameMutate }) as never,
+      );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({ mutate: assignmentMutate }) as never,
       );
@@ -621,7 +625,9 @@ describe("UserListView", () => {
 
       const emailCell = screen.getAllByRole("cell")[0]!;
       expect(
-        within(emailCell).getByText("Couldn't reach the server. Check your connection and try again."),
+        within(emailCell).getByText(
+          "Couldn't reach the server. Check your connection and try again.",
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -671,9 +677,7 @@ describe("UserListView", () => {
 
       renderView();
 
-      expect(
-        screen.getByText("This user already has this exact assignment"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("This user already has this exact assignment")).toBeInTheDocument();
     });
 
     it("renders the shared network-failure message when the assignment rejection is not an ApiError", () => {
@@ -704,7 +708,7 @@ describe("UserListView", () => {
 
       renderView();
 
-      expect(screen.getByRole("button", { name: "Reset password" })).toHaveClass("bg-red-600");
+      expect(screen.getByRole("button", { name: "Reset password" })).toHaveClass("bg-danger-solid");
     });
 
     it("keeps the reset-password button disabled until the draft is at least 8 characters", () => {
@@ -714,7 +718,9 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
+      const passwordInput = screen.getByPlaceholderText(
+        "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
+      );
       const submitButton = screen.getByRole("button", { name: "Reset password" });
       expect(submitButton).toBeDisabled();
 
@@ -734,7 +740,9 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
+      const passwordInput = screen.getByPlaceholderText(
+        "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
+      );
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.blur(passwordInput);
       expect(mutate).not.toHaveBeenCalled();
@@ -754,7 +762,9 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
+      const passwordInput = screen.getByPlaceholderText(
+        "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
+      );
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
       const dialog = screen.getByRole("alertdialog");
@@ -778,7 +788,9 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
+      const passwordInput = screen.getByPlaceholderText(
+        "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
+      );
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
       const dialog = screen.getByRole("alertdialog");
@@ -799,7 +811,9 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
+      const passwordInput = screen.getByPlaceholderText(
+        "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
+      );
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
       const dialog = screen.getByRole("alertdialog");
@@ -846,9 +860,7 @@ describe("UserListView", () => {
 
       renderView();
 
-      expect(
-        screen.getByText("Password must be at least 8 characters"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Password must be at least 8 characters")).toBeInTheDocument();
     });
 
     it("renders the shared network-failure message when the rejection is not an ApiError", () => {
@@ -875,7 +887,9 @@ describe("UserListView", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [baseUser] }) as never,
       );
-      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+      mockedUseUpdateUserMutation.mockReturnValue(
+        mutationResult({ mutate: renameMutate }) as never,
+      );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({ mutate: assignmentMutate }) as never,
       );
@@ -904,7 +918,9 @@ describe("UserListView", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: [baseUser] }) as never,
       );
-      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+      mockedUseUpdateUserMutation.mockReturnValue(
+        mutationResult({ mutate: renameMutate }) as never,
+      );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({ mutate: assignmentMutate }) as never,
       );
@@ -914,7 +930,9 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
+      const passwordInput = screen.getByPlaceholderText(
+        "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
+      );
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
       const dialog = screen.getByRole("alertdialog");
@@ -964,7 +982,9 @@ describe("UserListView", () => {
           data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
         }) as never,
       );
-      mockedUseUnlockUserMutation.mockReturnValue(mutationResult({ mutate: unlockMutate }) as never);
+      mockedUseUnlockUserMutation.mockReturnValue(
+        mutationResult({ mutate: unlockMutate }) as never,
+      );
 
       renderView();
       fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
@@ -1016,14 +1036,18 @@ describe("UserListView", () => {
           data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
         }) as never,
       );
-      mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
+      mockedUseUpdateUserMutation.mockReturnValue(
+        mutationResult({ mutate: renameMutate }) as never,
+      );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({ mutate: assignmentMutate }) as never,
       );
       mockedUseResetPasswordMutation.mockReturnValue(
         mutationResult({ mutate: resetPasswordMutate }) as never,
       );
-      mockedUseUnlockUserMutation.mockReturnValue(mutationResult({ mutate: unlockMutate }) as never);
+      mockedUseUnlockUserMutation.mockReturnValue(
+        mutationResult({ mutate: unlockMutate }) as never,
+      );
 
       renderView();
       fireEvent.click(screen.getByRole("button", { name: "Unlock" }));

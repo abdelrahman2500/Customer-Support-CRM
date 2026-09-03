@@ -78,9 +78,7 @@ describe("CustomerDetailView", () => {
     // Every render path calls `useTicketsQuery({})` (Story 27); default to
     // an empty, successful result so pre-existing tests (which only assert
     // on the customer/contacts sections) are unaffected.
-    mockedUseTicketsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [] }) as never,
-    );
+    mockedUseTicketsQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
     mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation() as never);
     mockedUseCreateContactMutation.mockReturnValue(idleMutation() as never);
     mockedUseUpdateContactMutation.mockReturnValue(idleMutation() as never);
@@ -130,7 +128,13 @@ describe("CustomerDetailView", () => {
           displayName: "Acme Inc.",
           isActive: true,
           contacts: [
-            { id: "contact-1", fullName: "Jane Doe", email: "jane@acme.test", phone: null, isPrimary: true },
+            {
+              id: "contact-1",
+              fullName: "Jane Doe",
+              email: "jane@acme.test",
+              phone: null,
+              isPrimary: true,
+            },
           ],
         },
       }) as never,
@@ -255,8 +259,8 @@ describe("CustomerDetailView", () => {
 
       render(<CustomerDetailView customerId="customer-1" />);
 
-      expect(screen.getByText("OPEN")).toHaveClass("bg-amber-100");
-      expect(screen.getByText("RESOLVED")).toHaveClass("bg-emerald-100");
+      expect(screen.getByText("OPEN")).toHaveClass("bg-warning-surface");
+      expect(screen.getByText("RESOLVED")).toHaveClass("bg-success-surface");
     });
 
     it("navigates to the ticket detail route when a related ticket row is clicked", () => {
@@ -368,7 +372,13 @@ describe("CustomerDetailView", () => {
             displayName: "Acme Inc.",
             isActive: true,
             contacts: [
-              { id: "contact-1", fullName: "Jane Doe", email: "jane@acme.test", phone: null, isPrimary: false },
+              {
+                id: "contact-1",
+                fullName: "Jane Doe",
+                email: "jane@acme.test",
+                phone: null,
+                isPrimary: false,
+              },
             ],
           },
         }) as never,
@@ -426,7 +436,10 @@ describe("CustomerDetailView", () => {
       fireEvent.click(within(form).getByText("detail.addContactSubmit"));
 
       await waitFor(() =>
-        expect(mutateAsync).toHaveBeenCalledWith({ fullName: "New Contact", email: "new@acme.test" }),
+        expect(mutateAsync).toHaveBeenCalledWith({
+          fullName: "New Contact",
+          email: "new@acme.test",
+        }),
       );
       await waitFor(() =>
         expect(within(form).getByLabelText("detail.contactFullNameLabel")).toHaveValue(""),
@@ -459,7 +472,13 @@ describe("CustomerDetailView", () => {
             displayName: "Acme Inc.",
             isActive: true,
             contacts: [
-              { id: "contact-1", fullName: "Jane Doe", email: "jane@acme.test", phone: null, isPrimary: false },
+              {
+                id: "contact-1",
+                fullName: "Jane Doe",
+                email: "jane@acme.test",
+                phone: null,
+                isPrimary: false,
+              },
             ],
           },
         }) as never,
@@ -473,7 +492,7 @@ describe("CustomerDetailView", () => {
     it("styles the submit trigger as destructive, matching its own confirmation dialog", () => {
       render(<CustomerDetailView customerId="customer-1" />);
 
-      expect(screen.getByText("detail.portalPasswordSubmit")).toHaveClass("bg-red-600");
+      expect(screen.getByText("detail.portalPasswordSubmit")).toHaveClass("bg-danger-solid");
     });
 
     it("keeps the submit button disabled until the draft is at least 8 characters", () => {
@@ -553,7 +572,10 @@ describe("CustomerDetailView", () => {
       mockedUseSetContactPortalPasswordMutation.mockReturnValue(
         idleMutation({
           isError: true,
-          error: new ApiError("Another contact already has portal access with this email address", 409),
+          error: new ApiError(
+            "Another contact already has portal access with this email address",
+            409,
+          ),
         }) as never,
       );
 
@@ -603,7 +625,7 @@ describe("CustomerDetailView", () => {
       render(<CustomerDetailView customerId="customer-1" />);
 
       expect(screen.getByText("detail.portalAccessGranted")).toBeInTheDocument();
-      expect(screen.getByText("detail.revokePortalAccessSubmit")).toHaveClass("bg-red-600");
+      expect(screen.getByText("detail.revokePortalAccessSubmit")).toHaveClass("bg-danger-solid");
     });
 
     it("clicking revoke opens a confirmation dialog rather than committing immediately", () => {
@@ -626,7 +648,9 @@ describe("CustomerDetailView", () => {
       render(<CustomerDetailView customerId="customer-1" />);
       fireEvent.click(screen.getByRole("button", { name: "detail.revokePortalAccessSubmit" }));
       const dialog = screen.getByRole("alertdialog");
-      fireEvent.click(within(dialog).getByRole("button", { name: "detail.revokePortalAccessSubmit" }));
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "detail.revokePortalAccessSubmit" }),
+      );
 
       expect(mockedUseRevokeContactPortalAccessMutation).toHaveBeenCalledWith(
         "customer-1",
@@ -649,7 +673,9 @@ describe("CustomerDetailView", () => {
       render(<CustomerDetailView customerId="customer-1" />);
       fireEvent.click(screen.getByRole("button", { name: "detail.revokePortalAccessSubmit" }));
       const dialog = screen.getByRole("alertdialog");
-      fireEvent.click(within(dialog).getByRole("button", { name: "detail.revokePortalAccessSubmit" }));
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: "detail.revokePortalAccessSubmit" }),
+      );
       act(() => {
         capturedOnSuccess?.();
       });

@@ -58,7 +58,9 @@ export function AttachmentsCard({
       <h2 className="text-sm font-semibold text-slate-900">{strings.heading}</h2>
       {attachmentsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
       {attachmentsQuery.isError && (
-        <Alert variant="destructive" className="mt-2">{strings.error}</Alert>
+        <Alert variant="destructive" className="mt-2">
+          {strings.error}
+        </Alert>
       )}
       {attachmentsQuery.isSuccess && attachmentsQuery.data.length === 0 && (
         <p className="mt-2 text-sm text-slate-500">{strings.empty}</p>
@@ -66,10 +68,13 @@ export function AttachmentsCard({
       {attachmentsQuery.isSuccess && attachmentsQuery.data.length > 0 && (
         <ol className="mt-2 flex flex-col gap-2 text-sm">
           {attachmentsQuery.data.map((attachment) => (
-            <li key={attachment.id} className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <li
+              key={attachment.id}
+              className="flex items-center justify-between border-b border-slate-100 pb-2"
+            >
               <button
                 type="button"
-                className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-ring"
                 onClick={() => void handleDownload(attachment.id)}
               >
                 {attachment.filename}
@@ -106,7 +111,9 @@ function AddAttachmentForm({
     try {
       await mutation.mutateAsync(file);
     } catch (uploadError) {
-      setError(uploadError instanceof ApiError ? uploadError.message : strings.uploadFailedFallback);
+      setError(
+        uploadError instanceof ApiError ? uploadError.message : strings.uploadFailedFallback,
+      );
     }
   }
 

@@ -1,3 +1,207 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/**
+ * Story S-1 — Design Token & Theme Foundation.
+ *
+ * Every value below is the *existing* colour this app already used, lifted
+ * out of ~113 component files and given a semantic name. Nothing here
+ * changes how the app looks: `--surface` is the white it was already on,
+ * `--ink` is the `slate-900` it already wrote in, `--warning-surface` is the
+ * `amber-100` a ticket status badge already had. What changes is that there
+ * is now one place to change them.
+ *
+ * Channels, not colours. Each token holds space-separated RGB channels so
+ * `tailwind.config.ts` can wrap them as `rgb(var(--token) / <alpha-value>)`
+ * and Tailwind's opacity modifiers keep working — `bg-ink/40` has to stay
+ * possible, because the dialog overlay is exactly that (it was
+ * `bg-slate-950/40`). A token holding `#0f172a` would break every `/nn`
+ * suffix silently.
+ *
+ * Light theme only, deliberately. Dark mode is explicitly out of scope for
+ * this story; the point of putting the palette behind tokens now is that
+ * adding it later is a second `:root` block rather than a sweep through
+ * every component. See the recon's §11.
+ */
+@layer base {
+  :root {
+    /* ---------------------------------------------------------------
+     * Surfaces — the grounds things sit on.
+     * ------------------------------------------------------------- */
+    --surface: 255 255 255; /* was: white — cards, inputs, header */
+    --surface-sunk: 248 250 252; /* was: slate-50 — the page behind cards */
+    --surface-muted: 241 245 249; /* was: slate-100 — hover, active nav, inset */
+
+    /* ---------------------------------------------------------------
+     * Ink — text, in descending emphasis. Contrast ratios are against
+     * `--surface`; every step here meets WCAG AA for body text, which is
+     * the point: the palette previously bottomed out at `slate-400`
+     * (2.8:1) and that shade was carrying real information.
+     * ------------------------------------------------------------- */
+    --ink: 15 23 42; /* was: slate-900 — 16.9:1 */
+    --ink-strong: 30 41 59; /* was: slate-800 — 13.9:1 */
+    --ink-muted: 71 85 105; /* was: slate-600 —  7.0:1 */
+    --ink-subtle: 100 116 139; /* was: slate-500 —  4.8:1, the lowest AA step */
+
+    /* ---------------------------------------------------------------
+     * Rules — borders and dividers.
+     * ------------------------------------------------------------- */
+    --rule: 226 232 240; /* was: slate-200 — card borders, table header */
+    --rule-strong: 203 213 225; /* was: slate-300 — input borders */
+    --rule-subtle: 241 245 249; /* was: slate-100 — row dividers */
+
+    /* ---------------------------------------------------------------
+     * Accent — the primary interactive colour. This app's accent has
+     * always been its darkest neutral (the primary button is
+     * `bg-slate-900`), not a brand hue; naming it `accent` rather than
+     * `slate-900` is what lets Story S-15 point it at a branch's
+     * configured `primaryColor` without touching a single component.
+     * ------------------------------------------------------------- */
+    --accent: 15 23 42; /* was: slate-900 */
+    --accent-hover: 51 65 85; /* was: slate-700 */
+    --accent-foreground: 255 255 255; /* text on top of --accent */
+    --accent-surface: 241 245 249; /* was: slate-100 — quiet accent tint */
+
+    /* The modal scrim. Its own role rather than a step of --ink: it was
+     * `slate-950/40`, a shade darker than any text colour, and it is the
+     * one place the palette is used at partial alpha — which is why every
+     * token in this file holds RGB channels rather than a hex. */
+    --overlay: 2 6 23; /* was: slate-950, used at /40 */
+
+    /* ---------------------------------------------------------------
+     * Focus. Its own token, not a step of --ink: a focus ring has to be
+     * legible against both the page and whatever control it wraps, and
+     * the previous `ring-slate-400` was 2.6:1 on white — under the 3:1
+     * WCAG 2.2 minimum for a non-text indicator. blue-700 is 6.3:1 on
+     * `--surface` and 6.0:1 on `--surface-sunk`, and reads as "focused"
+     * rather than as one more grey border. Always paired with an offset
+     * (see the `.focus-ring` utility) so it clears dark controls too.
+     * ------------------------------------------------------------- */
+    --focus: 29 78 216; /* blue-700 */
+
+    /* ---------------------------------------------------------------
+     * Semantic states. Four families, each with the same four roles, so a
+     * consumer picks a *meaning* and gets a coherent set:
+     *   -subtle      quietest tint      (was: *-50)   alert backgrounds
+     *   -surface     tint               (was: *-100)  badge backgrounds
+     *   -border      tint's border      (was: *-200)
+     *   -solid       full-strength fill (was: *-600)  destructive buttons
+     *   -foreground  text on the tint   (was: *-800)
+     * ------------------------------------------------------------- */
+    --success-subtle: 236 253 245; /* was: emerald-50 */
+    --success-surface: 209 250 229; /* was: emerald-100 */
+    --success-border: 167 243 208; /* was: emerald-200 */
+    --success-solid: 5 150 105; /* was: emerald-600 */
+    --success-foreground: 6 95 70; /* was: emerald-800 — 6.4:1 on -surface */
+
+    --warning-subtle: 255 251 235; /* was: amber-50 */
+    --warning-surface: 254 243 199; /* was: amber-100 */
+    --warning-border: 253 230 138; /* was: amber-200 */
+    --warning-solid: 217 119 6; /* was: amber-600 */
+    --warning-foreground: 146 64 14; /* was: amber-800 — 6.5:1 on -surface */
+
+    --danger-subtle: 254 242 242; /* was: red-50 */
+    --danger-surface: 254 226 226; /* was: red-100 */
+    --danger-border: 254 202 202; /* was: red-200 */
+    --danger-solid: 220 38 38; /* was: red-600 */
+    --danger-solid-hover: 239 68 68; /* was: red-500 */
+    --danger-foreground: 153 27 27; /* was: red-800 — 6.9:1 on -surface */
+
+    /* `info` had no palette before this story — the one blue in the app
+     * was a bare `text-blue-600` link on the locale index page. It is
+     * defined here so an informational state has somewhere to go instead
+     * of borrowing `--accent` (which means "primary action") or
+     * `--warning` (which means "attention"). */
+    --info-subtle: 239 246 255; /* blue-50 */
+    --info-surface: 219 234 254; /* blue-100 */
+    --info-border: 191 219 254; /* blue-200 */
+    --info-solid: 37 99 235; /* blue-600 */
+    --info-foreground: 30 64 175; /* blue-800 */
+
+    /* ---------------------------------------------------------------
+     * Radius. Exposed as a token so it is nameable, but Tailwind's own
+     * radius scale is deliberately left alone: `rounded-md` (0.375rem) is
+     * already used 149 times and is correct. Remapping the scale would
+     * have been a silent visual change across the whole app for no gain.
+     * ------------------------------------------------------------- */
+    --radius: 0.375rem;
+
+    /* ---------------------------------------------------------------
+     * shadcn/ui compatibility aliases. `components.json` now declares
+     * `cssVariables: true`, so anything scaffolded by the shadcn CLI later
+     * will emit `bg-background`, `text-muted-foreground`, `border-input`,
+     * `ring-ring`. These map that vocabulary onto the tokens above so
+     * generated components work without hand-editing.
+     *
+     * One deliberate divergence: shadcn's `--accent` means "quiet hover
+     * tint" while this app's design API uses `accent` for the primary
+     * interactive colour (per the story's own token list). Rather than
+     * redefine `accent` to mean two things, shadcn's hover role is mapped
+     * to `--muted` below and shadcn's `--accent`/`--accent-foreground`
+     * are intentionally not aliased. A scaffolded component using
+     * `bg-accent` will therefore get this app's primary colour; that is
+     * the documented behaviour here, not an oversight.
+     * ------------------------------------------------------------- */
+    --background: var(--surface-sunk);
+    --foreground: var(--ink);
+    --card: var(--surface);
+    --card-foreground: var(--ink);
+    --popover: var(--surface);
+    --popover-foreground: var(--ink);
+    --primary: var(--accent);
+    --primary-foreground: var(--accent-foreground);
+    --secondary: var(--surface-muted);
+    --secondary-foreground: var(--ink);
+    --muted: var(--surface-muted);
+    --muted-foreground: var(--ink-muted);
+    --destructive: var(--danger-solid);
+    --destructive-foreground: 255 255 255;
+    --border: var(--rule);
+    --input: var(--rule-strong);
+    --ring: var(--focus);
+  }
+
+  /**
+   * Explicitly `--surface`, not `--surface-sunk`. An unstyled `<body>`
+   * already painted white, and the authenticated layouts paint their own
+   * `bg-surface-sunk` shell on top — so naming white here keeps every
+   * existing page pixel-identical instead of tinting the handful
+   * (`not-found`, `error`, the locale index) that never set a background.
+   */
+  body {
+    background-color: rgb(var(--surface));
+    color: rgb(var(--ink));
+  }
+}
+
+@layer components {
+  /**
+   * The one focus treatment for the whole app.
+   *
+   * Replaces the `focus-visible:outline-none focus-visible:ring-2
+   * focus-visible:ring-slate-400` triplet that was repeated 45 times, and
+   * fixes it in two ways the old pattern could not be: the ring colour is
+   * `--focus` (6.3:1, over the 3:1 minimum the old slate-400 missed at
+   * 2.6:1), and it now has a 2px offset in the surface colour.
+   *
+   * The offset is what makes one ring work everywhere. Without it the ring
+   * painted directly onto the control's own edge, so it was invisible on
+   * the dark primary button and competed with the border on inputs. With
+   * it, there is a surface-coloured gap and the ring is always evaluated
+   * against the page rather than against the control.
+   */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface;
+  }
+
+  /**
+   * Same treatment for components whose focus is driven by Radix's
+   * `:focus` rather than `:focus-visible` (the select trigger, menu
+   * items) — Radix moves focus programmatically, where `:focus-visible`
+   * does not always match.
+   */
+  .focus-ring-always {
+    @apply focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-surface;
+  }
+}

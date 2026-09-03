@@ -234,7 +234,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           {t("detail.customer")}:{" "}
           <button
             type="button"
-            className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="rounded-sm hover:underline focus-ring"
             onClick={() => router.push(`/${locale}/customers/${ticket.customerId}`)}
           >
             {customerNameById.get(ticket.customerId) ?? ticket.customerId}
@@ -259,7 +259,10 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             onValueChange={(value) =>
               mutation.mutate(
                 { status: value as TicketStatus },
-                { onSuccess: () => showSuccessToast(t("detail.statusUpdateSuccess", { status: value })) },
+                {
+                  onSuccess: () =>
+                    showSuccessToast(t("detail.statusUpdateSuccess", { status: value })),
+                },
               )
             }
           >
@@ -337,7 +340,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           >
             <SelectTrigger>
               <SelectValue
-                placeholder={usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")}
+                placeholder={
+                  usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")
+                }
               />
             </SelectTrigger>
             <SelectContent>
@@ -396,10 +401,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
       {aiCategoryNoMatch && (
         <Alert>
           {t("detail.aiCategoryNoMatch", { category: aiCategoryNoMatch })}{" "}
-          <a
-            className="underline"
-            href={`/${locale}/ticket-categories`}
-          >
+          <a className="underline" href={`/${locale}/ticket-categories`}>
             {t("detail.aiCategoryNoMatchLink")}
           </a>
         </Alert>
@@ -427,7 +429,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.escalationsHeading")}</h2>
         {escalationsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {escalationsQuery.isError && (
-          <Alert variant="destructive" className="mt-2">{t("detail.escalationsError")}</Alert>
+          <Alert variant="destructive" className="mt-2">
+            {t("detail.escalationsError")}
+          </Alert>
         )}
         {escalationsQuery.isSuccess && escalationsQuery.data.length === 0 && (
           <p className="mt-2 text-sm text-slate-500">{t("detail.escalationsEmpty")}</p>
@@ -437,7 +441,10 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             {escalationsQuery.data.map((escalation) => {
               const targetTypeLabelKey = TARGET_TYPE_LABEL_KEYS[escalation.targetType];
               return (
-                <li key={escalation.id} className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <li
+                  key={escalation.id}
+                  className="flex items-center justify-between border-b border-slate-100 pb-2"
+                >
                   <span className="font-medium text-slate-800">
                     {targetTypeLabelKey ? t(targetTypeLabelKey) : escalation.targetType}
                   </span>
@@ -454,16 +461,25 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.historyHeading")}</h2>
         {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
-        {historyQuery.isError && <Alert variant="destructive" className="mt-2">{t("detail.historyError")}</Alert>}
+        {historyQuery.isError && (
+          <Alert variant="destructive" className="mt-2">
+            {t("detail.historyError")}
+          </Alert>
+        )}
         {historyQuery.isSuccess && historyQuery.data.length === 0 && (
           <p className="mt-2 text-sm text-slate-500">{t("detail.historyEmpty")}</p>
         )}
         {historyQuery.isSuccess && historyQuery.data.length > 0 && (
           <ol className="mt-2 flex flex-col gap-2 text-sm">
             {historyQuery.data.map((entry) => (
-              <li key={entry.id} className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <li
+                key={entry.id}
+                className="flex items-center justify-between border-b border-slate-100 pb-2"
+              >
                 <span className="font-medium text-slate-800">{entry.eventType}</span>
-                <span className="text-slate-500">{new Date(entry.createdAt).toLocaleString(locale)}</span>
+                <span className="text-slate-500">
+                  {new Date(entry.createdAt).toLocaleString(locale)}
+                </span>
               </li>
             ))}
           </ol>
@@ -474,7 +490,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.csatHeading")}</h2>
         {csatQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
         {csatQuery.isError && (
-          <Alert variant="destructive" className="mt-2">{t("detail.csatError")}</Alert>
+          <Alert variant="destructive" className="mt-2">
+            {t("detail.csatError")}
+          </Alert>
         )}
         {csatQuery.isSuccess && !csatQuery.data && (
           <p className="mt-2 text-sm text-slate-500">{t("detail.csatEmpty")}</p>
@@ -484,9 +502,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             <span className="font-medium text-slate-800">
               {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
             </span>
-            {csatQuery.data.comment && (
-              <p className="text-slate-700">{csatQuery.data.comment}</p>
-            )}
+            {csatQuery.data.comment && <p className="text-slate-700">{csatQuery.data.comment}</p>}
           </div>
         )}
       </div>
@@ -495,7 +511,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.notesHeading")}</h2>
         {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {notesQuery.isError && (
-          <Alert variant="destructive" className="mt-2">{t("detail.notesError")}</Alert>
+          <Alert variant="destructive" className="mt-2">
+            {t("detail.notesError")}
+          </Alert>
         )}
         {notesQuery.isSuccess && notesQuery.data.length === 0 && (
           <p className="mt-2 text-sm text-slate-500">{t("detail.notesEmpty")}</p>
@@ -566,7 +584,7 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
   return (
     <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
       <textarea
-        className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
         rows={3}
         value={body}
         placeholder={t("detail.notesPlaceholder")}

@@ -135,7 +135,7 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
   return (
     <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
       <textarea
-        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-ring"
         rows={2}
         value={body}
         placeholder={t("detail.chatPlaceholder")}
@@ -148,7 +148,7 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
         <button
           type="submit"
           disabled={mutation.isPending || !body.trim()}
-          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
         >
           {mutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
         </button>

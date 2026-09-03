@@ -25,10 +25,12 @@ const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
  */
 function statusPillClassName(status: string): string {
   const base = "rounded-full border px-2 py-0.5 text-xs";
-  if (status === "OPEN") return `${base} border-transparent bg-amber-100 text-amber-800`;
-  if (status === "RESOLVED") return `${base} border-transparent bg-emerald-100 text-emerald-800`;
-  if (status === "CLOSED") return `${base} border-slate-300 text-slate-700`;
-  return `${base} border-transparent bg-slate-100 text-slate-900`; // IN_PROGRESS
+  if (status === "OPEN")
+    return `${base} border-transparent bg-warning-surface text-warning-foreground`;
+  if (status === "RESOLVED")
+    return `${base} border-transparent bg-success-surface text-success-foreground`;
+  if (status === "CLOSED") return `${base} border-rule-strong text-ink-strong`;
+  return `${base} border-transparent bg-surface-muted text-ink`; // IN_PROGRESS
 }
 
 /**
@@ -202,9 +204,7 @@ function CsatSection({ ticketId }: { ticketId: string }) {
           <span className="font-medium text-slate-800">
             {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
           </span>
-          {csatQuery.data.comment && (
-            <p className="text-slate-600">{csatQuery.data.comment}</p>
-          )}
+          {csatQuery.data.comment && <p className="text-slate-600">{csatQuery.data.comment}</p>}
           <p className="text-slate-500">{t("detail.csatSubmitted")}</p>
         </div>
       )}
@@ -254,7 +254,7 @@ function CsatForm({ ticketId }: { ticketId: string }) {
             role="radio"
             aria-checked={rating === value}
             onClick={() => setRating(value)}
-            className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${
+            className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm font-medium focus-ring ${
               rating === value
                 ? "border-slate-900 bg-slate-900 text-white"
                 : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
@@ -267,7 +267,7 @@ function CsatForm({ ticketId }: { ticketId: string }) {
       <label className="flex flex-col gap-1 text-sm text-slate-700">
         {t("detail.csatCommentLabel")}
         <textarea
-          className="w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-ring"
           value={comment}
           onChange={(event) => setComment(event.target.value)}
           rows={3}
@@ -281,7 +281,7 @@ function CsatForm({ ticketId }: { ticketId: string }) {
       <button
         type="submit"
         disabled={mutation.isPending || !rating}
-        className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
       >
         {mutation.isPending ? t("detail.csatSubmitting") : t("detail.csatSubmit")}
       </button>

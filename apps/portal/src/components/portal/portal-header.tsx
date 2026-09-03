@@ -106,14 +106,14 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const chatHref = `/${locale}/chat`;
   const notificationsHref = `/${locale}/notifications`;
   const linkClassName = (href: string) =>
-    `flex items-center gap-1.5 rounded-md px-2 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${
+    `flex items-center gap-1.5 rounded-md px-2 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-ring ${
       isActiveHref(href) ? "bg-slate-100 font-medium text-slate-900" : ""
     }`;
 
   return (
     <header
       style={{ "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties}
-      className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-[var(--brand-primary,theme(colors.slate.200))] bg-white px-6 py-3"
+      className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
     >
       <nav aria-label={t("nav.label")} className="flex flex-wrap items-center gap-4 text-sm">
         {brandingQuery.data?.logoUrl && (
@@ -123,7 +123,11 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         <a href={`/${locale}/home`} className="rounded-md px-2 py-1.5 font-semibold text-slate-900">
           {t("signedInAs", { name: contact.fullName })}
         </a>
-        <a href={ticketsHref} aria-current={isActiveHref(ticketsHref) ? "page" : undefined} className={linkClassName(ticketsHref)}>
+        <a
+          href={ticketsHref}
+          aria-current={isActiveHref(ticketsHref) ? "page" : undefined}
+          className={linkClassName(ticketsHref)}
+        >
           {tTickets("nav")}
         </a>
         <a
@@ -133,7 +137,11 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         >
           {tKnowledgeBase("nav")}
         </a>
-        <a href={chatHref} aria-current={isActiveHref(chatHref) ? "page" : undefined} className={linkClassName(chatHref)}>
+        <a
+          href={chatHref}
+          aria-current={isActiveHref(chatHref) ? "page" : undefined}
+          className={linkClassName(chatHref)}
+        >
           {tChat("nav")}
         </a>
         <a
@@ -168,7 +176,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         <button
           type="button"
           onClick={handleSignOut}
-          className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-ring"
         >
           {t("signOut")}
         </button>

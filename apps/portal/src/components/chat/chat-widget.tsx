@@ -161,7 +161,7 @@ export function ChatWidget() {
             type="button"
             onClick={() => void handleEscalate()}
             disabled={escalate.isPending}
-            className="inline-flex h-9 w-fit items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="inline-flex h-9 w-fit items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
           >
             {escalate.isPending ? t("escalating") : t("escalate")}
           </button>
@@ -205,7 +205,9 @@ function ChatComposer({
       setBody("");
       onSent(result.id);
     } catch (submitError) {
-      setError(errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("sendFailed") }));
+      setError(
+        errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("sendFailed") }),
+      );
     }
   }
 
@@ -224,7 +226,7 @@ function ChatComposer({
   return (
     <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
       <textarea
-        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-ring"
         rows={2}
         value={body}
         placeholder={t("placeholder")}
@@ -237,7 +239,7 @@ function ChatComposer({
         <button
           type="submit"
           disabled={mutation.isPending || !sessionId || !body.trim()}
-          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
         >
           {mutation.isPending ? t("sending") : t("send")}
         </button>

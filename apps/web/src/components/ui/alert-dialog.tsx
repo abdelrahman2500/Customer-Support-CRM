@@ -36,7 +36,7 @@ export const AlertDialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={cn("fixed inset-0 z-50 bg-slate-950/40", className)}
+    className={cn("fixed inset-0 z-50 bg-overlay/40", className)}
     {...props}
   />
 ));
@@ -52,7 +52,7 @@ export const AlertDialogContent = React.forwardRef<
       ref={ref}
       role="alertdialog"
       className={cn(
-        "fixed start-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white p-6 shadow-lg focus:outline-none rtl:translate-x-1/2",
+        "fixed start-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-md border border-rule bg-surface p-6 shadow-lg focus:outline-none rtl:translate-x-1/2",
         className,
       )}
       {...props}
@@ -73,7 +73,7 @@ export const AlertDialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("text-base font-semibold text-slate-900", className)}
+    className={cn("text-base font-semibold text-ink", className)}
     {...props}
   />
 ));
@@ -85,7 +85,7 @@ export const AlertDialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-slate-600", className)}
+    className={cn("text-sm text-ink-muted", className)}
     {...props}
   />
 ));
@@ -93,6 +93,9 @@ AlertDialogDescription.displayName = "AlertDialogDescription";
 
 export function AlertDialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("mt-4 flex flex-wrap items-center justify-end gap-2", className)} {...props} />
+    <div
+      className={cn("mt-4 flex flex-wrap items-center justify-end gap-2", className)}
+      {...props}
+    />
   );
 }

@@ -36,7 +36,10 @@ function isTicketEscalatedPayload(
  * levels) rather than a single key literally named `"ticket.escalated"`.
  * This maps the three existing, unmodified event-type strings to the
  * camelCase message keys `messages/{en,ar}.json` actually defines. */
-const EVENT_LABEL_KEY: Record<BranchNotification["eventType"], "slaAtRisk" | "slaBreached" | "ticketEscalated"> = {
+const EVENT_LABEL_KEY: Record<
+  BranchNotification["eventType"],
+  "slaAtRisk" | "slaBreached" | "ticketEscalated"
+> = {
   "sla.at_risk": "slaAtRisk",
   "sla.breached": "slaBreached",
   "ticket.escalated": "ticketEscalated",
@@ -104,14 +107,16 @@ export function NotificationToaster({
             )}
           >
             <div className="flex items-start justify-between gap-2">
-              <Badge variant={notification.eventType === "sla.breached" ? "destructive" : "warning"}>
+              <Badge
+                variant={notification.eventType === "sla.breached" ? "destructive" : "warning"}
+              >
                 {t(`eventLabel.${EVENT_LABEL_KEY[notification.eventType]}`)}
               </Badge>
               <button
                 type="button"
                 aria-label={t("dismiss")}
                 onClick={() => dismiss(notification.id)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-ink-subtle hover:text-slate-600"
               >
                 ×
               </button>

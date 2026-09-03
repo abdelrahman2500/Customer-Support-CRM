@@ -12,12 +12,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 function DiffCell({ diff }: { diff: unknown }) {
   const t = useTranslations("auditLogs");
   if (diff === null || diff === undefined) {
-    return <span className="text-slate-400">{t("noDiff")}</span>;
+    return <span className="text-ink-subtle">{t("noDiff")}</span>;
   }
   return (
     <div className="max-w-xs overflow-x-auto">
@@ -36,10 +43,16 @@ function DiffCell({ diff }: { diff: unknown }) {
  * doesn't contain (a deleted user, or one outside this lookup) falls back to
  * the raw id, exactly like `TicketListView`'s existing fallback.
  */
-function ActorCell({ actorId, nameById }: { actorId: string | null; nameById: Map<string, string> }) {
+function ActorCell({
+  actorId,
+  nameById,
+}: {
+  actorId: string | null;
+  nameById: Map<string, string>;
+}) {
   const t = useTranslations("auditLogs");
   if (!actorId) {
-    return <span className="text-slate-400">{t("systemActor")}</span>;
+    return <span className="text-ink-subtle">{t("systemActor")}</span>;
   }
   return <span>{nameById.get(actorId) ?? actorId}</span>;
 }
@@ -149,9 +162,7 @@ export function AuditLogView() {
         </div>
       )}
 
-      {auditLogsQuery.isError && forbidden && (
-        <Alert variant="destructive">{t("forbidden")}</Alert>
-      )}
+      {auditLogsQuery.isError && forbidden && <Alert variant="destructive">{t("forbidden")}</Alert>}
 
       {auditLogsQuery.isError && !forbidden && (
         <Alert variant="destructive" className="flex items-center justify-between">
@@ -197,13 +208,13 @@ export function AuditLogView() {
                   </TableCell>
                   <TableCell>{log.entityType}</TableCell>
                   <TableCell className="text-slate-500">
-                    {log.entityId ?? <span className="text-slate-400">{t("noEntityId")}</span>}
+                    {log.entityId ?? <span className="text-ink-subtle">{t("noEntityId")}</span>}
                   </TableCell>
                   <TableCell className="text-slate-500">
-                    {log.branchId ?? <span className="text-slate-400">{t("noBranch")}</span>}
+                    {log.branchId ?? <span className="text-ink-subtle">{t("noBranch")}</span>}
                   </TableCell>
                   <TableCell className="text-slate-500">
-                    {log.ipAddress ?? <span className="text-slate-400">{t("noIpAddress")}</span>}
+                    {log.ipAddress ?? <span className="text-ink-subtle">{t("noIpAddress")}</span>}
                   </TableCell>
                   <TableCell>
                     <DiffCell diff={log.diff} />

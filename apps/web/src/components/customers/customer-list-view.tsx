@@ -17,7 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const ALL_VALUE = "__all__";
 
@@ -128,18 +135,22 @@ export function CustomerListView() {
               <TableHead>
                 <button
                   type="button"
-                  className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                  className="rounded-sm hover:underline focus-ring"
                   onClick={() => toggleSort("displayName")}
                 >
                   {t("list.columns.name")}
-                  {filters.sortBy === "displayName" ? (filters.sortDir === "asc" ? " ▲" : " ▼") : ""}
+                  {filters.sortBy === "displayName"
+                    ? filters.sortDir === "asc"
+                      ? " ▲"
+                      : " ▼"
+                    : ""}
                 </button>
               </TableHead>
               <TableHead>{t("list.columns.status")}</TableHead>
               <TableHead>
                 <button
                   type="button"
-                  className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                  className="rounded-sm hover:underline focus-ring"
                   onClick={() => toggleSort("createdAt")}
                 >
                   {t("list.columns.createdAt")}
