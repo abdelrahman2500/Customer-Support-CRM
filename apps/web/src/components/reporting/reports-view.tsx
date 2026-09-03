@@ -15,7 +15,8 @@ import {
   useTicketVolumeQuery,
   useUpdateDashboardMutation,
 } from "@/hooks/use-reporting";
-import type { ReportDateRange, ReportWidgetType } from "@/lib/reporting-api";
+import { downloadReportCsv } from "@/lib/reporting-api";
+import type { ReportDateRange, ReportExportPath, ReportWidgetType } from "@/lib/reporting-api";
 import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
 import { Alert } from "@/components/ui/alert";
@@ -164,6 +165,8 @@ export function ReportsView() {
             query={ticketVolumeQuery}
             t={t}
             skeleton="list"
+            exportPath="ticket-volume"
+            range={range}
           >
             {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length === 0 && (
               <p className="text-sm text-slate-500">{t("ticketVolume.empty")}</p>
@@ -188,6 +191,8 @@ export function ReportsView() {
             query={slaComplianceQuery}
             t={t}
             skeleton="stat"
+            exportPath="sla-compliance"
+            range={range}
           >
             {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget === 0 && (
               <p className="text-sm text-slate-500">{t("slaCompliance.empty")}</p>
@@ -210,7 +215,14 @@ export function ReportsView() {
 
       case "CSAT":
         return (
-          <ReportCard heading={t("csat.heading")} query={csatQuery} t={t} skeleton="stat">
+          <ReportCard
+            heading={t("csat.heading")}
+            query={csatQuery}
+            t={t}
+            skeleton="stat"
+            exportPath="csat"
+            range={range}
+          >
             {csatQuery.isSuccess && csatQuery.data.responseCount === 0 && (
               <p className="text-sm text-slate-500">{t("csat.empty")}</p>
             )}
@@ -234,6 +246,8 @@ export function ReportsView() {
             query={agentPerformanceQuery}
             t={t}
             skeleton="list"
+            exportPath="agent-performance"
+            range={range}
           >
             {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length === 0 && (
               <p className="text-sm text-slate-500">{t("agentPerformance.empty")}</p>
@@ -258,7 +272,14 @@ export function ReportsView() {
 
       case "TICKET_AGING":
         return (
-          <ReportCard heading={t("ticketAging.heading")} query={ticketAgingQuery} t={t} skeleton="list">
+          <ReportCard
+            heading={t("ticketAging.heading")}
+            query={ticketAgingQuery}
+            t={t}
+            skeleton="list"
+            exportPath="ticket-aging"
+            range={range}
+          >
             {ticketAgingQuery.isSuccess && (
               <ul className="flex flex-col gap-1 text-sm">
                 {ticketAgingQuery.data.map((row) => (
@@ -287,6 +308,8 @@ export function ReportsView() {
             query={resolutionTimeQuery}
             t={t}
             skeleton="stat"
+            exportPath="resolution-time"
+            range={range}
           >
             {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount === 0 && (
               <p className="text-sm text-slate-500">{t("resolutionTime.empty")}</p>
@@ -311,7 +334,14 @@ export function ReportsView() {
         // this screen's existing "never hide a caveat" convention (e.g.
         // `slaCompliance.detail`, `resolutionTime.detail`).
         return (
-          <ReportCard heading={t("aiUsage.heading")} query={aiUsageQuery} t={t} skeleton="list">
+          <ReportCard
+            heading={t("aiUsage.heading")}
+            query={aiUsageQuery}
+            t={t}
+            skeleton="list"
+            exportPath="ai-usage"
+            range={range}
+          >
             {aiUsageQuery.isSuccess && aiUsageQuery.data.totalCalls === 0 && (
               <p className="text-sm text-slate-500">{t("aiUsage.empty")}</p>
             )}
@@ -494,20 +524,37 @@ function ReportCardSkeleton({ variant }: { variant: "list" | "stat" }) {
 
 /** Shared card shell — loading/forbidden/generic-error states are identical
  * across all three cards; only the populated body differs (passed as
- * `children`, rendered only once `query.isSuccess`). */
+ * `children`, rendered only once `query.isSuccess`).
+ *
+ * Story 125 — Reporting Export. `exportPath`/`range` are optional so this
+ * shell stays reusable without export support if a future card ever needs
+ * that; every current caller passes both. The button only appears once the
+ * report has real data (`query.isSuccess`) — exporting a loading/error
+ * card's (nonexistent) data makes no sense. A failed export shows a small
+ * inline error next to the button rather than replacing the card's already-
+ * loaded content with a full error state (mirrors this component's own
+ * `invalidRange`/`forbidden` split: a failure in one concern must never
+ * blank out data that loaded successfully in another). */
 function ReportCard({
   heading,
   query,
   t,
   skeleton = "list",
+  exportPath,
+  range,
   children,
 }: {
   heading: string;
   query: QueryLike;
   t: ReturnType<typeof useTranslations>;
   skeleton?: "list" | "stat";
+  exportPath?: ReportExportPath;
+  range?: ReportDateRange;
   children: ReactNode;
 }) {
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
+
   const forbidden = query.isError && query.error instanceof ApiError && query.error.status === 403;
   // Story 93 — an invalid/reversed date range (400) is distinguished from a
   // generic failure the same way `forbidden` already is: no retry action,
@@ -516,9 +563,47 @@ function ReportCard({
   const invalidRange =
     query.isError && query.error instanceof ApiError && query.error.status === 400;
 
+  async function handleExport() {
+    if (!exportPath) {
+      return;
+    }
+    setIsExporting(true);
+    setExportError(false);
+    try {
+      const { blob, filename } = await downloadReportCsv(exportPath, range);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError(true);
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   return (
     <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{heading}</h2>
+      {/* `<header>`, not another `<div>` — several existing tests locate
+          this card via `heading.closest("div")` to reach the OUTER card
+          shell (skeleton/content included); a nested `<div>` here would
+          make `closest("div")` resolve to this row instead. */}
+      <header className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">{heading}</h2>
+        {exportPath && query.isSuccess && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isExporting}
+            onClick={() => void handleExport()}
+          >
+            {t("export.button")}
+          </Button>
+        )}
+      </header>
+      {exportError && <p className="mt-1 text-xs text-red-600">{t("export.error")}</p>}
       {query.isLoading && <ReportCardSkeleton variant={skeleton} />}
       {query.isError && forbidden && (
         <Alert variant="destructive" className="mt-2">

@@ -339,6 +339,145 @@ describe("Reporting & Analytics (e2e)", () => {
       .expect(403);
   });
 
+  // Story 125 — Reporting Export.
+  describe("export (Story 125)", () => {
+    const EXPORT_ROUTES = [
+      "ticket-volume",
+      "sla-compliance",
+      "csat",
+      "agent-performance",
+      "ticket-aging",
+      "resolution-time",
+      "ai-usage",
+    ];
+
+    it("rejects unauthenticated requests on every export route (401)", async () => {
+      for (const route of EXPORT_ROUTES) {
+        await request(app.getHttpServer()).get(`/api/v1/reports/${route}/export`).expect(401);
+      }
+    });
+
+    it("rejects an Agent-role user lacking report:read on every export route (403)", async () => {
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+
+      const agentEmail = `agent-reporting-export-${randomUUID()}@example.com`;
+      const agentPassword = "agent-export-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: agentPassword,
+          fullName: "Test Agent Reporting Export",
+          branchId: adminBranchId,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+      const agentAccessToken = agentLogin.body.accessToken as string;
+
+      for (const route of EXPORT_ROUTES) {
+        await request(app.getHttpServer())
+          .get(`/api/v1/reports/${route}/export`)
+          .set("Authorization", `Bearer ${agentAccessToken}`)
+          .expect(403);
+      }
+    });
+
+    it("rejects a reversed range (from > to) with 400 on every export route, identical to the JSON routes", async () => {
+      for (const route of EXPORT_ROUTES) {
+        await request(app.getHttpServer())
+          .get(`/api/v1/reports/${route}/export?from=${today()}&to=${yesterday()}`)
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .expect(400);
+      }
+    });
+
+    it("ticket-volume/export returns a CSV whose data matches the JSON route, with the correct headers/filename", async () => {
+      await createTicket();
+      const jsonRows = await getTicketVolume();
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/reports/ticket-volume/export")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.headers["content-type"]).toMatch(/^text\/csv/);
+      expect(response.headers["content-disposition"]).toBe(
+        'attachment; filename="ticket-volume-all.csv"',
+      );
+      const lines = (response.text as string).trim().split("\r\n");
+      expect(lines[0]).toBe("Status,Count");
+      expect(lines).toHaveLength(jsonRows.length + 1);
+      const openLine = lines.find((line) => line.startsWith("OPEN,"));
+      const jsonOpenCount = jsonRows.find((row) => row.status === "OPEN")?.count;
+      expect(openLine).toBe(`OPEN,${jsonOpenCount}`);
+    });
+
+    it("an export route's filename reflects the requested range", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/reports/ticket-volume/export?from=${today()}&to=${today()}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.headers["content-disposition"]).toBe(
+        `attachment; filename="ticket-volume-${today()}_${today()}.csv"`,
+      );
+    });
+
+    it("sla-compliance/export renders the single summary object as a one-row CSV", async () => {
+      const summary = await getSlaCompliance();
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/reports/sla-compliance/export")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const lines = (response.text as string).trim().split("\r\n");
+      expect(lines[0]).toBe("Total With Target,Breached Count,Compliant Count,Compliance Rate");
+      expect(lines).toHaveLength(2);
+      const [totalWithTarget, breachedCount, compliantCount] = lines[1]!.split(",");
+      expect(Number(totalWithTarget)).toBe(summary.totalWithTarget);
+      expect(Number(breachedCount)).toBe(summary.breachedCount);
+      expect(Number(compliantCount)).toBe(summary.compliantCount);
+    });
+
+    it("ai-usage/export renders the byFeature breakdown, not the outer summary object", async () => {
+      await createAiPromptLog({
+        feature: "SUMMARIZE",
+        outcome: "SUCCESS",
+        inputTokens: 100,
+        outputTokens: 50,
+        costMicroUsd: 1_000_000,
+      });
+      const summary = await getAiUsage();
+      const summarizeRow = summary.byFeature.find((row) => row.feature === "SUMMARIZE");
+      expect(summarizeRow).toBeDefined();
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/reports/ai-usage/export")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const lines = (response.text as string).trim().split("\r\n");
+      expect(lines[0]).toBe(
+        "Feature,Call Count,Success Count,Error Count,Total Input Tokens,Total Output Tokens,Total Cost (USD)",
+      );
+      expect(lines).toHaveLength(summary.byFeature.length + 1);
+      const summarizeLine = lines.find((line) => line.startsWith("SUMMARIZE,"));
+      expect(summarizeLine).toBe(
+        `SUMMARIZE,${summarizeRow!.callCount},${summarizeRow!.successCount},${summarizeRow!.errorCount},${summarizeRow!.totalInputTokens},${summarizeRow!.totalOutputTokens},${summarizeRow!.totalCostUsd}`,
+      );
+    });
+  });
+
   it("reflects a real, newly-created OPEN ticket in the volume-by-status delta", async () => {
     const before = await getTicketVolume();
     const beforeOpen = before.find((row) => row.status === "OPEN")?.count ?? 0;

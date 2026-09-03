@@ -15,6 +15,18 @@ import {
   useUpdateDashboardMutation,
 } from "@/hooks/use-reporting";
 import { ApiError } from "@/lib/api";
+import { downloadReportCsv } from "@/lib/reporting-api";
+
+vi.mock("@/lib/reporting-api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/reporting-api")>();
+  return { ...actual, downloadReportCsv: vi.fn() };
+});
+
+const mockedDownloadReportCsv = vi.mocked(downloadReportCsv);
+
+// jsdom does not implement the Blob URL APIs the export button uses.
+URL.createObjectURL = vi.fn(() => "blob:mock-url");
+URL.revokeObjectURL = vi.fn();
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
@@ -115,6 +127,10 @@ describe("ReportsView", () => {
       mutateAsync: vi.fn().mockResolvedValue({ id: "deleted" }),
       isPending: false,
     } as never);
+    mockedDownloadReportCsv.mockResolvedValue({
+      blob: new Blob(["Status,Count\r\n"], { type: "text/csv" }),
+      filename: "ticket-volume-all.csv",
+    });
   });
 
   it("renders each card's empty state when there is no data yet", () => {
@@ -628,6 +644,44 @@ describe("ReportsView", () => {
 
       await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith("dash-1"));
       expect(screen.getByLabelText("dashboards.pickerLabel")).toHaveValue("");
+    });
+  });
+
+  // Story 125 — Reporting Export.
+  describe("export CSV button (Story 125)", () => {
+    it("renders one export button per report card", () => {
+      render(<ReportsView />);
+
+      expect(screen.getAllByText("export.button")).toHaveLength(7);
+    });
+
+    it("does not render an export button for a card whose query has not succeeded yet", () => {
+      mockedUseTicketVolumeQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<ReportsView />);
+
+      expect(screen.getAllByText("export.button")).toHaveLength(6);
+    });
+
+    it("clicking a card's export button downloads that report with the correct path and current range", async () => {
+      render(<ReportsView />);
+
+      fireEvent.click(screen.getAllByText("export.button")[0]!);
+
+      await waitFor(() =>
+        expect(mockedDownloadReportCsv).toHaveBeenCalledWith("ticket-volume", {}),
+      );
+    });
+
+    it("shows an inline error when the export fails, without disturbing the card's already-loaded content", async () => {
+      mockedDownloadReportCsv.mockRejectedValue(new ApiError("Server error", 500));
+
+      render(<ReportsView />);
+      fireEvent.click(screen.getAllByText("export.button")[0]!);
+
+      expect(await screen.findByText("export.error")).toBeInTheDocument();
+      // The card's own (empty-state) content is still there.
+      expect(screen.getByText("ticketVolume.empty")).toBeInTheDocument();
     });
   });
 });

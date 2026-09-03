@@ -657,6 +657,10 @@
     "forbidden": "You don't have permission to view reports.",
     "error": "Couldn't load this report.",
     "retry": "Retry",
+    "export": {
+      "button": "Export CSV",
+      "error": "Couldn't export this report. Please try again."
+    },
     "dateRange": {
       "fromLabel": "From",
       "toLabel": "To",

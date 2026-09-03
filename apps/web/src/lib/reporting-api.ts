@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { ApiError, apiFetch, getAccessToken, getApiBaseUrl } from "./api";
 
 /**
  * Story 56 — Reporting & Analytics Foundation. A dedicated API client file,
@@ -120,6 +120,48 @@ export function getResolutionTime(range: ReportDateRange = {}): Promise<Resoluti
 
 export function getAiUsage(range: ReportDateRange = {}): Promise<AiUsageSummary> {
   return apiFetch<AiUsageSummary>(`/reports/ai-usage${toQueryString(range)}`);
+}
+
+/** Story 125 — Reporting Export. One path segment per existing report,
+ * matching `ReportingController`'s own new `GET /reports/<name>/export`
+ * routes exactly. */
+export type ReportExportPath =
+  | "ticket-volume"
+  | "sla-compliance"
+  | "csat"
+  | "agent-performance"
+  | "ticket-aging"
+  | "resolution-time"
+  | "ai-usage";
+
+/**
+ * Story 125 — Reporting Export. A raw, dedicated `fetch` — not routed
+ * through `apiFetch` — since `apiFetch`/`attempt` always call
+ * `response.json()`, which cannot parse a CSV body. Mirrors `attempt`'s
+ * own Bearer-header/non-2xx-to-`ApiError` handling, but resolves to a
+ * `Blob` plus the filename the backend's own `Content-Disposition` header
+ * chose (`ReportingController`'s `sendCsv`) — the caller (`ReportsView`)
+ * turns that into a real browser download via `URL.createObjectURL` + a
+ * synthetic `<a>` click, since this repo's auth is a JS-readable Bearer
+ * token, not an httpOnly session cookie a plain `<a href>` could rely on.
+ */
+export async function downloadReportCsv(
+  reportPath: ReportExportPath,
+  range: ReportDateRange = {},
+): Promise<{ blob: Blob; filename: string }> {
+  const token = getAccessToken();
+  const response = await fetch(
+    `${getApiBaseUrl()}/reports/${reportPath}/export${toQueryString(range)}`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  if (!response.ok) {
+    throw new ApiError(`Failed to export ${reportPath}`, response.status);
+  }
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const filenameMatch = /filename="([^"]+)"/.exec(disposition);
+  const filename = filenameMatch?.[1] ?? `${reportPath}.csv`;
+  const blob = await response.blob();
+  return { blob, filename };
 }
 
 /**
