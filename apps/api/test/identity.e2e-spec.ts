@@ -116,6 +116,7 @@ describe("Identity & Access (e2e)", () => {
         "user:read",
         "kb:read",
         "quick-reply:read",
+        "ticket-category:read",
         "notification:read",
         "sla:read",
       ];
