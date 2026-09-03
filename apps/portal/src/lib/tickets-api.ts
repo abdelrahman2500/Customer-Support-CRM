@@ -11,7 +11,8 @@ export type PortalTicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export interface PortalTicketSummary {
   id: string;
   subject: string;
-  category: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
   priority: PortalTicketPriority;
   status: PortalTicketStatus;
   customerId: string;
@@ -30,8 +31,16 @@ export interface PortalTicketHistoryEntry {
   createdAt: string;
 }
 
-/** Mirrors the existing `PortalCreateTicketDto` exactly
- * (`apps/api/src/modules/portal/dto/portal-create-ticket.dto.ts`). */
+/**
+ * Mirrors the existing `PortalCreateTicketDto` exactly
+ * (`apps/api/src/modules/portal/dto/portal-create-ticket.dto.ts`).
+ *
+ * Story 120 — `category` stays free text on the wire, deliberately unlike
+ * `PortalTicketSummary.categoryId`/`categoryName` below: it is resolved
+ * server-side to an existing `TicketCategory` by exact, case-insensitive
+ * name (never auto-created from customer input) — see
+ * `TicketsService.createTicketForContact`'s own doc comment.
+ */
 export interface CreatePortalTicketInput {
   subject: string;
   category?: string;

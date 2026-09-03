@@ -9,6 +9,7 @@ import {
   useDepartmentsQuery,
   useUsersQuery,
 } from "@/hooks/use-tickets";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { ApiError } from "@/lib/api";
 import { showSuccessToast } from "@/lib/toast-store";
 import enMessages from "../../../messages/en.json";
@@ -37,11 +38,16 @@ vi.mock("@/hooks/use-tickets", () => ({
   useUsersQuery: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-ticket-categories", () => ({
+  useTicketCategoriesQuery: vi.fn(),
+}));
+
 const mockedUseCreateTicketMutation = vi.mocked(useCreateTicketMutation);
 const mockedUseCustomersQuery = vi.mocked(useCustomersQuery);
 const mockedUseCustomerQuery = vi.mocked(useCustomerQuery);
 const mockedUseDepartmentsQuery = vi.mocked(useDepartmentsQuery);
 const mockedUseUsersQuery = vi.mocked(useUsersQuery);
+const mockedUseTicketCategoriesQuery = vi.mocked(useTicketCategoriesQuery);
 
 function queryResult(overrides: Record<string, unknown> = {}) {
   return {
@@ -73,6 +79,12 @@ describe("CreateTicketView", () => {
     mockedUseCustomerQuery.mockReturnValue(queryResult({ data: undefined }) as never);
     mockedUseDepartmentsQuery.mockReturnValue(queryResult({ data: [] }) as never);
     mockedUseUsersQuery.mockReturnValue(queryResult({ data: [] }) as never);
+    mockedUseTicketCategoriesQuery.mockReturnValue(
+      queryResult({
+        data: [{ id: "category-1", branchId: "branch-1", name: "billing", isActive: true }],
+        isSuccess: true,
+      }) as never,
+    );
   });
 
   it("renders the form with the existing customer list in the picker (English)", () => {
@@ -100,7 +112,7 @@ describe("CreateTicketView", () => {
     expect(screen.getByRole("button", { name: "Create ticket" })).toBeDisabled();
   });
 
-  it("submits only { customerId, subject, category?, priority? } when contact/department/assignee are left unset (Story 43 base case), and navigates to the new ticket", async () => {
+  it("submits only { customerId, subject, categoryId?, priority? } when contact/department/assignee are left unset (Story 43 base case), and navigates to the new ticket", async () => {
     const mutateAsync = vi.fn().mockResolvedValue({ id: "ticket-42" });
     mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
 
@@ -109,14 +121,15 @@ describe("CreateTicketView", () => {
     fireEvent.click(screen.getByText("Select a customer"));
     fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
     fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Cannot log in" } });
-    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "billing" } });
+    fireEvent.click(within(screen.getByText("Category").closest("label")!).getByRole("combobox"));
+    fireEvent.click(await screen.findByRole("option", { name: "billing" }));
     fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
 
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith({
         customerId: "customer-1",
         subject: "Cannot log in",
-        category: "billing",
+        categoryId: "category-1",
       }),
     );
     expect(push).toHaveBeenCalledWith("/en/tickets/ticket-42");
@@ -362,16 +375,16 @@ describe("CreateTicketView", () => {
       fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Cannot log in" } });
 
       // Indices, once a customer is selected: 0 customer, 1 contact,
-      // 2 priority, 3 department, 4 assignee.
+      // 2 category, 3 priority, 4 department, 5 assignee.
       const comboboxes = screen.getAllByRole("combobox");
 
       fireEvent.click(comboboxes[1]!);
       fireEvent.click(await screen.findByRole("option", { name: "Jane Doe" }));
 
-      fireEvent.click(comboboxes[3]!);
+      fireEvent.click(comboboxes[4]!);
       fireEvent.click(await screen.findByRole("option", { name: "Billing" }));
 
-      fireEvent.click(comboboxes[4]!);
+      fireEvent.click(comboboxes[5]!);
       fireEvent.click(await screen.findByRole("option", { name: "Ada Lovelace" }));
 
       fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
@@ -459,10 +472,11 @@ describe("CreateTicketView", () => {
 
       expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
       // Comboboxes, in DOM order, with no customer selected yet (so no
-      // Contact picker rendered): customer, priority, department, assignee.
+      // Contact picker rendered): customer, category, priority, department,
+      // assignee.
       const comboboxes = screen.getAllByRole("combobox");
-      expect(comboboxes[2]).not.toBeDisabled();
       expect(comboboxes[3]).not.toBeDisabled();
+      expect(comboboxes[4]).not.toBeDisabled();
     });
   });
 });

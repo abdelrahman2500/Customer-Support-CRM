@@ -83,17 +83,31 @@ describe("Reporting & Analytics (e2e)", () => {
     return customer.body.id;
   }
 
-  async function createTicket(category?: string): Promise<string> {
+  async function createTicket(categoryId?: string): Promise<string> {
     const ticket = await request(app.getHttpServer())
       .post("/api/v1/tickets")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({
         customerId: await createCustomer(),
         subject: "Reporting e2e ticket",
-        ...(category ? { category } : {}),
+        ...(categoryId ? { categoryId } : {}),
       })
       .expect(201);
     return ticket.body.id;
+  }
+
+  /** Story 120 — a uniquely-named `TicketCategory`, used only as an
+   * isolation key: an SLA policy scoped to it can only ever match a
+   * ticket that also carries this same id, so this test's own
+   * fixture ticket/policy pair never interferes with concurrent
+   * e2e activity in the shared dev database. */
+  async function createTicketCategory(): Promise<string> {
+    const category = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `reporting-e2e-${randomUUID()}` })
+      .expect(201);
+    return category.body.id;
   }
 
   /** Story 93 — `{from, to}` (each `YYYY-MM-DD`) appended as query params
@@ -271,13 +285,13 @@ describe("Reporting & Analytics (e2e)", () => {
   it("reflects a real SlaTicketTarget in totalWithTarget, then a real sla.breached escalation in breachedCount/complianceRate", async () => {
     const before = await getSlaCompliance();
 
-    const matchingCategory = `reporting-e2e-${randomUUID()}`;
+    const matchingCategoryId = await createTicketCategory();
     await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ category: matchingCategory, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
+      .send({ categoryId: matchingCategoryId, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
       .expect(201);
-    const ticketId = await createTicket(matchingCategory);
+    const ticketId = await createTicket(matchingCategoryId);
 
     // SlaTargetListener runs fire-and-forget after POST /tickets responds
     // (sla-targets.e2e-spec.ts's own documented gap) — poll briefly until
@@ -665,13 +679,13 @@ describe("Reporting & Analytics (e2e)", () => {
     const beforeToday = await getSlaCompliance({ from: today(), to: today() });
     const beforeYesterday = await getSlaCompliance({ from: yesterday(), to: yesterday() });
 
-    const matchingCategory = `reporting-e2e-range-${randomUUID()}`;
+    const matchingCategoryId = await createTicketCategory();
     await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ category: matchingCategory, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
+      .send({ categoryId: matchingCategoryId, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
       .expect(201);
-    const ticketId = await createTicket(matchingCategory);
+    const ticketId = await createTicket(matchingCategoryId);
 
     const deadline = Date.now() + 5000;
     let targetSeen = false;

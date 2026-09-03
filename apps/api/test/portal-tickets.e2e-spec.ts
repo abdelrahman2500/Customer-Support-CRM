@@ -144,18 +144,30 @@ describe("Customer Portal — Tickets (e2e)", () => {
   });
 
   it("submits a ticket scoped to the contact's own customer, with no client-controlled scope fields accepted", async () => {
+    // Story 120 — `category` stays free text on the wire; a matching
+    // `TicketCategory` must already exist in the customer's own branch for
+    // it to resolve onto the created ticket (never auto-created from
+    // customer input) — see `TicketsService.createTicketForContact`'s own
+    // doc comment.
+    const categoryName = `portal-tickets-e2e-${randomUUID()}`;
+    await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: categoryName })
+      .expect(201);
+
     const token = await loginAsPortalContact(contactEmail);
 
     const response = await request(app.getHttpServer())
       .post("/api/v1/portal/tickets")
       .set("Authorization", `Bearer ${token}`)
-      .send({ subject: "Cannot log in", category: "account" })
+      .send({ subject: "Cannot log in", category: categoryName })
       .expect(201);
 
     expect(response.body.customerId).toBe(customerId);
     expect(response.body.contactId).toBe(contactId);
     expect(response.body.status).toBe("OPEN");
-    expect(response.body.category).toBe("account");
+    expect(response.body.categoryName).toBe(categoryName);
     ticketId = response.body.id;
   });
 

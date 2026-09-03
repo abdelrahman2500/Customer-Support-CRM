@@ -1,8 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { CreateSlaPolicyView } from "./create-sla-policy-view";
 import { useCreateSlaPolicyMutation } from "@/hooks/use-sla-policies";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { ApiError } from "@/lib/api";
 import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
@@ -18,7 +19,12 @@ vi.mock("@/hooks/use-sla-policies", () => ({
   useCreateSlaPolicyMutation: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-ticket-categories", () => ({
+  useTicketCategoriesQuery: vi.fn(),
+}));
+
 const mockedUseCreateSlaPolicyMutation = vi.mocked(useCreateSlaPolicyMutation);
+const mockedUseTicketCategoriesQuery = vi.mocked(useTicketCategoriesQuery);
 
 function renderWithLocale(locale: "en" | "ar" = "en") {
   const messages = locale === "en" ? enMessages : arMessages;
@@ -32,6 +38,11 @@ function renderWithLocale(locale: "en" | "ar" = "en") {
 describe("CreateSlaPolicyView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedUseTicketCategoriesQuery.mockReturnValue({
+      data: [{ id: "category-1", branchId: "branch-1", name: "billing", isActive: true }],
+      isLoading: false,
+      isSuccess: true,
+    } as never);
   });
 
   it("renders the form (English)", () => {
@@ -109,7 +120,8 @@ describe("CreateSlaPolicyView", () => {
     fireEvent.change(screen.getByLabelText("Department ID"), {
       target: { value: "dept-1" },
     });
-    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "billing" } });
+    fireEvent.click(within(screen.getByText("Category").closest("label")!).getByRole("combobox"));
+    fireEvent.click(await screen.findByRole("option", { name: "billing" }));
     fireEvent.change(screen.getByLabelText("Response target (minutes)"), {
       target: { value: "30" },
     });
@@ -121,7 +133,7 @@ describe("CreateSlaPolicyView", () => {
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith({
         departmentId: "dept-1",
-        category: "billing",
+        categoryId: "category-1",
         responseTargetMinutes: 30,
         resolutionTargetMinutes: 240,
       }),

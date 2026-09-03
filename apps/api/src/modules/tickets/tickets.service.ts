@@ -50,7 +50,11 @@ const MAX_TICKET_ROWS = 500;
 export interface TicketSummary {
   id: string;
   subject: string;
-  category: string | null;
+  /** Story 120 — `Ticket.category` (free text) replaced by a real FK.
+   * `categoryName` is resolved via the `category` relation (never
+   * denormalized onto `Ticket` itself) — see `CATEGORY_NAME_INCLUDE`. */
+  categoryId: string | null;
+  categoryName: string | null;
   priority: TicketPriority;
   status: TicketStatus;
   customerId: string;
@@ -60,6 +64,11 @@ export interface TicketSummary {
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** Story 120 — spread into a Prisma `include` wherever a `Ticket` row is
+ * turned into a `TicketSummary`, so `categoryName` is always resolved via
+ * the relation, never denormalized. */
+const CATEGORY_NAME_INCLUDE = { category: { select: { name: true } } } as const;
 
 /**
  * Story 23 — the same shape `SlaTargetsService.getSlaTargetForTicket`
@@ -157,6 +166,10 @@ export class TicketsService {
       await this.requireUserInScope(dto.assignedToUserId, branchId);
     }
 
+    if (dto.categoryId) {
+      await this.requireCategoryInScope(dto.categoryId, branchId);
+    }
+
     const ticket = await this.prisma.ticket.create({
       data: {
         branchId,
@@ -165,9 +178,10 @@ export class TicketsService {
         departmentId: dto.departmentId ?? null,
         assignedToUserId: dto.assignedToUserId ?? null,
         subject: dto.subject,
-        category: dto.category ?? null,
+        categoryId: dto.categoryId ?? null,
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
       },
+      include: CATEGORY_NAME_INCLUDE,
     });
     const summary = toTicketSummary(ticket);
     this.eventEmitter.emit(TICKET_CREATED_EVENT, {
@@ -206,7 +220,7 @@ export class TicketsService {
       ...(await this.resolveSearchAndVisibilityFilter(query.search)),
       ...(query.status !== undefined ? { status: query.status } : {}),
       ...(query.priority !== undefined ? { priority: query.priority } : {}),
-      ...(query.category !== undefined ? { category: query.category } : {}),
+      ...(query.categoryId !== undefined ? { categoryId: query.categoryId } : {}),
       ...(query.assignedToUserId !== undefined
         ? { assignedToUserId: query.assignedToUserId }
         : {}),
@@ -228,7 +242,7 @@ export class TicketsService {
     const tickets = await this.prisma.ticket.findMany({
       where,
       orderBy: { [sortBy]: "desc" },
-      include: { slaTarget: true },
+      include: { slaTarget: true, ...CATEGORY_NAME_INCLUDE },
       take: MAX_TICKET_ROWS,
     });
     if (sortDir === "asc") {
@@ -263,9 +277,12 @@ export class TicketsService {
     if (dto.assignedToUserId !== undefined) {
       await this.requireUserInScope(dto.assignedToUserId, branchId);
     }
+    if (dto.categoryId !== undefined && dto.categoryId !== null) {
+      await this.requireCategoryInScope(dto.categoryId, branchId);
+    }
 
     const isRecategorized =
-      (dto.category !== undefined && dto.category !== existing.category) ||
+      (dto.categoryId !== undefined && dto.categoryId !== existing.categoryId) ||
       (dto.priority !== undefined && dto.priority !== existing.priority) ||
       (dto.departmentId !== undefined && dto.departmentId !== existing.departmentId);
 
@@ -290,7 +307,7 @@ export class TicketsService {
       where: { id },
       data: {
         ...(dto.subject !== undefined ? { subject: dto.subject } : {}),
-        ...(dto.category !== undefined ? { category: dto.category } : {}),
+        ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
@@ -299,6 +316,7 @@ export class TicketsService {
           : {}),
         ...(resolvedAtUpdate !== undefined ? { resolvedAt: resolvedAtUpdate } : {}),
       },
+      include: CATEGORY_NAME_INCLUDE,
     });
     const summary = toTicketSummary(updated);
     this.eventEmitter.emit(TICKET_UPDATED_EVENT, {
@@ -386,11 +404,20 @@ export class TicketsService {
   // ---------------------------------------------------------------------
 
   /**
-   * The only way a portal Contact creates a ticket. `actorUserId` on the
-   * emitted event is always `null` — a Contact is not an agent `User` (and
-   * is not a valid `identity.users` foreign key), mirroring
-   * `TicketEscalatedEvent`'s existing "no human actor" precedent (plan
-   * Design item 3).
+   * The only way a portal Contact creates a ticket — also the funnel
+   * `WebFormIntakeService` (Story 87) uses for the one public,
+   * unauthenticated ticket-creation surface. `actorUserId` on the emitted
+   * event is always `null` — a Contact is not an agent `User` (and is not
+   * a valid `identity.users` foreign key), mirroring `TicketEscalatedEvent`'s
+   * existing "no human actor" precedent (plan Design item 3).
+   *
+   * Story 120 — `dto.category` stays free text on the wire (it comes from
+   * a customer-facing/public surface, never trusted to name a real
+   * category id directly): resolved here to an existing `TicketCategory`
+   * by exact, case-insensitive name within the target branch; no match
+   * leaves the ticket's category unset — never auto-created from
+   * customer/public input, which would silently reopen the exact
+   * fragmentation risk this story exists to close.
    */
   async createTicketForContact(
     contactId: string,
@@ -404,14 +431,20 @@ export class TicketsService {
       throw new NotFoundException("Contact not found");
     }
 
+    const categoryId = await this.resolveCategoryIdByName(
+      contact.customer.branchId,
+      dto.category,
+    );
+
     const ticket = await this.prisma.ticket.create({
       data: {
         branchId: contact.customer.branchId,
         customerId: contact.customerId,
         contactId: contact.id,
         subject: dto.subject,
-        category: dto.category ?? null,
+        categoryId,
       },
+      include: CATEGORY_NAME_INCLUDE,
     });
     const summary = toTicketSummary(ticket);
     this.eventEmitter.emit(TICKET_CREATED_EVENT, {
@@ -435,6 +468,7 @@ export class TicketsService {
     const tickets = await this.prisma.ticket.findMany({
       where: { customerId },
       orderBy: { createdAt: "desc" },
+      include: CATEGORY_NAME_INCLUDE,
     });
     return tickets.map(toTicketSummary);
   }
@@ -532,7 +566,8 @@ export class TicketsService {
   ): Promise<{
     id: string;
     subject: string;
-    category: string | null;
+    categoryId: string | null;
+    category: { name: string } | null;
     priority: TicketPriority;
     status: TicketStatus;
     customerId: string;
@@ -542,7 +577,10 @@ export class TicketsService {
     createdAt: Date;
     updatedAt: Date;
   }> {
-    const ticket = await this.prisma.ticket.findFirst({ where: { id, customerId } });
+    const ticket = await this.prisma.ticket.findFirst({
+      where: { id, customerId },
+      include: CATEGORY_NAME_INCLUDE,
+    });
     if (!ticket) {
       throw new NotFoundException("Ticket not found");
     }
@@ -552,7 +590,8 @@ export class TicketsService {
   private async findTicketInScope(id: string): Promise<{
     id: string;
     subject: string;
-    category: string | null;
+    categoryId: string | null;
+    category: { name: string } | null;
     priority: TicketPriority;
     status: TicketStatus;
     customerId: string;
@@ -565,6 +604,7 @@ export class TicketsService {
     const { branchId } = this.tenantContext.requireBranchScope();
     const ticket = await this.prisma.ticket.findFirst({
       where: { id, branchId, ...(await this.resolveDepartmentVisibilityFilter()) },
+      include: CATEGORY_NAME_INCLUDE,
     });
     if (!ticket) {
       throw new NotFoundException("Ticket not found");
@@ -666,6 +706,37 @@ export class TicketsService {
     }
   }
 
+  /** Story 120 — mirrors `requireDepartmentInScope`'s exact shape. */
+  private async requireCategoryInScope(categoryId: string, branchId: string): Promise<void> {
+    const category = await this.prisma.ticketCategory.findFirst({
+      where: { id: categoryId, branchId },
+    });
+    if (!category) {
+      throw new NotFoundException("Ticket category not found");
+    }
+  }
+
+  /**
+   * Story 120 — the one place a customer/public-facing free-text category
+   * string is resolved to a real `TicketCategory` id: exact,
+   * case-insensitive name match within the given branch, or `null` when
+   * nothing matches. Never creates a new `TicketCategory` from this input
+   * — see `createTicketForContact`'s own doc comment for why.
+   */
+  private async resolveCategoryIdByName(
+    branchId: string,
+    name: string | undefined,
+  ): Promise<string | null> {
+    if (!name) {
+      return null;
+    }
+    const category = await this.prisma.ticketCategory.findFirst({
+      where: { branchId, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    return category?.id ?? null;
+  }
+
   /** A "user in scope" means they hold at least one role in this branch — see UserBranchRole. */
   private async requireUserInScope(userId: string, branchId: string): Promise<void> {
     const membership = await this.prisma.userBranchRole.findFirst({
@@ -694,7 +765,11 @@ export class TicketsService {
 export function toTicketSummary(ticket: {
   id: string;
   subject: string;
-  category: string | null;
+  categoryId: string | null;
+  /** Optional — omitted by a caller that didn't `include`
+   * `CATEGORY_NAME_INCLUDE` (e.g. a bare `.update()` result used only for
+   * event payloads); `categoryName` resolves to `null` in that case. */
+  category?: { name: string } | null;
   priority: TicketPriority;
   status: TicketStatus;
   customerId: string;
@@ -707,7 +782,8 @@ export function toTicketSummary(ticket: {
   return {
     id: ticket.id,
     subject: ticket.subject,
-    category: ticket.category,
+    categoryId: ticket.categoryId,
+    categoryName: ticket.category?.name ?? null,
     priority: ticket.priority,
     status: ticket.status,
     customerId: ticket.customerId,
@@ -740,10 +816,15 @@ function toCsatSummary(response: {
 /** Story 70 — mirrors `KnowledgeBaseService`'s own `searchWhereClause`
  * exactly: empty object (no-op `where` clause addition) for an empty/
  * missing `search` — every existing caller sees the exact same
- * unfiltered query it always has. `OR` on `subject`/`category`,
+ * unfiltered query it always has. `OR` on `subject`/`category name`,
  * case-insensitive substring — plain Prisma `contains`, never raw SQL
  * (see `listTickets`'s own doc comment for why `tsvector` is deliberately
- * deferred). */
+ * deferred).
+ *
+ * Story 120 — the `category` arm became a relation filter
+ * (`category: { name: { contains, mode: "insensitive" } } }`) once
+ * `Ticket.category` stopped being a plain string column — same shape,
+ * same behavior for every caller. */
 function searchWhereClause(
   search: string | undefined,
 ): { OR: Prisma.TicketWhereInput[] } | Record<string, never> {
@@ -753,7 +834,7 @@ function searchWhereClause(
   return {
     OR: [
       { subject: { contains: search, mode: "insensitive" } },
-      { category: { contains: search, mode: "insensitive" } },
+      { category: { name: { contains: search, mode: "insensitive" } } },
     ],
   };
 }

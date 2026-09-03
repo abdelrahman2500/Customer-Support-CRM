@@ -17,6 +17,7 @@ import {
   useUpdateTicketMutation,
   useUsersQuery,
 } from "@/hooks/use-tickets";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
@@ -107,6 +108,16 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * `mutation` (`useUpdateTicketMutation`) this view already instantiates
  * for every other field — no second mutation instance, no new
  * category-persistence mechanism.
+ *
+ * Story 120 — the free-text category `Input` became a `Select` sourced
+ * from `useTicketCategoriesQuery()` (mirrors the `department` field's own
+ * `Select` immediately below it). `TicketAiCard`'s AI-suggested category
+ * text is resolved here to an existing category by exact,
+ * case-insensitive name match — applied via the same `mutation` when one
+ * exists; when none matches, a message points the agent at the Ticket
+ * Categories screen instead of silently failing or auto-creating one (see
+ * `TicketCategoriesService`'s own doc comment for why creation stays a
+ * deliberate, separate action).
  */
 /**
  * Story 97 — Loading & Skeleton UX. Replaces the previous generic
@@ -164,11 +175,12 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const customersQuery = useCustomersQuery();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
+  const categoriesQuery = useTicketCategoriesQuery();
   const errorMessage = useErrorMessage();
   const mutation = useUpdateTicketMutation(ticketId);
 
-  const [categoryDraft, setCategoryDraft] = useState<string | null>(null);
   const [subjectDraft, setSubjectDraft] = useState<string | null>(null);
+  const [aiCategoryNoMatch, setAiCategoryNoMatch] = useState<string | null>(null);
 
   const customerNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -292,15 +304,29 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         </Field>
 
         <Field label={t("detail.category")}>
-          <Input
-            defaultValue={ticket.category ?? ""}
-            onChange={(event) => setCategoryDraft(event.target.value)}
-            onBlur={() => {
-              if (categoryDraft !== null && categoryDraft !== (ticket.category ?? "")) {
-                mutation.mutate({ category: categoryDraft });
-              }
-            }}
-          />
+          <Select
+            value={ticket.categoryId ?? undefined}
+            disabled={mutation.isPending || categoriesQuery.isLoading}
+            onValueChange={(value) => mutation.mutate({ categoryId: value })}
+          >
+            <SelectTrigger>
+              <SelectValue
+                placeholder={
+                  categoriesQuery.isLoading ? t("detail.optionsLoading") : t("detail.noCategory")
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {(categoriesQuery.data ?? []).map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {categoriesQuery.isError && (
+            <span className="text-xs text-red-600">{t("detail.categoryLoadError")}</span>
+          )}
         </Field>
 
         <Field label={t("detail.assignedAgent")}>
@@ -355,8 +381,29 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
       <TicketAiCard
         ticketId={ticketId}
-        onApplyCategory={(category) => mutation.mutate({ category })}
+        onApplyCategory={(suggested) => {
+          const match = (categoriesQuery.data ?? []).find(
+            (category) => category.name.toLowerCase() === suggested.trim().toLowerCase(),
+          );
+          if (match) {
+            setAiCategoryNoMatch(null);
+            mutation.mutate({ categoryId: match.id });
+          } else {
+            setAiCategoryNoMatch(suggested);
+          }
+        }}
       />
+      {aiCategoryNoMatch && (
+        <Alert>
+          {t("detail.aiCategoryNoMatch", { category: aiCategoryNoMatch })}{" "}
+          <a
+            className="underline"
+            href={`/${locale}/ticket-categories`}
+          >
+            {t("detail.aiCategoryNoMatchLink")}
+          </a>
+        </Alert>
+      )}
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("detail.slaHeading")}</h2>

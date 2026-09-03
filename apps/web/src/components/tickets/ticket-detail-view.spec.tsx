@@ -15,6 +15,7 @@ import {
   useUpdateTicketMutation,
   useUsersQuery,
 } from "@/hooks/use-tickets";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import {
   useCreateTicketMessageMutation,
@@ -57,6 +58,10 @@ vi.mock("@/hooks/use-tickets", () => ({
   useDepartmentsQuery: vi.fn(),
   useUpdateTicketMutation: vi.fn(),
   useCreateTicketNoteMutation: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-ticket-categories", () => ({
+  useTicketCategoriesQuery: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-attachments", () => ({
@@ -105,7 +110,8 @@ function queryResult(overrides: Record<string, unknown>) {
 const baseTicket = {
   id: "ticket-1",
   subject: "Cannot log in",
-  category: "billing",
+  categoryId: "category-1",
+  categoryName: "billing",
   priority: "HIGH",
   status: "OPEN",
   customerId: "customer-1",
@@ -124,6 +130,12 @@ describe("TicketDetailView", () => {
     );
     vi.mocked(useUsersQuery).mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     vi.mocked(useDepartmentsQuery).mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    vi.mocked(useTicketCategoriesQuery).mockReturnValue(
+      queryResult({
+        data: [{ id: "category-1", branchId: "branch-1", name: "billing", isActive: true }],
+        isSuccess: true,
+      }) as never,
+    );
     vi.mocked(useTicketHistoryQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );

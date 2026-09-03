@@ -8,6 +8,7 @@ import {
   useUpdateAutomationRuleMutation,
 } from "@/hooks/use-automation-rules";
 import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { AutomationRuleSummary } from "@/lib/automation-rules-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
@@ -40,12 +41,18 @@ import {
  * optional action fields, resolving `actionSetDepartmentId` through
  * `useDepartmentsQuery()` the same way `actionAssignToUserId` resolves
  * through `useUsersQuery()`.
+ *
+ * Story 120 — `conditionCategory`/`actionSetCategory` (free-text `Input`s)
+ * became `conditionCategoryId`/`actionSetCategoryId` `Select`s sourced
+ * from `useTicketCategoriesQuery()`, resolved to a display name the same
+ * way `actionSetDepartmentId` already is.
  */
 export function AutomationRulesView() {
   const t = useTranslations("automationRules");
   const rulesQuery = useAutomationRulesQuery();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
+  const categoriesQuery = useTicketCategoriesQuery();
 
   const userNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -62,6 +69,14 @@ export function AutomationRulesView() {
     }
     return map;
   }, [departmentsQuery.data]);
+
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const category of categoriesQuery.data ?? []) {
+      map.set(category.id, category.name);
+    }
+    return map;
+  }, [categoriesQuery.data]);
 
   return (
     <section className="flex flex-col gap-4">
@@ -109,6 +124,7 @@ export function AutomationRulesView() {
                 rule={rule}
                 userNameById={userNameById}
                 departmentNameById={departmentNameById}
+                categoryNameById={categoryNameById}
               />
             ))}
           </TableBody>
@@ -127,10 +143,12 @@ function AutomationRuleRow({
   rule,
   userNameById,
   departmentNameById,
+  categoryNameById,
 }: {
   rule: AutomationRuleSummary;
   userNameById: Map<string, string>;
   departmentNameById: Map<string, string>;
+  categoryNameById: Map<string, string>;
 }) {
   const t = useTranslations("automationRules");
   const errorMessage = useErrorMessage();
@@ -153,12 +171,18 @@ function AutomationRuleRow({
     <TableRow>
       <TableCell className="font-medium text-slate-800">{rule.name}</TableCell>
       <TableCell className="text-slate-500">
-        {rule.conditionCategory ?? t("anyCategory")}
+        {rule.conditionCategoryId
+          ? (categoryNameById.get(rule.conditionCategoryId) ?? rule.conditionCategoryId)
+          : t("anyCategory")}
       </TableCell>
       <TableCell className="text-slate-500">
         {userNameById.get(rule.actionAssignToUserId) ?? rule.actionAssignToUserId}
       </TableCell>
-      <TableCell className="text-slate-500">{rule.actionSetCategory ?? t("noAction")}</TableCell>
+      <TableCell className="text-slate-500">
+        {rule.actionSetCategoryId
+          ? (categoryNameById.get(rule.actionSetCategoryId) ?? rule.actionSetCategoryId)
+          : t("noAction")}
+      </TableCell>
       <TableCell className="text-slate-500">
         {rule.actionSetDepartmentId
           ? (departmentNameById.get(rule.actionSetDepartmentId) ?? rule.actionSetDepartmentId)
@@ -206,10 +230,11 @@ function AddAutomationRuleForm() {
   const errorMessage = useErrorMessage();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
+  const categoriesQuery = useTicketCategoriesQuery();
   const [name, setName] = useState("");
-  const [conditionCategory, setConditionCategory] = useState("");
+  const [conditionCategoryId, setConditionCategoryId] = useState("");
   const [actionAssignToUserId, setActionAssignToUserId] = useState("");
-  const [actionSetCategory, setActionSetCategory] = useState("");
+  const [actionSetCategoryId, setActionSetCategoryId] = useState("");
   const [actionSetDepartmentId, setActionSetDepartmentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const mutation = useCreateAutomationRuleMutation();
@@ -221,14 +246,14 @@ function AddAutomationRuleForm() {
       await mutation.mutateAsync({
         name: name.trim(),
         actionAssignToUserId,
-        ...(conditionCategory.trim() ? { conditionCategory: conditionCategory.trim() } : {}),
-        ...(actionSetCategory.trim() ? { actionSetCategory: actionSetCategory.trim() } : {}),
+        ...(conditionCategoryId ? { conditionCategoryId } : {}),
+        ...(actionSetCategoryId ? { actionSetCategoryId } : {}),
         ...(actionSetDepartmentId ? { actionSetDepartmentId } : {}),
       });
       setName("");
-      setConditionCategory("");
+      setConditionCategoryId("");
       setActionAssignToUserId("");
-      setActionSetCategory("");
+      setActionSetCategoryId("");
       setActionSetDepartmentId("");
     } catch (submitError) {
       setError(errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }));
@@ -251,12 +276,18 @@ function AddAutomationRuleForm() {
         </label>
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("conditionCategoryLabel")}
-          <Input
-            value={conditionCategory}
-            placeholder={t("anyCategory")}
-            onChange={(event) => setConditionCategory(event.target.value)}
-            className="w-40"
-          />
+          <Select value={conditionCategoryId} onValueChange={setConditionCategoryId}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder={t("anyCategory")} />
+            </SelectTrigger>
+            <SelectContent>
+              {(categoriesQuery.data ?? []).map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("actionAssignToLabel")}
@@ -275,12 +306,18 @@ function AddAutomationRuleForm() {
         </label>
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("actionSetCategoryLabel")}
-          <Input
-            value={actionSetCategory}
-            placeholder={t("noAction")}
-            onChange={(event) => setActionSetCategory(event.target.value)}
-            className="w-40"
-          />
+          <Select value={actionSetCategoryId} onValueChange={setActionSetCategoryId}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder={t("noAction")} />
+            </SelectTrigger>
+            <SelectContent>
+              {(categoriesQuery.data ?? []).map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("actionSetDepartmentLabel")}

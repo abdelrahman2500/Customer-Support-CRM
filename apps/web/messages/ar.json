@@ -68,6 +68,7 @@
       "branding": "الهوية البصرية",
       "aiSettings": "إعدادات الذكاء الاصطناعي",
       "quickReplies": "الردود السريعة",
+      "ticketCategories": "فئات التذاكر",
       "unreadNotificationsLabel": "{count} إشعارات غير مقروءة"
     }
   },
@@ -107,6 +108,10 @@
       "status": "الحالة",
       "priority": "الأولوية",
       "category": "الفئة",
+      "noCategory": "بدون فئة",
+      "categoryLoadError": "تعذّر تحميل الفئات.",
+      "aiCategoryNoMatch": "لا توجد فئة مطابقة لـ \"{category}\".",
+      "aiCategoryNoMatchLink": "أنشئها في فئات التذاكر",
       "assignedAgent": "الوكيل المكلّف",
       "department": "القسم",
       "noDepartment": "بدون قسم",
@@ -184,6 +189,7 @@
       "contactsLoadError": "تعذّر تحميل جهات اتصال هذا العميل.",
       "subject": "الموضوع",
       "category": "الفئة",
+      "categoryDefault": "بدون فئة",
       "priority": "الأولوية",
       "priorityDefault": "الافتراضي",
       "department": "القسم",
@@ -356,6 +362,7 @@
       "department": "معرّف القسم",
       "departmentPlaceholder": "اترك الحقل فارغًا لتطبيقها على جميع الأقسام",
       "category": "الفئة",
+      "categoryDefault": "أي فئة",
       "priority": "الأولوية",
       "priorityDefault": "أي أولوية",
       "responseTarget": "هدف الاستجابة (بالدقائق)",
@@ -743,6 +750,31 @@
     "createFailed": "تعذّر إنشاء الرد السريع. حاول مرة أخرى.",
     "deactivateConfirmTitle": "هل تريد إلغاء تفعيل هذا الرد السريع؟",
     "deactivateConfirmDescription": "لن يكون \"{title}\" متاحًا بعد الآن في قائمة الردود."
+  },
+  "ticketCategories": {
+    "heading": "فئات التذاكر",
+    "description": "إدارة مفردات الفئات التي تختار منها التذاكر وسياسات اتفاقية مستوى الخدمة وقواعد الأتمتة.",
+    "error": "تعذّر تحميل فئات التذاكر.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد فئات تذاكر حتى الآن.",
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "activate": "تفعيل",
+    "deactivate": "إلغاء التفعيل",
+    "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+    "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+    "columns": {
+      "name": "الاسم",
+      "status": "الحالة"
+    },
+    "nameLabel": "الاسم",
+    "createPlaceholder": "مثال: الفوترة",
+    "createSubmit": "إضافة فئة",
+    "createSubmitting": "جارٍ الإضافة...",
+    "createFailed": "تعذّر إنشاء الفئة. حاول مرة أخرى.",
+    "createSuccess": "تم إنشاء الفئة \"{name}\".",
+    "deactivateConfirmTitle": "هل تريد إلغاء تفعيل هذه الفئة؟",
+    "deactivateConfirmDescription": "لن تظهر \"{name}\" بعد الآن عند اختيار فئة لتذكرة أو سياسة اتفاقية مستوى خدمة أو قاعدة أتمتة جديدة — لن تتأثر التذاكر التي تستخدمها بالفعل."
   },
   "notificationTemplates": {
     "title": "قوالب الإشعارات",

@@ -68,6 +68,7 @@
       "branding": "Branding",
       "aiSettings": "AI Settings",
       "quickReplies": "Quick Replies",
+      "ticketCategories": "Ticket Categories",
       "unreadNotificationsLabel": "{count} unread notifications"
     }
   },
@@ -107,6 +108,10 @@
       "status": "Status",
       "priority": "Priority",
       "category": "Category",
+      "noCategory": "No category",
+      "categoryLoadError": "Couldn't load categories.",
+      "aiCategoryNoMatch": "No existing category matches \"{category}\".",
+      "aiCategoryNoMatchLink": "Create it in Ticket Categories",
       "assignedAgent": "Assigned agent",
       "department": "Department",
       "noDepartment": "No department",
@@ -184,6 +189,7 @@
       "contactsLoadError": "Couldn't load this customer's contacts.",
       "subject": "Subject",
       "category": "Category",
+      "categoryDefault": "No category",
       "priority": "Priority",
       "priorityDefault": "Default",
       "department": "Department",
@@ -361,6 +367,7 @@
       "department": "Department ID",
       "departmentPlaceholder": "Leave blank to apply to every department",
       "category": "Category",
+      "categoryDefault": "Any category",
       "priority": "Priority",
       "priorityDefault": "Any priority",
       "responseTarget": "Response target (minutes)",
@@ -751,6 +758,31 @@
     "createFailed": "Couldn't create the quick reply. Please try again.",
     "deactivateConfirmTitle": "Deactivate this quick reply?",
     "deactivateConfirmDescription": "\"{title}\" will no longer be available in the reply picker."
+  },
+  "ticketCategories": {
+    "heading": "Ticket Categories",
+    "description": "Manage the category vocabulary tickets, SLA policies, and automation rules pick from.",
+    "error": "Couldn't load ticket categories.",
+    "retry": "Retry",
+    "empty": "No ticket categories yet.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "actionForbidden": "You don't have permission to perform that action.",
+    "actionFailed": "That change couldn't be saved. Please try again.",
+    "columns": {
+      "name": "Name",
+      "status": "Status"
+    },
+    "nameLabel": "Name",
+    "createPlaceholder": "e.g. Billing",
+    "createSubmit": "Add category",
+    "createSubmitting": "Adding...",
+    "createFailed": "Couldn't create the category. Please try again.",
+    "createSuccess": "Category \"{name}\" created.",
+    "deactivateConfirmTitle": "Deactivate this category?",
+    "deactivateConfirmDescription": "\"{name}\" will no longer appear when picking a category for a new ticket, SLA policy, or automation rule — tickets already using it are unaffected."
   },
   "notificationTemplates": {
     "title": "Notification Templates",

@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TicketListView } from "./ticket-list-view";
 import { useCustomersQuery, useTicketsQuery, useUsersQuery } from "@/hooks/use-tickets";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
@@ -19,9 +20,14 @@ vi.mock("@/hooks/use-tickets", () => ({
   useUsersQuery: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-ticket-categories", () => ({
+  useTicketCategoriesQuery: vi.fn(),
+}));
+
 const mockedUseTicketsQuery = vi.mocked(useTicketsQuery);
 const mockedUseCustomersQuery = vi.mocked(useCustomersQuery);
 const mockedUseUsersQuery = vi.mocked(useUsersQuery);
+const mockedUseTicketCategoriesQuery = vi.mocked(useTicketCategoriesQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -40,6 +46,9 @@ describe("TicketListView", () => {
     vi.clearAllMocks();
     mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     mockedUseUsersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseTicketCategoriesQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
   });
 
   it("shows a loading state while the tickets query is pending", () => {
@@ -77,7 +86,8 @@ describe("TicketListView", () => {
           {
             id: "ticket-1",
             subject: "Cannot log in",
-            category: "billing",
+            categoryId: "category-1",
+            categoryName: "billing",
             priority: "HIGH",
             status: "OPEN",
             customerId: "customer-1",
@@ -128,7 +138,8 @@ describe("TicketListView", () => {
       return {
         id: `ticket-${status}`,
         subject: `Ticket ${status}`,
-        category: null,
+        categoryId: null,
+        categoryName: null,
         priority: "LOW",
         status,
         customerId: "customer-1",
@@ -179,7 +190,8 @@ describe("TicketListView", () => {
           {
             id: "ticket-1",
             subject: "Cannot log in",
-            category: null,
+            categoryId: null,
+            categoryName: null,
             priority: "LOW",
             status: "OPEN",
             customerId: "customer-1",

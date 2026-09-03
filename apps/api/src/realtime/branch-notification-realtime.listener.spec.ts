@@ -42,7 +42,8 @@ const breachedEvent = {
 const ticketSummary = {
   id: "ticket-3",
   subject: "Cannot log in",
-  category: "billing",
+  categoryId: "category-1",
+  categoryName: "billing",
   priority: "MEDIUM" as const,
   status: "OPEN" as const,
   customerId: "customer-1",

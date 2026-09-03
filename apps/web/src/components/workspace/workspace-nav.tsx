@@ -67,6 +67,9 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * Story 91 — `quick-replies` appended as the new last entry, same
  * convention.
  *
+ * Story 120 — `ticket-categories` appended as the new last entry, same
+ * convention.
+ *
  * Story 92 — the `notifications` nav link gains an unread-count `Badge`
  * from `useUnreadNotificationCountQuery()`. Rendered only when the count
  * is a real, positive number; a loading or errored query (or a `0` count)
@@ -111,6 +114,7 @@ const NAV_ITEMS = [
   { href: "branding", labelKey: "nav.branding" },
   { href: "ai-settings", labelKey: "nav.aiSettings" },
   { href: "quick-replies", labelKey: "nav.quickReplies" },
+  { href: "ticket-categories", labelKey: "nav.ticketCategories" },
 ] as const;
 
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {

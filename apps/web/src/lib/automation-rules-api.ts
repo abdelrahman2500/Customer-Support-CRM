@@ -7,33 +7,37 @@ import { apiFetch } from "./api";
  *
  * Mirrors the backend's own `AutomationRuleSummary`
  * (`apps/api/src/modules/sla-policies/automation-rules.service.ts`) exactly.
+ *
+ * Story 120 — `conditionCategory`/`actionSetCategory` (free text) renamed
+ * `conditionCategoryId`/`actionSetCategoryId`, mirroring the backend's own
+ * schema change.
  */
 export interface AutomationRuleSummary {
   id: string;
   name: string;
   isActive: boolean;
-  conditionCategory: string | null;
+  conditionCategoryId: string | null;
   actionAssignToUserId: string;
-  actionSetCategory: string | null;
+  actionSetCategoryId: string | null;
   actionSetDepartmentId: string | null;
 }
 
 /** Mirrors the existing `CreateAutomationRuleDto` exactly. */
 export interface CreateAutomationRuleInput {
   name: string;
-  conditionCategory?: string;
+  conditionCategoryId?: string;
   actionAssignToUserId: string;
-  actionSetCategory?: string;
+  actionSetCategoryId?: string;
   actionSetDepartmentId?: string;
 }
 
 /** Mirrors the existing `UpdateAutomationRuleDto` exactly. */
 export interface UpdateAutomationRuleInput {
   name?: string;
-  conditionCategory?: string;
+  conditionCategoryId?: string;
   actionAssignToUserId?: string;
   isActive?: boolean;
-  actionSetCategory?: string;
+  actionSetCategoryId?: string;
   actionSetDepartmentId?: string;
 }
 

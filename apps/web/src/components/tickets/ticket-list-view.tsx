@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomersQuery, useTicketsQuery, useUsersQuery } from "@/hooks/use-tickets";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { ListTicketsFilters, TicketListItem } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,7 @@ export function TicketListView() {
   const ticketsQuery = useTicketsQuery(filters);
   const customersQuery = useCustomersQuery();
   const usersQuery = useUsersQuery();
+  const categoriesQuery = useTicketCategoriesQuery();
 
   const customerNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -100,6 +102,14 @@ export function TicketListView() {
     }
     return map;
   }, [usersQuery.data]);
+
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const category of categoriesQuery.data ?? []) {
+      map.set(category.id, category.name);
+    }
+    return map;
+  }, [categoriesQuery.data]);
 
   function updateFilter<K extends keyof ListTicketsFilters>(key: K, value: string) {
     setFilters((current) => ({
@@ -138,15 +148,13 @@ export function TicketListView() {
           onChange={(value) => updateFilter("priority", value)}
           options={PRIORITY_OPTIONS}
         />
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
-          {t("list.filterCategory")}
-          <Input
-            className="min-w-[10rem]"
-            defaultValue={filters.category ?? ""}
-            placeholder={t("list.filterCategoryPlaceholder")}
-            onBlur={(event) => updateFilter("category", event.target.value.trim() || ALL_VALUE)}
-          />
-        </label>
+        <FilterSelect
+          label={t("list.filterCategory")}
+          value={filters.categoryId ?? ALL_VALUE}
+          onChange={(value) => updateFilter("categoryId", value)}
+          options={(categoriesQuery.data ?? []).map((category) => category.id)}
+          renderLabel={(id) => categoryNameById.get(id) ?? id}
+        />
         <FilterSelect
           label={t("list.filterAssignedAgent")}
           value={filters.assignedToUserId ?? ALL_VALUE}
@@ -244,7 +252,7 @@ export function TicketListView() {
                 <TableCell>
                   <Badge variant={priorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
                 </TableCell>
-                <TableCell>{ticket.category ?? t("list.noCategory")}</TableCell>
+                <TableCell>{ticket.categoryName ?? t("list.noCategory")}</TableCell>
                 <TableCell>
                   {ticket.assignedToUserId
                     ? userNameById.get(ticket.assignedToUserId) ?? ticket.assignedToUserId

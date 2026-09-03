@@ -31,7 +31,8 @@ const escalatedEvent = {
   ticket: {
     id: "ticket-1",
     subject: "Cannot log in",
-    category: "billing",
+    categoryId: "category-1",
+    categoryName: "billing",
     priority: "URGENT" as const,
     status: "OPEN" as const,
     customerId: "customer-1",

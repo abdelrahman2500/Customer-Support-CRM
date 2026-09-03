@@ -29,8 +29,8 @@ export class CreateTicketDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsString()
-  category?: string;
+  @IsUUID()
+  categoryId?: string;
 
   @ApiProperty({ required: false, enum: TicketPriority })
   @IsOptional()

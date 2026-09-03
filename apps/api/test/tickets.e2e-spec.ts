@@ -287,10 +287,16 @@ describe("Ticketing (e2e)", () => {
         .expect(201);
       searchSubjectTicketId = subjectTicket.body.id;
 
+      const category = await request(app.getHttpServer())
+        .post("/api/v1/ticket-categories")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ name: searchCategoryMarker })
+        .expect(201);
+
       const categoryTicket = await request(app.getHttpServer())
         .post("/api/v1/tickets")
         .set("Authorization", `Bearer ${adminAccessToken}`)
-        .send({ customerId, subject: "Unrelated subject", category: searchCategoryMarker })
+        .send({ customerId, subject: "Unrelated subject", categoryId: category.body.id })
         .expect(201);
       searchCategoryTicketId = categoryTicket.body.id;
     });
@@ -980,7 +986,7 @@ describe("Ticketing (e2e)", () => {
   // Story 75/76 — Ticket Categorization, the third consumer of Story 72's
   // AiGatewayService, routed through ai-processing since Story 76. Same
   // scope boundary as Stories 73/74's own tests above. Never mutates
-  // Ticket.category — advisory only, unchanged.
+  // Ticket.categoryId — advisory only, unchanged.
   describe("ticket AI categorization (Story 75/76)", () => {
     it("rejects an unauthenticated request", async () => {
       await request(app.getHttpServer())
@@ -1061,7 +1067,7 @@ describe("Ticketing (e2e)", () => {
         .get(`/api/v1/tickets/${ticketId}`)
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      expect(ticketAfter.body.category).toBe(ticketBefore.body.category);
+      expect(ticketAfter.body.categoryId).toBe(ticketBefore.body.categoryId);
     });
   });
 

@@ -15,6 +15,9 @@ function buildPrismaMock() {
     department: {
       findFirst: vi.fn(),
     },
+    ticketCategory: {
+      findFirst: vi.fn(),
+    },
   };
 }
 
@@ -58,7 +61,7 @@ describe("SlaPoliciesService", () => {
       prisma.slaPolicy.create.mockResolvedValue({
         id: "policy-1",
         departmentId: null,
-        category: null,
+        categoryId: null,
         priority: null,
         responseTargetMinutes: 60,
         resolutionTargetMinutes: 480,
@@ -72,7 +75,7 @@ describe("SlaPoliciesService", () => {
         data: {
           branchId: "branch-1",
           departmentId: null,
-          category: null,
+          categoryId: null,
           priority: null,
           responseTargetMinutes: 60,
           resolutionTargetMinutes: 480,
@@ -81,7 +84,7 @@ describe("SlaPoliciesService", () => {
       expect(result).toEqual({
         id: "policy-1",
         departmentId: null,
-        category: null,
+        categoryId: null,
         priority: null,
         responseTargetMinutes: 60,
         resolutionTargetMinutes: 480,
@@ -101,12 +104,13 @@ describe("SlaPoliciesService", () => {
       expect(prisma.slaPolicy.create).not.toHaveBeenCalled();
     });
 
-    it("passes through provided category/priority/departmentId when given", async () => {
+    it("passes through provided categoryId/priority/departmentId when given", async () => {
       prisma.department.findFirst.mockResolvedValue({ id: "dept-1" });
+      prisma.ticketCategory.findFirst.mockResolvedValue({ id: "category-1" });
       prisma.slaPolicy.create.mockResolvedValue({
         id: "policy-1",
         departmentId: "dept-1",
-        category: "billing",
+        categoryId: "category-1",
         priority: "HIGH",
         responseTargetMinutes: 30,
         resolutionTargetMinutes: 240,
@@ -115,7 +119,7 @@ describe("SlaPoliciesService", () => {
 
       await service.createSlaPolicy({
         departmentId: "dept-1",
-        category: "billing",
+        categoryId: "category-1",
         priority: "HIGH" as never,
         responseTargetMinutes: 30,
         resolutionTargetMinutes: 240,
@@ -125,12 +129,24 @@ describe("SlaPoliciesService", () => {
         data: {
           branchId: "branch-1",
           departmentId: "dept-1",
-          category: "billing",
+          categoryId: "category-1",
           priority: "HIGH",
           responseTargetMinutes: 30,
           resolutionTargetMinutes: 240,
         },
       });
+    });
+
+    it("throws NotFoundException when the category isn't in the caller's branch", async () => {
+      prisma.ticketCategory.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createSlaPolicy({ ...baseDto, categoryId: "category-from-elsewhere" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticketCategory.findFirst).toHaveBeenCalledWith({
+        where: { id: "category-from-elsewhere", branchId: "branch-1" },
+      });
+      expect(prisma.slaPolicy.create).not.toHaveBeenCalled();
     });
   });
 

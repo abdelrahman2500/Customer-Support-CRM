@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla-policies";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { SlaPolicySummary } from "@/lib/sla-policies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,15 @@ export function SlaPolicyListView() {
   const { locale } = useParams<{ locale: string }>();
 
   const policiesQuery = useSlaPoliciesQuery();
+  const categoriesQuery = useTicketCategoriesQuery();
+
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const category of categoriesQuery.data ?? []) {
+      map.set(category.id, category.name);
+    }
+    return map;
+  }, [categoriesQuery.data]);
 
   return (
     <section className="flex flex-col gap-4">
@@ -82,7 +92,7 @@ export function SlaPolicyListView() {
           </TableHeader>
           <TableBody>
             {policiesQuery.data.map((policy) => (
-              <SlaPolicyRow key={policy.id} policy={policy} />
+              <SlaPolicyRow key={policy.id} policy={policy} categoryNameById={categoryNameById} />
             ))}
           </TableBody>
         </Table>
@@ -98,7 +108,13 @@ export function SlaPolicyListView() {
  * rules of hooks — the same constraint `ContactRow`/`UnclaimedTicketRow`
  * already established elsewhere in this codebase).
  */
-function SlaPolicyRow({ policy }: { policy: SlaPolicySummary }) {
+function SlaPolicyRow({
+  policy,
+  categoryNameById,
+}: {
+  policy: SlaPolicySummary;
+  categoryNameById: Map<string, string>;
+}) {
   const t = useTranslations("slaPolicies");
   const errorMessage = useErrorMessage();
   const mutation = useUpdateSlaPolicyMutation(policy.id);
@@ -152,7 +168,9 @@ function SlaPolicyRow({ policy }: { policy: SlaPolicySummary }) {
   return (
     <TableRow>
       <TableCell className="text-slate-500">{policy.departmentId ?? t("list.noDepartment")}</TableCell>
-      <TableCell className="text-slate-500">{policy.category ?? t("list.noCategory")}</TableCell>
+      <TableCell className="text-slate-500">
+        {policy.categoryId ? (categoryNameById.get(policy.categoryId) ?? policy.categoryId) : t("list.noCategory")}
+      </TableCell>
       <TableCell>
         {policy.priority ? (
           <Badge variant="outline">{policy.priority}</Badge>

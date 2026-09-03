@@ -198,7 +198,8 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
       ticket: {
         id: ticket.id,
         subject: "Realtime e2e ticket",
-        category: null,
+        categoryId: null,
+        categoryName: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: ticket.customerId,
@@ -350,7 +351,8 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
           ticket: {
             id: ticket.id,
             subject: "cross-instance relay",
-            category: null,
+            categoryId: null,
+            categoryName: null,
             priority: "MEDIUM",
             status: "OPEN",
             customerId: ticket.customerId,

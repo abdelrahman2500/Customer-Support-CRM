@@ -76,26 +76,32 @@ describe("SLA Policies (e2e)", () => {
       .expect(201);
 
     expect(response.body.departmentId).toBeNull();
-    expect(response.body.category).toBeNull();
+    expect(response.body.categoryId).toBeNull();
     expect(response.body.priority).toBeNull();
     expect(response.body.isActive).toBe(true);
     policyId = response.body.id;
   });
 
   it("creates a scoped policy with department/category/priority", async () => {
+    const category = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `sla-policies-e2e-billing-${randomUUID()}` })
+      .expect(201);
+
     const response = await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({
         departmentId: departmentId ?? undefined,
-        category: "billing",
+        categoryId: category.body.id,
         priority: "HIGH",
         responseTargetMinutes: 30,
         resolutionTargetMinutes: 240,
       })
       .expect(201);
 
-    expect(response.body.category).toBe("billing");
+    expect(response.body.categoryId).toBe(category.body.id);
     expect(response.body.priority).toBe("HIGH");
   });
 

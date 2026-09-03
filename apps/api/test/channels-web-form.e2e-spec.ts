@@ -109,7 +109,17 @@ describe("Channels — Public Web-Form Ticket Intake (e2e)", () => {
   });
 
   it("creates a ticket and a WEB_FORM channel message for a brand-new email, visible to an agent", async () => {
-    const payload = validPayload();
+    // Story 120 — `category` stays free text on the wire; a matching
+    // `TicketCategory` must already exist for it to resolve onto the
+    // created ticket (never auto-created from public input) — see
+    // `TicketsService.createTicketForContact`'s own doc comment.
+    const categoryName = `web-form-e2e-${randomUUID()}`;
+    await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: categoryName })
+      .expect(201);
+    const payload = validPayload({ category: categoryName });
 
     const response = await request(app.getHttpServer())
       .post("/api/v1/channels/web-form")
@@ -118,7 +128,7 @@ describe("Channels — Public Web-Form Ticket Intake (e2e)", () => {
 
     expect(response.body).toMatchObject({
       subject: payload.subject,
-      category: payload.category,
+      categoryName,
       status: "OPEN",
     });
     expect(response.body.id).toBeDefined();

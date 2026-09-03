@@ -33,7 +33,8 @@ function createListener(
 const ticket: TicketSummary = {
   id: "ticket-1",
   subject: "Cannot log in",
-  category: "billing",
+  categoryId: "category-1",
+  categoryName: "billing",
   priority: "MEDIUM",
   status: "OPEN",
   customerId: "customer-1",
@@ -68,7 +69,7 @@ describe("AutomationEvaluationListener", () => {
   it("never overrides an explicit assignment", async () => {
     prisma.ticket.findUnique.mockResolvedValue({
       branchId: "branch-1",
-      category: "billing",
+      categoryId: "category-1",
       assignedToUserId: "user-explicit",
     });
 
@@ -81,7 +82,7 @@ describe("AutomationEvaluationListener", () => {
   it("does nothing when no active rule matches", async () => {
     prisma.ticket.findUnique.mockResolvedValue({
       branchId: "branch-1",
-      category: "billing",
+      categoryId: "category-1",
       assignedToUserId: null,
     });
     prisma.automationRule.findFirst.mockResolvedValue(null);
@@ -94,7 +95,7 @@ describe("AutomationEvaluationListener", () => {
   it("queries with a category-or-wildcard filter, scoped by branch and isActive", async () => {
     prisma.ticket.findUnique.mockResolvedValue({
       branchId: "branch-1",
-      category: "billing",
+      categoryId: "category-1",
       assignedToUserId: null,
     });
     prisma.automationRule.findFirst.mockResolvedValue(null);
@@ -105,13 +106,13 @@ describe("AutomationEvaluationListener", () => {
       where: {
         branchId: "branch-1",
         isActive: true,
-        OR: [{ conditionCategory: null }, { conditionCategory: "billing" }],
+        OR: [{ conditionCategoryId: null }, { conditionCategoryId: "category-1" }],
       },
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
         actionAssignToUserId: true,
-        actionSetCategory: true,
+        actionSetCategoryId: true,
         actionSetDepartmentId: true,
       },
     });
@@ -120,19 +121,19 @@ describe("AutomationEvaluationListener", () => {
   it("queries with only a wildcard filter when the ticket has no category", async () => {
     prisma.ticket.findUnique.mockResolvedValue({
       branchId: "branch-1",
-      category: null,
+      categoryId: null,
       assignedToUserId: null,
     });
     prisma.automationRule.findFirst.mockResolvedValue(null);
 
     await listener.onTicketCreated({
-      ticket: { ...ticket, category: null },
+      ticket: { ...ticket, categoryId: null, categoryName: null },
       actorUserId: null,
     });
 
     expect(prisma.automationRule.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { branchId: "branch-1", isActive: true, conditionCategory: null },
+        where: { branchId: "branch-1", isActive: true, conditionCategoryId: null },
       }),
     );
   });
@@ -140,13 +141,13 @@ describe("AutomationEvaluationListener", () => {
   it("emits AUTOMATION_RULE_MATCHED_EVENT when a rule matches", async () => {
     prisma.ticket.findUnique.mockResolvedValue({
       branchId: "branch-1",
-      category: "billing",
+      categoryId: "category-1",
       assignedToUserId: null,
     });
     prisma.automationRule.findFirst.mockResolvedValue({
       id: "rule-1",
       actionAssignToUserId: "user-1",
-      actionSetCategory: null,
+      actionSetCategoryId: null,
       actionSetDepartmentId: null,
     });
 
@@ -156,22 +157,22 @@ describe("AutomationEvaluationListener", () => {
       ticketId: "ticket-1",
       ruleId: "rule-1",
       assignToUserId: "user-1",
-      setCategory: null,
+      setCategoryId: null,
       setDepartmentId: null,
     });
   });
 
   // Story 83 — Automation Rules — Category & Department Actions.
-  it("includes the matched rule's own setCategory/setDepartmentId in the emitted event", async () => {
+  it("includes the matched rule's own setCategoryId/setDepartmentId in the emitted event", async () => {
     prisma.ticket.findUnique.mockResolvedValue({
       branchId: "branch-1",
-      category: "billing",
+      categoryId: "category-1",
       assignedToUserId: null,
     });
     prisma.automationRule.findFirst.mockResolvedValue({
       id: "rule-1",
       actionAssignToUserId: "user-1",
-      actionSetCategory: "billing",
+      actionSetCategoryId: "category-1",
       actionSetDepartmentId: "dept-1",
     });
 
@@ -179,7 +180,7 @@ describe("AutomationEvaluationListener", () => {
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       AUTOMATION_RULE_MATCHED_EVENT,
-      expect.objectContaining({ setCategory: "billing", setDepartmentId: "dept-1" }),
+      expect.objectContaining({ setCategoryId: "category-1", setDepartmentId: "dept-1" }),
     );
   });
 

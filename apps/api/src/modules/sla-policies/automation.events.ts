@@ -13,7 +13,9 @@ export interface AutomationRuleMatchedEvent {
   ruleId: string;
   assignToUserId: string;
   /** Story 83 — both optional/independent (a rule's own
-   * `actionSetCategory`/`actionSetDepartmentId`, `null` when unset). */
-  setCategory: string | null;
+   * `actionSetCategoryId`/`actionSetDepartmentId`, `null` when unset).
+   * Story 120 — `setCategory` (free text) renamed `setCategoryId` (a
+   * `TicketCategory` id). */
+  setCategoryId: string | null;
   setDepartmentId: string | null;
 }

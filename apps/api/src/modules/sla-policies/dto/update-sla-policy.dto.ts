@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID, Min } from "class-validator";
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsUUID, Min } from "class-validator";
 import { TicketPriority } from "@prisma/client";
 
 export class UpdateSlaPolicyDto {
@@ -10,8 +10,8 @@ export class UpdateSlaPolicyDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsString()
-  category?: string;
+  @IsUUID()
+  categoryId?: string;
 
   @ApiProperty({ required: false, enum: TicketPriority })
   @IsOptional()

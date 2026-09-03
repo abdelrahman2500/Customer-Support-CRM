@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { SlaPolicyListView } from "./sla-policy-list-view";
 import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla-policies";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { ApiError } from "@/lib/api";
 
 const push = vi.fn();
@@ -21,8 +22,13 @@ vi.mock("@/hooks/use-sla-policies", () => ({
   useUpdateSlaPolicyMutation: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-ticket-categories", () => ({
+  useTicketCategoriesQuery: vi.fn(),
+}));
+
 const mockedUseSlaPoliciesQuery = vi.mocked(useSlaPoliciesQuery);
 const mockedUseUpdateSlaPolicyMutation = vi.mocked(useUpdateSlaPolicyMutation);
+const mockedUseTicketCategoriesQuery = vi.mocked(useTicketCategoriesQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -49,7 +55,7 @@ function mutationResult(overrides: Record<string, unknown> = {}) {
 const basePolicy = {
   id: "policy-1",
   departmentId: "dept-1",
-  category: "billing",
+  categoryId: "category-1",
   priority: "HIGH",
   responseTargetMinutes: 30,
   resolutionTargetMinutes: 240,
@@ -60,6 +66,12 @@ describe("SlaPolicyListView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedUseUpdateSlaPolicyMutation.mockReturnValue(mutationResult() as never);
+    mockedUseTicketCategoriesQuery.mockReturnValue(
+      queryResult({
+        data: [{ id: "category-1", branchId: "branch-1", name: "billing", isActive: true }],
+        isSuccess: true,
+      }) as never,
+    );
   });
 
   it("shows a loading state while the policies query is pending", () => {
@@ -118,7 +130,7 @@ describe("SlaPolicyListView", () => {
     mockedUseSlaPoliciesQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ ...basePolicy, departmentId: null, category: null, priority: null }],
+        data: [{ ...basePolicy, departmentId: null, categoryId: null, priority: null }],
       }) as never,
     );
 

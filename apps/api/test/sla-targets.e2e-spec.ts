@@ -55,7 +55,7 @@ async function waitForSlaTarget(
 describe("SLA Targets (e2e)", () => {
   let app: INestApplication;
   let adminAccessToken: string;
-  let matchingCategory: string;
+  let matchingCategoryId: string;
   let matchingTicketId: string;
 
   beforeAll(async () => {
@@ -81,14 +81,19 @@ describe("SLA Targets (e2e)", () => {
       .expect(200);
     adminAccessToken = loginResponse.body.accessToken;
 
-    // A fresh SlaPolicy scoped only by a randomly-generated category — no
+    // A fresh SlaPolicy scoped only by a freshly-created category — no
     // department/priority — so it cannot collide with any leftover fixture
     // another suite created in this shared database.
-    matchingCategory = `sla-target-e2e-${randomUUID()}`;
+    const matchingCategory = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `sla-target-e2e-${randomUUID()}` })
+      .expect(201);
+    matchingCategoryId = matchingCategory.body.id;
     await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ category: matchingCategory, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
+      .send({ categoryId: matchingCategoryId, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
       .expect(201);
 
     const customer = await request(app.getHttpServer())
@@ -103,7 +108,7 @@ describe("SLA Targets (e2e)", () => {
       .send({
         customerId: customer.body.id,
         subject: "Matching-policy ticket",
-        category: matchingCategory,
+        categoryId: matchingCategoryId,
       })
       .expect(201);
     matchingTicketId = matchingTicket.body.id;
@@ -138,6 +143,11 @@ describe("SLA Targets (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({ displayName: `SLA target e2e customer ${randomUUID()}` })
       .expect(201);
+    const noMatchCategory = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `sla-target-e2e-no-match-${randomUUID()}` })
+      .expect(201);
 
     const noMatchTicket = await request(app.getHttpServer())
       .post("/api/v1/tickets")
@@ -145,7 +155,7 @@ describe("SLA Targets (e2e)", () => {
       .send({
         customerId: customer.body.id,
         subject: "No-matching-policy ticket",
-        category: `sla-target-e2e-no-match-${randomUUID()}`,
+        categoryId: noMatchCategory.body.id,
       })
       .expect(201);
 

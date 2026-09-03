@@ -7,7 +7,7 @@ import type { UpdateSlaPolicyDto } from "./dto/update-sla-policy.dto";
 export interface SlaPolicySummary {
   id: string;
   departmentId: string | null;
-  category: string | null;
+  categoryId: string | null;
   priority: string | null;
   responseTargetMinutes: number;
   resolutionTargetMinutes: number;
@@ -34,12 +34,15 @@ export class SlaPoliciesService {
     if (dto.departmentId) {
       await this.requireDepartmentInScope(dto.departmentId, branchId);
     }
+    if (dto.categoryId) {
+      await this.requireCategoryInScope(dto.categoryId, branchId);
+    }
 
     const policy = await this.prisma.slaPolicy.create({
       data: {
         branchId,
         departmentId: dto.departmentId ?? null,
-        category: dto.category ?? null,
+        categoryId: dto.categoryId ?? null,
         priority: dto.priority ?? null,
         responseTargetMinutes: dto.responseTargetMinutes,
         resolutionTargetMinutes: dto.resolutionTargetMinutes,
@@ -69,12 +72,15 @@ export class SlaPoliciesService {
     if (dto.departmentId !== undefined) {
       await this.requireDepartmentInScope(dto.departmentId, branchId);
     }
+    if (dto.categoryId !== undefined && dto.categoryId !== null) {
+      await this.requireCategoryInScope(dto.categoryId, branchId);
+    }
 
     await this.prisma.slaPolicy.update({
       where: { id },
       data: {
         ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
-        ...(dto.category !== undefined ? { category: dto.category } : {}),
+        ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
         ...(dto.responseTargetMinutes !== undefined
           ? { responseTargetMinutes: dto.responseTargetMinutes }
@@ -95,7 +101,7 @@ export class SlaPoliciesService {
   private async findSlaPolicyInScope(id: string): Promise<{
     id: string;
     departmentId: string | null;
-    category: string | null;
+    categoryId: string | null;
     priority: string | null;
     responseTargetMinutes: number;
     resolutionTargetMinutes: number;
@@ -117,12 +123,22 @@ export class SlaPoliciesService {
       throw new NotFoundException("Department not found");
     }
   }
+
+  /** Story 120 — mirrors `requireDepartmentInScope`'s exact shape. */
+  private async requireCategoryInScope(categoryId: string, branchId: string): Promise<void> {
+    const category = await this.prisma.ticketCategory.findFirst({
+      where: { id: categoryId, branchId },
+    });
+    if (!category) {
+      throw new NotFoundException("Ticket category not found");
+    }
+  }
 }
 
 function toSlaPolicySummary(policy: {
   id: string;
   departmentId: string | null;
-  category: string | null;
+  categoryId: string | null;
   priority: string | null;
   responseTargetMinutes: number;
   resolutionTargetMinutes: number;
@@ -131,7 +147,7 @@ function toSlaPolicySummary(policy: {
   return {
     id: policy.id,
     departmentId: policy.departmentId,
-    category: policy.category,
+    categoryId: policy.categoryId,
     priority: policy.priority,
     responseTargetMinutes: policy.responseTargetMinutes,
     resolutionTargetMinutes: policy.resolutionTargetMinutes,

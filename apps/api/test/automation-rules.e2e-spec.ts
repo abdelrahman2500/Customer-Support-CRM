@@ -54,7 +54,7 @@ describe("Automation Rules (e2e)", () => {
     await app.close();
   });
 
-  async function createTicket(category?: string): Promise<{ id: string; assignedToUserId: string | null }> {
+  async function createTicket(categoryId?: string): Promise<{ id: string; assignedToUserId: string | null }> {
     const customer = await request(app.getHttpServer())
       .post("/api/v1/customers")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -67,10 +67,24 @@ describe("Automation Rules (e2e)", () => {
       .send({
         customerId: customer.body.id,
         subject: "Automation rules e2e ticket",
-        ...(category ? { category } : {}),
+        ...(categoryId ? { categoryId } : {}),
       })
       .expect(201);
     return ticket.body;
+  }
+
+  /** Story 120 — a uniquely-named `TicketCategory`, used only as an
+   * isolation key: a `conditionCategoryId`-scoped rule can only ever
+   * match a ticket carrying this same id, so this suite's own
+   * fixture rule/ticket pairs never interfere with concurrent e2e
+   * activity in the shared dev database. */
+  async function createTicketCategory(namePrefix: string): Promise<string> {
+    const category = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `${namePrefix}-${randomUUID()}` })
+      .expect(201);
+    return category.body.id;
   }
 
   async function waitForAssignment(
@@ -168,7 +182,7 @@ describe("Automation Rules (e2e)", () => {
       .expect(201);
     const ruleId = createResponse.body.id;
     expect(createResponse.body.isActive).toBe(true);
-    expect(createResponse.body.conditionCategory).toBeNull();
+    expect(createResponse.body.conditionCategoryId).toBeNull();
 
     const listResponse = await request(app.getHttpServer())
       .get("/api/v1/automation-rules")
@@ -203,18 +217,18 @@ describe("Automation Rules (e2e)", () => {
   });
 
   it("auto-assigns a real, newly-created ticket matching an active category-scoped rule, and logs it in history", async () => {
-    const matchingCategory = `automation-rules-e2e-${randomUUID()}`;
+    const matchingCategoryId = await createTicketCategory("automation-rules-e2e");
     await request(app.getHttpServer())
       .post("/api/v1/automation-rules")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({
         name: "Auto-assign matching category",
-        conditionCategory: matchingCategory,
+        conditionCategoryId: matchingCategoryId,
         actionAssignToUserId: adminUserId,
       })
       .expect(201);
 
-    const ticket = await createTicket(matchingCategory);
+    const ticket = await createTicket(matchingCategoryId);
     expect(ticket.assignedToUserId).toBeNull();
 
     const response = await waitForAssignment(ticket.id);
@@ -229,9 +243,9 @@ describe("Automation Rules (e2e)", () => {
     ).toBe(true);
   });
 
-  it("auto-assigns via a wildcard (conditionCategory: null) rule when no category-specific rule matches", async () => {
+  it("auto-assigns via a wildcard (conditionCategoryId: null) rule when no category-specific rule matches", async () => {
     // Unlike every other rule this suite creates (each scoped to its own
-    // `randomUUID()` category, so it can never match another suite's
+    // freshly-created category, so it can never match another suite's
     // ticket), a *wildcard* rule matches literally every ticket in this
     // shared branch — left active, it would silently auto-assign every
     // ticket every other e2e suite creates afterward (extra, unexpected
@@ -246,7 +260,8 @@ describe("Automation Rules (e2e)", () => {
     const wildcardRuleId = createResponse.body.id;
 
     try {
-      const ticket = await createTicket(`unmatched-category-${randomUUID()}`);
+      const unmatchedCategoryId = await createTicketCategory("unmatched-category");
+      const ticket = await createTicket(unmatchedCategoryId);
       const response = await waitForAssignment(ticket.id);
       expect(response.body.assignedToUserId).toBe(adminUserId);
     } finally {
@@ -286,13 +301,13 @@ describe("Automation Rules (e2e)", () => {
       .expect(201);
     const explicitAgentId = explicitAgent.body.id;
 
-    const matchingCategory = `automation-rules-e2e-explicit-${randomUUID()}`;
+    const matchingCategoryId = await createTicketCategory("automation-rules-e2e-explicit");
     await request(app.getHttpServer())
       .post("/api/v1/automation-rules")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({
         name: "Should not override",
-        conditionCategory: matchingCategory,
+        conditionCategoryId: matchingCategoryId,
         actionAssignToUserId: adminUserId,
       })
       .expect(201);
@@ -308,7 +323,7 @@ describe("Automation Rules (e2e)", () => {
       .send({
         customerId: customer.body.id,
         subject: "Explicitly assigned ticket",
-        category: matchingCategory,
+        categoryId: matchingCategoryId,
         assignedToUserId: explicitAgentId,
       })
       .expect(201);
@@ -334,9 +349,11 @@ describe("Automation Rules (e2e)", () => {
       .expect(201);
     const departmentId = department.body.id;
 
-    // A ticket must have no category of its own for actionSetCategory to
+    const actionCategoryId = await createTicketCategory("automation-category-dept");
+
+    // A ticket must have no category of its own for actionSetCategoryId to
     // apply (never overriding an explicit choice) — matching such a
-    // ticket requires a wildcard (no conditionCategory) rule, which (like
+    // ticket requires a wildcard (no conditionCategoryId) rule, which (like
     // the "auto-assigns via a wildcard" test above) matches every
     // uncategorized ticket in this shared branch and so must be
     // deactivated afterward.
@@ -346,7 +363,7 @@ describe("Automation Rules (e2e)", () => {
       .send({
         name: "Auto-categorize and route",
         actionAssignToUserId: adminUserId,
-        actionSetCategory: "billing",
+        actionSetCategoryId: actionCategoryId,
         actionSetDepartmentId: departmentId,
       })
       .expect(201);
@@ -358,7 +375,7 @@ describe("Automation Rules (e2e)", () => {
 
       const response = await waitForAssignment(ticket.id);
       expect(response.body.assignedToUserId).toBe(adminUserId);
-      expect(response.body.category).toBe("billing");
+      expect(response.body.categoryId).toBe(actionCategoryId);
       expect(response.body.departmentId).toBe(departmentId);
 
       const history = await request(app.getHttpServer())

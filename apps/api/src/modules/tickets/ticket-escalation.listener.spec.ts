@@ -37,13 +37,16 @@ const slaEscalatedEvent = {
 const ticketRow = {
   id: "ticket-1",
   subject: "Cannot log in",
-  category: "billing",
+  categoryId: "category-1",
+  category: { name: "billing" },
   priority: "MEDIUM",
   status: "OPEN",
   customerId: "customer-1",
   contactId: null,
   departmentId: null,
   assignedToUserId: null,
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
 };
 
 describe("TicketEscalationListener", () => {
@@ -69,7 +72,8 @@ describe("TicketEscalationListener", () => {
         select: {
           id: true,
           subject: true,
-          category: true,
+          categoryId: true,
+          category: { select: { name: true } },
           priority: true,
           status: true,
           customerId: true,
@@ -92,13 +96,16 @@ describe("TicketEscalationListener", () => {
         ticket: {
           id: "ticket-1",
           subject: "Cannot log in",
-          category: "billing",
+          categoryId: "category-1",
+          categoryName: "billing",
           priority: "MEDIUM",
           status: "OPEN",
           customerId: "customer-1",
           contactId: null,
           departmentId: null,
           assignedToUserId: null,
+          createdAt: ticketRow.createdAt,
+          updatedAt: ticketRow.updatedAt,
         },
         actorUserId: null,
       });

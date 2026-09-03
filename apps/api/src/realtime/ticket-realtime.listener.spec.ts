@@ -23,7 +23,8 @@ function createListener(gatewayMock: ReturnType<typeof buildGatewayMock>): Ticke
 const ticketSummary = {
   id: "ticket-1",
   subject: "Cannot log in",
-  category: "billing",
+  categoryId: "category-1",
+  categoryName: "billing",
   priority: "MEDIUM" as const,
   status: "OPEN" as const,
   customerId: "customer-1",

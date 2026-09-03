@@ -127,7 +127,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <div>
             <dt className="text-xs text-slate-500">{t("detail.category")}</dt>
             <dd className="font-medium text-slate-800">
-              {ticket.category ?? t("list.noCategory")}
+              {ticket.categoryName ?? t("list.noCategory")}
             </dd>
           </div>
         </dl>

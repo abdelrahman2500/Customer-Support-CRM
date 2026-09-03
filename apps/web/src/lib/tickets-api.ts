@@ -14,7 +14,8 @@ export interface TicketSlaTarget {
 export interface TicketSummary {
   id: string;
   subject: string;
-  category: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
   priority: TicketPriority;
   status: TicketStatus;
   customerId: string;
@@ -125,9 +126,9 @@ export interface UserSummary {
 export interface ListTicketsFilters {
   status?: TicketStatus;
   priority?: TicketPriority;
-  category?: string;
+  categoryId?: string;
   assignedToUserId?: string;
-  /** Story 70 — matches `subject`/`category`, case-insensitive. Mirrors
+  /** Story 70 — matches `subject`/category name, case-insensitive. Mirrors
    * `knowledge-base-api.ts`'s own `search` filter shape. */
   search?: string;
   sortBy?: "createdAt" | "updatedAt";
@@ -224,7 +225,7 @@ export async function getTicketSlaTarget(id: string): Promise<TicketSlaTarget | 
 export interface UpdateTicketInput {
   status?: TicketStatus;
   priority?: TicketPriority;
-  category?: string;
+  categoryId?: string;
   assignedToUserId?: string;
   subject?: string;
   departmentId?: string;
@@ -445,7 +446,7 @@ export function createCustomer(input: CreateCustomerInput): Promise<CustomerSumm
 export interface CreateTicketInput {
   customerId: string;
   subject: string;
-  category?: string;
+  categoryId?: string;
   priority?: TicketPriority;
   contactId?: string;
   departmentId?: string;

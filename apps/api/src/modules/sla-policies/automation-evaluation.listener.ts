@@ -28,7 +28,7 @@ export class AutomationEvaluationListener {
     try {
       const ticket = await this.prisma.ticket.findUnique({
         where: { id: event.ticket.id },
-        select: { branchId: true, category: true, assignedToUserId: true },
+        select: { branchId: true, categoryId: true, assignedToUserId: true },
       });
       if (!ticket) {
         return;
@@ -40,7 +40,7 @@ export class AutomationEvaluationListener {
         return;
       }
 
-      const matchedRule = await this.resolveMatchingRule(ticket.branchId, ticket.category);
+      const matchedRule = await this.resolveMatchingRule(ticket.branchId, ticket.categoryId);
       if (!matchedRule) {
         return;
       }
@@ -49,7 +49,7 @@ export class AutomationEvaluationListener {
         ticketId: event.ticket.id,
         ruleId: matchedRule.id,
         assignToUserId: matchedRule.actionAssignToUserId,
-        setCategory: matchedRule.actionSetCategory,
+        setCategoryId: matchedRule.actionSetCategoryId,
         setDepartmentId: matchedRule.actionSetDepartmentId,
       } satisfies AutomationRuleMatchedEvent);
     } catch (error) {
@@ -59,22 +59,22 @@ export class AutomationEvaluationListener {
 
   /**
    * First-match-wins, ordered `createdAt` ascending (Design decision 4) — a
-   * category-specific rule and a wildcard (`conditionCategory: null`) rule
-   * are otherwise equally eligible; the `OR` filter shape mirrors
+   * category-specific rule and a wildcard (`conditionCategoryId: null`)
+   * rule are otherwise equally eligible; the `OR` filter shape mirrors
    * `SlaTargetListener.resolveBestPolicy`'s own category dimension exactly.
    */
   private async resolveMatchingRule(
     branchId: string,
-    category: string | null,
+    categoryId: string | null,
   ): Promise<{
     id: string;
     actionAssignToUserId: string;
-    actionSetCategory: string | null;
+    actionSetCategoryId: string | null;
     actionSetDepartmentId: string | null;
   } | null> {
-    const categoryFilter = category
-      ? { OR: [{ conditionCategory: null }, { conditionCategory: category }] }
-      : { conditionCategory: null };
+    const categoryFilter = categoryId
+      ? { OR: [{ conditionCategoryId: null }, { conditionCategoryId: categoryId }] }
+      : { conditionCategoryId: null };
 
     const rule = await this.prisma.automationRule.findFirst({
       where: { branchId, isActive: true, ...categoryFilter },
@@ -82,7 +82,7 @@ export class AutomationEvaluationListener {
       select: {
         id: true,
         actionAssignToUserId: true,
-        actionSetCategory: true,
+        actionSetCategoryId: true,
         actionSetDepartmentId: true,
       },
     });

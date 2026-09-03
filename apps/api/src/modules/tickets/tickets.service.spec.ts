@@ -41,6 +41,13 @@ function buildPrismaMock() {
     department: {
       findFirst: vi.fn(),
     },
+    // Defaults to a truthy match so every pre-existing test that passes a
+    // `categoryId` through `updateTicket`/`createTicket` without itself
+    // caring about category-scope validation continues to exercise the
+    // exact same downstream behavior it always has.
+    ticketCategory: {
+      findFirst: vi.fn().mockResolvedValue({ id: "category-1" }),
+    },
     userBranchRole: {
       findFirst: vi.fn(),
     },
@@ -167,7 +174,7 @@ describe("TicketsService", () => {
       prisma.ticket.create.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -191,8 +198,9 @@ describe("TicketsService", () => {
           departmentId: "dept-1",
           assignedToUserId: "user-1",
           subject: "Cannot log in",
-          category: null,
+          categoryId: null,
         },
+        include: { category: { select: { name: true } } },
       });
       expect(result.status).toBe("OPEN");
       expect(result.priority).toBe("MEDIUM");
@@ -208,7 +216,7 @@ describe("TicketsService", () => {
       prisma.ticket.create.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -230,8 +238,9 @@ describe("TicketsService", () => {
           departmentId: null,
           assignedToUserId: null,
           subject: "Cannot log in",
-          category: null,
+          categoryId: null,
         },
+        include: { category: { select: { name: true } } },
       });
     });
 
@@ -240,7 +249,7 @@ describe("TicketsService", () => {
       prisma.ticket.create.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "URGENT",
         status: "OPEN",
         customerId: "customer-1",
@@ -261,7 +270,8 @@ describe("TicketsService", () => {
     const baseTicketRow = {
       id: "ticket-1",
       subject: "Cannot log in",
-      category: "billing",
+      categoryId: "category-1",
+      category: { name: "billing" },
       priority: "MEDIUM" as const,
       status: "OPEN" as const,
       customerId: "customer-1",
@@ -285,7 +295,7 @@ describe("TicketsService", () => {
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
         orderBy: { createdAt: "desc" },
-        include: { slaTarget: true },
+        include: { slaTarget: true, category: { select: { name: true } } },
         take: 500,
       });
     });
@@ -322,13 +332,13 @@ describe("TicketsService", () => {
       expect(result.map((t) => t.id)).toEqual(["ticket-newer", "ticket-older"]);
     });
 
-    it("applies status/priority/category/assignedToUserId filters independently and in combination", async () => {
+    it("applies status/priority/categoryId/assignedToUserId filters independently and in combination", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
 
       await service.listTickets({
         status: "OPEN",
         priority: "URGENT" as never,
-        category: "billing",
+        categoryId: "category-1",
         assignedToUserId: "user-1",
       });
 
@@ -338,7 +348,7 @@ describe("TicketsService", () => {
             branchId: "branch-1",
             status: "OPEN",
             priority: "URGENT",
-            category: "billing",
+            categoryId: "category-1",
             assignedToUserId: "user-1",
           },
         }),
@@ -364,7 +374,8 @@ describe("TicketsService", () => {
         {
           id: "ticket-1",
           subject: "Cannot log in",
-          category: "billing",
+          categoryId: "category-1",
+          categoryName: "billing",
           priority: "MEDIUM",
           status: "OPEN",
           customerId: "customer-1",
@@ -405,7 +416,7 @@ describe("TicketsService", () => {
               branchId: "branch-1",
               OR: [
                 { subject: { contains: "login", mode: "insensitive" } },
-                { category: { contains: "login", mode: "insensitive" } },
+                { category: { name: { contains: "login", mode: "insensitive" } } },
               ],
             },
           }),
@@ -433,7 +444,7 @@ describe("TicketsService", () => {
               branchId: "branch-1",
               OR: [
                 { subject: { contains: "login", mode: "insensitive" } },
-                { category: { contains: "login", mode: "insensitive" } },
+                { category: { name: { contains: "login", mode: "insensitive" } } },
               ],
               status: "OPEN",
               assignedToUserId: "user-1",
@@ -459,7 +470,7 @@ describe("TicketsService", () => {
                 {
                   OR: [
                     { subject: { contains: "login", mode: "insensitive" } },
-                    { category: { contains: "login", mode: "insensitive" } },
+                    { category: { name: { contains: "login", mode: "insensitive" } } },
                   ],
                 },
               ],
@@ -495,6 +506,7 @@ describe("TicketsService", () => {
       await expect(service.getTicket("missing-id")).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.ticket.findFirst).toHaveBeenCalledWith({
         where: { id: "missing-id", branchId: "branch-1" },
+        include: { category: { select: { name: true } } },
       });
     });
   });
@@ -564,6 +576,7 @@ describe("TicketsService", () => {
           branchId: "branch-1",
           OR: [{ departmentId: "dept-1" }, { departmentId: null }],
         },
+        include: { category: { select: { name: true } } },
       });
     });
 
@@ -574,7 +587,7 @@ describe("TicketsService", () => {
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -629,7 +642,7 @@ describe("TicketsService", () => {
     });
 
     it("throws NotFoundException when moving to a department outside the caller's branch, before updating or emitting", async () => {
-      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", category: null, priority: "MEDIUM", departmentId: null });
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", categoryId: null, priority: "MEDIUM", departmentId: null });
       prisma.department.findFirst.mockResolvedValue(null);
 
       await expect(
@@ -650,7 +663,7 @@ describe("TicketsService", () => {
       prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         departmentId: "dept-1",
       });
@@ -669,7 +682,7 @@ describe("TicketsService", () => {
       prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         departmentId: null,
       });
@@ -677,7 +690,7 @@ describe("TicketsService", () => {
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -695,7 +708,7 @@ describe("TicketsService", () => {
     it("allows a BRANCH-scoped caller (unchanged, pre-Story-69 behavior) to reassign to any department", async () => {
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         departmentId: null,
       });
@@ -703,7 +716,7 @@ describe("TicketsService", () => {
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -723,7 +736,7 @@ describe("TicketsService", () => {
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         status: "IN_PROGRESS",
         customerId: "customer-1",
@@ -737,6 +750,7 @@ describe("TicketsService", () => {
       expect(prisma.ticket.update).toHaveBeenCalledWith({
         where: { id: "ticket-1" },
         data: { status: "IN_PROGRESS" },
+        include: { category: { select: { name: true } } },
       });
       expect(eventEmitter.emit).toHaveBeenCalledOnce();
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
@@ -752,14 +766,14 @@ describe("TicketsService", () => {
     it("does not emit ticket.recategorized when only subject changes", async () => {
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
-        category: "billing",
+        categoryId: "billing",
         priority: "MEDIUM",
         departmentId: null,
       });
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "New subject",
-        category: "billing",
+        categoryId: "billing",
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -780,14 +794,14 @@ describe("TicketsService", () => {
     it("does not emit ticket.recategorized when the DTO resends the ticket's current category", async () => {
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
-        category: "billing",
+        categoryId: "billing",
         priority: "MEDIUM",
         departmentId: null,
       });
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: "billing",
+        categoryId: "billing",
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -796,7 +810,7 @@ describe("TicketsService", () => {
         assignedToUserId: null,
       });
 
-      await service.updateTicket("ticket-1", { category: "billing" });
+      await service.updateTicket("ticket-1", { categoryId: "billing" });
 
       expect(eventEmitter.emit).toHaveBeenCalledOnce();
       expect(eventEmitter.emit).not.toHaveBeenCalledWith(
@@ -808,14 +822,14 @@ describe("TicketsService", () => {
     it("emits ticket.recategorized when category changes", async () => {
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
-        category: "billing",
+        categoryId: "billing",
         priority: "MEDIUM",
         departmentId: null,
       });
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: "technical",
+        categoryId: "technical",
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -824,15 +838,15 @@ describe("TicketsService", () => {
         assignedToUserId: null,
       });
 
-      await service.updateTicket("ticket-1", { category: "technical" });
+      await service.updateTicket("ticket-1", { categoryId: "technical" });
 
       expect(eventEmitter.emit).toHaveBeenCalledTimes(2);
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
-        ticket: expect.objectContaining({ id: "ticket-1", category: "technical" }),
+        ticket: expect.objectContaining({ id: "ticket-1", categoryId: "technical" }),
         actorUserId: "user-1",
       });
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_RECATEGORIZED_EVENT, {
-        ticket: expect.objectContaining({ id: "ticket-1", category: "technical" }),
+        ticket: expect.objectContaining({ id: "ticket-1", categoryId: "technical" }),
         actorUserId: "user-1",
       });
     });
@@ -840,14 +854,14 @@ describe("TicketsService", () => {
     it("emits ticket.recategorized when priority changes", async () => {
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         departmentId: null,
       });
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "URGENT",
         status: "OPEN",
         customerId: "customer-1",
@@ -868,7 +882,7 @@ describe("TicketsService", () => {
     it("emits ticket.recategorized when departmentId changes", async () => {
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         departmentId: "dept-old",
       });
@@ -876,7 +890,7 @@ describe("TicketsService", () => {
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -900,14 +914,14 @@ describe("TicketsService", () => {
     it("emits ticket.recategorized exactly once when category and priority both change in the same update", async () => {
       prisma.ticket.findFirst.mockResolvedValue({
         id: "ticket-1",
-        category: "billing",
+        categoryId: "billing",
         priority: "MEDIUM",
         departmentId: null,
       });
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: "technical",
+        categoryId: "technical",
         priority: "URGENT",
         status: "OPEN",
         customerId: "customer-1",
@@ -916,7 +930,7 @@ describe("TicketsService", () => {
         assignedToUserId: null,
       });
 
-      await service.updateTicket("ticket-1", { category: "technical", priority: "URGENT" as never });
+      await service.updateTicket("ticket-1", { categoryId: "technical", priority: "URGENT" as never });
 
       expect(eventEmitter.emit).toHaveBeenCalledTimes(2);
       const recategorizedCalls = eventEmitter.emit.mock.calls.filter(
@@ -931,7 +945,7 @@ describe("TicketsService", () => {
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -945,6 +959,7 @@ describe("TicketsService", () => {
       expect(prisma.ticket.update).toHaveBeenCalledWith({
         where: { id: "ticket-1" },
         data: { assignedToUserId: "user-1" },
+        include: { category: { select: { name: true } } },
       });
       expect(eventEmitter.emit).toHaveBeenCalledOnce();
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
@@ -969,7 +984,7 @@ describe("TicketsService", () => {
       it("sets resolvedAt to now when transitioning from OPEN to RESOLVED", async () => {
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "OPEN",
@@ -977,7 +992,7 @@ describe("TicketsService", () => {
         prisma.ticket.update.mockResolvedValue({
           id: "ticket-1",
           subject: "Cannot log in",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           status: "RESOLVED",
           customerId: "customer-1",
@@ -991,13 +1006,14 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "RESOLVED", resolvedAt: NOW },
+          include: { category: { select: { name: true } } },
         });
       });
 
       it("sets resolvedAt to now when transitioning from IN_PROGRESS to CLOSED", async () => {
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "IN_PROGRESS",
@@ -1009,13 +1025,14 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "CLOSED", resolvedAt: NOW },
+          include: { category: { select: { name: true } } },
         });
       });
 
       it("clears resolvedAt to null when reopening a RESOLVED ticket back to IN_PROGRESS", async () => {
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "RESOLVED",
@@ -1027,13 +1044,14 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "IN_PROGRESS", resolvedAt: null },
+          include: { category: { select: { name: true } } },
         });
       });
 
       it("clears resolvedAt to null when reopening a CLOSED ticket back to OPEN", async () => {
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "CLOSED",
@@ -1045,13 +1063,14 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "OPEN", resolvedAt: null },
+          include: { category: { select: { name: true } } },
         });
       });
 
       it("leaves resolvedAt untouched when moving between RESOLVED and CLOSED (never actually reopened)", async () => {
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "RESOLVED",
@@ -1063,13 +1082,14 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "CLOSED" },
+          include: { category: { select: { name: true } } },
         });
       });
 
       it("leaves resolvedAt untouched (no key in data at all) when the transition never crosses the resolved boundary", async () => {
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "OPEN",
@@ -1081,13 +1101,14 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "IN_PROGRESS" },
+          include: { category: { select: { name: true } } },
         });
       });
 
       it("does not touch resolvedAt when status is absent from the DTO entirely, regardless of current status", async () => {
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "RESOLVED",
@@ -1099,6 +1120,7 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { subject: "New subject" },
+          include: { category: { select: { name: true } } },
         });
       });
 
@@ -1106,7 +1128,7 @@ describe("TicketsService", () => {
         // First resolution.
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "OPEN",
@@ -1116,12 +1138,13 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenLastCalledWith({
           where: { id: "ticket-1" },
           data: { status: "RESOLVED", resolvedAt: NOW },
+          include: { category: { select: { name: true } } },
         });
 
         // Reopen.
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "RESOLVED",
@@ -1131,6 +1154,7 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenLastCalledWith({
           where: { id: "ticket-1" },
           data: { status: "OPEN", resolvedAt: null },
+          include: { category: { select: { name: true } } },
         });
 
         // Resolve again, later.
@@ -1138,7 +1162,7 @@ describe("TicketsService", () => {
         vi.setSystemTime(LATER);
         prisma.ticket.findFirst.mockResolvedValue({
           id: "ticket-1",
-          category: null,
+          categoryId: null,
           priority: "MEDIUM",
           departmentId: null,
           status: "OPEN",
@@ -1148,6 +1172,7 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenLastCalledWith({
           where: { id: "ticket-1" },
           data: { status: "RESOLVED", resolvedAt: LATER },
+          include: { category: { select: { name: true } } },
         });
       });
     });
@@ -1351,7 +1376,7 @@ describe("TicketsService", () => {
       prisma.ticket.create.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: null,
+        categoryId: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -1372,9 +1397,11 @@ describe("TicketsService", () => {
           customerId: "customer-1",
           contactId: "contact-1",
           subject: "Cannot log in",
-          category: null,
+          categoryId: null,
         },
+        include: { category: { select: { name: true } } },
       });
+      expect(prisma.ticketCategory.findFirst).not.toHaveBeenCalled();
       expect(result.customerId).toBe("customer-1");
       expect(eventEmitter.emit).toHaveBeenCalledOnce();
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_CREATED_EVENT, {
@@ -1383,16 +1410,21 @@ describe("TicketsService", () => {
       });
     });
 
-    it("passes through category when given", async () => {
+    // Story 120 — `dto.category` is still free text on this customer/public
+    // -facing surface; it's resolved here to an existing `TicketCategory` by
+    // exact, case-insensitive name within the contact's own branch.
+    it("resolves a free-text category to an existing category id, case-insensitively, within the contact's branch", async () => {
       prisma.contact.findUnique.mockResolvedValue({
         id: "contact-1",
         customerId: "customer-1",
         customer: { id: "customer-1", branchId: "branch-1" },
       });
+      prisma.ticketCategory.findFirst.mockResolvedValue({ id: "category-1" });
       prisma.ticket.create.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
-        category: "account",
+        categoryId: "category-1",
+        category: { name: "Account" },
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
@@ -1408,8 +1440,43 @@ describe("TicketsService", () => {
         category: "account",
       });
 
+      expect(prisma.ticketCategory.findFirst).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", name: { equals: "account", mode: "insensitive" } },
+        select: { id: true },
+      });
       expect(prisma.ticket.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ category: "account" }) }),
+        expect.objectContaining({ data: expect.objectContaining({ categoryId: "category-1" }) }),
+      );
+    });
+
+    it("leaves the category unset (never auto-creates) when no existing category matches", async () => {
+      prisma.contact.findUnique.mockResolvedValue({
+        id: "contact-1",
+        customerId: "customer-1",
+        customer: { id: "customer-1", branchId: "branch-1" },
+      });
+      prisma.ticketCategory.findFirst.mockResolvedValue(null);
+      prisma.ticket.create.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        categoryId: null,
+        priority: "MEDIUM",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: "contact-1",
+        departmentId: null,
+        assignedToUserId: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+
+      await service.createTicketForContact("contact-1", {
+        subject: "Cannot log in",
+        category: "nonexistent-category",
+      });
+
+      expect(prisma.ticket.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ categoryId: null }) }),
       );
     });
   });
@@ -1423,6 +1490,7 @@ describe("TicketsService", () => {
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: { customerId: "customer-1" },
         orderBy: { createdAt: "desc" },
+        include: { category: { select: { name: true } } },
       });
     });
 
@@ -1444,6 +1512,7 @@ describe("TicketsService", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.ticket.findFirst).toHaveBeenCalledWith({
         where: { id: "ticket-1", customerId: "customer-1" },
+        include: { category: { select: { name: true } } },
       });
     });
   });

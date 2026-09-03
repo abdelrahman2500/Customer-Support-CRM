@@ -24,7 +24,7 @@ export type SlaPolicyPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export interface SlaPolicySummary {
   id: string;
   departmentId: string | null;
-  category: string | null;
+  categoryId: string | null;
   priority: SlaPolicyPriority | null;
   responseTargetMinutes: number;
   resolutionTargetMinutes: number;
@@ -34,7 +34,7 @@ export interface SlaPolicySummary {
 /** Mirrors the existing `CreateSlaPolicyDto` exactly (`apps/api/src/modules/sla-policies/dto/create-sla-policy.dto.ts`). */
 export interface CreateSlaPolicyInput {
   departmentId?: string;
-  category?: string;
+  categoryId?: string;
   priority?: SlaPolicyPriority;
   responseTargetMinutes: number;
   resolutionTargetMinutes: number;
@@ -44,14 +44,14 @@ export interface CreateSlaPolicyInput {
  * Mirrors the existing `UpdateSlaPolicyDto` exactly
  * (`apps/api/src/modules/sla-policies/dto/update-sla-policy.dto.ts`). Plan
  * Design item 2: only `responseTargetMinutes`/`resolutionTargetMinutes`/
- * `isActive` are ever sent by this story's UI — `departmentId`/`category`/
+ * `isActive` are ever sent by this story's UI — `departmentId`/`categoryId`/
  * `priority` exist on the DTO but are deliberately never edited after
  * creation (changing scoping fields would change which tickets a policy
  * applies to).
  */
 export interface UpdateSlaPolicyInput {
   departmentId?: string;
-  category?: string;
+  categoryId?: string;
   priority?: SlaPolicyPriority;
   responseTargetMinutes?: number;
   resolutionTargetMinutes?: number;

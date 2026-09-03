@@ -33,7 +33,8 @@ function createListener(prismaMock: ReturnType<typeof buildPrismaMock>): SlaTarg
 const ticket: TicketSummary = {
   id: "ticket-1",
   subject: "Cannot log in",
-  category: null,
+  categoryId: null,
+  categoryName: null,
   priority: "MEDIUM",
   status: "OPEN",
   customerId: "customer-1",
@@ -47,7 +48,7 @@ const ticket: TicketSummary = {
 const fullTicketRow = {
   branchId: "branch-1",
   departmentId: null as string | null,
-  category: null as string | null,
+  categoryId: null as string | null,
   priority: "MEDIUM",
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
 };
@@ -56,7 +57,7 @@ function wildcardPolicy(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: "policy-wildcard",
     departmentId: null,
-    category: null,
+    categoryId: null,
     priority: null,
     responseTargetMinutes: 30,
     resolutionTargetMinutes: 240,
@@ -87,7 +88,7 @@ describe("SlaTargetListener", () => {
         select: {
           branchId: true,
           departmentId: true,
-          category: true,
+          categoryId: true,
           priority: true,
           createdAt: true,
         },
@@ -129,14 +130,14 @@ describe("SlaTargetListener", () => {
     });
 
     it("prefers the more specific of two matching candidates", async () => {
-      prisma.ticket.findUnique.mockResolvedValue({ ...fullTicketRow, category: "billing" });
+      prisma.ticket.findUnique.mockResolvedValue({ ...fullTicketRow, categoryId: "category-1" });
       const wildcard = wildcardPolicy({
         id: "policy-wildcard",
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
       });
       const scoped = wildcardPolicy({
         id: "policy-scoped",
-        category: "billing",
+        categoryId: "category-1",
         responseTargetMinutes: 15,
         resolutionTargetMinutes: 120,
         createdAt: new Date("2026-01-01T00:05:00.000Z"),
@@ -248,7 +249,7 @@ describe("SlaTargetListener", () => {
         select: {
           branchId: true,
           departmentId: true,
-          category: true,
+          categoryId: true,
           priority: true,
           createdAt: true,
         },

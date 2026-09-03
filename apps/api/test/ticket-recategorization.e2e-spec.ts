@@ -119,18 +119,26 @@ describe("Ticket Recategorization and SLA Target Recomputation (e2e)", () => {
   });
 
   it("recomputes the SLA target when a ticket's category is changed to match a different policy", async () => {
-    const categoryA = `ticket-recat-e2e-a-${randomUUID()}`;
-    const categoryB = `ticket-recat-e2e-b-${randomUUID()}`;
+    const categoryA = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `ticket-recat-e2e-a-${randomUUID()}` })
+      .expect(201);
+    const categoryB = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `ticket-recat-e2e-b-${randomUUID()}` })
+      .expect(201);
 
     await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ category: categoryA, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
+      .send({ categoryId: categoryA.body.id, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
       .expect(201);
     await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ category: categoryB, responseTargetMinutes: 10, resolutionTargetMinutes: 60 })
+      .send({ categoryId: categoryB.body.id, responseTargetMinutes: 10, resolutionTargetMinutes: 60 })
       .expect(201);
 
     const customer = await request(app.getHttpServer())
@@ -145,7 +153,7 @@ describe("Ticket Recategorization and SLA Target Recomputation (e2e)", () => {
       .send({
         customerId: customer.body.id,
         subject: "Recategorization e2e ticket",
-        category: categoryA,
+        categoryId: categoryA.body.id,
       })
       .expect(201);
     const ticketId = ticket.body.id;
@@ -158,7 +166,7 @@ describe("Ticket Recategorization and SLA Target Recomputation (e2e)", () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/tickets/${ticketId}`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ category: categoryB })
+      .send({ categoryId: categoryB.body.id })
       .expect(200);
 
     // Poll until the target's slaPolicyId (and therefore its timestamps)
@@ -206,13 +214,21 @@ describe("Ticket Recategorization and SLA Target Recomputation (e2e)", () => {
   });
 
   it("removes the SLA target when recategorized into a category no active policy matches", async () => {
-    const matchingCategory = `ticket-recat-e2e-match-${randomUUID()}`;
-    const nonMatchingCategory = `ticket-recat-e2e-nomatch-${randomUUID()}`;
+    const matchingCategory = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `ticket-recat-e2e-match-${randomUUID()}` })
+      .expect(201);
+    const nonMatchingCategory = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `ticket-recat-e2e-nomatch-${randomUUID()}` })
+      .expect(201);
 
     await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ category: matchingCategory, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
+      .send({ categoryId: matchingCategory.body.id, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
       .expect(201);
 
     const customer = await request(app.getHttpServer())
@@ -227,7 +243,7 @@ describe("Ticket Recategorization and SLA Target Recomputation (e2e)", () => {
       .send({
         customerId: customer.body.id,
         subject: "Recategorization-to-no-match e2e ticket",
-        category: matchingCategory,
+        categoryId: matchingCategory.body.id,
       })
       .expect(201);
     const ticketId = ticket.body.id;
@@ -239,7 +255,7 @@ describe("Ticket Recategorization and SLA Target Recomputation (e2e)", () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/tickets/${ticketId}`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ category: nonMatchingCategory })
+      .send({ categoryId: nonMatchingCategory.body.id })
       .expect(200);
 
     const afterRecategorization = await waitForNoSlaTarget(app.getHttpServer(), adminAccessToken, ticketId);

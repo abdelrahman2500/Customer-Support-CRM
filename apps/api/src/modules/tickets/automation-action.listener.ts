@@ -19,7 +19,7 @@ import { toTicketSummary } from "./tickets.service";
  * by `event.ticketId` rather than trusting any stale state the emitting
  * listener saw. Catch-and-log throughout.
  *
- * Story 83 — `actionSetCategory`/`actionSetDepartmentId` added alongside
+ * Story 83 — `actionSetCategoryId`/`actionSetDepartmentId` added alongside
  * the original `assignedToUserId` action. Each of the three fields is
  * applied independently, only when the ticket's own current value is
  * still `null` — never overriding an explicit human choice, the same
@@ -27,12 +27,16 @@ import { toTicketSummary } from "./tickets.service";
  * than as one unified early return (a ticket already assigned, e.g. by a
  * human who claimed it first, can still legitimately receive an
  * automation-driven category/department). When the applied change
- * includes `category`/`departmentId`, this also emits
+ * includes `categoryId`/`departmentId`, this also emits
  * `TICKET_RECATEGORIZED_EVENT` — the exact same reconciliation signal
  * `TicketsService.updateTicket` emits for a human `PATCH`
  * (`tickets.service.ts`'s own `isRecategorized` shape) — so
  * `SlaTargetListener` recomputes the SLA target with zero new SLA-domain
  * code.
+ *
+ * Story 120 — `event.setCategory`/`ticket.category` (free text) became
+ * `event.setCategoryId`/`ticket.categoryId`; the write is now a relation
+ * `connect`, mirroring `department`'s existing shape exactly.
  */
 @Injectable()
 export class AutomationActionListener {
@@ -55,8 +59,8 @@ export class AutomationActionListener {
       if (!ticket.assignedToUserId) {
         data.assignedToUser = { connect: { id: event.assignToUserId } };
       }
-      if (event.setCategory && !ticket.category) {
-        data.category = event.setCategory;
+      if (event.setCategoryId && !ticket.categoryId) {
+        data.category = { connect: { id: event.setCategoryId } };
       }
       if (event.setDepartmentId && !ticket.departmentId) {
         data.department = { connect: { id: event.setDepartmentId } };
@@ -70,7 +74,11 @@ export class AutomationActionListener {
 
       const wasRecategorized = data.category !== undefined || data.department !== undefined;
 
-      const updated = await this.prisma.ticket.update({ where: { id: event.ticketId }, data });
+      const updated = await this.prisma.ticket.update({
+        where: { id: event.ticketId },
+        data,
+        include: { category: { select: { name: true } } },
+      });
       const summary = toTicketSummary(updated);
 
       this.eventEmitter.emit(TICKET_UPDATED_EVENT, {

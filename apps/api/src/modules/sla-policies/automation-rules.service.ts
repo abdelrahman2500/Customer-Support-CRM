@@ -8,9 +8,9 @@ export interface AutomationRuleSummary {
   id: string;
   name: string;
   isActive: boolean;
-  conditionCategory: string | null;
+  conditionCategoryId: string | null;
   actionAssignToUserId: string;
-  actionSetCategory: string | null;
+  actionSetCategoryId: string | null;
   actionSetDepartmentId: string | null;
 }
 
@@ -37,14 +37,20 @@ export class AutomationRulesService {
     if (dto.actionSetDepartmentId !== undefined) {
       await this.requireDepartmentInScope(dto.actionSetDepartmentId, branchId);
     }
+    if (dto.conditionCategoryId !== undefined) {
+      await this.requireCategoryInScope(dto.conditionCategoryId, branchId);
+    }
+    if (dto.actionSetCategoryId !== undefined) {
+      await this.requireCategoryInScope(dto.actionSetCategoryId, branchId);
+    }
 
     const rule = await this.prisma.automationRule.create({
       data: {
         branchId,
         name: dto.name,
-        conditionCategory: dto.conditionCategory ?? null,
+        conditionCategoryId: dto.conditionCategoryId ?? null,
         actionAssignToUserId: dto.actionAssignToUserId,
-        actionSetCategory: dto.actionSetCategory ?? null,
+        actionSetCategoryId: dto.actionSetCategoryId ?? null,
         actionSetDepartmentId: dto.actionSetDepartmentId ?? null,
       },
     });
@@ -75,17 +81,27 @@ export class AutomationRulesService {
     if (dto.actionSetDepartmentId !== undefined) {
       await this.requireDepartmentInScope(dto.actionSetDepartmentId, branchId);
     }
+    if (dto.conditionCategoryId !== undefined && dto.conditionCategoryId !== null) {
+      await this.requireCategoryInScope(dto.conditionCategoryId, branchId);
+    }
+    if (dto.actionSetCategoryId !== undefined && dto.actionSetCategoryId !== null) {
+      await this.requireCategoryInScope(dto.actionSetCategoryId, branchId);
+    }
 
     await this.prisma.automationRule.update({
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.conditionCategory !== undefined ? { conditionCategory: dto.conditionCategory } : {}),
+        ...(dto.conditionCategoryId !== undefined
+          ? { conditionCategoryId: dto.conditionCategoryId }
+          : {}),
         ...(dto.actionAssignToUserId !== undefined
           ? { actionAssignToUserId: dto.actionAssignToUserId }
           : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-        ...(dto.actionSetCategory !== undefined ? { actionSetCategory: dto.actionSetCategory } : {}),
+        ...(dto.actionSetCategoryId !== undefined
+          ? { actionSetCategoryId: dto.actionSetCategoryId }
+          : {}),
         ...(dto.actionSetDepartmentId !== undefined
           ? { actionSetDepartmentId: dto.actionSetDepartmentId }
           : {}),
@@ -102,9 +118,9 @@ export class AutomationRulesService {
     id: string;
     name: string;
     isActive: boolean;
-    conditionCategory: string | null;
+    conditionCategoryId: string | null;
     actionAssignToUserId: string;
-    actionSetCategory: string | null;
+    actionSetCategoryId: string | null;
     actionSetDepartmentId: string | null;
   }> {
     const { branchId } = this.tenantContext.requireBranchScope();
@@ -136,24 +152,35 @@ export class AutomationRulesService {
       throw new NotFoundException("Department not found in this branch");
     }
   }
+
+  /** Story 120 — mirrors `requireDepartmentInScope`'s exact shape, shared
+   * by both `conditionCategoryId` and `actionSetCategoryId`. */
+  private async requireCategoryInScope(categoryId: string, branchId: string): Promise<void> {
+    const category = await this.prisma.ticketCategory.findFirst({
+      where: { id: categoryId, branchId },
+    });
+    if (!category) {
+      throw new NotFoundException("Ticket category not found in this branch");
+    }
+  }
 }
 
 function toAutomationRuleSummary(rule: {
   id: string;
   name: string;
   isActive: boolean;
-  conditionCategory: string | null;
+  conditionCategoryId: string | null;
   actionAssignToUserId: string;
-  actionSetCategory: string | null;
+  actionSetCategoryId: string | null;
   actionSetDepartmentId: string | null;
 }): AutomationRuleSummary {
   return {
     id: rule.id,
     name: rule.name,
     isActive: rule.isActive,
-    conditionCategory: rule.conditionCategory,
+    conditionCategoryId: rule.conditionCategoryId,
     actionAssignToUserId: rule.actionAssignToUserId,
-    actionSetCategory: rule.actionSetCategory,
+    actionSetCategoryId: rule.actionSetCategoryId,
     actionSetDepartmentId: rule.actionSetDepartmentId,
   };
 }

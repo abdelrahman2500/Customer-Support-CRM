@@ -24,7 +24,8 @@ function createListener(prismaMock: ReturnType<typeof buildPrismaMock>): TicketH
 const ticket: TicketSummary = {
   id: "ticket-1",
   subject: "Cannot log in",
-  category: null,
+  categoryId: null,
+  categoryName: null,
   priority: "MEDIUM",
   status: "OPEN",
   customerId: "customer-1",

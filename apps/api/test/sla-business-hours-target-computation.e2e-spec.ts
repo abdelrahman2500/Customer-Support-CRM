@@ -165,11 +165,16 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
     responseTargetMinutes: number,
     resolutionTargetMinutes: number,
   ): Promise<{ id: string; createdAt: Date }> {
-    const category = `sla-bh-e2e-${randomUUID()}`;
+    const category = await request(app.getHttpServer())
+      .post("/api/v1/ticket-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: `sla-bh-e2e-${randomUUID()}` })
+      .expect(201);
+    const categoryId = category.body.id;
     await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ category, responseTargetMinutes, resolutionTargetMinutes })
+      .send({ categoryId, responseTargetMinutes, resolutionTargetMinutes })
       .expect(201);
 
     const customer = await request(app.getHttpServer())
@@ -181,7 +186,7 @@ describe("SLA Business-Hours-Aware Target Computation (e2e)", () => {
     const ticket = await request(app.getHttpServer())
       .post("/api/v1/tickets")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ customerId: customer.body.id, subject: "Business-hours e2e ticket", category })
+      .send({ customerId: customer.body.id, subject: "Business-hours e2e ticket", categoryId })
       .expect(201);
     return {
       id: ticket.body.id as string,

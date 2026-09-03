@@ -60,7 +60,8 @@ function queryResult(overrides: Record<string, unknown>) {
 const baseTicket = {
   id: "ticket-1",
   subject: "Cannot log in",
-  category: "account",
+  categoryId: "category-1",
+  categoryName: "account",
   priority: "MEDIUM",
   status: "OPEN",
   customerId: "customer-1",

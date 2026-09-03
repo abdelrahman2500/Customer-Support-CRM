@@ -10,7 +10,7 @@ const MINUTE_MS = 60_000;
 interface PolicyCandidate {
   id: string;
   departmentId: string | null;
-  category: string | null;
+  categoryId: string | null;
   priority: string | null;
   responseTargetMinutes: number;
   resolutionTargetMinutes: number;
@@ -44,7 +44,7 @@ export class SlaTargetListener {
         select: {
           branchId: true,
           departmentId: true,
-          category: true,
+          categoryId: true,
           priority: true,
           createdAt: true,
         },
@@ -99,7 +99,7 @@ export class SlaTargetListener {
         select: {
           branchId: true,
           departmentId: true,
-          category: true,
+          categoryId: true,
           priority: true,
           createdAt: true,
         },
@@ -156,15 +156,15 @@ export class SlaTargetListener {
   private async resolveBestPolicy(ticket: {
     branchId: string;
     departmentId: string | null;
-    category: string | null;
+    categoryId: string | null;
     priority: string;
   }): Promise<PolicyCandidate | null> {
     const departmentFilter = ticket.departmentId
       ? { OR: [{ departmentId: null }, { departmentId: ticket.departmentId }] }
       : { departmentId: null };
-    const categoryFilter = ticket.category
-      ? { OR: [{ category: null }, { category: ticket.category }] }
-      : { category: null };
+    const categoryFilter = ticket.categoryId
+      ? { OR: [{ categoryId: null }, { categoryId: ticket.categoryId }] }
+      : { categoryId: null };
     const priorityFilter = { OR: [{ priority: null }, { priority: ticket.priority }] };
 
     const candidates = await this.prisma.slaPolicy.findMany({
@@ -225,7 +225,7 @@ export class SlaTargetListener {
     for (const candidate of candidates) {
       const score =
         (candidate.departmentId !== null ? 1 : 0) +
-        (candidate.category !== null ? 1 : 0) +
+        (candidate.categoryId !== null ? 1 : 0) +
         (candidate.priority !== null ? 1 : 0);
       if (score > bestScore) {
         best = candidate;

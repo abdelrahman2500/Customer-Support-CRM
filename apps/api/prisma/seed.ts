@@ -60,6 +60,9 @@ const PERMISSION_CATALOG = [
   "quick-reply:create",
   "quick-reply:read",
   "quick-reply:update",
+  "ticket-category:create",
+  "ticket-category:read",
+  "ticket-category:update",
 ] as const;
 
 // Story 100 — `Agent`'s default grant: exactly what frontline ticket work
@@ -85,6 +88,7 @@ const ROLE_GRANTS: Record<string, readonly string[]> = {
     "user:read",
     "kb:read",
     "quick-reply:read",
+    "ticket-category:read",
     "notification:read",
     "sla:read",
   ],

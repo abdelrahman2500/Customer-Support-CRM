@@ -33,7 +33,8 @@ export class TicketEscalationListener {
         select: {
           id: true,
           subject: true,
-          category: true,
+          categoryId: true,
+          category: { select: { name: true } },
           priority: true,
           status: true,
           customerId: true,

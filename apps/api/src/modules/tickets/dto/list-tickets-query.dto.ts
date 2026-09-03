@@ -14,8 +14,12 @@ import { TicketPriority, TicketStatus } from "@prisma/client";
  * disclose ("No search... inventing one is out of scope"), now that
  * Story 64 established the precedent for this codebase's first
  * search-query-param (`ListArticlesQueryDto`). Matches `subject` or
- * `category` via the same plain `contains`/`mode: "insensitive"` filter,
- * not `tsvector` — see `tickets.service.ts`'s own doc comment for why.
+ * category name via the same plain `contains`/`mode: "insensitive"`
+ * filter, not `tsvector` — see `tickets.service.ts`'s own doc comment for
+ * why.
+ *
+ * Story 120 — `category` (free text) replaced by `categoryId` (exact-id
+ * equality filter), mirroring `Ticket.category`'s own schema change.
  */
 export class ListTicketsQueryDto {
   @ApiProperty({ required: false, enum: TicketStatus })
@@ -30,8 +34,8 @@ export class ListTicketsQueryDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsString()
-  category?: string;
+  @IsUUID()
+  categoryId?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()

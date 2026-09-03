@@ -6,6 +6,8 @@ import { CustomersModule } from "../customers/customers.module";
 import { QueuesModule } from "../../queues/queues.module";
 import { AutomationActionListener } from "./automation-action.listener";
 import { TicketAiService } from "./ticket-ai.service";
+import { TicketCategoriesController } from "./ticket-categories.controller";
+import { TicketCategoriesService } from "./ticket-categories.service";
 import { TicketChannelService } from "./ticket-channel.service";
 import { TicketEscalationListener } from "./ticket-escalation.listener";
 import { TicketHistoryListener } from "./ticket-history.listener";
@@ -47,10 +49,15 @@ import { WebFormIntakeService } from "./web-form-intake.service";
  * `CustomersService` directly. `WebFormIntakeController`/`Service` are the
  * first fully public (`@Public()`, no `TenantContext`) surface on this
  * module — see `web-form-intake.controller.ts`'s own doc comment.
+ *
+ * Story 120 — `TicketCategoriesController`/`Service` added the same way
+ * `Department` CRUD lives in `IdentityModule`: pure branch-scoped CRUD,
+ * no cross-module reactions, registered here because `TicketCategory` is
+ * owned by the `ticketing` schema.
  */
 @Module({
   imports: [AiModule, ChannelsModule, CustomersModule, QueuesModule],
-  controllers: [TicketsController, WebFormIntakeController],
+  controllers: [TicketsController, TicketCategoriesController, WebFormIntakeController],
   providers: [
     TicketsService,
     TenantContext,
@@ -58,6 +65,7 @@ import { WebFormIntakeService } from "./web-form-intake.service";
     TicketEscalationListener,
     AutomationActionListener,
     TicketAiService,
+    TicketCategoriesService,
     TicketChannelService,
     WebFormIntakeService,
   ],

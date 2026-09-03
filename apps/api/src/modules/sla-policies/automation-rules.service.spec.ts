@@ -18,6 +18,9 @@ function buildPrismaMock() {
     department: {
       findFirst: vi.fn(),
     },
+    ticketCategory: {
+      findFirst: vi.fn(),
+    },
   };
 }
 
@@ -46,9 +49,9 @@ const ruleRow = {
   id: "rule-1",
   name: "Auto-assign billing",
   isActive: true,
-  conditionCategory: null,
+  conditionCategoryId: null,
   actionAssignToUserId: "user-1",
-  actionSetCategory: null,
+  actionSetCategoryId: null,
   actionSetDepartmentId: null,
 };
 
@@ -86,35 +89,52 @@ describe("AutomationRulesService", () => {
         data: {
           branchId: "branch-1",
           name: "Auto-assign billing",
-          conditionCategory: null,
+          conditionCategoryId: null,
           actionAssignToUserId: "user-1",
-          actionSetCategory: null,
+          actionSetCategoryId: null,
           actionSetDepartmentId: null,
         },
       });
     });
 
-    it("passes through conditionCategory when given", async () => {
+    it("passes through conditionCategoryId when given", async () => {
       prisma.userBranchRole.findFirst.mockResolvedValue({ id: "membership-1" });
-      prisma.automationRule.create.mockResolvedValue({ ...ruleRow, conditionCategory: "billing" });
+      prisma.ticketCategory.findFirst.mockResolvedValue({ id: "category-1" });
+      prisma.automationRule.create.mockResolvedValue({ ...ruleRow, conditionCategoryId: "category-1" });
 
-      await service.createAutomationRule({ ...baseDto, conditionCategory: "billing" });
+      await service.createAutomationRule({ ...baseDto, conditionCategoryId: "category-1" });
 
       expect(prisma.automationRule.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ conditionCategory: "billing" }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ conditionCategoryId: "category-1" }),
+        }),
       );
     });
 
     // Story 83 — Automation Rules — Category & Department Actions.
-    it("passes through actionSetCategory when given", async () => {
+    it("passes through actionSetCategoryId when given", async () => {
       prisma.userBranchRole.findFirst.mockResolvedValue({ id: "membership-1" });
-      prisma.automationRule.create.mockResolvedValue({ ...ruleRow, actionSetCategory: "billing" });
+      prisma.ticketCategory.findFirst.mockResolvedValue({ id: "category-1" });
+      prisma.automationRule.create.mockResolvedValue({ ...ruleRow, actionSetCategoryId: "category-1" });
 
-      await service.createAutomationRule({ ...baseDto, actionSetCategory: "billing" });
+      await service.createAutomationRule({ ...baseDto, actionSetCategoryId: "category-1" });
 
       expect(prisma.automationRule.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ actionSetCategory: "billing" }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ actionSetCategoryId: "category-1" }),
+        }),
       );
+    });
+
+    // Story 120 — mirrors the actionSetDepartmentId validation below.
+    it("validates conditionCategoryId against the caller's branch, throwing NotFoundException when absent", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue({ id: "membership-1" });
+      prisma.ticketCategory.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createAutomationRule({ ...baseDto, conditionCategoryId: "category-1" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.automationRule.create).not.toHaveBeenCalled();
     });
 
     it("validates actionSetDepartmentId against the caller's branch, throwing NotFoundException when absent", async () => {
@@ -216,19 +236,20 @@ describe("AutomationRulesService", () => {
       expect(prisma.automationRule.update).not.toHaveBeenCalled();
     });
 
-    it("updates actionSetCategory/actionSetDepartmentId when provided", async () => {
+    it("updates actionSetCategoryId/actionSetDepartmentId when provided", async () => {
       prisma.automationRule.findFirst.mockResolvedValue(ruleRow);
       prisma.department.findFirst.mockResolvedValue({ id: "dept-1" });
+      prisma.ticketCategory.findFirst.mockResolvedValue({ id: "category-1" });
       prisma.automationRule.update.mockResolvedValue({ id: "rule-1" });
 
       await service.updateAutomationRule("rule-1", {
-        actionSetCategory: "sales",
+        actionSetCategoryId: "category-1",
         actionSetDepartmentId: "dept-1",
       });
 
       expect(prisma.automationRule.update).toHaveBeenCalledWith({
         where: { id: "rule-1" },
-        data: { actionSetCategory: "sales", actionSetDepartmentId: "dept-1" },
+        data: { actionSetCategoryId: "category-1", actionSetDepartmentId: "dept-1" },
       });
     });
   });

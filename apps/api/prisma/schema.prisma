@@ -55,6 +55,7 @@ model Branch {
   aiSettings            AiSettings?
   quickReplies          QuickReply[]
   reportDashboards      ReportDashboard[]
+  ticketCategories      TicketCategory[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -432,8 +433,6 @@ model CustomerAttachment {
 /// emission (ticket.created/ticket.updated/ticket.escalated) and CASL-based
 /// per-record visibility are named in the architecture but explicitly
 /// deferred by Story 07 — see that story's "Settled decisions" section.
-/// `category` is a plain nullable String, not a lookup table — no story has
-/// justified a `Category` model yet.
 enum TicketPriority {
   LOW
   MEDIUM
@@ -465,7 +464,14 @@ model Ticket {
   assignedToUserId  String?              @map("assigned_to_user_id")
   assignedToUser    User?                @relation(fields: [assignedToUserId], references: [id])
   subject           String
-  category          String?
+  /// Story 120 — replaced the original plain-`String?` free-text
+  /// `category` column with a real FK into `TicketCategory`, closing the
+  /// silent-fragmentation risk exact-string matching created for
+  /// `SlaPolicy`/`AutomationRule` category resolution (two differently
+  /// -cased/-spelled strings could never match). See `TicketCategory`'s
+  /// own doc comment.
+  categoryId        String?              @map("category_id")
+  category          TicketCategory?      @relation(fields: [categoryId], references: [id])
   priority          TicketPriority       @default(MEDIUM)
   status            TicketStatus         @default(OPEN)
   historyEntries    TicketHistoryEntry[]
@@ -496,6 +502,7 @@ model Ticket {
   @@index([branchId])
   @@index([customerId])
   @@index([assignedToUserId])
+  @@index([categoryId])
   @@map("tickets")
   @@schema("ticketing")
 }
@@ -565,6 +572,39 @@ model TicketCsatResponse {
   @@schema("ticketing")
 }
 
+/// Story 120 — the managed vocabulary `Ticket.categoryId`,
+/// `SlaPolicy.categoryId`, and `AutomationRule.conditionCategoryId`/
+/// `actionSetCategoryId` all reference, replacing the four free-text
+/// `category`/`conditionCategory`/`actionSetCategory` columns those
+/// models previously carried. Branch-scoped, mirrors `Department`'s
+/// exact shape (`id`/`branchId`/`name`/`isActive`, `@@unique([branchId,
+/// name])`) — including that model's own precedent of no delete route,
+/// only rename + activate/deactivate: a category is never actually
+/// deleted, so "what happens to a ticket/policy/rule that still
+/// references a deleted category" is a question this schema never has
+/// to answer. An inactive category remains valid on every row that
+/// already references it; `TicketCategoriesService.listCategories`'s
+/// own `includeInactive` flag controls whether it still appears in a
+/// "pick a category for something new" UI going forward.
+model TicketCategory {
+  id        String   @id @default(uuid())
+  branchId  String   @map("branch_id")
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tickets          Ticket[]
+  slaPolicies      SlaPolicy[]
+  conditionOnRules AutomationRule[] @relation("AutomationRuleCondition")
+  actionOnRules    AutomationRule[] @relation("AutomationRuleActionSet")
+
+  @@unique([branchId, name])
+  @@map("ticket_categories")
+  @@schema("ticketing")
+}
+
 // ---------------------------------------------------------------------------
 // sla schema
 // ---------------------------------------------------------------------------
@@ -586,7 +626,13 @@ model SlaPolicy {
   branch                  Branch            @relation(fields: [branchId], references: [id])
   departmentId            String?           @map("department_id")
   department              Department?       @relation(fields: [departmentId], references: [id])
-  category                String?
+  /// Story 120 — replaced the original plain-`String?` free-text
+  /// `category` column with a real FK into `TicketCategory`, closing the
+  /// silent-fragmentation risk exact-string matching created for
+  /// `resolveBestPolicy`'s category resolution. See `TicketCategory`'s own
+  /// doc comment.
+  categoryId              String?           @map("category_id")
+  category                TicketCategory?   @relation(fields: [categoryId], references: [id])
   priority                String?
   responseTargetMinutes   Int               @map("response_target_minutes")
   resolutionTargetMinutes Int               @map("resolution_target_minutes")
@@ -596,6 +642,7 @@ model SlaPolicy {
   targets                 SlaTicketTarget[]
 
   @@index([branchId])
+  @@index([categoryId])
   @@map("sla_policies")
   @@schema("sla")
 }
@@ -611,26 +658,37 @@ model SlaPolicy {
 /// any of them would risk desyncing a ticket's SLA target with no existing
 /// reconciliation mechanism, unlike a real agent's `ticket.recategorized`).
 model AutomationRule {
-  id                    String      @id @default(uuid())
-  branchId              String      @map("branch_id")
-  branch                Branch      @relation(fields: [branchId], references: [id])
+  id                    String          @id @default(uuid())
+  branchId              String          @map("branch_id")
+  branch                Branch          @relation(fields: [branchId], references: [id])
   name                  String
-  isActive              Boolean     @default(true) @map("is_active")
-  conditionCategory     String?     @map("condition_category")
-  actionAssignToUserId  String      @map("action_assign_to_user_id")
-  actionAssignToUser    User        @relation(fields: [actionAssignToUserId], references: [id])
+  isActive              Boolean         @default(true) @map("is_active")
+  /// Story 120 — replaced the original plain-`String?` free-text
+  /// `conditionCategory` column with a real FK into `TicketCategory`,
+  /// closing the silent-fragmentation risk exact-string matching created
+  /// for `resolveMatchingRule`'s condition matching. See `TicketCategory`'s
+  /// own doc comment.
+  conditionCategoryId   String?         @map("condition_category_id")
+  conditionCategory     TicketCategory? @relation("AutomationRuleCondition", fields: [conditionCategoryId], references: [id])
+  actionAssignToUserId  String          @map("action_assign_to_user_id")
+  actionAssignToUser    User            @relation(fields: [actionAssignToUserId], references: [id])
   /// Story 83 — both nullable/independent: a rule may set neither, one,
   /// or both, alongside its always-required assignment action. Applied
   /// only when the matched ticket's own current value is still `null`
   /// (never overrides an explicit human choice) — mirrors
   /// `AutomationActionListener`'s existing `assignedToUserId` guard.
-  actionSetCategory     String?     @map("action_set_category")
-  actionSetDepartmentId String?     @map("action_set_department_id")
-  actionSetDepartment   Department? @relation(fields: [actionSetDepartmentId], references: [id])
-  createdAt             DateTime    @default(now()) @map("created_at")
-  updatedAt             DateTime    @updatedAt @map("updated_at")
+  /// Story 120 — `actionSetCategory` (free-text) replaced with
+  /// `actionSetCategoryId`, a real FK into `TicketCategory`.
+  actionSetCategoryId   String?         @map("action_set_category_id")
+  actionSetCategory     TicketCategory? @relation("AutomationRuleActionSet", fields: [actionSetCategoryId], references: [id])
+  actionSetDepartmentId String?         @map("action_set_department_id")
+  actionSetDepartment   Department?     @relation(fields: [actionSetDepartmentId], references: [id])
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
 
   @@index([branchId])
+  @@index([conditionCategoryId])
+  @@index([actionSetCategoryId])
   @@map("automation_rules")
   @@schema("sla")
 }
@@ -921,16 +979,16 @@ enum KnowledgeBaseArticleStatus {
 /// version history lives in `KnowledgeBaseArticleVersion` (Story 65). No
 /// Customer Portal or AI Services consumption yet.
 model KnowledgeBaseArticle {
-  id           String                        @id @default(uuid())
-  branchId     String                        @map("branch_id")
-  branch       Branch                        @relation(fields: [branchId], references: [id])
+  id           String                            @id @default(uuid())
+  branchId     String                            @map("branch_id")
+  branch       Branch                            @relation(fields: [branchId], references: [id])
   title        String
   body         String
   category     String?
-  status       KnowledgeBaseArticleStatus    @default(DRAFT)
-  publishedAt  DateTime?                     @map("published_at")
-  createdAt    DateTime                      @default(now()) @map("created_at")
-  updatedAt    DateTime                      @updatedAt @map("updated_at")
+  status       KnowledgeBaseArticleStatus        @default(DRAFT)
+  publishedAt  DateTime?                         @map("published_at")
+  createdAt    DateTime                          @default(now()) @map("created_at")
+  updatedAt    DateTime                          @updatedAt @map("updated_at")
   /// Story 102 — generated column (see this story's own migration SQL):
   /// `to_tsvector('english', title || ' ' || body)`, STORED, with a GIN
   /// index. `Unsupported` because Prisma Client has no native `tsvector`
@@ -939,7 +997,7 @@ model KnowledgeBaseArticle {
   /// typed `create`/`update`/`findMany` API (Postgres maintains it
   /// itself; `Unsupported` fields are automatically excluded from every
   /// generated input type, so no existing call site needs to change).
-  searchVector Unsupported("tsvector")?      @map("search_vector")
+  searchVector Unsupported("tsvector")?          @map("search_vector")
   versions     KnowledgeBaseArticleVersion[]
   /// Story 109 — see `KnowledgeBaseArticleTranslation`'s own doc comment.
   translations KnowledgeBaseArticleTranslation[]

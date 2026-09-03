@@ -209,7 +209,8 @@ describe("In-App Notification Delivery (e2e)", () => {
       ticket: {
         id: ticket.id,
         subject: "Notification delivery e2e ticket",
-        category: null,
+        categoryId: null,
+        categoryName: null,
         priority: "MEDIUM",
         status: "OPEN",
         customerId: ticket.customerId,

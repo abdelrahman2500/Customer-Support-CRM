@@ -10,6 +10,7 @@ import {
   useDepartmentsQuery,
   useUsersQuery,
 } from "@/hooks/use-tickets";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { TicketPriority } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { showSuccessToast } from "@/lib/toast-store";
@@ -29,10 +30,11 @@ const UNSET_PRIORITY = "__unset__";
 const UNSET_CONTACT = "__unset__";
 const UNSET_DEPARTMENT = "__unset__";
 const UNSET_ASSIGNEE = "__unset__";
+const UNSET_CATEGORY = "__unset__";
 
 /**
  * Story 25 — Create Ticket (plan Task 4). Submits `{ customerId, subject,
- * category?, priority? }` through the existing `POST /tickets` — the
+ * categoryId?, priority? }` through the existing `POST /tickets` — the
  * customer picker reuses the same `useCustomersQuery()` cache every other
  * workspace screen already uses (Design item 1) — no new backend search/
  * autocomplete. Never optimistic: on success, navigates to the real new
@@ -66,7 +68,7 @@ export function CreateTicketView() {
 
   const [customerId, setCustomerId] = useState("");
   const [subject, setSubject] = useState("");
-  const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<string>(UNSET_CATEGORY);
   const [priority, setPriority] = useState<string>(UNSET_PRIORITY);
   const [contactId, setContactId] = useState<string>(UNSET_CONTACT);
   const [departmentId, setDepartmentId] = useState<string>(UNSET_DEPARTMENT);
@@ -77,6 +79,7 @@ export function CreateTicketView() {
   const customerDetailQuery = useCustomerQuery(customerId);
   const departmentsQuery = useDepartmentsQuery();
   const usersQuery = useUsersQuery();
+  const categoriesQuery = useTicketCategoriesQuery();
   const mutation = useCreateTicketMutation();
 
   function handleCustomerChange(value: string) {
@@ -101,7 +104,7 @@ export function CreateTicketView() {
       const ticket = await mutation.mutateAsync({
         customerId,
         subject,
-        ...(category.trim() ? { category: category.trim() } : {}),
+        ...(categoryId !== UNSET_CATEGORY ? { categoryId } : {}),
         ...(priority !== UNSET_PRIORITY ? { priority: priority as TicketPriority } : {}),
         ...(contactId !== UNSET_CONTACT ? { contactId } : {}),
         ...(departmentId !== UNSET_DEPARTMENT ? { departmentId } : {}),
@@ -194,7 +197,19 @@ export function CreateTicketView() {
 
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.category")}
-          <Input value={category} onChange={(event) => setCategory(event.target.value)} />
+          <Select value={categoryId} onValueChange={setCategoryId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNSET_CATEGORY}>{t("create.categoryDefault")}</SelectItem>
+              {(categoriesQuery.data ?? []).map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-slate-700">

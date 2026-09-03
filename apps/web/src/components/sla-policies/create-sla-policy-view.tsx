@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateSlaPolicyMutation } from "@/hooks/use-sla-policies";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { SlaPolicyPriority } from "@/lib/sla-policies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { showSuccessToast } from "@/lib/toast-store";
@@ -20,6 +21,7 @@ import {
 
 const PRIORITY_OPTIONS: SlaPolicyPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 const UNSET_PRIORITY = "__unset__";
+const UNSET_CATEGORY = "__unset__";
 
 /**
  * Story 31 — Create SLA Policy (plan Task 4), mirroring `CreateTicketView`'s
@@ -41,13 +43,14 @@ export function CreateSlaPolicyView() {
   const { locale } = useParams<{ locale: string }>();
 
   const [departmentId, setDepartmentId] = useState("");
-  const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState<string>(UNSET_CATEGORY);
   const [priority, setPriority] = useState<string>(UNSET_PRIORITY);
   const [responseTargetMinutes, setResponseTargetMinutes] = useState("");
   const [resolutionTargetMinutes, setResolutionTargetMinutes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useCreateSlaPolicyMutation();
+  const categoriesQuery = useTicketCategoriesQuery();
 
   const parsedResponse = Number(responseTargetMinutes);
   const parsedResolution = Number(resolutionTargetMinutes);
@@ -66,7 +69,7 @@ export function CreateSlaPolicyView() {
     try {
       await mutation.mutateAsync({
         ...(departmentId.trim() ? { departmentId: departmentId.trim() } : {}),
-        ...(category.trim() ? { category: category.trim() } : {}),
+        ...(categoryId !== UNSET_CATEGORY ? { categoryId } : {}),
         ...(priority !== UNSET_PRIORITY ? { priority: priority as SlaPolicyPriority } : {}),
         responseTargetMinutes: parsedResponse,
         resolutionTargetMinutes: parsedResolution,
@@ -101,7 +104,19 @@ export function CreateSlaPolicyView() {
 
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.category")}
-          <Input value={category} onChange={(event) => setCategory(event.target.value)} />
+          <Select value={categoryId} onValueChange={setCategoryId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNSET_CATEGORY}>{t("create.categoryDefault")}</SelectItem>
+              {(categoriesQuery.data ?? []).map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-slate-700">

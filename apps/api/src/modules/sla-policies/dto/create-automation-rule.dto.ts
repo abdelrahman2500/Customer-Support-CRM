@@ -9,8 +9,8 @@ export class CreateAutomationRuleDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsString()
-  conditionCategory?: string;
+  @IsUUID()
+  conditionCategoryId?: string;
 
   @ApiProperty()
   @IsUUID()
@@ -18,8 +18,8 @@ export class CreateAutomationRuleDto {
 
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsString()
-  actionSetCategory?: string;
+  @IsUUID()
+  actionSetCategoryId?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
