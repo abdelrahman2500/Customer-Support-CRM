@@ -6,6 +6,7 @@ import type { Job, Queue } from "bullmq";
 import * as Sentry from "@sentry/node";
 import { PrismaService } from "../prisma/prisma.service";
 import { AI_PROVIDER } from "../ai/ai.constants";
+import { computeCostMicroUsd } from "../ai/ai-cost.util";
 import { AI_PROCESSING_EVENTS_QUEUE } from "./ai-processing-events.types";
 import type { AiCompletionJobPayload } from "./ai-processing-events.types";
 import { CorrelationIdStore } from "../common/logging/correlation-id.store";
@@ -89,6 +90,13 @@ export interface AiProcessingJobPayload {
  * job with no `correlationId` (there is none today, but nothing enforces
  * it) still gets a fresh one rather than an `undefined` field, keeping
  * every job's logs uniformly correlatable.
+ *
+ * Story 121 — the same `aiPromptLog.update` call also persists
+ * `costMicroUsd`, computed via `computeCostMicroUsd` (`../ai/ai-cost.util`)
+ * from the just-resolved `result.model`/`inputTokens`/`outputTokens` — the
+ * one place in the codebase that knows a call's real model and real token
+ * counts at the same moment, so cost is a fact captured once, here, never
+ * recomputed later against a price table that may have since changed.
  */
 @Injectable()
 @Processor(AI_PROCESSING_QUEUE)
@@ -149,6 +157,12 @@ export class AiProcessingProcessor extends WorkerHost {
         outcome: result.outcome,
         outputText: result.text,
         errorMessage: result.errorMessage,
+        // Story 121 — computed once, here, at the same moment the real
+        // model + token counts are known — see computeCostMicroUsd's own
+        // doc comment for why this is never recomputed at report-query
+        // time, and why it's null (not a fabricated 0) whenever tokens
+        // are null or the model is unpriced.
+        costMicroUsd: computeCostMicroUsd(result.model, result.inputTokens, result.outputTokens),
       },
     });
 

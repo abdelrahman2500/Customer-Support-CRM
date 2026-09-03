@@ -18,11 +18,11 @@ import { SLA_TIMER_EVENTS_QUEUE, type SlaDetectionJobPayload } from "../src/queu
  * inside this app. The seeded branch (from `apps/api`'s `prisma:seed`) is
  * reused rather than creating a new `Organization`/`Branch`.
  *
- * The `SlaPolicy` this suite creates is scoped by a randomly-generated
- * `category` (never matched by anything else) and is deleted in `afterAll`
- * alongside every other row this suite creates, so nothing leaks into a
- * later run of `apps/api`'s own e2e suites against the same shared,
- * persistent database.
+ * The `SlaPolicy` this suite creates is scoped by a freshly-created,
+ * uniquely-named `TicketCategory` (Story 120 — never matched by anything
+ * else) and is deleted in `afterAll` alongside every other row this suite
+ * creates, so nothing leaks into a later run of `apps/api`'s own e2e
+ * suites against the same shared, persistent database.
  */
 describe("SlaTimerProcessor (e2e)", () => {
   let moduleRef: TestingModule;
@@ -32,6 +32,7 @@ describe("SlaTimerProcessor (e2e)", () => {
   let branchId: string;
   let customerId: string;
   let slaPolicyId: string;
+  let categoryId: string;
 
   beforeAll(async () => {
     moduleRef = await Test.createTestingModule({ imports: [WorkerModule] }).compile();
@@ -52,10 +53,15 @@ describe("SlaTimerProcessor (e2e)", () => {
     });
     customerId = customer.id;
 
+    const category = await prisma.ticketCategory.create({
+      data: { branchId, name: `sla-timer-e2e-${randomUUID()}` },
+    });
+    categoryId = category.id;
+
     const policy = await prisma.slaPolicy.create({
       data: {
         branchId,
-        category: `sla-timer-e2e-${randomUUID()}`,
+        categoryId,
         responseTargetMinutes: 100,
         resolutionTargetMinutes: 100_000,
       },
@@ -68,6 +74,7 @@ describe("SlaTimerProcessor (e2e)", () => {
     // no more references at that point.
     await prisma.ticket.deleteMany({ where: { customerId } });
     await prisma.slaPolicy.delete({ where: { id: slaPolicyId } });
+    await prisma.ticketCategory.delete({ where: { id: categoryId } });
     await prisma.customer.delete({ where: { id: customerId } });
     await moduleRef.close();
   });

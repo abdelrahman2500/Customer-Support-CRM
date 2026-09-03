@@ -21,6 +21,10 @@ function buildPrismaMock() {
     user: {
       findMany: vi.fn(),
     },
+    aiPromptLog: {
+      groupBy: vi.fn(),
+      count: vi.fn(),
+    },
   };
 }
 
@@ -586,6 +590,191 @@ describe("ReportingService", () => {
       service = createService(prisma, tenantContext);
 
       await expect(service.getResolutionTime()).rejects.toThrow(/no active branch/);
+    });
+  });
+
+  // Story 121 — AI Usage/Cost Reporting.
+  describe("getAiUsage", () => {
+    it("returns all-zero/null totals and [] byFeature when the branch has no AiPromptLog rows", async () => {
+      prisma.aiPromptLog.groupBy.mockResolvedValue([]);
+      prisma.aiPromptLog.count.mockResolvedValue(0);
+
+      const result = await service.getAiUsage();
+
+      expect(result).toEqual({
+        totalCalls: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCostUsd: null,
+        unpricedCallCount: 0,
+        byFeature: [],
+      });
+    });
+
+    it("scopes the query by branch and groups by [feature, outcome]", async () => {
+      prisma.aiPromptLog.groupBy.mockResolvedValue([]);
+      prisma.aiPromptLog.count.mockResolvedValue(0);
+
+      await service.getAiUsage();
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.aiPromptLog.groupBy).toHaveBeenCalledWith({
+        by: ["feature", "outcome"],
+        where: { branchId: "branch-1" },
+        _count: { _all: true },
+        _sum: { inputTokens: true, outputTokens: true, costMicroUsd: true },
+      });
+      expect(prisma.aiPromptLog.count).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", outcome: "SUCCESS", costMicroUsd: null },
+      });
+    });
+
+    it("merges multiple outcome rows for the same feature into one byFeature entry", async () => {
+      prisma.aiPromptLog.groupBy.mockResolvedValue([
+        {
+          feature: "SUMMARIZE",
+          outcome: "SUCCESS",
+          _count: { _all: 3 },
+          _sum: { inputTokens: 300, outputTokens: 150, costMicroUsd: 9000 },
+        },
+        {
+          feature: "SUMMARIZE",
+          outcome: "ERROR",
+          _count: { _all: 1 },
+          _sum: { inputTokens: null, outputTokens: null, costMicroUsd: null },
+        },
+        {
+          feature: "SUMMARIZE",
+          outcome: "PENDING",
+          _count: { _all: 1 },
+          _sum: { inputTokens: null, outputTokens: null, costMicroUsd: null },
+        },
+      ]);
+      prisma.aiPromptLog.count.mockResolvedValue(0);
+
+      const result = await service.getAiUsage();
+
+      expect(result.byFeature).toEqual([
+        {
+          feature: "SUMMARIZE",
+          callCount: 5,
+          successCount: 3,
+          errorCount: 1,
+          totalInputTokens: 300,
+          totalOutputTokens: 150,
+          totalCostUsd: 0.009,
+        },
+      ]);
+      expect(result.totalCalls).toBe(5);
+      expect(result.totalCostUsd).toBe(0.009);
+    });
+
+    it("keeps totalCostUsd null for a feature whose only successful calls are all unpriced", async () => {
+      prisma.aiPromptLog.groupBy.mockResolvedValue([
+        {
+          feature: "CHAT",
+          outcome: "SUCCESS",
+          _count: { _all: 2 },
+          _sum: { inputTokens: 400, outputTokens: 200, costMicroUsd: null },
+        },
+      ]);
+      prisma.aiPromptLog.count.mockResolvedValue(2);
+
+      const result = await service.getAiUsage();
+
+      expect(result.byFeature).toEqual([
+        {
+          feature: "CHAT",
+          callCount: 2,
+          successCount: 2,
+          errorCount: 0,
+          totalInputTokens: 400,
+          totalOutputTokens: 200,
+          totalCostUsd: null,
+        },
+      ]);
+      expect(result.totalCostUsd).toBeNull();
+      expect(result.unpricedCallCount).toBe(2);
+    });
+
+    it("sums totalCostUsd across features, treating an unpriced feature as contributing $0, not null", async () => {
+      prisma.aiPromptLog.groupBy.mockResolvedValue([
+        {
+          feature: "SUMMARIZE",
+          outcome: "SUCCESS",
+          _count: { _all: 1 },
+          _sum: { inputTokens: 100, outputTokens: 50, costMicroUsd: 1_000_000 },
+        },
+        {
+          feature: "CATEGORIZE",
+          outcome: "SUCCESS",
+          _count: { _all: 1 },
+          _sum: { inputTokens: 100, outputTokens: 50, costMicroUsd: null },
+        },
+      ]);
+      prisma.aiPromptLog.count.mockResolvedValue(1);
+
+      const result = await service.getAiUsage();
+
+      // $1 from the priced SUMMARIZE feature; CATEGORIZE contributes
+      // nothing to the sum (unpriced), but the overall total is still a
+      // real number, not null, because at least one feature is priced.
+      expect(result.totalCostUsd).toBe(1);
+      expect(result.unpricedCallCount).toBe(1);
+    });
+
+    it("sorts byFeature alphabetically by feature name", async () => {
+      prisma.aiPromptLog.groupBy.mockResolvedValue([
+        { feature: "SUGGEST_REPLY", outcome: "SUCCESS", _count: { _all: 1 }, _sum: { inputTokens: 1, outputTokens: 1, costMicroUsd: null } },
+        { feature: "CATEGORIZE", outcome: "SUCCESS", _count: { _all: 1 }, _sum: { inputTokens: 1, outputTokens: 1, costMicroUsd: null } },
+        { feature: "CHAT", outcome: "SUCCESS", _count: { _all: 1 }, _sum: { inputTokens: 1, outputTokens: 1, costMicroUsd: null } },
+      ]);
+      prisma.aiPromptLog.count.mockResolvedValue(3);
+
+      const result = await service.getAiUsage();
+
+      expect(result.byFeature.map((row) => row.feature)).toEqual([
+        "CATEGORIZE",
+        "CHAT",
+        "SUGGEST_REPLY",
+      ]);
+    });
+
+    it("filters by AiPromptLog.createdAt when a range is supplied", async () => {
+      prisma.aiPromptLog.groupBy.mockResolvedValue([]);
+      prisma.aiPromptLog.count.mockResolvedValue(0);
+
+      await service.getAiUsage("2026-01-01", "2026-01-31");
+
+      const expectedRange = {
+        gte: new Date("2026-01-01T00:00:00.000Z"),
+        lt: new Date("2026-02-01T00:00:00.000Z"),
+      };
+      expect(prisma.aiPromptLog.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1", createdAt: expectedRange } }),
+      );
+      expect(prisma.aiPromptLog.count).toHaveBeenCalledWith({
+        where: {
+          branchId: "branch-1",
+          outcome: "SUCCESS",
+          costMicroUsd: null,
+          createdAt: expectedRange,
+        },
+      });
+    });
+
+    it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
+      await expect(service.getAiUsage("2026-02-01", "2026-01-01")).rejects.toThrow(
+        /from must not be after to/,
+      );
+      expect(prisma.aiPromptLog.groupBy).not.toHaveBeenCalled();
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, tenantContext);
+
+      await expect(service.getAiUsage()).rejects.toThrow(/no active branch/);
     });
   });
 });

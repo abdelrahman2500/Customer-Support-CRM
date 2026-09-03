@@ -68,6 +68,32 @@ export interface ResolutionTimeSummary {
   averageResolutionMs: number | null;
 }
 
+/** Story 121 — mirrors the backend's own `AiUsageByFeature` exactly.
+ * `totalCostUsd` is `null` (never `0`) when no successful call in this
+ * feature has a priced cost. */
+export interface AiUsageByFeature {
+  feature: string;
+  callCount: number;
+  successCount: number;
+  errorCount: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number | null;
+}
+
+/** Story 121 — mirrors the backend's own `AiUsageSummary` exactly.
+ * `unpricedCallCount` is the count of successful calls excluded from
+ * `totalCostUsd` because their model has no entry in the price table —
+ * surfaced explicitly, never silently folded into the total as `$0`. */
+export interface AiUsageSummary {
+  totalCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number | null;
+  unpricedCallCount: number;
+  byFeature: AiUsageByFeature[];
+}
+
 export function getTicketVolumeByStatus(range: ReportDateRange = {}): Promise<TicketVolumeByStatus[]> {
   return apiFetch<TicketVolumeByStatus[]>(`/reports/ticket-volume${toQueryString(range)}`);
 }
@@ -92,6 +118,10 @@ export function getResolutionTime(range: ReportDateRange = {}): Promise<Resoluti
   return apiFetch<ResolutionTimeSummary>(`/reports/resolution-time${toQueryString(range)}`);
 }
 
+export function getAiUsage(range: ReportDateRange = {}): Promise<AiUsageSummary> {
+  return apiFetch<AiUsageSummary>(`/reports/ai-usage${toQueryString(range)}`);
+}
+
 /**
  * Story 110 — Saved Dashboards. `widgetType` mirrors the backend's
  * `ReportWidgetType` enum values exactly — one per existing report
@@ -106,7 +136,8 @@ export type ReportWidgetType =
   | "CSAT"
   | "AGENT_PERFORMANCE"
   | "TICKET_AGING"
-  | "RESOLUTION_TIME";
+  | "RESOLUTION_TIME"
+  | "AI_USAGE";
 
 export interface DashboardWidgetSummary {
   widgetType: ReportWidgetType;

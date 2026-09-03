@@ -4,6 +4,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import {
   useAgentPerformanceQuery,
+  useAiUsageQuery,
   useCreateDashboardMutation,
   useCsatSummaryQuery,
   useDashboardsQuery,
@@ -32,7 +33,24 @@ const ALL_WIDGET_TYPES: ReportWidgetType[] = [
   "AGENT_PERFORMANCE",
   "TICKET_AGING",
   "RESOLUTION_TIME",
+  "AI_USAGE",
 ];
+
+/** Story 121 — no currency-formatting precedent exists anywhere else in
+ * this codebase (Recon finding), so this is a small, local helper rather
+ * than a new shared `lib` module for a single caller. Renders as e.g.
+ * "$0.0034" — AI per-call costs are routinely sub-cent, so a fixed 2-decimal
+ * `Intl.NumberFormat` "currency" style would round every real value to
+ * "$0.00"; 4 decimals is the smallest fixed precision that still shows a
+ * typical single Claude call's cost as a nonzero number. */
+function formatUsd(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  }).format(amount);
+}
 
 /**
  * Story 56 — Reporting & Analytics Foundation. Independent cards over
@@ -72,6 +90,12 @@ const ALL_WIDGET_TYPES: ReportWidgetType[] = [
  * dashboard's widgets still use this page's one shared `{from, to}`
  * control, exactly like "All reports" always has (Story 93's own explicit
  * decision against per-card independent controls).
+ *
+ * Story 121 — a seventh card, `GET /reports/ai-usage`, added the same
+ * way; no permission/layout-shell change beyond widening "All reports."
+ * Total cost plus a per-`AiFeature` breakdown, with an explicit caveat
+ * when some successful calls used an unpriced/unrecognized model (see
+ * `AiUsageSummary.unpricedCallCount`'s own doc comment).
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
@@ -87,6 +111,7 @@ export function ReportsView() {
   const agentPerformanceQuery = useAgentPerformanceQuery(range);
   const resolutionTimeQuery = useResolutionTimeQuery(range);
   const ticketAgingQuery = useTicketAgingQuery(range);
+  const aiUsageQuery = useAiUsageQuery(range);
 
   const dashboardsQuery = useDashboardsQuery();
   const createDashboardMutation = useCreateDashboardMutation();
@@ -274,6 +299,53 @@ export function ReportsView() {
                 <span className="text-slate-500">
                   {t("resolutionTime.detail", { count: resolutionTimeQuery.data.resolvedCount })}
                 </span>
+              </div>
+            )}
+          </ReportCard>
+        );
+
+      case "AI_USAGE":
+        // Story 121 — `totalCostUsd` is `null` (never a misleading `$0`)
+        // when no successful call in range has a priced cost; a nonzero
+        // `unpricedCallCount` is surfaced as an explicit caveat, mirroring
+        // this screen's existing "never hide a caveat" convention (e.g.
+        // `slaCompliance.detail`, `resolutionTime.detail`).
+        return (
+          <ReportCard heading={t("aiUsage.heading")} query={aiUsageQuery} t={t} skeleton="list">
+            {aiUsageQuery.isSuccess && aiUsageQuery.data.totalCalls === 0 && (
+              <p className="text-sm text-slate-500">{t("aiUsage.empty")}</p>
+            )}
+            {aiUsageQuery.isSuccess && aiUsageQuery.data.totalCalls > 0 && (
+              <div className="flex flex-col gap-2 text-sm">
+                <div className="flex flex-col gap-1">
+                  <span className="text-2xl font-semibold text-slate-900">
+                    {aiUsageQuery.data.totalCostUsd !== null
+                      ? formatUsd(aiUsageQuery.data.totalCostUsd)
+                      : t("aiUsage.costUnknown")}
+                  </span>
+                  <span className="text-slate-500">
+                    {t("aiUsage.detail", {
+                      calls: aiUsageQuery.data.totalCalls,
+                      inputTokens: aiUsageQuery.data.totalInputTokens,
+                      outputTokens: aiUsageQuery.data.totalOutputTokens,
+                    })}
+                  </span>
+                </div>
+                <ul className="flex flex-col gap-1 border-t border-slate-100 pt-2">
+                  {aiUsageQuery.data.byFeature.map((row) => (
+                    <li key={row.feature} className="flex items-center justify-between">
+                      <span className="text-slate-600">{row.feature}</span>
+                      <span className="font-medium text-slate-900">
+                        {row.totalCostUsd !== null ? formatUsd(row.totalCostUsd) : t("aiUsage.costUnknown")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {aiUsageQuery.data.unpricedCallCount > 0 && (
+                  <p className="text-xs text-amber-700">
+                    {t("aiUsage.unpricedWarning", { count: aiUsageQuery.data.unpricedCallCount })}
+                  </p>
+                )}
               </div>
             )}
           </ReportCard>

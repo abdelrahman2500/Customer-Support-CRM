@@ -123,6 +123,12 @@ describe("AiProcessingProcessor", () => {
           outcome: "SUCCESS",
           outputText: "A summary.",
           errorMessage: null,
+          // Story 121 — "claude-test" has no entry in the price table
+          // (it's a test fixture, not a real Anthropic model id), so
+          // computeCostMicroUsd correctly returns null here, never a
+          // fabricated 0 — see that util's own dedicated spec for the
+          // known-model cases.
+          costMicroUsd: null,
         },
       });
       expect(handbackQueue.add).toHaveBeenCalledWith("ai-completion", {
@@ -160,6 +166,26 @@ describe("AiProcessingProcessor", () => {
 
       expect(seenDuringProcessing).toBeTypeOf("string");
       expect(seenDuringProcessing).not.toBe("");
+    });
+
+    // Story 121 — AI Usage/Cost Reporting.
+    it("persists a real computed costMicroUsd for a real, priced model", async () => {
+      provider.summarize.mockResolvedValue({
+        outcome: "SUCCESS",
+        text: "A summary.",
+        model: "claude-sonnet-4-5-20250929",
+        inputTokens: 500,
+        outputTokens: 200,
+        errorMessage: null,
+      });
+      const job = buildJob(PAYLOAD);
+
+      await processor.process(job);
+
+      // 500 * $3/M + 200 * $15/M = 1500 + 3000 = 4500 micro-USD.
+      expect(prisma.aiPromptLog.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ costMicroUsd: 4500 }) }),
+      );
     });
 
     it("calls provider.suggestReply for a SUGGEST_REPLY job", async () => {

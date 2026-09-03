@@ -4,6 +4,7 @@ import { RequirePermissions } from "../../common/auth/require-permissions.decora
 import { ReportDateRangeQueryDto } from "./dto/report-date-range-query.dto";
 import type {
   AgentPerformanceSummary,
+  AiUsageSummary,
   CsatSummary,
   ResolutionTimeSummary,
   SlaComplianceSummary,
@@ -30,6 +31,9 @@ import { ReportingService } from "./reporting.service";
  * omitted reproduces each route's exact pre-Story-93 response.
  *
  * Story 99 — `GET /reports/resolution-time` added the same way; no new
+ * permission (reuses `report:read`).
+ *
+ * Story 121 — `GET /reports/ai-usage` added the same way; no new
  * permission (reuses `report:read`). */
 @ApiTags("reporting")
 @ApiBearerAuth()
@@ -75,5 +79,11 @@ export class ReportingController {
     @Query() { from, to }: ReportDateRangeQueryDto,
   ): Promise<ResolutionTimeSummary> {
     return this.reportingService.getResolutionTime(from, to);
+  }
+
+  @Get("ai-usage")
+  @RequirePermissions("report:read")
+  getAiUsage(@Query() { from, to }: ReportDateRangeQueryDto): Promise<AiUsageSummary> {
+    return this.reportingService.getAiUsage(from, to);
   }
 }

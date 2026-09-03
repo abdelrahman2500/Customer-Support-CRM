@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { SLA_BREACHED_EVENT } from "../src/modules/sla-policies/sla-detection.events";
+import { PrismaService } from "../src/prisma/prisma.service";
 
 /**
  * Integration suite for Story 56 — `GET /reports/ticket-volume`,
@@ -36,6 +37,7 @@ import { SLA_BREACHED_EVENT } from "../src/modules/sla-policies/sla-detection.ev
 describe("Reporting & Analytics (e2e)", () => {
   let app: INestApplication;
   let eventEmitter: EventEmitter2;
+  let prisma: PrismaService;
   let adminAccessToken: string;
   let adminBranchId: string;
 
@@ -43,6 +45,7 @@ describe("Reporting & Analytics (e2e)", () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     eventEmitter = moduleRef.get(EventEmitter2);
+    prisma = moduleRef.get(PrismaService);
 
     app.use(cookieParser());
     app.setGlobalPrefix("api/v1", { exclude: ["health", "health/ready"] });
@@ -203,6 +206,66 @@ describe("Reporting & Analytics (e2e)", () => {
     return response.body;
   }
 
+  /** Story 121 — AI Usage/Cost Reporting. */
+  interface AiUsageByFeature {
+    feature: string;
+    callCount: number;
+    successCount: number;
+    errorCount: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalCostUsd: number | null;
+  }
+  interface AiUsageSummary {
+    totalCalls: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalCostUsd: number | null;
+    unpricedCallCount: number;
+    byFeature: AiUsageByFeature[];
+  }
+  async function getAiUsage(range?: DateRange): Promise<AiUsageSummary> {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/reports/ai-usage${toQueryString(range)}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    return response.body;
+  }
+
+  /**
+   * Story 121 — there is no HTTP endpoint that lets a caller set
+   * `inputTokens`/`outputTokens`/`costMicroUsd` deterministically (a real
+   * completed `AiPromptLog` row is only ever produced by `apps/worker`
+   * actually calling a real Anthropic API) — this suite creates the row
+   * directly via Prisma instead, mirroring `ticket-recategorization.e2e-
+   * spec.ts`'s own "no HTTP endpoint exists for this fixture, create it
+   * directly" precedent. `ticketId`/`chatSessionId` are both omitted
+   * (both nullable, mutually exclusive with `feature`) since this report
+   * never reads either.
+   */
+  async function createAiPromptLog(overrides: {
+    feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT";
+    outcome: "PENDING" | "SUCCESS" | "ERROR" | "DISABLED";
+    model?: string;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    costMicroUsd?: number | null;
+  }): Promise<string> {
+    const row = await prisma.aiPromptLog.create({
+      data: {
+        branchId: adminBranchId,
+        feature: overrides.feature,
+        model: overrides.model ?? "claude-sonnet-4-5-20250929",
+        promptRef: `reporting-e2e-${randomUUID()}`,
+        inputTokens: overrides.inputTokens ?? null,
+        outputTokens: overrides.outputTokens ?? null,
+        outcome: overrides.outcome,
+        costMicroUsd: overrides.costMicroUsd ?? null,
+      },
+    });
+    return row.id;
+  }
+
   it("rejects unauthenticated requests on every route", async () => {
     await request(app.getHttpServer()).get("/api/v1/reports/ticket-volume").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/sla-compliance").expect(401);
@@ -210,6 +273,7 @@ describe("Reporting & Analytics (e2e)", () => {
     await request(app.getHttpServer()).get("/api/v1/reports/agent-performance").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/ticket-aging").expect(401);
     await request(app.getHttpServer()).get("/api/v1/reports/resolution-time").expect(401);
+    await request(app.getHttpServer()).get("/api/v1/reports/ai-usage").expect(401);
   });
 
   it("rejects an Agent-role user lacking report:read on every route (403)", async () => {
@@ -267,6 +331,10 @@ describe("Reporting & Analytics (e2e)", () => {
       .expect(403);
     await request(app.getHttpServer())
       .get("/api/v1/reports/resolution-time")
+      .set("Authorization", `Bearer ${agentAccessToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get("/api/v1/reports/ai-usage")
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(403);
   });
@@ -799,5 +867,85 @@ describe("Reporting & Analytics (e2e)", () => {
     const allTime = await getTicketVolume();
     const explicitlyUnfiltered = await getTicketVolume({});
     expect(explicitlyUnfiltered).toEqual(allTime);
+  });
+
+  // Story 121 — AI Usage/Cost Reporting.
+  describe("ai-usage", () => {
+    it("reflects a real, priced SUCCESS AiPromptLog row in totalCalls/totalCostUsd and its own feature's row", async () => {
+      const before = await getAiUsage();
+
+      await createAiPromptLog({
+        feature: "SUMMARIZE",
+        outcome: "SUCCESS",
+        model: "claude-sonnet-4-5-20250929",
+        inputTokens: 500,
+        outputTokens: 200,
+        // 500 * $3/M + 200 * $15/M = 1500 + 3000 = 4500 micro-USD = $0.0045.
+        costMicroUsd: 4500,
+      });
+
+      const after = await getAiUsage();
+      expect(after.totalCalls).toBe(before.totalCalls + 1);
+      expect(after.totalInputTokens).toBe(before.totalInputTokens + 500);
+      expect(after.totalOutputTokens).toBe(before.totalOutputTokens + 200);
+      expect((after.totalCostUsd ?? 0) - (before.totalCostUsd ?? 0)).toBeCloseTo(0.0045, 10);
+
+      const summarizeRow = after.byFeature.find((row) => row.feature === "SUMMARIZE");
+      expect(summarizeRow).toBeDefined();
+      expect(summarizeRow!.successCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("counts an unpriced SUCCESS row in unpricedCallCount, never silently as $0 or dropped from totalCalls", async () => {
+      const before = await getAiUsage();
+
+      await createAiPromptLog({
+        feature: "CATEGORIZE",
+        outcome: "SUCCESS",
+        model: "some-future-unpriced-model",
+        inputTokens: 100,
+        outputTokens: 50,
+        costMicroUsd: null,
+      });
+
+      const after = await getAiUsage();
+      expect(after.totalCalls).toBe(before.totalCalls + 1);
+      expect(after.unpricedCallCount).toBe(before.unpricedCallCount + 1);
+    });
+
+    it("counts an ERROR row in errorCount, contributing no tokens/cost", async () => {
+      const before = await getAiUsage();
+
+      await createAiPromptLog({ feature: "CHAT", outcome: "ERROR" });
+
+      const after = await getAiUsage();
+      expect(after.totalCalls).toBe(before.totalCalls + 1);
+      const chatRow = after.byFeature.find((row) => row.feature === "CHAT");
+      expect(chatRow).toBeDefined();
+      expect(chatRow!.errorCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("a [today, today] range includes a freshly-created row; a [yesterday, yesterday] range is unaffected by it", async () => {
+      const beforeToday = await getAiUsage({ from: today(), to: today() });
+      // Story 5's disclosed date-boundary flake precedent (CLAUDE.md §13):
+      // never assert an absolute yesterday count in this shared, persistent
+      // database — only that creating a fixture *today* leaves *yesterday's*
+      // own count exactly as it already was (a delta, like every other
+      // range assertion in this suite).
+      const beforeYesterday = await getAiUsage({ from: yesterday(), to: yesterday() });
+
+      await createAiPromptLog({
+        feature: "SUGGEST_REPLY",
+        outcome: "SUCCESS",
+        inputTokens: 10,
+        outputTokens: 10,
+        costMicroUsd: 100,
+      });
+
+      const afterToday = await getAiUsage({ from: today(), to: today() });
+      expect(afterToday.totalCalls).toBe(beforeToday.totalCalls + 1);
+
+      const afterYesterday = await getAiUsage({ from: yesterday(), to: yesterday() });
+      expect(afterYesterday.totalCalls).toBe(beforeYesterday.totalCalls);
+    });
   });
 });

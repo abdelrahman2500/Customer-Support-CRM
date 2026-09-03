@@ -686,6 +686,13 @@
       "empty": "No tickets resolved yet.",
       "detail": "based on {count} resolved tickets"
     },
+    "aiUsage": {
+      "heading": "AI Usage & Cost",
+      "empty": "No AI usage yet.",
+      "detail": "{calls} calls · {inputTokens} input / {outputTokens} output tokens",
+      "costUnknown": "Cost unknown",
+      "unpricedWarning": "{count} successful call(s) used a model not in the price table and are excluded from the cost total."
+    },
     "dashboards": {
       "pickerLabel": "Dashboard",
       "allReports": "All reports",

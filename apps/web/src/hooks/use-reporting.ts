@@ -8,6 +8,7 @@ import {
   createDashboard,
   deleteDashboard,
   getAgentPerformance,
+  getAiUsage,
   getCsatSummary,
   getDashboard,
   getResolutionTime,
@@ -69,6 +70,14 @@ export function useResolutionTimeQuery(range: ReportDateRange = {}) {
   return useQuery({
     queryKey: ["reports", "resolution-time", range],
     queryFn: () => getResolutionTime(range),
+  });
+}
+
+/** Story 121 — same parameterized-query-key pattern as every other hook here. */
+export function useAiUsageQuery(range: ReportDateRange = {}) {
+  return useQuery({
+    queryKey: ["reports", "ai-usage", range],
+    queryFn: () => getAiUsage(range),
   });
 }
 

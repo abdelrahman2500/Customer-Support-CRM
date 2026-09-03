@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ReportsView } from "./reports-view";
 import {
   useAgentPerformanceQuery,
+  useAiUsageQuery,
   useCreateDashboardMutation,
   useCsatSummaryQuery,
   useDashboardsQuery,
@@ -27,6 +28,7 @@ vi.mock("@/hooks/use-reporting", () => ({
   useAgentPerformanceQuery: vi.fn(),
   useTicketAgingQuery: vi.fn(),
   useResolutionTimeQuery: vi.fn(),
+  useAiUsageQuery: vi.fn(),
   useDashboardsQuery: vi.fn(),
   useCreateDashboardMutation: vi.fn(),
   useUpdateDashboardMutation: vi.fn(),
@@ -39,6 +41,7 @@ const mockedUseCsatSummaryQuery = vi.mocked(useCsatSummaryQuery);
 const mockedUseAgentPerformanceQuery = vi.mocked(useAgentPerformanceQuery);
 const mockedUseTicketAgingQuery = vi.mocked(useTicketAgingQuery);
 const mockedUseResolutionTimeQuery = vi.mocked(useResolutionTimeQuery);
+const mockedUseAiUsageQuery = vi.mocked(useAiUsageQuery);
 const mockedUseDashboardsQuery = vi.mocked(useDashboardsQuery);
 const mockedUseCreateDashboardMutation = vi.mocked(useCreateDashboardMutation);
 const mockedUseUpdateDashboardMutation = vi.mocked(useUpdateDashboardMutation);
@@ -85,6 +88,19 @@ describe("ReportsView", () => {
     );
     mockedUseResolutionTimeQuery.mockReturnValue(
       queryResult({ data: { resolvedCount: 0, averageResolutionMs: null }, isSuccess: true }) as never,
+    );
+    mockedUseAiUsageQuery.mockReturnValue(
+      queryResult({
+        data: {
+          totalCalls: 0,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          totalCostUsd: null,
+          unpricedCallCount: 0,
+          byFeature: [],
+        },
+        isSuccess: true,
+      }) as never,
     );
     mockedUseDashboardsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     mockedUseCreateDashboardMutation.mockReturnValue({
@@ -360,9 +376,107 @@ describe("ReportsView", () => {
     });
   });
 
+  // Story 121 — AI Usage/Cost Reporting.
+  describe("ai-usage card (Story 121)", () => {
+    it("renders the empty state when there is no AI usage yet", () => {
+      render(<ReportsView />);
+
+      expect(screen.getByText("aiUsage.empty")).toBeInTheDocument();
+    });
+
+    it("renders total cost, the usage detail line, and a per-feature cost breakdown", () => {
+      mockedUseAiUsageQuery.mockReturnValue(
+        queryResult({
+          data: {
+            totalCalls: 5,
+            totalInputTokens: 1000,
+            totalOutputTokens: 500,
+            totalCostUsd: 0.0045,
+            unpricedCallCount: 0,
+            byFeature: [
+              {
+                feature: "SUMMARIZE",
+                callCount: 5,
+                successCount: 5,
+                errorCount: 0,
+                totalInputTokens: 1000,
+                totalOutputTokens: 500,
+                totalCostUsd: 0.0045,
+              },
+            ],
+          },
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+
+      // Appears twice: the card's own overall total, and the per-feature
+      // breakdown row (this fixture has only one feature, with the same
+      // cost as the overall total).
+      expect(screen.getAllByText("$0.0045")).toHaveLength(2);
+      expect(
+        screen.getByText('aiUsage.detail:{"calls":5,"inputTokens":1000,"outputTokens":500}'),
+      ).toBeInTheDocument();
+      expect(screen.getByText("SUMMARIZE")).toBeInTheDocument();
+      expect(screen.queryByText("aiUsage.unpricedWarning:{\"count\":0}")).not.toBeInTheDocument();
+    });
+
+    it("shows 'cost unknown' (not $0) for a feature whose calls are all unpriced, plus the unpriced-count caveat", () => {
+      mockedUseAiUsageQuery.mockReturnValue(
+        queryResult({
+          data: {
+            totalCalls: 2,
+            totalInputTokens: 400,
+            totalOutputTokens: 200,
+            totalCostUsd: null,
+            unpricedCallCount: 2,
+            byFeature: [
+              {
+                feature: "CHAT",
+                callCount: 2,
+                successCount: 2,
+                errorCount: 0,
+                totalInputTokens: 400,
+                totalOutputTokens: 200,
+                totalCostUsd: null,
+              },
+            ],
+          },
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+
+      expect(screen.getAllByText("aiUsage.costUnknown").length).toBeGreaterThan(0);
+      expect(screen.getByText('aiUsage.unpricedWarning:{"count":2}')).toBeInTheDocument();
+    });
+
+    it("uses the list skeleton shape while loading", () => {
+      mockedUseAiUsageQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<ReportsView />);
+
+      const heading = screen.getByText("aiUsage.heading");
+      const card = heading.closest("div")!;
+      expect(card.querySelectorAll(".animate-pulse")).toHaveLength(3);
+    });
+
+    it("shares the same date-range state as the other cards", () => {
+      render(<ReportsView />);
+
+      fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
+        target: { value: "2026-01-01" },
+      });
+
+      expect(mockedUseAiUsageQuery).toHaveBeenLastCalledWith({ from: "2026-01-01" });
+    });
+  });
+
   // Story 110 — Saved Dashboards.
   describe("saved dashboards (Story 110)", () => {
-    it("renders all six report cards under the 'All reports' default, unaffected by an empty dashboard list", () => {
+    it("renders all seven report cards under the 'All reports' default, unaffected by an empty dashboard list", () => {
       render(<ReportsView />);
 
       expect(screen.getByText("ticketVolume.heading")).toBeInTheDocument();
@@ -371,6 +485,7 @@ describe("ReportsView", () => {
       expect(screen.getByText("agentPerformance.heading")).toBeInTheDocument();
       expect(screen.getByText("ticketAging.heading")).toBeInTheDocument();
       expect(screen.getByText("resolutionTime.heading")).toBeInTheDocument();
+      expect(screen.getByText("aiUsage.heading")).toBeInTheDocument();
       // No owner-only actions are shown for the default, dashboard-less view.
       expect(screen.queryByText("dashboards.share")).not.toBeInTheDocument();
       expect(screen.queryByText("dashboards.delete")).not.toBeInTheDocument();
@@ -423,6 +538,7 @@ describe("ReportsView", () => {
       expect(screen.queryByText("agentPerformance.heading")).not.toBeInTheDocument();
       expect(screen.queryByText("ticketAging.heading")).not.toBeInTheDocument();
       expect(screen.queryByText("resolutionTime.heading")).not.toBeInTheDocument();
+      expect(screen.queryByText("aiUsage.heading")).not.toBeInTheDocument();
     });
 
     it("shows owner-only share/delete actions only for a dashboard the caller owns", () => {
@@ -470,6 +586,7 @@ describe("ReportsView", () => {
           "AGENT_PERFORMANCE",
           "TICKET_AGING",
           "RESOLUTION_TIME",
+          "AI_USAGE",
         ],
       });
     });

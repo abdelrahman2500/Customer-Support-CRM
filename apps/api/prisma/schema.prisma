@@ -1146,6 +1146,21 @@ model AiPromptLog {
   /// existing outputTokens field.
   outputText    String?      @map("output_text")
   errorMessage  String?      @map("error_message")
+  /// Story 121 — AI Usage/Cost Reporting. Integer micro-USD (1,000,000 =
+  /// $1), not a float dollar amount, to avoid floating-point drift when
+  /// summing many small per-call costs in a report aggregate. Computed
+  /// once, by `AiProcessingProcessor` (`apps/worker`), at the same moment
+  /// `inputTokens`/`outputTokens` are known — never recomputed at
+  /// report-query time, so a later change to the price table never
+  /// silently rewrites a historical call's already-recorded cost (mirrors
+  /// `latencyMs`'s own "a fact captured once, at call time" precedent).
+  /// Null whenever `inputTokens`/`outputTokens` are null (PENDING/ERROR/
+  /// DISABLED) and also whenever `model` has no entry in the worker's
+  /// price table (an unpriced/unrecognized model) — never a fabricated
+  /// `0`. Rows created before this story ships keep this `null` forever —
+  /// no backfill, by design (mirrors `Ticket.resolvedAt`'s own Story 99
+  /// precedent).
+  costMicroUsd  Int?         @map("cost_micro_usd")
   createdAt     DateTime     @default(now()) @map("created_at")
 
   @@index([branchId])
@@ -1338,6 +1353,8 @@ enum ReportWidgetType {
   AGENT_PERFORMANCE
   TICKET_AGING
   RESOLUTION_TIME
+  /// Story 121 — AI Usage/Cost Reporting.
+  AI_USAGE
 
   @@schema("reporting")
 }

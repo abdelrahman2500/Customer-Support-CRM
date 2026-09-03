@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { TicketStatus } from "@prisma/client";
+import type { AiFeature, TicketStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { hasDateRange, resolveReportDateRange } from "./report-date-range.util";
@@ -52,6 +52,42 @@ export interface AgentPerformanceSummary {
 export interface ResolutionTimeSummary {
   resolvedCount: number;
   averageResolutionMs: number | null;
+}
+
+/**
+ * Story 121 — one row per `AiFeature` value with at least one `AiPromptLog`
+ * row in the caller's branch (in this window) — same "only what exists"
+ * convention as `TicketVolumeByStatus`. `totalCostUsd` is `null` (never a
+ * misleading `0`) when no successful call in this feature has a priced
+ * cost — either because none succeeded, or because every one that did used
+ * a model with no entry in `apps/worker`'s price table (see
+ * `AiPromptLog.costMicroUsd`'s own schema doc comment); a real `0` would
+ * wrongly read as "this feature cost nothing" rather than "cost unknown."
+ */
+export interface AiUsageByFeature {
+  feature: AiFeature;
+  callCount: number;
+  successCount: number;
+  errorCount: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number | null;
+}
+
+/**
+ * `unpricedCallCount` is the count of `SUCCESS` calls whose `costMicroUsd`
+ * is `null` (an unrecognized/unpriced model) — surfaced explicitly rather
+ * than silently folded into `totalCostUsd` as `$0` or silently dropped
+ * from `totalCalls`, so a caller can tell "no AI usage yet" apart from
+ * "there was usage, but some of it isn't reflected in the cost total."
+ */
+export interface AiUsageSummary {
+  totalCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number | null;
+  unpricedCallCount: number;
+  byFeature: AiUsageByFeature[];
 }
 
 /** Fixed age buckets for currently-open tickets, always returned in this
@@ -343,5 +379,77 @@ export class ReportingService {
       0,
     );
     return { resolvedCount, averageResolutionMs: totalMs / resolvedCount };
+  }
+
+  /**
+   * Story 121 — AI Usage/Cost Reporting. Filters on `AiPromptLog.createdAt`
+   * (when the operation was submitted) — the same "filter on whichever
+   * timestamp represents when this fact became true" rule every other
+   * method here already follows. A single `groupBy(["feature", "outcome"])`
+   * (mirrors `getAgentPerformance`'s own two-dimension groupBy-then-merge
+   * shape) plus one dedicated `count()` for `unpricedCallCount` — `_sum`
+   * only ever accumulates from `SUCCESS` rows in practice (every other
+   * outcome's `inputTokens`/`outputTokens`/`costMicroUsd` are always
+   * `null`, so they contribute nothing to a Prisma `_sum`), which is also
+   * exactly why `totalCostUsd` naturally comes back `null` (not `0`) for a
+   * feature/branch with no priced successful call at all — Prisma's own
+   * `_sum` returns `null`, not `0`, when it has zero non-null values to
+   * add, the same SQL `SUM()` behavior this codebase already relies on
+   * nowhere else needing special-casing.
+   */
+  async getAiUsage(from?: string, to?: string): Promise<AiUsageSummary> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const range = resolveReportDateRange(from, to);
+    const dateFilter = hasDateRange(range) ? { createdAt: range } : {};
+
+    const grouped = await this.prisma.aiPromptLog.groupBy({
+      by: ["feature", "outcome"],
+      where: { branchId, ...dateFilter },
+      _count: { _all: true },
+      _sum: { inputTokens: true, outputTokens: true, costMicroUsd: true },
+    });
+
+    const unpricedCallCount = await this.prisma.aiPromptLog.count({
+      where: { branchId, outcome: "SUCCESS", costMicroUsd: null, ...dateFilter },
+    });
+
+    const byFeatureMap = new Map<AiFeature, AiUsageByFeature>();
+    for (const row of grouped) {
+      const existing = byFeatureMap.get(row.feature) ?? {
+        feature: row.feature,
+        callCount: 0,
+        successCount: 0,
+        errorCount: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalCostUsd: null,
+      };
+      existing.callCount += row._count._all;
+      if (row.outcome === "SUCCESS") {
+        existing.successCount += row._count._all;
+      } else if (row.outcome === "ERROR") {
+        existing.errorCount += row._count._all;
+      }
+      existing.totalInputTokens += row._sum.inputTokens ?? 0;
+      existing.totalOutputTokens += row._sum.outputTokens ?? 0;
+      if (row._sum.costMicroUsd !== null) {
+        existing.totalCostUsd = (existing.totalCostUsd ?? 0) + row._sum.costMicroUsd / 1_000_000;
+      }
+      byFeatureMap.set(row.feature, existing);
+    }
+
+    const byFeature = [...byFeatureMap.values()].sort((a, b) => a.feature.localeCompare(b.feature));
+    const totalCostUsd = byFeature.some((row) => row.totalCostUsd !== null)
+      ? byFeature.reduce((sum, row) => sum + (row.totalCostUsd ?? 0), 0)
+      : null;
+
+    return {
+      totalCalls: byFeature.reduce((sum, row) => sum + row.callCount, 0),
+      totalInputTokens: byFeature.reduce((sum, row) => sum + row.totalInputTokens, 0),
+      totalOutputTokens: byFeature.reduce((sum, row) => sum + row.totalOutputTokens, 0),
+      totalCostUsd,
+      unpricedCallCount,
+      byFeature,
+    };
   }
 }
