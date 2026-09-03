@@ -714,6 +714,8 @@
       "share": "Share with branch",
       "unshare": "Stop sharing",
       "delete": "Delete dashboard",
+      "deleteConfirmTitle": "Delete this dashboard?",
+      "deleteConfirmDescription": "\"{name}\" will be removed for everyone it is shared with. This can't be undone.",
       "nameLabel": "Dashboard name",
       "shareLabel": "Share with branch",
       "save": "Save",
@@ -823,7 +825,7 @@
   },
   "branding": {
     "title": "Branding",
-    "description": "Configure your branch's logo and brand colors. This is a preview only for now — it is not yet applied anywhere else in the app.",
+    "description": "Configure your branch's logo and brand colors. These are applied live to the workspace header and the Customer Portal.",
     "error": "Couldn't load your branding settings.",
     "retry": "Retry",
     "logoUrlLabel": "Logo URL",
@@ -833,6 +835,8 @@
     "save": "Save",
     "saving": "Saving...",
     "saveFailed": "Couldn't save your branding settings. Please try again.",
+    "saveSuccess": "Branding saved.",
+    "invalidColor": "Enter a hex color, e.g. #0f172a.",
     "previewHeading": "Preview",
     "logoPreviewAlt": "Logo preview",
     "noLogo": "No logo set"

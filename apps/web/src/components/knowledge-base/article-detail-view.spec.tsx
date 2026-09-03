@@ -8,6 +8,12 @@ import {
 } from "@/hooks/use-knowledge-base";
 import { ApiError } from "@/lib/api";
 
+// Version-history dates are formatted with the active locale (same
+// convention as `audit-log-view.spec.tsx`, which mocks this identically).
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ locale: "en" }),
+}));
+
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
     vars ? `${key}:${JSON.stringify(vars)}` : key,

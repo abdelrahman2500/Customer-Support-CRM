@@ -3,6 +3,12 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MySessionsView } from "./my-sessions-view";
 import { useMySessionsQuery, useRevokeSessionMutation } from "@/hooks/use-sessions";
 
+// Session timestamps are formatted with the active locale (same convention
+// as `audit-log-view.spec.tsx`, which mocks this identically).
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ locale: "en" }),
+}));
+
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));

@@ -22,6 +22,7 @@ import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -113,6 +114,10 @@ export function ReportsView() {
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [newDashboardName, setNewDashboardName] = useState("");
   const [newDashboardShared, setNewDashboardShared] = useState(false);
+  // Deleting a saved dashboard is irreversible and — when shared — removes it
+  // for the whole branch, so it goes through the same `ConfirmDialog` gate
+  // every other destructive action in this app already uses (Story 94).
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const ticketVolumeQuery = useTicketVolumeQuery(range);
   const slaComplianceQuery = useSlaComplianceQuery(range);
@@ -162,6 +167,7 @@ export function ReportsView() {
       return;
     }
     await deleteDashboardMutation.mutateAsync(selectedDashboard.id);
+    setShowDeleteConfirm(false);
     setSelectedDashboardId(null);
   }
 
@@ -479,12 +485,24 @@ export function ReportsView() {
             <Button variant="outline" size="sm" onClick={handleToggleShare}>
               {selectedDashboard.isShared ? t("dashboards.unshare") : t("dashboards.share")}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void handleDelete()}>
+            <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(true)}>
               {t("dashboards.delete")}
             </Button>
           </>
         )}
       </div>
+
+      {selectedDashboard && (
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title={t("dashboards.deleteConfirmTitle")}
+          description={t("dashboards.deleteConfirmDescription", { name: selectedDashboard.name })}
+          confirmLabel={t("dashboards.delete")}
+          onConfirm={() => void handleDelete()}
+          isPending={deleteDashboardMutation.isPending}
+        />
+      )}
 
       {showSaveForm && (
         <div className="flex flex-wrap items-end gap-2 rounded-md border border-slate-200 bg-white p-3">

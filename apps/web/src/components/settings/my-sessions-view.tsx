@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMySessionsQuery, useRevokeSessionMutation } from "@/hooks/use-sessions";
 import type { SessionSummary } from "@/lib/sessions-api";
@@ -81,6 +82,10 @@ export function MySessionsView() {
 
 function SessionRow({ session }: { session: SessionSummary }) {
   const t = useTranslations("mySessions");
+  // Same locale-aware date convention every other table in this app uses
+  // (e.g. `audit-log-view.tsx`) — an omitted `locale` argument silently
+  // formats in the browser's own locale, not the one the user picked.
+  const { locale } = useParams<{ locale: string }>();
   const errorMessage = useErrorMessage();
   const mutation = useRevokeSessionMutation();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -96,8 +101,8 @@ function SessionRow({ session }: { session: SessionSummary }) {
       <TableCell className="font-mono text-xs text-slate-500">
         {session.ipAddress ?? "—"}
       </TableCell>
-      <TableCell>{new Date(session.lastActiveAt).toLocaleString()}</TableCell>
-      <TableCell>{new Date(session.sessionCreatedAt).toLocaleString()}</TableCell>
+      <TableCell>{new Date(session.lastActiveAt).toLocaleString(locale)}</TableCell>
+      <TableCell>{new Date(session.sessionCreatedAt).toLocaleString(locale)}</TableCell>
       <TableCell>
         {!session.isCurrent && (
           <>

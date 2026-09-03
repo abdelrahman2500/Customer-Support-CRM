@@ -45,7 +45,13 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         href={`/${locale}/knowledge-base`}
         className="text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
       >
-        &larr; {t("detail.backToList")}
+        {/* `rtl:rotate-180` so "back" points the way back in both
+            directions — a bare `&larr;` points *forward* in Arabic.
+            `aria-hidden`: the adjacent label already names the action. */}
+        <span aria-hidden="true" className="inline-block rtl:rotate-180">
+          &larr;
+        </span>{" "}
+        {t("detail.backToList")}
       </a>
 
       <div className="rounded-md border border-slate-200 bg-white p-4">

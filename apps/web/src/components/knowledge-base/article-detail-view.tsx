@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useArticleQuery,
@@ -159,6 +160,10 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
  * `ArticleListView`'s own loading/error/empty/populated shape. */
 function ArticleVersionHistory({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
+  // Same locale-aware date convention every other table in this app uses
+  // (e.g. `audit-log-view.tsx`); omitting `locale` formats in the browser's
+  // own locale rather than the one the user selected.
+  const { locale } = useParams<{ locale: string }>();
   const versionsQuery = useArticleVersionsQuery(articleId);
 
   return (
@@ -189,7 +194,7 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
               <TableRow key={version.id}>
                 <TableCell>{version.versionNumber}</TableCell>
                 <TableCell>{version.title}</TableCell>
-                <TableCell>{new Date(version.publishedAt).toLocaleString()}</TableCell>
+                <TableCell>{new Date(version.publishedAt).toLocaleString(locale)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

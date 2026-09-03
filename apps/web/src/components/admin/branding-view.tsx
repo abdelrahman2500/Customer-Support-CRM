@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { useBrandingQuery, useUpdateBrandingMutation } from "@/hooks/use-branding";
 import { ApiError } from "@/lib/api";
+import { showSuccessToast } from "@/lib/toast-store";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +81,10 @@ function BrandingForm({
         ...(primaryColor.trim() ? { primaryColor: primaryColor.trim() } : {}),
         ...(secondaryColor.trim() ? { secondaryColor: secondaryColor.trim() } : {}),
       });
+      // Every other write surface in this app confirms itself (a toast or a
+      // success Alert); without this a successful save looked identical to
+      // clicking a dead button.
+      showSuccessToast(t("saveSuccess"));
     } catch (submitError) {
       setError(submitError instanceof ApiError ? submitError.message : t("saveFailed"));
     }
@@ -87,6 +92,12 @@ function BrandingForm({
 
   const validPrimary = HEX_COLOR_PATTERN.test(primaryColor);
   const validSecondary = HEX_COLOR_PATTERN.test(secondaryColor);
+  // Both colors are optional, so "empty" is valid — only a non-empty value
+  // that isn't a hex color is a validation failure. Previously `validPrimary`/
+  // `validSecondary` were computed but only ever used to tint the preview
+  // swatch, so malformed input submitted happily and failed server-side.
+  const invalidPrimary = primaryColor.trim() !== "" && !validPrimary;
+  const invalidSecondary = secondaryColor.trim() !== "" && !validSecondary;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -104,19 +115,27 @@ function BrandingForm({
           <Input
             value={primaryColor}
             placeholder="#0f172a"
+            aria-invalid={invalidPrimary || undefined}
             onChange={(event) => setPrimaryColor(event.target.value)}
           />
+          {invalidPrimary && <span className="text-red-600">{t("invalidColor")}</span>}
         </label>
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("secondaryColorLabel")}
           <Input
             value={secondaryColor}
             placeholder="#64748b"
+            aria-invalid={invalidSecondary || undefined}
             onChange={(event) => setSecondaryColor(event.target.value)}
           />
+          {invalidSecondary && <span className="text-red-600">{t("invalidColor")}</span>}
         </label>
         <div>
-          <Button type="submit" size="sm" disabled={mutation.isPending}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={mutation.isPending || invalidPrimary || invalidSecondary}
+          >
             {mutation.isPending ? t("saving") : t("save")}
           </Button>
         </div>

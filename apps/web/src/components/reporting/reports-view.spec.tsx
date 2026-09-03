@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { ReportsView } from "./reports-view";
 import {
   useAgentPerformanceQuery,
@@ -651,7 +651,7 @@ describe("ReportsView", () => {
       expect(mutate).toHaveBeenCalledWith({ isShared: true });
     });
 
-    it("deletes the owned, selected dashboard and resets to 'All reports'", async () => {
+    it("does not delete immediately — clicking delete opens a confirmation dialog first", () => {
       const mutateAsync = vi.fn().mockResolvedValue({ id: "dash-1" });
       mockedUseDeleteDashboardMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
       mockedUseDashboardsQuery.mockReturnValue(
@@ -665,7 +665,29 @@ describe("ReportsView", () => {
       fireEvent.change(screen.getByLabelText("dashboards.pickerLabel"), {
         target: { value: "dash-1" },
       });
-      fireEvent.click(screen.getByText("dashboards.delete"));
+      fireEvent.click(screen.getByRole("button", { name: "dashboards.delete" }));
+
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+      expect(mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("deletes the owned, selected dashboard via the confirmation dialog and resets to 'All reports'", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "dash-1" });
+      mockedUseDeleteDashboardMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
+      mockedUseDashboardsQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "dash-1", name: "Owned", isShared: false, isOwner: true, widgets: [] }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+      fireEvent.change(screen.getByLabelText("dashboards.pickerLabel"), {
+        target: { value: "dash-1" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "dashboards.delete" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "dashboards.delete" }));
 
       await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith("dash-1"));
       expect(screen.getByLabelText("dashboards.pickerLabel")).toHaveValue("");
