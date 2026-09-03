@@ -108,6 +108,7 @@ export function CreateUserView() {
             required
             minLength={8}
           />
+          <span className="text-xs text-slate-500">{t("create.passwordHint")}</span>
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-slate-700">

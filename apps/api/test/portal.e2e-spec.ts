@@ -41,7 +41,9 @@ describe("Customer Portal (e2e)", () => {
   let customerId: string;
   let contactId: string;
   const contactEmail = `portal-contact-${randomUUID()}@example.com`;
-  const portalPassword = "a-strong-portal-password";
+  // Story 123 — Password Complexity: needs a digit alongside the existing
+  // lowercase letters + hyphen to satisfy the new 3-of-4-classes rule.
+  const portalPassword = "a-strong-portal-password-1";
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -112,6 +114,16 @@ describe("Customer Portal (e2e)", () => {
       .patch(`/api/v1/customers/${customerId}/contacts/${contactId}/portal-password`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({ newPassword: "short" })
+      .expect(400);
+  });
+
+  it("rejects a portal-password update that is long enough but not complex enough (Story 123)", async () => {
+    // 8+ characters, but only 1 character class (all lowercase) — fails the
+    // "at least 3 of: lowercase, uppercase, digit, symbol" rule.
+    await request(app.getHttpServer())
+      .patch(`/api/v1/customers/${customerId}/contacts/${contactId}/portal-password`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ newPassword: "onlylowercaseletters" })
       .expect(400);
   });
 
@@ -234,7 +246,7 @@ describe("Customer Portal (e2e)", () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/customers/${customerId}/contacts/${contactId}/portal-password`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ newPassword: "yet-another-strong-password" })
+      .send({ newPassword: "yet-another-strong-password-1" })
       .expect(200);
 
     await request(app.getHttpServer())
@@ -253,7 +265,7 @@ describe("Customer Portal (e2e)", () => {
   it("rejects a customer-audience token on the pre-existing, agent-only surface (401)", async () => {
     const loginResponse = await request(app.getHttpServer())
       .post("/api/v1/portal/auth/login")
-      .send({ email: contactEmail, password: "yet-another-strong-password" })
+      .send({ email: contactEmail, password: "yet-another-strong-password-1" })
       .expect(200);
     const portalAccessToken = loginResponse.body.accessToken as string;
 

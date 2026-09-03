@@ -714,7 +714,7 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
       const submitButton = screen.getByRole("button", { name: "Reset password" });
       expect(submitButton).toBeDisabled();
 
@@ -734,7 +734,7 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.blur(passwordInput);
       expect(mutate).not.toHaveBeenCalled();
@@ -754,7 +754,7 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
       const dialog = screen.getByRole("alertdialog");
@@ -778,7 +778,7 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
       const dialog = screen.getByRole("alertdialog");
@@ -799,7 +799,7 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
       const dialog = screen.getByRole("alertdialog");
@@ -914,7 +914,7 @@ describe("UserListView", () => {
 
       renderView();
 
-      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters)");
+      const passwordInput = screen.getByPlaceholderText("New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)");
       fireEvent.change(passwordInput, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
       const dialog = screen.getByRole("alertdialog");

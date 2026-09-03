@@ -30,7 +30,7 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
   let draftArticleId: string;
   let publishedArticleId: string;
   const contactEmail = `portal-kb-contact-${randomUUID()}@example.com`;
-  const portalPassword = "a-strong-portal-password";
+  const portalPassword = "a-strong-portal-password-1";
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();

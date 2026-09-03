@@ -16,7 +16,7 @@ test.use({ baseURL: "http://localhost:3002" });
 
 test("a customer signs in to the portal and submits a new ticket", async ({ page }) => {
   const contactEmail = `playwright-portal-${randomUUID()}@example.com`;
-  const contactPassword = "a-strong-playwright-password";
+  const contactPassword = "a-strong-playwright-password-1";
   const subject = `Playwright — my order has not arrived ${randomUUID()}`;
 
   const adminToken = await loginAsAdmin();

@@ -1567,6 +1567,45 @@ describe("Identity & Access (e2e)", () => {
       .send({ email: resetAgentEmail, password: newPassword })
       .expect(200);
   });
+
+  // Story 123 — Password Complexity.
+  it("rejects creating a user with a password that is long enough but not complex enough (400)", async () => {
+    // 8+ characters, but only 1 character class (all lowercase) — fails the
+    // "at least 3 of: lowercase, uppercase, digit, symbol" rule.
+    await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: `not-complex-enough-${randomUUID()}@example.com`,
+        password: "onlylowercaseletters",
+        fullName: "Not Complex Enough",
+        branchId: adminBranchId,
+        roleId: agentRoleId,
+      })
+      .expect(400);
+  });
+
+  it("rejects an admin password reset with a password that is long enough but not complex enough (400)", async () => {
+    const complexityAgentEmail = `agent-complexity-${randomUUID()}@example.com`;
+    const createResponse = await request(app.getHttpServer())
+      .post("/api/v1/identity/users")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        email: complexityAgentEmail,
+        password: "initial-password-123",
+        fullName: "Password Complexity Agent",
+        branchId: adminBranchId,
+        roleId: agentRoleId,
+      })
+      .expect(201);
+    const complexityAgentUserId = createResponse.body.id as string;
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/identity/users/${complexityAgentUserId}/password`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ newPassword: "onlylowercaseletters" })
+      .expect(400);
+  });
 });
 
 /**

@@ -24,5 +24,6 @@
 - Secrets are environment variables validated at boot with `@nestjs/config` and `zod`; missing or malformed secrets fail startup.
 - Every controller input is a `class-validator` DTO. NestJS Throttler protects auth, portal, and inbound webhook endpoints.
 - Account lockout: 5 consecutive failed login attempts locks the account for 15 minutes (or until an admin manually unlocks it via `POST identity/users/:id/unlock`) — per-account, independent of source IP, complementing the IP-based Throttler above. A locked account's login attempt returns the same generic 401 as any other failure.
+- Password complexity: every password creation/change (agent/admin user creation, admin-driven password reset, agent-driven Customer Portal contact password) requires at least 8 characters containing at least 3 of the 4 classes lowercase/uppercase/digit/symbol — enforced only at creation/change time, never at login.
 - The runtime DB role cannot alter schema; a separate migration role is used only by CI/deploy.
 - Provider signatures verify inbound email/WhatsApp/SMS/ERP webhooks before processing; requests are rate-limited and logged.

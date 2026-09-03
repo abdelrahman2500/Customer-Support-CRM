@@ -24,7 +24,7 @@ describe("Customer Portal — Tickets (e2e)", () => {
   let ticketId: string;
   const contactEmail = `portal-ticket-contact-${randomUUID()}@example.com`;
   const otherContactEmail = `portal-ticket-other-contact-${randomUUID()}@example.com`;
-  const portalPassword = "a-strong-portal-password";
+  const portalPassword = "a-strong-portal-password-1";
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();

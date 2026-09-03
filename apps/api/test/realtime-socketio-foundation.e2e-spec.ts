@@ -387,7 +387,7 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
     let contactAccessToken: string;
     let otherCustomerContactAccessToken: string;
     let ticketId: string;
-    const portalPassword = "a-strong-portal-password";
+    const portalPassword = "a-strong-portal-password-1";
 
     beforeAll(async () => {
       const customer = await request(app.getHttpServer())

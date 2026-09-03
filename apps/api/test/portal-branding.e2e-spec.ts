@@ -61,7 +61,7 @@ describe("Customer Portal — Branding (e2e)", () => {
     const customerId = customer.body.id;
 
     const contactEmail = `portal-branding-contact-${randomUUID()}@example.com`;
-    const portalPassword = "a-strong-portal-password";
+    const portalPassword = "a-strong-portal-password-1";
     const contact = await request(app.getHttpServer())
       .post(`/api/v1/customers/${customerId}/contacts`)
       .set("Authorization", `Bearer ${adminAccessToken}`)

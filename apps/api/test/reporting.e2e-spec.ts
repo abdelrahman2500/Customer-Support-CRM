@@ -409,7 +409,7 @@ describe("Reporting & Analytics (e2e)", () => {
     const before = await getCsat();
 
     const contactEmail = `reporting-e2e-contact-${randomUUID()}@example.com`;
-    const portalPassword = "a-strong-portal-password";
+    const portalPassword = "a-strong-portal-password-1";
     const customer = await request(app.getHttpServer())
       .post("/api/v1/customers")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -692,7 +692,7 @@ describe("Reporting & Analytics (e2e)", () => {
 
   it("csat: a [today, today] range includes freshly-submitted feedback; a [yesterday, yesterday] range excludes it", async () => {
     const contactEmail = `reporting-e2e-range-contact-${randomUUID()}@example.com`;
-    const portalPassword = "a-strong-portal-password";
+    const portalPassword = "a-strong-portal-password-1";
     const customer = await request(app.getHttpServer())
       .post("/api/v1/customers")
       .set("Authorization", `Bearer ${adminAccessToken}`)
