@@ -218,6 +218,40 @@ jobs:
       - name: Seed database
         run: pnpm --filter @crm/api prisma:seed
 
+      - name: Start MinIO
+        # Same reasoning as build-and-test's own "Start MinIO" step above:
+        # this job's pre-built apps/api (see "Build API" below) boots the
+        # real AppModule too, which includes S3StorageService (Story 66) —
+        # its `onModuleInit` eagerly calls MinIO (`ensureBucketExists`) at
+        # bootstrap, unconditionally, before Playwright's webServer health
+        # check ever gets a chance. Without a reachable S3_ENDPOINT (this
+        # job set none, so it defaults to http://localhost:9000, see
+        # apps/api/src/common/config/env.validation.ts), that call throws
+        # an uncaught ECONNREFUSED and crashes the process immediately —
+        # confirmed while diagnosing a real "Process from config.webServer
+        # was not able to start. Exit code: 1" CI failure. This job never
+        # had a MinIO service (unlike build-and-test), so it was masked
+        # only by apps/api's previous, much slower `nest start --watch`
+        # startup (see "Build API" below) always timing out first.
+        run: >-
+          docker run -d --name minio -p 9000:9000
+          -e MINIO_ROOT_USER=minioadmin
+          -e MINIO_ROOT_PASSWORD=minioadmin
+          minio/minio:latest server /data
+
+      - name: Wait for MinIO
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live > /dev/null; then
+              echo "MinIO is ready"
+              exit 0
+            fi
+            echo "Waiting for MinIO to become ready... ($i/30)"
+            sleep 1
+          done
+          echo "::error::MinIO did not become ready within 30 seconds"
+          exit 1
+
       - name: Build API
         # apps/e2e's playwright.config.ts now starts apps/api via its
         # pre-built `start` script (`node dist/main.js`), not `dev`
