@@ -30,7 +30,7 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} dir={dir}>
-      <body>
+      <body suppressHydrationWarning>
         <NextIntlClientProvider>
           <QueryProvider>{children}</QueryProvider>
         </NextIntlClientProvider>
