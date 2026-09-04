@@ -54,7 +54,9 @@ describe("Automation Rules (e2e)", () => {
     await app.close();
   });
 
-  async function createTicket(categoryId?: string): Promise<{ id: string; assignedToUserId: string | null }> {
+  async function createTicket(
+    categoryId?: string,
+  ): Promise<{ id: string; assignedToUserId: string | null }> {
     const customer = await request(app.getHttpServer())
       .post("/api/v1/customers")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -98,6 +100,27 @@ describe("Automation Rules (e2e)", () => {
         .get(`/api/v1/tickets/${ticketId}`)
         .set("Authorization", `Bearer ${adminAccessToken}`);
       if (lastResponse.body?.assignedToUserId) {
+        return lastResponse;
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    } while (Date.now() < deadline);
+    return lastResponse;
+  }
+
+  async function waitForHistoryEvent(
+    ticketId: string,
+    eventType: string,
+    { timeoutMs = 5000, intervalMs = 100 }: { timeoutMs?: number; intervalMs?: number } = {},
+  ): Promise<request.Response> {
+    const deadline = Date.now() + timeoutMs;
+    let lastResponse: request.Response;
+    do {
+      lastResponse = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticketId}/history`)
+        .set("Authorization", `Bearer ${adminAccessToken}`);
+      if (
+        lastResponse.body?.some((entry: { eventType: string }) => entry.eventType === eventType)
+      ) {
         return lastResponse;
       }
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
@@ -378,10 +401,8 @@ describe("Automation Rules (e2e)", () => {
       expect(response.body.categoryId).toBe(actionCategoryId);
       expect(response.body.departmentId).toBe(departmentId);
 
-      const history = await request(app.getHttpServer())
-        .get(`/api/v1/tickets/${ticket.id}/history`)
-        .set("Authorization", `Bearer ${adminAccessToken}`)
-        .expect(200);
+      const history = await waitForHistoryEvent(ticket.id, "ticket.recategorized");
+      expect(history.status).toBe(200);
       expect(
         history.body.some(
           (entry: { eventType: string }) => entry.eventType === "ticket.recategorized",
