@@ -85,4 +85,20 @@ describe("SuccessToaster", () => {
     expect(screen.getAllByRole("status")).toHaveLength(3);
     expect(screen.queryByText("First")).not.toBeInTheDocument();
   });
+
+  /** Story S-4 — the dismiss button was the only interactive element in
+   * this package without the shared focus treatment. */
+  it("gives the dismiss button the shared focus ring and keeps it reachable", async () => {
+    showSuccessToast("Ticket created.");
+    renderToaster();
+
+    const dismiss = screen.getByRole("button", { name: "Dismiss" });
+    expect(dismiss).toHaveClass("focus-ring");
+
+    dismiss.focus();
+    expect(dismiss).toHaveFocus();
+
+    fireEvent.click(dismiss);
+    expect(screen.queryByText("Ticket created.")).not.toBeInTheDocument();
+  });
 });

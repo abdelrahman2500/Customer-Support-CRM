@@ -46,7 +46,12 @@ export function SuccessToaster({
             type="button"
             aria-label={dismissLabel}
             onClick={() => dismiss(toast.id)}
-            className="text-success-solid hover:text-success-foreground"
+            // Story S-4: the dismiss button was the one interactive
+            // element in the shared package with no focus ring, so a
+            // keyboard user tabbing to it got no indication of where they
+            // were. `focus-ring` is the same S-1 utility every other
+            // control here uses.
+            className="focus-ring rounded-sm text-success-solid hover:text-success-foreground"
           >
             ×
           </button>

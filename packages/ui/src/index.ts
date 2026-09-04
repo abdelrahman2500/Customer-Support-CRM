@@ -47,6 +47,13 @@ export type { CardProps } from "./components/card";
 export { Alert } from "./components/alert";
 export type { AlertProps } from "./components/alert";
 
+// --- Query / loading / empty state (Story S-4) -----------------------------
+export { EmptyState } from "./components/empty-state";
+export type { EmptyStateProps } from "./components/empty-state";
+
+export { QueryStateCard } from "./components/query-state-card";
+export type { QueryStateCardProps, QueryStateErrorProps } from "./components/query-state-card";
+
 export {
   AlertDialog,
   AlertDialogTrigger,
@@ -81,7 +88,8 @@ export {
   SelectScrollDownButton,
 } from "./components/select";
 
-export { Skeleton } from "./components/skeleton";
+export { Skeleton, SkeletonText, SkeletonCard } from "./components/skeleton";
+export type { SkeletonTextProps, SkeletonCardProps } from "./components/skeleton";
 
 export { SuccessToaster } from "./components/success-toaster";
 
