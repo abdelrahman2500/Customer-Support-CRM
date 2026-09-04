@@ -66,8 +66,8 @@ export function SlaPolicyListView() {
       )}
 
       {policiesQuery.isSuccess && policiesQuery.data.length === 0 && (
-        <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
-          <p className="text-sm text-slate-500">{t("list.empty")}</p>
+        <div className="rounded-md border border-dashed border-rule-strong p-8 text-center">
+          <p className="text-sm text-ink-subtle">{t("list.empty")}</p>
           <Button
             size="sm"
             className="mt-3"

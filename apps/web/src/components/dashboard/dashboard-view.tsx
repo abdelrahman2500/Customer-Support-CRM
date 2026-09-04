@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useCustomersQuery, useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
 import type { TicketListItem } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
+import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { ApiError } from "@/lib/api";
 import { Alert, Badge, Button, Skeleton } from "@crm/ui";
 
@@ -15,25 +16,6 @@ import { Alert, Badge, Button, Skeleton } from "@crm/ui";
  * "Unclaimed tickets" section — an unassigned ticket that's already
  * resolved/closed has nothing left to claim. */
 const OPEN_STATUSES = new Set(["OPEN", "IN_PROGRESS"]);
-
-/** Duplicated from `ticket-list-view.tsx` rather than shared — the same
- * small presentational-helper duplication `customer-detail-view.tsx`
- * (Story 27) already established for this exact helper, in place of a
- * premature shared-component extraction. */
-function priorityBadgeVariant(priority: string) {
-  if (priority === "URGENT") return "destructive" as const;
-  if (priority === "HIGH") return "warning" as const;
-  return "secondary" as const;
-}
-
-/** Story 98 — Design System & Visual Polish. Mirrors `ticket-list-view.tsx`'s
- * own `statusBadgeVariant` exactly — see that file's doc comment for why. */
-function statusBadgeVariant(status: string) {
-  if (status === "OPEN") return "warning" as const;
-  if (status === "RESOLVED") return "success" as const;
-  if (status === "CLOSED") return "outline" as const;
-  return "secondary" as const; // IN_PROGRESS
-}
 
 /**
  * SLA-urgency sort key: breached tickets first, then on-track tickets by
@@ -139,8 +121,8 @@ function UnclaimedTicketRow({
         )}
       </span>
       <span className="flex items-center gap-2">
-        <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
-        <Badge variant={priorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
+        <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+        <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
         <SlaPresentation ticket={ticket} now={now} />
         <Button
           size="sm"
@@ -245,7 +227,7 @@ export function DashboardView({ userId }: { userId: string }) {
             the clearest missing next-action: previously static text with
             no path forward when an agent has nothing open right now. */}
         {myTicketsQuery.isSuccess && openTickets.length === 0 && (
-          <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+          <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
             <p>{t("empty")}</p>
             <button
               type="button"
@@ -286,8 +268,10 @@ export function DashboardView({ userId }: { userId: string }) {
                   </button>
                 </span>
                 <span className="flex items-center gap-2">
-                  <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
-                  <Badge variant={priorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
+                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+                  <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
+                    {ticket.priority}
+                  </Badge>
                   <SlaPresentation ticket={ticket} now={now} />
                 </span>
               </li>
@@ -317,7 +301,7 @@ export function DashboardView({ userId }: { userId: string }) {
         )}
 
         {allTicketsQuery.isSuccess && unclaimedTickets.length === 0 && (
-          <p className="mt-2 rounded-md border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+          <p className="mt-2 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
             {t("unassignedEmpty")}
           </p>
         )}

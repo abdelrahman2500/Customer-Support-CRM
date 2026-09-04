@@ -18,22 +18,8 @@ import type { ContactSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
-
-function priorityBadgeVariant(priority: string) {
-  if (priority === "URGENT") return "destructive" as const;
-  if (priority === "HIGH") return "warning" as const;
-  return "secondary" as const;
-}
-
-/** Story 98 — Design System & Visual Polish. Mirrors `ticket-list-view.tsx`'s
- * own `statusBadgeVariant` exactly — see that file's doc comment for why. */
-function statusBadgeVariant(status: string) {
-  if (status === "OPEN") return "warning" as const;
-  if (status === "RESOLVED") return "success" as const;
-  if (status === "CLOSED") return "outline" as const;
-  return "secondary" as const; // IN_PROGRESS
-}
 
 /**
  * Story 30 — one existing contact's inline-editable fields. A dedicated
@@ -503,8 +489,10 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               >
                 <span className="font-medium text-slate-800">{ticket.subject}</span>
                 <span className="flex items-center gap-2">
-                  <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
-                  <Badge variant={priorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
+                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+                  <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
+                    {ticket.priority}
+                  </Badge>
                   <span className="text-slate-500">
                     {new Date(ticket.createdAt).toLocaleDateString(locale)}
                   </span>

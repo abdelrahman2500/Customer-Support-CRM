@@ -189,7 +189,7 @@ function DepartmentsSection() {
       )}
 
       {departmentsQuery.isSuccess && departmentsQuery.data.length === 0 && (
-        <p className="mt-2 rounded-md border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+        <p className="mt-2 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
           {t("departments.empty")}
         </p>
       )}

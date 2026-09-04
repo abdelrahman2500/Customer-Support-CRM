@@ -62,14 +62,14 @@ export function ArticleListView() {
       )}
 
       {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search !== "" && (
-        <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
-          <p className="text-sm text-slate-500">{t("list.noResults")}</p>
+        <div className="rounded-md border border-dashed border-rule-strong p-8 text-center">
+          <p className="text-sm text-ink-subtle">{t("list.noResults")}</p>
         </div>
       )}
 
       {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search === "" && (
-        <div className="rounded-md border border-dashed border-slate-300 p-8 text-center">
-          <p className="text-sm text-slate-500">{t("list.empty")}</p>
+        <div className="rounded-md border border-dashed border-rule-strong p-8 text-center">
+          <p className="text-sm text-ink-subtle">{t("list.empty")}</p>
           <Button
             size="sm"
             className="mt-3"

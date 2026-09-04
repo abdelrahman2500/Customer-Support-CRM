@@ -9,7 +9,7 @@ import type {
   TicketEscalatedNotificationPayload,
 } from "@/lib/notifications-store";
 import { renderNotificationTemplate } from "@/lib/notification-template-render";
-import { Badge, Button, cn } from "@crm/ui";
+import { Badge, Button, CloseIcon, cn } from "@crm/ui";
 
 function isSlaDetectionPayload(
   notification: BranchNotification,
@@ -114,9 +114,12 @@ export function NotificationToaster({
                 type="button"
                 aria-label={t("dismiss")}
                 onClick={() => dismiss(notification.id)}
-                className="text-ink-subtle hover:text-slate-600"
+                className="focus-ring rounded-sm text-ink-subtle hover:text-ink-muted"
               >
-                ×
+                {/* Story S-5: the shared close glyph, matching Dialog and
+                    SuccessToaster. The button carries aria-label, so the
+                    icon is decorative. */}
+                <CloseIcon className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
             <p className="text-sm text-slate-800">

@@ -5,27 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateMyTicketMutation, useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
+import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { Badge, Button, Input, Skeleton, showSuccessToast } from "@crm/ui";
-
-/**
- * Story S-2 — maps a ticket status onto one of `@crm/ui`'s semantic `Badge`
- * variants, replacing the hand-rolled pill class string this file and
- * `ticket-detail-view.tsx` each carried their own copy of.
- *
- * The mapping stays in this app deliberately: `@crm/ui` holds primitives and
- * knows nothing about tickets, so `TicketStatus -> variant` is domain
- * knowledge that belongs to a consumer. Each variant resolves to exactly the
- * colours the pill already used (warning = amber tint, success = emerald,
- * secondary = slate, outline = bordered), so the only rendered difference is
- * `Badge`'s slightly wider padding and medium weight — which is precisely
- * what makes a portal status read identically to an agent-workspace one.
- */
-function statusBadgeVariant(status: string): "warning" | "success" | "outline" | "secondary" {
-  if (status === "OPEN") return "warning";
-  if (status === "RESOLVED") return "success";
-  if (status === "CLOSED") return "outline";
-  return "secondary"; // IN_PROGRESS
-}
 
 /**
  * Story 53 — Customer Portal — Submit & Track Own Tickets. Mirrors
@@ -89,7 +70,7 @@ export function TicketListView() {
               >
                 <span className="font-medium text-slate-800">{ticket.subject}</span>
                 <span className="flex items-center gap-2 text-slate-500">
-                  <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
                   <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
                 </span>
               </li>

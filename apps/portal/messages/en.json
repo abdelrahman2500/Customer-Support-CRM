@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "Customer Portal",
+    "loading": "Loading...",
     "cancel": "Cancel",
     "working": "Working...",
     "dismiss": "Dismiss",

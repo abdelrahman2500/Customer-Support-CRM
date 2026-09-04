@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomersQuery } from "@/hooks/use-tickets";
 import type { ListCustomersFilters } from "@/lib/tickets-api";
-import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Input, Skeleton, SortIndicator } from "@crm/ui";
 import {
   Select,
   SelectContent,
@@ -117,7 +117,7 @@ export function CustomerListView() {
       )}
 
       {customersQuery.isSuccess && customersQuery.data.length === 0 && (
-        <p className="rounded-md border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
           {t("list.empty")}
         </p>
       )}
@@ -133,11 +133,9 @@ export function CustomerListView() {
                   onClick={() => toggleSort("displayName")}
                 >
                   {t("list.columns.name")}
-                  {filters.sortBy === "displayName"
-                    ? filters.sortDir === "asc"
-                      ? " ▲"
-                      : " ▼"
-                    : ""}
+                  <SortIndicator
+                    direction={filters.sortBy === "displayName" ? filters.sortDir : null}
+                  />
                 </button>
               </TableHead>
               <TableHead>{t("list.columns.status")}</TableHead>
@@ -148,7 +146,9 @@ export function CustomerListView() {
                   onClick={() => toggleSort("createdAt")}
                 >
                   {t("list.columns.createdAt")}
-                  {filters.sortBy === "createdAt" ? (filters.sortDir === "asc" ? " ▲" : " ▼") : ""}
+                  <SortIndicator
+                    direction={filters.sortBy === "createdAt" ? filters.sortDir : null}
+                  />
                 </button>
               </TableHead>
             </TableRow>

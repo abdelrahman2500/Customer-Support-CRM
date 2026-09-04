@@ -1,5 +1,6 @@
 "use client";
 
+import { CloseIcon } from "../lib/icons";
 import { useToastStore } from "../lib/toast-store";
 
 /**
@@ -53,7 +54,11 @@ export function SuccessToaster({
             // control here uses.
             className="focus-ring rounded-sm text-success-solid hover:text-success-foreground"
           >
-            ×
+            {/* Story S-5: was a `×` multiplication sign, which renders at an
+                unpredictable weight and is read aloud by some screen
+                readers. The button already carries `aria-label`, so the
+                glyph itself is decorative. */}
+            <CloseIcon className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       ))}

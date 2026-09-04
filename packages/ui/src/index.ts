@@ -29,6 +29,36 @@
 // --- Utilities -------------------------------------------------------------
 export { cn } from "./lib/cn";
 
+// --- Icon vocabulary (Story S-5) -------------------------------------------
+// Semantic role names over glyph names, so "delete" is one decision made
+// once. See ./lib/icons.ts for the sizing and aria conventions.
+export {
+  SearchIcon,
+  FilterIcon,
+  SortIcon,
+  SortAscIcon,
+  SortDescIcon,
+  EditIcon,
+  DeleteIcon,
+  AddIcon,
+  RetryIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ExternalLinkIcon,
+  MenuIcon,
+  CloseIcon,
+  SuccessIcon,
+  WarningIcon,
+  ErrorIcon,
+  InfoIcon,
+} from "./lib/icons";
+export type { LucideIcon } from "./lib/icons";
+
+export { SortIndicator } from "./components/sort-indicator";
+export type { SortIndicatorProps, SortDirection } from "./components/sort-indicator";
+
 // --- Feedback state --------------------------------------------------------
 export { useToastStore, showSuccessToast } from "./lib/toast-store";
 export type { SuccessToast } from "./lib/toast-store";

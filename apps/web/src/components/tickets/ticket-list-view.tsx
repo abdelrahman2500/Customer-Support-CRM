@@ -7,7 +7,8 @@ import { useCustomersQuery, useTicketsQuery, useUsersQuery } from "@/hooks/use-t
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { ListTicketsFilters, TicketListItem } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
-import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
+import { Alert, Badge, Button, Input, Skeleton, SortIndicator } from "@crm/ui";
 import {
   Select,
   SelectContent,
@@ -25,26 +26,6 @@ import {
 const STATUS_OPTIONS = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
 const PRIORITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
 const ALL_VALUE = "__all__";
-
-function priorityBadgeVariant(priority: string) {
-  if (priority === "URGENT") return "destructive" as const;
-  if (priority === "HIGH") return "warning" as const;
-  return "secondary" as const;
-}
-
-/**
- * Story 98 — Design System & Visual Polish. Recon found ticket status
- * rendered as the same neutral `outline` Badge everywhere, carrying no
- * visual urgency signal at all (unlike priority, already color-coded via
- * `priorityBadgeVariant` above). Duplicated per-file rather than shared,
- * mirroring that exact same existing precedent/convention.
- */
-function statusBadgeVariant(status: string) {
-  if (status === "OPEN") return "warning" as const;
-  if (status === "RESOLVED") return "success" as const;
-  if (status === "CLOSED") return "outline" as const;
-  return "secondary" as const; // IN_PROGRESS
-}
 
 function SlaCell({ ticket }: { ticket: TicketListItem }) {
   const t = useTranslations("tickets");
@@ -188,7 +169,7 @@ export function TicketListView() {
       )}
 
       {ticketsQuery.isSuccess && ticketsQuery.data.length === 0 && (
-        <p className="rounded-md border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
           {t("list.empty")}
         </p>
       )}
@@ -212,7 +193,9 @@ export function TicketListView() {
                   onClick={() => toggleSort("createdAt")}
                 >
                   {t("list.columns.createdAt")}
-                  {filters.sortBy === "createdAt" ? (filters.sortDir === "asc" ? " ▲" : " ▼") : ""}
+                  <SortIndicator
+                    direction={filters.sortBy === "createdAt" ? filters.sortDir : null}
+                  />
                 </button>
               </TableHead>
               <TableHead>
@@ -222,7 +205,9 @@ export function TicketListView() {
                   onClick={() => toggleSort("updatedAt")}
                 >
                   {t("list.columns.updatedAt")}
-                  {filters.sortBy === "updatedAt" ? (filters.sortDir === "asc" ? " ▲" : " ▼") : ""}
+                  <SortIndicator
+                    direction={filters.sortBy === "updatedAt" ? filters.sortDir : null}
+                  />
                 </button>
               </TableHead>
             </TableRow>
@@ -258,10 +243,12 @@ export function TicketListView() {
                   </button>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={priorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
+                  <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
+                    {ticket.priority}
+                  </Badge>
                 </TableCell>
                 <TableCell>{ticket.categoryName ?? t("list.noCategory")}</TableCell>
                 <TableCell>

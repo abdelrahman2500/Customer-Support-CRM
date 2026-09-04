@@ -27,6 +27,18 @@ const badgeVariants = cva(
         success: "border-transparent bg-success-surface text-success-foreground",
         warning: "border-transparent bg-warning-surface text-warning-foreground",
         destructive: "border-transparent bg-danger-surface text-danger-foreground",
+        /**
+         * Story S-5 — completes the semantic set. S-1 defined a full `info`
+         * token family (blue-50/100/200/600/800) and nothing ever consumed
+         * it, so an informational state had no badge representation and a
+         * caller wanting one had to reach for a raw palette value. No new
+         * colour is introduced here: these are the S-1 tokens, finally
+         * given the home the other three families already had.
+         *
+         * info-surface on info-foreground is 7.0:1, in line with the
+         * success/warning/danger pairs above.
+         */
+        info: "border-transparent bg-info-surface text-info-foreground",
       },
     },
     defaultVariants: { variant: "default" },
