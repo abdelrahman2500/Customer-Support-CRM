@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "../lib/cn";
+import { overlayClassName, overlayPanelClassName } from "../lib/overlay";
 
 /**
  * Story 94 — low-level dialog primitives for `ConfirmDialog`
@@ -34,11 +35,7 @@ export const AlertDialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn("fixed inset-0 z-50 bg-overlay/40", className)}
-    {...props}
-  />
+  <DialogPrimitive.Overlay ref={ref} className={cn(overlayClassName, className)} {...props} />
 ));
 AlertDialogOverlay.displayName = "AlertDialogOverlay";
 
@@ -51,10 +48,7 @@ export const AlertDialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       role="alertdialog"
-      className={cn(
-        "fixed start-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-md border border-rule bg-surface p-6 shadow-lg focus:outline-none rtl:translate-x-1/2",
-        className,
-      )}
+      className={cn(overlayPanelClassName, className)}
       {...props}
     >
       {children}

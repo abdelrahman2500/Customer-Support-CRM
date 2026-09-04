@@ -34,6 +34,16 @@ export { useToastStore, showSuccessToast } from "./lib/toast-store";
 export type { SuccessToast } from "./lib/toast-store";
 
 // --- Primitives ------------------------------------------------------------
+export {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "./components/card";
+export type { CardProps } from "./components/card";
+
 export { Alert } from "./components/alert";
 export type { AlertProps } from "./components/alert";
 
@@ -67,10 +77,60 @@ export {
   SelectTrigger,
   SelectContent,
   SelectItem,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
 } from "./components/select";
 
 export { Skeleton } from "./components/skeleton";
 
 export { SuccessToaster } from "./components/success-toaster";
 
+export { Checkbox } from "./components/checkbox";
+
+export {
+  Dialog,
+  DialogTrigger,
+  DialogClose,
+  DialogPortal,
+  DialogOverlay,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "./components/dialog";
+export type { DialogContentProps } from "./components/dialog";
+
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "./components/dropdown-menu";
+export type { DropdownMenuItemProps } from "./components/dropdown-menu";
+
+export { Label } from "./components/label";
+
+export {
+  Popover,
+  PopoverTrigger,
+  PopoverAnchor,
+  PopoverClose,
+  PopoverContent,
+} from "./components/popover";
+
+export { Spinner } from "./components/spinner";
+export type { SpinnerProps } from "./components/spinner";
+
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/tabs";
+
 export { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "./components/table";
+
+export { Textarea } from "./components/textarea";
+export type { TextareaProps } from "./components/textarea";
+
+export { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "./components/tooltip";
