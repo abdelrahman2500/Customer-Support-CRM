@@ -7,6 +7,7 @@ import {
   updateArticle,
 } from "@/lib/knowledge-base-api";
 import type { CreateArticleInput, UpdateArticleInput } from "@/lib/knowledge-base-api";
+import { preservePreviousResults } from "@/lib/list-query";
 
 /**
  * Story 51 — dedicated Knowledge Base hooks (plan Design item 8), mirroring
@@ -27,6 +28,9 @@ export function useArticlesQuery(search?: string) {
   return useQuery({
     queryKey: articlesQueryKey(search),
     queryFn: () => listArticles(search),
+    // Story S-7 — `search` is the key, so typing is a new query. Keep the
+    // previous results visible while the new ones load.
+    ...preservePreviousResults,
   });
 }
 

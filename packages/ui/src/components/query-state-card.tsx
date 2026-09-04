@@ -95,6 +95,22 @@ export interface QueryStateCardProps {
   /** Filtered/no-match branch. Falls back to `empty` when not supplied. */
   noResults?: EmptyStateProps | React.ReactNode;
 
+  /**
+   * Story S-7 — a *background* refetch failed while previously loaded
+   * content is still on screen.
+   *
+   * This is the case the four-branch ladder got wrong. TanStack Query v5
+   * keeps `data` from the last successful fetch when a refetch fails, so a
+   * caller that renders its error branch on `isError` alone throws away
+   * rows the user can still legitimately read, in exchange for a failure
+   * that may well be transient. Passing the error here instead keeps the
+   * content mounted and puts a non-destructive banner above it.
+   *
+   * The caller decides which case it is: `isError` for a failure with no
+   * data to fall back on, `backgroundError` for one with data.
+   */
+  backgroundError?: QueryStateErrorProps | React.ReactNode;
+
   /** The loaded content. Rendered unwrapped. */
   children?: React.ReactNode;
   /** Applied to the loading/error/empty wrapper only — never to `children`. */
@@ -116,6 +132,7 @@ export function QueryStateCard({
   error,
   empty,
   noResults,
+  backgroundError,
   children,
   className,
 }: QueryStateCardProps) {
@@ -134,36 +151,7 @@ export function QueryStateCard({
     if (error !== undefined && !isConfig<QueryStateErrorProps>(error)) {
       return <>{error}</>;
     }
-
-    const config = (error ?? { title: "" }) as QueryStateErrorProps;
-    const canRetry = Boolean(config.onRetry && config.retryLabel);
-
-    return (
-      // `variant="destructive"` keeps `role="alert"` (see `alert.tsx`), so a
-      // failure that appears after the page has settled is announced.
-      <Alert
-        variant="destructive"
-        className={cn("flex flex-wrap items-center justify-between gap-2", className)}
-      >
-        <span className="flex flex-col gap-0.5">
-          <span>{config.title}</span>
-          {config.description ? (
-            <span className="text-xs opacity-80">{config.description}</span>
-          ) : null}
-        </span>
-
-        {canRetry ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={config.onRetry}
-            isLoading={config.isRetrying}
-          >
-            {config.retryLabel}
-          </Button>
-        ) : null}
-      </Alert>
-    );
+    return renderError((error ?? { title: "" }) as QueryStateErrorProps, "destructive", className);
   }
 
   if (isEmpty) {
@@ -178,7 +166,54 @@ export function QueryStateCard({
     return <EmptyState {...chosen} className={cn(chosen.className, className)} />;
   }
 
-  // Success: no wrapper, no extra element, nothing between the caller and
-  // its own markup.
-  return <>{children}</>;
+  // Success. With no background error there is still no wrapper, no extra
+  // element, nothing between the caller and its own markup.
+  if (backgroundError === undefined) {
+    return <>{children}</>;
+  }
+
+  return (
+    <>
+      {isConfig<QueryStateErrorProps>(backgroundError) ? (
+        // `default`, not `destructive`: the rows below are intact and
+        // readable, so this is a status message, not a failure of the
+        // screen. Story S-4 gave that variant `role="status"`, which is
+        // also the right announcement here.
+        renderError(backgroundError, "default")
+      ) : (
+        <>{backgroundError}</>
+      )}
+      {children}
+    </>
+  );
+}
+
+/** Shared by the no-data and background error cases so the two can never
+ * drift apart in layout or retry behaviour. */
+function renderError(
+  config: QueryStateErrorProps,
+  variant: "destructive" | "default",
+  className?: string,
+) {
+  const canRetry = Boolean(config.onRetry && config.retryLabel);
+
+  return (
+    <Alert
+      variant={variant}
+      className={cn("flex flex-wrap items-center justify-between gap-2", className)}
+    >
+      <span className="flex flex-col gap-0.5">
+        <span>{config.title}</span>
+        {config.description ? (
+          <span className="text-xs opacity-80">{config.description}</span>
+        ) : null}
+      </span>
+
+      {canRetry ? (
+        <Button variant="outline" size="sm" onClick={config.onRetry} isLoading={config.isRetrying}>
+          {config.retryLabel}
+        </Button>
+      ) : null}
+    </Alert>
+  );
 }

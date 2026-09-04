@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useArticlesQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
 import type { ArticleSummary } from "@/lib/knowledge-base-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { Badge, Button, FetchingIndicator, Input, QueryStateCard, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -22,16 +22,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
  */
 export function ArticleListView() {
   const t = useTranslations("knowledgeBase");
-  const router = useRouter();
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
   const [search, setSearch] = useState("");
 
   const articlesQuery = useArticlesQuery(search);
+  const articles = articlesQuery.data;
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          {/* Story S-7 — this list's search is un-debounced, so every
+              keystroke was previously a new query key and a full skeleton
+              swap. Now the previous results stay and this is the signal. */}
+          <FetchingIndicator active={articlesQuery.isPlaceholderData} label={tCommon("updating")} />
+        </div>
         <Button size="sm" asChild>
           <Link href={`/${locale}/knowledge-base/new`}>{t("list.createButton")}</Link>
         </Button>
@@ -45,39 +52,47 @@ export function ArticleListView() {
         className="max-w-sm"
       />
 
-      {articlesQuery.isLoading && (
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2, 3, 4].map((row) => (
-            <Skeleton key={row} className="h-10 w-full" />
-          ))}
-        </div>
-      )}
-
-      {articlesQuery.isError && (
-        <Alert variant="destructive" className="flex items-center justify-between">
-          <span>{t("list.error")}</span>
-          <Button variant="outline" size="sm" onClick={() => articlesQuery.refetch()}>
-            {t("list.retry")}
-          </Button>
-        </Alert>
-      )}
-
-      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search !== "" && (
-        <div className="rounded-md border border-dashed border-rule-strong p-8 text-center">
-          <p className="text-sm text-ink-subtle">{t("list.noResults")}</p>
-        </div>
-      )}
-
-      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search === "" && (
-        <div className="rounded-md border border-dashed border-rule-strong p-8 text-center">
-          <p className="text-sm text-ink-subtle">{t("list.empty")}</p>
-          <Button size="sm" className="mt-3" asChild>
-            <Link href={`/${locale}/knowledge-base/new`}>{t("list.createButton")}</Link>
-          </Button>
-        </div>
-      )}
-
-      {articlesQuery.isSuccess && articlesQuery.data.length > 0 && (
+      {/* Story S-7 — the two dashed blocks this replaces differed only in
+          copy and CTA, and were selected by `search !== ""`. That is
+          precisely `isFiltered`/`noResults`, so the duplication goes away
+          rather than being carried forward. */}
+      <QueryStateCard
+        isLoading={articlesQuery.isPending}
+        isError={articlesQuery.isError && articles === undefined}
+        isEmpty={articles !== undefined && articles.length === 0}
+        isFiltered={search !== ""}
+        loadingLabel={tCommon("loading")}
+        loadingPlaceholder={
+          <div className="flex flex-col gap-2">
+            {[0, 1, 2, 3, 4].map((row) => (
+              <Skeleton key={row} className="h-10 w-full" />
+            ))}
+          </div>
+        }
+        error={{
+          title: t("list.error"),
+          retryLabel: t("list.retry"),
+          onRetry: () => void articlesQuery.refetch(),
+        }}
+        backgroundError={
+          articlesQuery.isError && articles !== undefined
+            ? {
+                title: t("list.error"),
+                retryLabel: t("list.retry"),
+                onRetry: () => void articlesQuery.refetch(),
+              }
+            : undefined
+        }
+        empty={{
+          title: t("list.empty"),
+          action: (
+            <Button size="sm" asChild>
+              <Link href={`/${locale}/knowledge-base/new`}>{t("list.createButton")}</Link>
+            </Button>
+          ),
+        }}
+        noResults={{ title: t("list.noResults") }}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -87,12 +102,12 @@ export function ArticleListView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {articlesQuery.data.map((article) => (
+            {(articles ?? []).map((article) => (
               <ArticleRow key={article.id} article={article} />
             ))}
           </TableBody>
         </Table>
-      )}
+      </QueryStateCard>
     </section>
   );
 }
@@ -107,7 +122,6 @@ export function ArticleListView() {
 function ArticleRow({ article }: { article: ArticleSummary }) {
   const t = useTranslations("knowledgeBase");
   const errorMessage = useErrorMessage();
-  const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const mutation = useUpdateArticleMutation(article.id);
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);

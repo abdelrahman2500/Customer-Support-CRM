@@ -27,6 +27,12 @@ const mockedUseUpdateArticleMutation = vi.mocked(useUpdateArticleMutation);
 function queryResult(overrides: Record<string, unknown>) {
   return {
     data: undefined,
+    // Story S-7 — `isPending` is what the views branch on now: with
+    // `placeholderData: keepPreviousData` a query only reports `pending`
+    // when it has no data at all, which is exactly "show the skeleton".
+    // `isPlaceholderData` marks rows that are about to be replaced.
+    isPending: false,
+    isPlaceholderData: false,
     isLoading: false,
     isError: false,
     isSuccess: false,
@@ -65,7 +71,7 @@ describe("ArticleListView", () => {
   });
 
   it("shows a loading state while the articles query is pending", () => {
-    mockedUseArticlesQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+    mockedUseArticlesQuery.mockReturnValue(queryResult({ isPending: true }) as never);
 
     render(<ArticleListView />);
 

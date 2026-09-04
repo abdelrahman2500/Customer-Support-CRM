@@ -32,6 +32,12 @@ const mockedUseTicketCategoriesQuery = vi.mocked(useTicketCategoriesQuery);
 function queryResult(overrides: Record<string, unknown>) {
   return {
     data: undefined,
+    // Story S-7 — `isPending` is what the views branch on now: with
+    // `placeholderData: keepPreviousData` a query only reports `pending`
+    // when it has no data at all, which is exactly "show the skeleton".
+    // `isPlaceholderData` marks rows that are about to be replaced.
+    isPending: false,
+    isPlaceholderData: false,
     isLoading: false,
     isError: false,
     isSuccess: false,
@@ -51,12 +57,17 @@ describe("TicketListView", () => {
     );
   });
 
-  it("shows a loading state while the tickets query is pending", () => {
-    mockedUseTicketsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+  it("shows a skeleton on the initial load, before any data exists", () => {
+    mockedUseTicketsQuery.mockReturnValue(queryResult({ isPending: true }) as never);
 
-    render(<TicketListView />);
+    const { container } = render(<TicketListView />);
 
-    expect(screen.getAllByRole("generic").length).toBeGreaterThan(0);
+    // Previously this asserted `getAllByRole("generic").length > 0`, which
+    // any `div` satisfies - it passed whether or not a skeleton rendered.
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    // And the load is announced once, not per bar.
+    expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
   });
 
   it("shows the empty state when the query succeeds with zero tickets", () => {
@@ -226,5 +237,145 @@ describe("TicketListView", () => {
       "href",
       "/en/customers/customer-1",
     );
+  });
+
+  /**
+   * Story S-7 — the refetch state machine.
+   *
+   * The filters are part of the query key, so changing one is a brand new
+   * query. Before this story that put the query back into `pending`, which
+   * replaced the whole table with a skeleton on every filter change, search
+   * blur and sort toggle. `placeholderData: keepPreviousData` now serves the
+   * previous key's rows while the new key resolves, and these tests pin the
+   * four states that distinction creates.
+   */
+  describe("refetch UX (Story S-7)", () => {
+    const ticket = (overrides: Record<string, unknown> = {}) => ({
+      id: "ticket-1",
+      subject: "Cannot log in",
+      categoryId: "category-1",
+      categoryName: "billing",
+      priority: "HIGH",
+      status: "OPEN",
+      customerId: "customer-1",
+      contactId: null,
+      departmentId: null,
+      assignedToUserId: null,
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-02T00:00:00.000Z",
+      slaTarget: null,
+      ...overrides,
+    });
+
+    it("keeps the previous rows on screen while a new filter resolves", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({
+          data: [ticket()],
+          isSuccess: true,
+          // The shape TanStack reports for a new key backed by the previous
+          // key's data: content, not pending.
+          isPlaceholderData: true,
+          isFetching: true,
+        }) as never,
+      );
+
+      const { container } = render(<TicketListView />);
+
+      expect(screen.getByRole("link", { name: "Cannot log in" })).toBeInTheDocument();
+      // The whole point: no skeleton swap.
+      expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+      expect(screen.getByRole("table")).toBeInTheDocument();
+    });
+
+    it("shows a polite background-fetch indicator over the surviving rows", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ data: [ticket()], isSuccess: true, isPlaceholderData: true }) as never,
+      );
+
+      render(<TicketListView />);
+
+      const status = screen.getByRole("status");
+      expect(status).toHaveTextContent("updating");
+      expect(status).toHaveAttribute("aria-live", "polite");
+      // Never an interruption.
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("shows no indicator once the new results have landed", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ data: [ticket()], isSuccess: true }) as never,
+      );
+
+      render(<TicketListView />);
+
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    it("replaces the previous rows when the new results arrive", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ data: [ticket()], isSuccess: true, isPlaceholderData: true }) as never,
+      );
+      const { rerender } = render(<TicketListView />);
+      expect(screen.getByRole("link", { name: "Cannot log in" })).toBeInTheDocument();
+
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({
+          data: [ticket({ id: "ticket-2", subject: "Refund not received" })],
+          isSuccess: true,
+        }) as never,
+      );
+      rerender(<TicketListView />);
+
+      expect(screen.getByRole("link", { name: "Refund not received" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Cannot log in" })).not.toBeInTheDocument();
+    });
+
+    it("keeps the rows when a background refetch fails, with a non-destructive notice", () => {
+      const refetch = vi.fn();
+      mockedUseTicketsQuery.mockReturnValue(
+        // v5 keeps `data` from the last success through an error.
+        queryResult({ data: [ticket()], isError: true, refetch }) as never,
+      );
+
+      render(<TicketListView />);
+
+      // The rows the user was reading are still there.
+      expect(screen.getByRole("link", { name: "Cannot log in" })).toBeInTheDocument();
+      expect(screen.getByRole("table")).toBeInTheDocument();
+      // And the failure is a status, not an assertive alert that wipes the
+      // screen - but retry is still offered.
+      expect(screen.getByRole("status")).toHaveTextContent("list.error");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "list.retry" }));
+      expect(refetch).toHaveBeenCalledOnce();
+    });
+
+    it("still shows the destructive error state when there is no data to fall back on", () => {
+      const refetch = vi.fn();
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ data: undefined, isError: true, refetch }) as never,
+      );
+
+      render(<TicketListView />);
+
+      expect(screen.getByRole("alert")).toHaveTextContent("list.error");
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "list.retry" }));
+      expect(refetch).toHaveBeenCalledOnce();
+    });
+
+    it("shows the empty state only when the resolved query really has no rows", () => {
+      mockedUseTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+      const { rerender, container } = render(<TicketListView />);
+      expect(screen.getByText("list.empty")).toBeInTheDocument();
+
+      // A refetch in progress over previous rows must NOT read as empty.
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ data: [ticket()], isSuccess: true, isPlaceholderData: true }) as never,
+      );
+      rerender(<TicketListView />);
+      expect(screen.queryByText("list.empty")).not.toBeInTheDocument();
+      expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+    });
   });
 });

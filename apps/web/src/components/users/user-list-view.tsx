@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useDepartmentsQuery,
@@ -95,7 +95,6 @@ const UNSET_DEPARTMENT = "__unset__";
  */
 export function UserListView() {
   const t = useTranslations("users");
-  const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const usersQuery = useUsersQuery();
   const userIds = useMemo(() => (usersQuery.data ?? []).map((user) => user.id), [usersQuery.data]);

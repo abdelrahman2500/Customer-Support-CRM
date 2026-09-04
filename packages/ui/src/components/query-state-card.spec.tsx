@@ -198,6 +198,85 @@ describe("QueryStateCard", () => {
     });
   });
 
+  /**
+   * Story S-7 — a refetch that fails while previously loaded rows are still
+   * on screen. TanStack Query v5 keeps `data` from the last successful
+   * fetch through an error, so throwing the content away would cost the
+   * user readable rows in exchange for a failure that may be transient.
+   */
+  describe("background error", () => {
+    it("keeps the content mounted and puts a banner above it", () => {
+      render(
+        <QueryStateCard {...base} backgroundError={{ title: "Could not refresh." }}>
+          <table data-testid="rows" />
+        </QueryStateCard>,
+      );
+
+      expect(screen.getByTestId("rows")).toBeInTheDocument();
+      expect(screen.getByText("Could not refresh.")).toBeInTheDocument();
+    });
+
+    it("announces it politely, not as an interruption", () => {
+      render(
+        <QueryStateCard {...base} backgroundError={{ title: "Could not refresh." }}>
+          <table data-testid="rows" />
+        </QueryStateCard>,
+      );
+
+      // The rows are intact, so this is a status message about the refresh,
+      // not a failure of the screen. Contrast the no-data error branch,
+      // which is role="alert".
+      expect(screen.getByRole("status")).toHaveTextContent("Could not refresh.");
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("offers the same retry affordance as the destructive branch", async () => {
+      const onRetry = vi.fn();
+      render(
+        <QueryStateCard
+          {...base}
+          backgroundError={{ title: "Could not refresh.", retryLabel: "Retry", onRetry }}
+        >
+          <table data-testid="rows" />
+        </QueryStateCard>,
+      );
+
+      expect(onRetry).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(onRetry).toHaveBeenCalledOnce();
+      // And the rows never went away.
+      expect(screen.getByTestId("rows")).toBeInTheDocument();
+    });
+
+    it("lets a caller replace the banner entirely", () => {
+      render(
+        <QueryStateCard {...base} backgroundError={<p>stale</p>}>
+          <table data-testid="rows" />
+        </QueryStateCard>,
+      );
+
+      expect(screen.getByText("stale")).toBeInTheDocument();
+      expect(screen.getByTestId("rows")).toBeInTheDocument();
+    });
+
+    it("is ignored while there is no data at all, so the error branch still wins", () => {
+      render(
+        <QueryStateCard
+          {...base}
+          isError
+          error={{ title: "Could not load tickets." }}
+          backgroundError={{ title: "Could not refresh." }}
+        >
+          <table data-testid="rows" />
+        </QueryStateCard>,
+      );
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Could not load tickets.");
+      expect(screen.queryByTestId("rows")).not.toBeInTheDocument();
+      expect(screen.queryByText("Could not refresh.")).not.toBeInTheDocument();
+    });
+  });
+
   describe("success", () => {
     it("renders content with no wrapper element of its own", () => {
       const { container } = render(

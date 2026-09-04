@@ -2,6 +2,7 @@
   "common": {
     "appName": "Customer Support CRM",
     "loading": "Loading...",
+    "updating": "Updating…",
     "signedInAs": "Signed in as {email}",
     "notSignedIn": "Not signed in.",
     "login": "Log in",

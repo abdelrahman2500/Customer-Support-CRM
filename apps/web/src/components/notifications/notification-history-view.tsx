@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMarkNotificationsReadMutation, useNotificationsQuery } from "@/hooks/use-notifications";
 import { useNotificationTemplatesQuery } from "@/hooks/use-notification-templates";
@@ -156,8 +156,6 @@ function NotificationRow({
  */
 export function NotificationHistoryView() {
   const t = useTranslations("notificationHistory");
-  const router = useRouter();
-  const { locale } = useParams<{ locale: string }>();
 
   const notificationsQuery = useNotificationsQuery();
   const ticketsQuery = useTicketsQuery({});

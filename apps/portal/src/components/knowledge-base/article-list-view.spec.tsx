@@ -23,6 +23,10 @@ const mockedUsePublishedArticlesQuery = vi.mocked(usePublishedArticlesQuery);
 function queryResult(overrides: Record<string, unknown>) {
   return {
     data: undefined,
+    // Story S-7 — see the agent workspace's list specs: `isPending` is the
+    // "nothing to show yet" signal once placeholder data is in play.
+    isPending: false,
+    isPlaceholderData: false,
     isLoading: false,
     isError: false,
     isSuccess: false,
@@ -49,7 +53,7 @@ describe("ArticleListView", () => {
   });
 
   it("shows a loading state while the articles query is pending", () => {
-    mockedUsePublishedArticlesQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+    mockedUsePublishedArticlesQuery.mockReturnValue(queryResult({ isPending: true }) as never);
 
     const { container } = render(<ArticleListView />);
 

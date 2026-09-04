@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AuthenticatedUser } from "@crm/shared";
 import { apiFetch } from "@/lib/api";
+import { preservePreviousResults } from "@/lib/list-query";
 import {
   createContact,
   createCustomer,
@@ -58,6 +59,10 @@ export function useTicketsQuery(filters: ListTicketsFilters) {
   return useQuery({
     queryKey: ticketsQueryKey(filters),
     queryFn: () => listTickets(filters),
+    // Story S-7 — the filters are the key, so a status/priority/search/sort
+    // change is a new query. Keep the previous rows on screen while it
+    // resolves instead of blanking the table.
+    ...preservePreviousResults,
   });
 }
 
@@ -122,6 +127,8 @@ export function useCustomersQuery(filters: ListCustomersFilters = {}) {
     queryKey: ["customers", filters],
     queryFn: () => listCustomers(filters),
     staleTime: 5 * 60_000,
+    // Story S-7 — see `useTicketsQuery`.
+    ...preservePreviousResults,
   });
 }
 

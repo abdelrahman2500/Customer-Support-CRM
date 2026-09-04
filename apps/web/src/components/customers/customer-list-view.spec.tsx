@@ -24,6 +24,12 @@ const mockedUseCustomersQuery = vi.mocked(useCustomersQuery);
 function queryResult(overrides: Record<string, unknown>) {
   return {
     data: undefined,
+    // Story S-7 — `isPending` is what the views branch on now: with
+    // `placeholderData: keepPreviousData` a query only reports `pending`
+    // when it has no data at all, which is exactly "show the skeleton".
+    // `isPlaceholderData` marks rows that are about to be replaced.
+    isPending: false,
+    isPlaceholderData: false,
     isLoading: false,
     isError: false,
     isSuccess: false,
@@ -38,12 +44,13 @@ describe("CustomerListView", () => {
     vi.clearAllMocks();
   });
 
-  it("shows a loading state while the customers query is pending", () => {
-    mockedUseCustomersQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+  it("shows a skeleton on the initial load, before any data exists", () => {
+    mockedUseCustomersQuery.mockReturnValue(queryResult({ isPending: true }) as never);
 
-    render(<CustomerListView />);
+    const { container } = render(<CustomerListView />);
 
-    expect(screen.getAllByRole("generic").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
   it("shows an error state with a retry action when the query fails", () => {

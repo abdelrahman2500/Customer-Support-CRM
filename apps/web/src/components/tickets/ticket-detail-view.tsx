@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useCreateTicketNoteMutation,
@@ -152,7 +152,6 @@ export function TicketDetailSkeleton() {
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
   const { locale } = useParams<{ locale: string }>();
-  const router = useRouter();
 
   useTicketRealtime(ticketId);
 

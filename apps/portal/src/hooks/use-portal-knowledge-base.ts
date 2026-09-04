@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getPublishedArticle, listPublishedArticles } from "@/lib/knowledge-base-api";
+import { preservePreviousResults } from "@/lib/list-query";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 
 /** Story 54 — read-only: no mutation hooks exist (portal never authors KB content).
@@ -19,6 +20,8 @@ export function usePublishedArticlesQuery(search?: string, locale?: KbLocale) {
   return useQuery({
     queryKey: publishedArticlesQueryKey(search, locale),
     queryFn: () => listPublishedArticles(search, locale),
+    // Story S-7 — `search`/`locale` are the key, so both are new queries.
+    ...preservePreviousResults,
   });
 }
 

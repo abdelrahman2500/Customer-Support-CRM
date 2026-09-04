@@ -6,7 +6,15 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomersQuery } from "@/hooks/use-tickets";
 import type { ListCustomersFilters } from "@/lib/tickets-api";
-import { Alert, Badge, Button, Input, Skeleton, SortIndicator } from "@crm/ui";
+import {
+  Badge,
+  Button,
+  FetchingIndicator,
+  Input,
+  QueryStateCard,
+  Skeleton,
+  SortIndicator,
+} from "@crm/ui";
 import {
   Select,
   SelectContent,
@@ -38,6 +46,7 @@ const ALL_VALUE = "__all__";
  */
 export function CustomerListView() {
   const t = useTranslations("customers");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
@@ -47,6 +56,10 @@ export function CustomerListView() {
   });
 
   const customersQuery = useCustomersQuery(filters);
+  /** Story S-7 — see `TicketListView`: the rows to render regardless of
+   * which fetch they came from, `undefined` only when there is genuinely
+   * nothing yet. */
+  const customers = customersQuery.data;
 
   function updateFilter<K extends keyof ListCustomersFilters>(key: K, value: string) {
     setFilters((current) => ({
@@ -65,8 +78,14 @@ export function CustomerListView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          <FetchingIndicator
+            active={customersQuery.isPlaceholderData}
+            label={tCommon("updating")}
+          />
+        </div>
         <Button size="sm" asChild>
           <Link href={`/${locale}/customers/new`}>{t("list.createButton")}</Link>
         </Button>
@@ -100,30 +119,37 @@ export function CustomerListView() {
         </label>
       </div>
 
-      {customersQuery.isLoading && (
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2, 3, 4].map((row) => (
-            <Skeleton key={row} className="h-10 w-full" />
-          ))}
-        </div>
-      )}
-
-      {customersQuery.isError && (
-        <Alert variant="destructive" className="flex items-center justify-between">
-          <span>{t("list.error")}</span>
-          <Button variant="outline" size="sm" onClick={() => customersQuery.refetch()}>
-            {t("list.retry")}
-          </Button>
-        </Alert>
-      )}
-
-      {customersQuery.isSuccess && customersQuery.data.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("list.empty")}
-        </p>
-      )}
-
-      {customersQuery.isSuccess && customersQuery.data.length > 0 && (
+      {/* Story S-7 — see `TicketListView` for why the error is split in
+          two and why this branches on `isPending` rather than
+          `isLoading`. */}
+      <QueryStateCard
+        isLoading={customersQuery.isPending}
+        isError={customersQuery.isError && customers === undefined}
+        isEmpty={customers !== undefined && customers.length === 0}
+        loadingLabel={tCommon("loading")}
+        loadingPlaceholder={
+          <div className="flex flex-col gap-2">
+            {[0, 1, 2, 3, 4].map((row) => (
+              <Skeleton key={row} className="h-10 w-full" />
+            ))}
+          </div>
+        }
+        error={{
+          title: t("list.error"),
+          retryLabel: t("list.retry"),
+          onRetry: () => void customersQuery.refetch(),
+        }}
+        backgroundError={
+          customersQuery.isError && customers !== undefined
+            ? {
+                title: t("list.error"),
+                retryLabel: t("list.retry"),
+                onRetry: () => void customersQuery.refetch(),
+              }
+            : undefined
+        }
+        empty={{ title: t("list.empty") }}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -155,7 +181,7 @@ export function CustomerListView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {customersQuery.data.map((customer) => (
+            {(customers ?? []).map((customer) => (
               <TableRow
                 key={customer.id}
                 className="cursor-pointer"
@@ -182,7 +208,7 @@ export function CustomerListView() {
             ))}
           </TableBody>
         </Table>
-      )}
+      </QueryStateCard>
     </section>
   );
 }

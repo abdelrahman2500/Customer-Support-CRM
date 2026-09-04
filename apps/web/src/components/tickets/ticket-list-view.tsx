@@ -9,7 +9,15 @@ import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { ListTicketsFilters, TicketListItem } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
-import { Alert, Badge, Button, Input, Skeleton, SortIndicator } from "@crm/ui";
+import {
+  Badge,
+  Button,
+  FetchingIndicator,
+  Input,
+  QueryStateCard,
+  Skeleton,
+  SortIndicator,
+} from "@crm/ui";
 import {
   Select,
   SelectContent,
@@ -59,6 +67,7 @@ function SlaCell({ ticket }: { ticket: TicketListItem }) {
  */
 export function TicketListView() {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
@@ -68,6 +77,12 @@ export function TicketListView() {
   });
 
   const ticketsQuery = useTicketsQuery(filters);
+  /** Story S-7 — the rows to render, whoever they came from: a completed
+   * fetch, the previous filters kept as placeholder data, or the last
+   * success still standing behind a failed refetch. `undefined` means there
+   * is genuinely nothing to show yet, which is what the state model below
+   * branches on. */
+  const tickets = ticketsQuery.data;
   const customersQuery = useCustomersQuery();
   const usersQuery = useUsersQuery();
   const categoriesQuery = useTicketCategoriesQuery();
@@ -113,8 +128,16 @@ export function TicketListView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          {/* Story S-7 — the rows below stay on screen while a filter change
+              resolves, so this is the only signal that anything is in
+              flight. `isPlaceholderData` rather than `isFetching`: a plain
+              background revalidation of the *same* filters is not worth
+              announcing, but data that is about to be replaced is. */}
+          <FetchingIndicator active={ticketsQuery.isPlaceholderData} label={tCommon("updating")} />
+        </div>
         <Button size="sm" asChild>
           <Link href={`/${locale}/tickets/new`}>{t("list.createButton")}</Link>
         </Button>
@@ -158,24 +181,39 @@ export function TicketListView() {
         </label>
       </div>
 
-      {ticketsQuery.isLoading && <ListSkeleton />}
+      {/* Story S-7 — `isPending`, not `isLoading`: with placeholder data in
+          play the query only reports `pending` on a genuine first load, so
+          the skeleton appears once and never again for a filter change.
 
-      {ticketsQuery.isError && (
-        <Alert variant="destructive" className="flex items-center justify-between">
-          <span>{t("list.error")}</span>
-          <Button variant="outline" size="sm" onClick={() => ticketsQuery.refetch()}>
-            {t("list.retry")}
-          </Button>
-        </Alert>
-      )}
-
-      {ticketsQuery.isSuccess && ticketsQuery.data.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("list.empty")}
-        </p>
-      )}
-
-      {ticketsQuery.isSuccess && ticketsQuery.data.length > 0 && (
+          The error split is the other half of the story. TanStack v5 keeps
+          `data` from the last successful fetch when a refetch fails, so
+          `isError` alone would throw away rows the user can still read over
+          a failure that may be transient. With data present the failure goes
+          to `backgroundError` (a non-destructive banner above the intact
+          table); only a failure with nothing to fall back on replaces the
+          screen. */}
+      <QueryStateCard
+        isLoading={ticketsQuery.isPending}
+        isError={ticketsQuery.isError && tickets === undefined}
+        isEmpty={tickets !== undefined && tickets.length === 0}
+        loadingLabel={tCommon("loading")}
+        loadingPlaceholder={<ListSkeleton />}
+        error={{
+          title: t("list.error"),
+          retryLabel: t("list.retry"),
+          onRetry: () => void ticketsQuery.refetch(),
+        }}
+        backgroundError={
+          ticketsQuery.isError && tickets !== undefined
+            ? {
+                title: t("list.error"),
+                retryLabel: t("list.retry"),
+                onRetry: () => void ticketsQuery.refetch(),
+              }
+            : undefined
+        }
+        empty={{ title: t("list.empty") }}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -214,7 +252,7 @@ export function TicketListView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {ticketsQuery.data.map((ticket) => (
+            {(tickets ?? []).map((ticket) => (
               <TableRow
                 key={ticket.id}
                 className="cursor-pointer"
@@ -268,7 +306,7 @@ export function TicketListView() {
             ))}
           </TableBody>
         </Table>
-      )}
+      </QueryStateCard>
     </section>
   );
 }

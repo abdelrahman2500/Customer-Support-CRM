@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Input, Skeleton } from "@crm/ui";
+import { FetchingIndicator, Input, Skeleton } from "@crm/ui";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 
@@ -27,14 +27,35 @@ import type { KbLocale } from "@/lib/knowledge-base-api";
  */
 export function ArticleListView() {
   const t = useTranslations("knowledgeBase");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const [search, setSearch] = useState("");
   const articlesQuery = usePublishedArticlesQuery(search, locale.toUpperCase() as KbLocale);
+  /**
+   * Story S-7 — the articles to render whatever their provenance: a
+   * completed fetch, the previous search kept as placeholder data, or the
+   * last success still standing behind a failed refetch.
+   *
+   * This screen keeps its own error/empty markup rather than adopting
+   * `QueryStateCard`. Its empty state is a quiet inline sentence inside a
+   * card (`mt-3 text-sm`) and its error is a compact red strip, neither of
+   * which `EmptyState`'s dashed `p-8` block or `Alert`'s full-width panel
+   * would reproduce — adopting them here would redesign the screen rather
+   * than de-duplicate it, which this story is not for. The S-7 *semantics*
+   * are all here regardless: pending-vs-placeholder, a fetch indicator, and
+   * an error that no longer takes the rows down with it.
+   */
+  const articles = articlesQuery.data;
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+        {/* In the heading's own row, so it adds no height and cannot shift
+            the list below it. */}
+        <FetchingIndicator active={articlesQuery.isPlaceholderData} label={tCommon("updating")} />
+      </div>
 
       <Input
         type="text"
@@ -45,7 +66,7 @@ export function ArticleListView() {
         className="mt-3 max-w-sm"
       />
 
-      {articlesQuery.isLoading && (
+      {articlesQuery.isPending && (
         <div className="mt-3 flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
@@ -66,17 +87,17 @@ export function ArticleListView() {
         </div>
       )}
 
-      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search !== "" && (
+      {articles !== undefined && articles.length === 0 && search !== "" && (
         <p className="mt-3 text-sm text-slate-500">{t("list.noResults")}</p>
       )}
 
-      {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search === "" && (
+      {articles !== undefined && articles.length === 0 && search === "" && (
         <p className="mt-3 text-sm text-slate-500">{t("list.empty")}</p>
       )}
 
-      {articlesQuery.isSuccess && articlesQuery.data.length > 0 && (
+      {articles !== undefined && articles.length > 0 && (
         <ol className="mt-3 flex flex-col gap-2 text-sm">
-          {articlesQuery.data.map((article) => (
+          {articles.map((article) => (
             <li
               key={article.id}
               className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2"

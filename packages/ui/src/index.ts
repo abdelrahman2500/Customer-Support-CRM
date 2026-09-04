@@ -81,6 +81,9 @@ export type { AlertProps } from "./components/alert";
 export { EmptyState } from "./components/empty-state";
 export type { EmptyStateProps } from "./components/empty-state";
 
+export { FetchingIndicator } from "./components/fetching-indicator";
+export type { FetchingIndicatorProps } from "./components/fetching-indicator";
+
 export { QueryStateCard } from "./components/query-state-card";
 export type { QueryStateCardProps, QueryStateErrorProps } from "./components/query-state-card";
 
