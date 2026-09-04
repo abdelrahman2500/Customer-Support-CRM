@@ -7,9 +7,7 @@ import {
   useNotificationTemplatesQuery,
 } from "@/hooks/use-notification-templates";
 import { ApiError } from "@/lib/api";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, Button, Skeleton } from "@crm/ui";
 
 /** The same three event types `NOTIFICATION_EVENT_TYPES` names on the
  * backend — mirrors `EVENT_LABEL_KEYS` in `notification-history-view.tsx`/

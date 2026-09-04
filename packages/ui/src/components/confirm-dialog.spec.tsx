@@ -2,15 +2,13 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { NextIntlClientProvider } from "next-intl";
 import { ConfirmDialog } from "./confirm-dialog";
-import enMessages from "../../messages/en.json";
 
 function renderDialog(overrides: Partial<React.ComponentProps<typeof ConfirmDialog>> = {}) {
   const onOpenChange = vi.fn();
   const onConfirm = vi.fn();
   render(
-    <NextIntlClientProvider locale="en" messages={enMessages}>
+    <>
       <button type="button">trigger</button>
       <ConfirmDialog
         open
@@ -18,10 +16,12 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof ConfirmDial
         title="Deactivate this user?"
         description="They will no longer be able to sign in."
         confirmLabel="Deactivate"
+        cancelLabel="Cancel"
+        workingLabel="Working..."
         onConfirm={onConfirm}
         {...overrides}
       />
-    </NextIntlClientProvider>,
+    </>,
   );
   return { onOpenChange, onConfirm };
 }
@@ -37,16 +37,18 @@ describe("ConfirmDialog", () => {
 
   it("renders nothing when closed", () => {
     render(
-      <NextIntlClientProvider locale="en" messages={enMessages}>
+      <>
         <ConfirmDialog
           open={false}
           onOpenChange={vi.fn()}
           title="Deactivate this user?"
           description="They will no longer be able to sign in."
           confirmLabel="Deactivate"
+          cancelLabel="Cancel"
+          workingLabel="Working..."
           onConfirm={vi.fn()}
         />
-      </NextIntlClientProvider>,
+      </>,
     );
 
     expect(screen.queryByText("Deactivate this user?")).not.toBeInTheDocument();
@@ -111,7 +113,8 @@ describe("ConfirmDialog", () => {
     function Harness() {
       const [open, setOpen] = useState(false);
       return (
-        <NextIntlClientProvider locale="en" messages={enMessages}>
+        <>
+          {" "}
           <button type="button" onClick={() => setOpen(true)}>
             Open
           </button>
@@ -121,9 +124,11 @@ describe("ConfirmDialog", () => {
             title="Deactivate this user?"
             description="They will no longer be able to sign in."
             confirmLabel="Deactivate"
+            cancelLabel="Cancel"
+            workingLabel="Working..."
             onConfirm={vi.fn()}
           />
-        </NextIntlClientProvider>
+        </>
       );
     }
     const user = userEvent.setup();

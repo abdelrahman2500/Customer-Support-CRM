@@ -10,11 +10,16 @@ import {
   useUpdateRoleMutation,
 } from "@/hooks/use-roles";
 import { ApiError } from "@/lib/api";
-import { showSuccessToast } from "@/lib/toast-store";
+import { showSuccessToast } from "@crm/ui";
 import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
 
-vi.mock("@/lib/toast-store", () => ({
+// Story S-2 — `showSuccessToast` now lives in `@crm/ui`, which also exports
+// every primitive these components render. A whole-module factory would
+// replace those too, so this spreads the real module and overrides only
+// the one function under assertion.
+vi.mock("@crm/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@crm/ui")>()),
   showSuccessToast: vi.fn(),
 }));
 
@@ -85,7 +90,10 @@ describe("RoleListView", () => {
     vi.clearAllMocks();
     mockedUseManagedRolesQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
     mockedUsePermissionsQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
-    mockedUseCreateRoleMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    mockedUseCreateRoleMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
     mockedUseUpdateRoleMutation.mockReturnValue(mutationResult() as never);
     mockedUseSetRolePermissionsMutation.mockReturnValue(mutationResult() as never);
   });
@@ -145,7 +153,14 @@ describe("RoleListView", () => {
     mockedUseManagedRolesQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ id: "role-1", name: "Viewer", permissions: ["ticket:read", "ticket:update"], isActive: true }],
+        data: [
+          {
+            id: "role-1",
+            name: "Viewer",
+            permissions: ["ticket:read", "ticket:update"],
+            isActive: true,
+          },
+        ],
       }) as never,
     );
 
@@ -161,7 +176,14 @@ describe("RoleListView", () => {
     mockedUseManagedRolesQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ id: "role-1", name: "Viewer", permissions: ["ticket:read", "ticket:update"], isActive: true }],
+        data: [
+          {
+            id: "role-1",
+            name: "Viewer",
+            permissions: ["ticket:read", "ticket:update"],
+            isActive: true,
+          },
+        ],
       }) as never,
     );
     mockedUsePermissionsQuery.mockReturnValue(
@@ -360,7 +382,9 @@ describe("RoleListView", () => {
           data: [{ id: "role-1", name: "Support", permissions: ["ticket:read"], isActive: true }],
         }) as never,
       );
-      mockedUsePermissionsQuery.mockReturnValue(queryResult({ isSuccess: true, data: catalog }) as never);
+      mockedUsePermissionsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: catalog }) as never,
+      );
       mockedUseSetRolePermissionsMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
       renderView();
@@ -400,7 +424,9 @@ describe("RoleListView", () => {
     const roleData = [{ id: "role-1", name: "Ops", permissions: [], isActive: true }];
 
     it("renders the forbidden message when a role-update mutation is rejected with 403", () => {
-      mockedUseManagedRolesQuery.mockReturnValue(queryResult({ isSuccess: true, data: roleData }) as never);
+      mockedUseManagedRolesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: roleData }) as never,
+      );
       mockedUseUpdateRoleMutation.mockReturnValue(
         mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
       );
@@ -413,7 +439,9 @@ describe("RoleListView", () => {
     });
 
     it("renders the backend's own message verbatim when a role-update mutation is rejected with a 409 duplicate-name conflict", () => {
-      mockedUseManagedRolesQuery.mockReturnValue(queryResult({ isSuccess: true, data: roleData }) as never);
+      mockedUseManagedRolesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: roleData }) as never,
+      );
       mockedUseUpdateRoleMutation.mockReturnValue(
         mutationResult({
           isError: true,
@@ -427,7 +455,9 @@ describe("RoleListView", () => {
     });
 
     it("renders the shared network-failure message when a role-update mutation is rejected with a non-ApiError", () => {
-      mockedUseManagedRolesQuery.mockReturnValue(queryResult({ isSuccess: true, data: roleData }) as never);
+      mockedUseManagedRolesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: roleData }) as never,
+      );
       mockedUseUpdateRoleMutation.mockReturnValue(
         mutationResult({ isError: true, error: new Error("network down") }) as never,
       );
@@ -487,7 +517,9 @@ describe("RoleListView", () => {
     });
 
     it("shows the backend's own message inline on a rejected submission (duplicate name) and preserves the entered value", async () => {
-      const mutateAsync = vi.fn().mockRejectedValue(new ApiError("A role with this name already exists", 409));
+      const mutateAsync = vi
+        .fn()
+        .mockRejectedValue(new ApiError("A role with this name already exists", 409));
       mockedUseCreateRoleMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
 
       renderView();
@@ -518,7 +550,10 @@ describe("RoleListView", () => {
     });
 
     it("shows a pending/disabled state while the create-role mutation is in flight", () => {
-      mockedUseCreateRoleMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: true } as never);
+      mockedUseCreateRoleMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: true,
+      } as never);
 
       renderView();
 

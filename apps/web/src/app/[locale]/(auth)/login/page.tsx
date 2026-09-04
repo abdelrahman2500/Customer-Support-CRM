@@ -3,9 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
+import { Alert, Button, Input } from "@crm/ui";
 import { getApiBaseUrl, setAccessToken } from "@/lib/api";
 
 /**
@@ -76,7 +74,9 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
       <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900">{t("title")}</h1>
-        {sessionExpired && !error && <Alert className="mt-4">{tCommon("errors.unauthorized")}</Alert>}
+        {sessionExpired && !error && (
+          <Alert className="mt-4">{tCommon("errors.unauthorized")}</Alert>
+        )}
         <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-1 text-sm text-slate-700">
             {t("email")}

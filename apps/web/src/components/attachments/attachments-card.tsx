@@ -6,8 +6,7 @@ import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-at
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import type { AttachmentOwner } from "@/lib/attachments-api";
 import { ApiError } from "@/lib/api";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, Skeleton } from "@crm/ui";
 
 /** Every string this shared component needs, supplied by the caller's own
  * `next-intl` namespace (`tickets.detail.attachments*` or

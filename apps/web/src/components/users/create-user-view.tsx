@@ -6,17 +6,8 @@ import { useTranslations } from "next-intl";
 import { useBranchesQuery, useCreateUserMutation, useDepartmentsQuery } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { showSuccessToast } from "@/lib/toast-store";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Alert, Button, Input, showSuccessToast } from "@crm/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 const UNSET_DEPARTMENT = "__unset__";
 
@@ -181,9 +172,7 @@ export function CreateUserView() {
 
         <Button
           type="submit"
-          disabled={
-            mutation.isPending || !email || !password || !fullName || !branchId || !roleId
-          }
+          disabled={mutation.isPending || !email || !password || !fullName || !branchId || !roleId}
           className="self-start"
         >
           {mutation.isPending ? t("create.submitting") : t("create.submit")}

@@ -7,19 +7,8 @@ import { useAuditLogsQuery } from "@/hooks/use-audit-logs";
 import { useUsersQuery } from "@/hooks/use-tickets";
 import type { AuditLogFilters, AuditLogSummary } from "@/lib/audit-logs-api";
 import { ApiError } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
 function DiffCell({ diff }: { diff: unknown }) {
   const t = useTranslations("auditLogs");

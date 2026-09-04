@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Input, Skeleton } from "@crm/ui";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 
@@ -34,19 +35,19 @@ export function ArticleListView() {
     <section className="rounded-md border border-slate-200 bg-white p-4">
       <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
 
-      <input
+      <Input
         type="text"
         aria-label={t("list.searchLabel")}
         placeholder={t("list.searchPlaceholder")}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
-        className="mt-3 w-full max-w-sm rounded-md border border-slate-300 px-3 py-1.5 text-sm shadow-sm placeholder:text-ink-subtle focus-ring"
+        className="mt-3 max-w-sm"
       />
 
       {articlesQuery.isLoading && (
         <div className="mt-3 flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
-            <div key={row} className="h-10 w-full animate-pulse rounded-md bg-slate-100" />
+            <Skeleton key={row} className="h-10 w-full" />
           ))}
         </div>
       )}

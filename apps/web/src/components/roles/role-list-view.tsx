@@ -11,21 +11,22 @@ import {
 } from "@/hooks/use-roles";
 import type { PermissionSummary, RoleSummary } from "@/lib/roles-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { showSuccessToast } from "@/lib/toast-store";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Alert,
+  Badge,
+  Button,
+  Input,
+  showSuccessToast,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@crm/ui";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /** The two seeded roles `seed.ts` reconciles by literal name — the backend
  * rejects a rename/deactivate on either (Design item 5); this is a
@@ -163,13 +164,18 @@ function RoleRow({
       {expanded && (
         <TableRow>
           <TableCell colSpan={4}>
-            <h3 className="text-xs font-semibold text-slate-700">{t("list.permissionsAssignHeading")}</h3>
+            <h3 className="text-xs font-semibold text-slate-700">
+              {t("list.permissionsAssignHeading")}
+            </h3>
             {allPermissions.length === 0 ? (
               <p className="mt-1 text-sm text-slate-500">{t("list.noPermissions")}</p>
             ) : (
               <div className="mt-2 flex flex-wrap gap-3">
                 {allPermissions.map((permission) => (
-                  <label key={permission.id} className="flex items-center gap-1.5 text-sm text-slate-700">
+                  <label
+                    key={permission.id}
+                    className="flex items-center gap-1.5 text-sm text-slate-700"
+                  >
                     <input
                       type="checkbox"
                       checked={role.permissions.includes(permission.key)}
@@ -207,7 +213,12 @@ function AddRoleForm() {
       setName("");
       showSuccessToast(t("list.createSuccess", { name: name.trim() }));
     } catch (submitError) {
-      setError(errorMessage(submitError, { forbidden: t("list.actionForbidden"), generic: t("list.createFailed") }));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("list.actionForbidden"),
+          generic: t("list.createFailed"),
+        }),
+      );
     }
   }
 

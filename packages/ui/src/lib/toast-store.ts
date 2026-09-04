@@ -1,3 +1,5 @@
+"use client";
+
 import { create } from "zustand";
 
 /**
@@ -38,7 +40,9 @@ export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
   add: (message) => {
     const id =
-      typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
     set((state) => ({ toasts: [{ id, message }, ...state.toasts].slice(0, MAX_VISIBLE) }));
     if (typeof window !== "undefined") {
       window.setTimeout(() => {

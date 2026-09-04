@@ -7,6 +7,7 @@ import {
 } from "@/hooks/use-portal-notification-preferences";
 import type { PortalNotificationPreferenceSummary } from "@/lib/notification-preferences-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
+import { Button, Skeleton } from "@crm/ui";
 
 /** The same two event-type strings `PORTAL_NOTIFICATION_EVENT_TYPES` names
  * on the backend (`apps/api/src/modules/notifications/
@@ -38,7 +39,7 @@ export function NotificationPreferencesSection() {
       {preferencesQuery.isLoading && (
         <div className="mt-2 flex flex-col gap-2">
           {[0, 1].map((row) => (
-            <div key={row} className="h-8 w-full animate-pulse rounded-md bg-slate-100" />
+            <Skeleton key={row} className="h-8 w-full" />
           ))}
         </div>
       )}
@@ -97,14 +98,16 @@ function PreferenceRow({ preference }: { preference: PortalNotificationPreferenc
         >
           {preference.inAppEnabled ? t("preferences.enabled") : t("preferences.disabled")}
         </span>
-        <button
+        <Button
           type="button"
           disabled={mutation.isPending}
           onClick={toggle}
-          className="inline-flex h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 focus-ring"
+          variant="outline"
+          size="sm"
+          className="text-sm"
         >
           {preference.inAppEnabled ? t("preferences.disable") : t("preferences.enable")}
-        </button>
+        </Button>
       </div>
       {mutation.isError && (
         <p className="mt-1 text-xs text-red-600">

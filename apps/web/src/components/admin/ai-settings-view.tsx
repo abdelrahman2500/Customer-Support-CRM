@@ -5,9 +5,7 @@ import { useTranslations } from "next-intl";
 import { useAiSettingsQuery, useUpdateAiSettingsMutation } from "@/hooks/use-ai-settings";
 import type { AiSettingsSummary } from "@/lib/ai-settings-api";
 import { ApiError } from "@/lib/api";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, Button, Skeleton } from "@crm/ui";
 
 type ToggleKey = keyof AiSettingsSummary;
 

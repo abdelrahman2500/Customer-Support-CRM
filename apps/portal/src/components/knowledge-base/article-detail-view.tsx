@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Skeleton } from "@crm/ui";
 import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
 import type { KbLocale } from "@/lib/knowledge-base-api";
@@ -19,8 +20,8 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
   if (articleQuery.isLoading) {
     return (
       <div className="flex flex-col gap-3">
-        <div className="h-8 w-1/2 animate-pulse rounded-md bg-slate-100" />
-        <div className="h-32 w-full animate-pulse rounded-md bg-slate-100" />
+        <Skeleton className="h-8 w-1/2" />
+        <Skeleton className="h-32 w-full" />
       </div>
     );
   }
@@ -56,9 +57,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h1 className="text-lg font-semibold text-slate-900">{article.title}</h1>
-        {article.category && (
-          <p className="mt-1 text-xs text-slate-500">{article.category}</p>
-        )}
+        {article.category && <p className="mt-1 text-xs text-slate-500">{article.category}</p>}
         <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{article.body}</p>
       </div>
     </section>

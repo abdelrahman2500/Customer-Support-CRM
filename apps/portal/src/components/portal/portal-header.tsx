@@ -8,6 +8,7 @@ import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
 import { clearAccessToken, logout, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
+import { Badge, Button } from "@crm/ui";
 
 /** Story 119 — mirrors `apps/web`'s own `WorkspaceNav` constants/helper
  * exactly; see that file's own doc comment. */
@@ -151,12 +152,12 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         >
           {tNotifications("nav")}
           {unreadCountQuery.isSuccess && unreadCount > 0 && (
-            <span
+            <Badge
+              variant="destructive"
               aria-label={tNotifications("unreadNotificationsLabel", { count: unreadCount })}
-              className="inline-flex items-center rounded-full border border-transparent bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800"
             >
               {unreadCount}
-            </span>
+            </Badge>
           )}
         </a>
       </nav>
@@ -173,13 +174,9 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-ring"
-        >
+        <Button type="button" onClick={handleSignOut} variant="outline" className="px-3">
           {t("signOut")}
-        </button>
+        </Button>
       </div>
     </header>
   );

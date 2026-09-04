@@ -16,19 +16,9 @@ import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { ApiError } from "@/lib/api";
 import type { ContactSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
+import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 function priorityBadgeVariant(priority: string) {
   if (priority === "URGENT") return "destructive" as const;
@@ -320,7 +310,11 @@ function AddContactForm({ customerId }: { customerId: string }) {
       <Button type="submit" size="sm" disabled={mutation.isPending}>
         {mutation.isPending ? t("detail.addContactSubmitting") : t("detail.addContactSubmit")}
       </Button>
-      {error && <Alert variant="destructive" className="w-full">{error}</Alert>}
+      {error && (
+        <Alert variant="destructive" className="w-full">
+          {error}
+        </Alert>
+      )}
     </form>
   );
 }
@@ -431,7 +425,9 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           <Select
             value={customer.isActive ? "active" : "inactive"}
             disabled={updateCustomerMutation.isPending}
-            onValueChange={(value) => updateCustomerMutation.mutate({ isActive: value === "active" })}
+            onValueChange={(value) =>
+              updateCustomerMutation.mutate({ isActive: value === "active" })
+            }
           >
             <SelectTrigger className="w-32">
               <SelectValue />

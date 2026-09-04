@@ -13,17 +13,8 @@ import {
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { TicketPriority } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { showSuccessToast } from "@/lib/toast-store";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Alert, Button, Input, showSuccessToast } from "@crm/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 const UNSET_PRIORITY = "__unset__";
@@ -283,11 +274,7 @@ export function CreateTicketView() {
           )}
         </label>
 
-        <Button
-          type="submit"
-          disabled={mutation.isPending || !customerId}
-          className="self-start"
-        >
+        <Button type="submit" disabled={mutation.isPending || !customerId} className="self-start">
           {mutation.isPending ? t("create.submitting") : t("create.submit")}
         </Button>
       </form>

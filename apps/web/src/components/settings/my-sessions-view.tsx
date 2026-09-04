@@ -6,19 +6,9 @@ import { useTranslations } from "next-intl";
 import { useMySessionsQuery, useRevokeSessionMutation } from "@/hooks/use-sessions";
 import type { SessionSummary } from "@/lib/sessions-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, Badge, Button, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
 /**
  * Story 124 — Session/Device Management. Lists the caller's own active
@@ -98,9 +88,7 @@ function SessionRow({ session }: { session: SessionSummary }) {
           {session.isCurrent && <Badge variant="secondary">{t("thisDevice")}</Badge>}
         </div>
       </TableCell>
-      <TableCell className="font-mono text-xs text-slate-500">
-        {session.ipAddress ?? "—"}
-      </TableCell>
+      <TableCell className="font-mono text-xs text-slate-500">{session.ipAddress ?? "—"}</TableCell>
       <TableCell>{new Date(session.lastActiveAt).toLocaleString(locale)}</TableCell>
       <TableCell>{new Date(session.sessionCreatedAt).toLocaleString(locale)}</TableCell>
       <TableCell>

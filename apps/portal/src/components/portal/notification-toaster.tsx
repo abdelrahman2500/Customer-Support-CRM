@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Button } from "@crm/ui";
 import { usePortalNotificationsStore } from "@/lib/notifications-store";
 import type {
   ChannelMessageNotificationPayload,
@@ -84,16 +85,18 @@ export function NotificationToaster() {
               </button>
             </div>
             <p className="text-sm text-slate-800">{messageFor(notification, t)}</p>
-            <button
+            <Button
               type="button"
               onClick={() => {
                 dismiss(notification.id);
                 router.push(`/${locale}/tickets/${ticketId}`);
               }}
-              className="inline-flex h-8 w-fit items-center justify-center self-start rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              variant="outline"
+              size="sm"
+              className="w-fit self-start text-sm"
             >
               {t("viewTicket")}
-            </button>
+            </Button>
           </div>
         );
       })}

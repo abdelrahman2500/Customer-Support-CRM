@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Button, Input } from "@crm/ui";
 import { getApiBaseUrl, setAccessToken } from "@/lib/api";
 
 /**
@@ -73,9 +74,8 @@ export default function LoginPage() {
         <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-1 text-sm text-slate-700">
             {t("email")}
-            <input
+            <Input
               type="email"
-              className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-ring"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
@@ -84,9 +84,8 @@ export default function LoginPage() {
           </label>
           <label className="flex flex-col gap-1 text-sm text-slate-700">
             {t("password")}
-            <input
+            <Input
               type="password"
-              className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-ring"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
@@ -98,13 +97,9 @@ export default function LoginPage() {
               {error}
             </p>
           )}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <Button type="submit" disabled={submitting}>
             {submitting ? t("signingIn") : t("signIn")}
-          </button>
+          </Button>
         </form>
       </div>
     </main>

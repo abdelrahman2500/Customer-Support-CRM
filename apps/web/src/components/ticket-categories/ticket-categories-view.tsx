@@ -9,13 +9,20 @@ import {
 } from "@/hooks/use-ticket-categories";
 import type { TicketCategory } from "@/lib/ticket-categories-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { showSuccessToast } from "@/lib/toast-store";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Alert,
+  Badge,
+  Button,
+  Input,
+  showSuccessToast,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**

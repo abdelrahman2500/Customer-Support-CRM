@@ -11,20 +11,21 @@ import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { AutomationRuleSummary } from "@/lib/automation-rules-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Alert,
+  Badge,
+  Button,
+  Input,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@crm/ui";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /**
  * Story 57 — Automation Rules, over the already-existing
@@ -213,7 +214,10 @@ function AutomationRuleRow({
         </div>
         {mutation.isError && (
           <p className="mt-1 text-xs text-red-600">
-            {errorMessage(mutation.error, { forbidden: t("actionForbidden"), generic: t("actionFailed") })}
+            {errorMessage(mutation.error, {
+              forbidden: t("actionForbidden"),
+              generic: t("actionFailed"),
+            })}
           </p>
         )}
       </TableCell>
@@ -256,7 +260,9 @@ function AddAutomationRuleForm() {
       setActionSetCategoryId("");
       setActionSetDepartmentId("");
     } catch (submitError) {
-      setError(errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }));
+      setError(
+        errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }),
+      );
     }
   }
 

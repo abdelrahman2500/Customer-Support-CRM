@@ -16,11 +16,7 @@ import type {
   BusinessHoursException,
 } from "@/lib/business-hours-api";
 import { ApiError } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
 
 const WEEKDAY_KEYS = [
   "sunday",
@@ -49,7 +45,9 @@ function minutesToTime(minutes: number | null): string {
   if (minutes === null) {
     return "";
   }
-  const hours = Math.floor(minutes / 60).toString().padStart(2, "0");
+  const hours = Math.floor(minutes / 60)
+    .toString()
+    .padStart(2, "0");
   const mins = (minutes % 60).toString().padStart(2, "0");
   return `${hours}:${mins}`;
 }
@@ -101,7 +99,11 @@ function DaysGrid({
                   onChange(
                     day.weekday,
                     isOpen
-                      ? { isOpen, startMinute: day.startMinute ?? 9 * 60, endMinute: day.endMinute ?? 17 * 60 }
+                      ? {
+                          isOpen,
+                          startMinute: day.startMinute ?? 9 * 60,
+                          endMinute: day.endMinute ?? 17 * 60,
+                        }
                       : { isOpen, startMinute: null, endMinute: null },
                   );
                 }}
@@ -115,14 +117,18 @@ function DaysGrid({
                   className="w-28"
                   value={minutesToTime(day.startMinute)}
                   aria-label={t("startLabel")}
-                  onChange={(event) => onChange(day.weekday, { startMinute: timeToMinutes(event.target.value) })}
+                  onChange={(event) =>
+                    onChange(day.weekday, { startMinute: timeToMinutes(event.target.value) })
+                  }
                 />
                 <Input
                   type="time"
                   className="w-28"
                   value={minutesToTime(day.endMinute)}
                   aria-label={t("endLabel")}
-                  onChange={(event) => onChange(day.weekday, { endMinute: timeToMinutes(event.target.value) })}
+                  onChange={(event) =>
+                    onChange(day.weekday, { endMinute: timeToMinutes(event.target.value) })
+                  }
                 />
               </>
             )}
@@ -142,7 +148,9 @@ function CreateCalendarForm() {
   const mutation = useCreateBusinessHoursCalendarMutation();
 
   function updateDay(weekday: number, patch: Partial<BusinessHoursDay>) {
-    setDays((current) => current.map((day) => (day.weekday === weekday ? { ...day, ...patch } : day)));
+    setDays((current) =>
+      current.map((day) => (day.weekday === weekday ? { ...day, ...patch } : day)),
+    );
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -186,7 +194,9 @@ function WeeklyScheduleEditor({ calendar }: { calendar: BusinessHoursCalendar })
   const mutation = useUpdateBusinessHoursCalendarMutation();
 
   function updateDay(weekday: number, patch: Partial<BusinessHoursDay>) {
-    setDays((current) => current.map((day) => (day.weekday === weekday ? { ...day, ...patch } : day)));
+    setDays((current) =>
+      current.map((day) => (day.weekday === weekday ? { ...day, ...patch } : day)),
+    );
   }
 
   return (
@@ -277,7 +287,13 @@ function ExceptionRow({ exception }: { exception: BusinessHoursException }) {
             />
           </>
         )}
-        <Button type="button" variant="outline" size="sm" disabled={mutation.isPending} onClick={toggleClosed}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={mutation.isPending}
+          onClick={toggleClosed}
+        >
           {exception.isClosed ? t("markOverriddenButton") : t("markClosedButton")}
         </Button>
       </span>
@@ -335,7 +351,11 @@ function AddExceptionForm() {
         />
       </label>
       <label className="flex items-center gap-1 text-xs text-slate-600">
-        <input type="checkbox" checked={isClosed} onChange={(event) => setIsClosed(event.target.checked)} />
+        <input
+          type="checkbox"
+          checked={isClosed}
+          onChange={(event) => setIsClosed(event.target.checked)}
+        />
         {t("closedLabel")}
       </label>
       {!isClosed && (
@@ -351,7 +371,12 @@ function AddExceptionForm() {
           </label>
           <label className="flex flex-col gap-1 text-xs text-slate-600">
             {t("overrideEndLabel")}
-            <Input type="time" className="w-28" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+            <Input
+              type="time"
+              className="w-28"
+              value={endTime}
+              onChange={(event) => setEndTime(event.target.value)}
+            />
           </label>
         </>
       )}
@@ -409,7 +434,10 @@ export function BusinessHoursView() {
     );
   }
 
-  const notFound = calendarQuery.isError && calendarQuery.error instanceof ApiError && calendarQuery.error.status === 404;
+  const notFound =
+    calendarQuery.isError &&
+    calendarQuery.error instanceof ApiError &&
+    calendarQuery.error.status === 404;
 
   if (calendarQuery.isError && !notFound) {
     return <Alert variant="destructive">{t("loadError")}</Alert>;

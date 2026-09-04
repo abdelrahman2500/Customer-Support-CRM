@@ -5,22 +5,26 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateMyTicketMutation, useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { showSuccessToast } from "@/lib/toast-store";
+import { Badge, Button, Input, Skeleton, showSuccessToast } from "@crm/ui";
 
 /**
- * Story 98 - Design System & Visual Polish. Mirrors apps/web's own
- * statusBadgeVariant (ticket-list-view.tsx) translated to portal's plain-
- * pill convention - status previously carried no color signal at all
- * here, unlike everywhere else in the app that does.
+ * Story S-2 — maps a ticket status onto one of `@crm/ui`'s semantic `Badge`
+ * variants, replacing the hand-rolled pill class string this file and
+ * `ticket-detail-view.tsx` each carried their own copy of.
+ *
+ * The mapping stays in this app deliberately: `@crm/ui` holds primitives and
+ * knows nothing about tickets, so `TicketStatus -> variant` is domain
+ * knowledge that belongs to a consumer. Each variant resolves to exactly the
+ * colours the pill already used (warning = amber tint, success = emerald,
+ * secondary = slate, outline = bordered), so the only rendered difference is
+ * `Badge`'s slightly wider padding and medium weight — which is precisely
+ * what makes a portal status read identically to an agent-workspace one.
  */
-function statusPillClassName(status: string): string {
-  const base = "rounded-full border px-2 py-0.5 text-xs";
-  if (status === "OPEN")
-    return `${base} border-transparent bg-warning-surface text-warning-foreground`;
-  if (status === "RESOLVED")
-    return `${base} border-transparent bg-success-surface text-success-foreground`;
-  if (status === "CLOSED") return `${base} border-rule-strong text-ink-strong`;
-  return `${base} border-transparent bg-surface-muted text-ink`; // IN_PROGRESS
+function statusBadgeVariant(status: string): "warning" | "success" | "outline" | "secondary" {
+  if (status === "OPEN") return "warning";
+  if (status === "RESOLVED") return "success";
+  if (status === "CLOSED") return "outline";
+  return "secondary"; // IN_PROGRESS
 }
 
 /**
@@ -46,7 +50,7 @@ export function TicketListView() {
         {ticketsQuery.isLoading && (
           <div className="mt-3 flex flex-col gap-2">
             {[0, 1, 2].map((row) => (
-              <div key={row} className="h-10 w-full animate-pulse rounded-md bg-slate-100" />
+              <Skeleton key={row} className="h-10 w-full" />
             ))}
           </div>
         )}
@@ -85,7 +89,7 @@ export function TicketListView() {
               >
                 <span className="font-medium text-slate-800">{ticket.subject}</span>
                 <span className="flex items-center gap-2 text-slate-500">
-                  <span className={statusPillClassName(ticket.status)}>{ticket.status}</span>
+                  <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
                   <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
                 </span>
               </li>
@@ -134,8 +138,8 @@ function CreateTicketForm() {
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("list.createSubjectLabel")}
-          <input
-            className="flex h-9 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-ring"
+          <Input
+            className="max-w-md"
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
             required
@@ -143,8 +147,8 @@ function CreateTicketForm() {
         </label>
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("list.createCategoryLabel")}
-          <input
-            className="flex h-9 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm focus-ring"
+          <Input
+            className="max-w-md"
             value={category}
             onChange={(event) => setCategory(event.target.value)}
           />
@@ -154,13 +158,9 @@ function CreateTicketForm() {
             {error}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={mutation.isPending || !subject.trim()}
-          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
-        >
+        <Button type="submit" disabled={mutation.isPending || !subject.trim()} className="w-fit">
           {mutation.isPending ? t("list.createSubmitting") : t("list.createSubmit")}
-        </button>
+        </Button>
       </form>
     </div>
   );

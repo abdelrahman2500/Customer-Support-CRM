@@ -11,7 +11,7 @@ import {
 } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { ApiError } from "@/lib/api";
-import { showSuccessToast } from "@/lib/toast-store";
+import { showSuccessToast } from "@crm/ui";
 import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
 
@@ -24,7 +24,12 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams,
 }));
 
-vi.mock("@/lib/toast-store", () => ({
+// Story S-2 — `showSuccessToast` now lives in `@crm/ui`, which also exports
+// every primitive these components render. A whole-module factory would
+// replace those too, so this spreads the real module and overrides only
+// the one function under assertion.
+vi.mock("@crm/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@crm/ui")>()),
   showSuccessToast: vi.fn(),
 }));
 
@@ -88,7 +93,10 @@ describe("CreateTicketView", () => {
   });
 
   it("renders the form with the existing customer list in the picker (English)", () => {
-    mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    mockedUseCreateTicketMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
 
     renderWithLocale("en");
 
@@ -97,7 +105,10 @@ describe("CreateTicketView", () => {
   });
 
   it("renders the form (Arabic)", () => {
-    mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    mockedUseCreateTicketMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
 
     renderWithLocale("ar");
 
@@ -105,7 +116,10 @@ describe("CreateTicketView", () => {
   });
 
   it("disables submit until a customer is selected", () => {
-    mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    mockedUseCreateTicketMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
 
     renderWithLocale("en");
 
@@ -185,7 +199,10 @@ describe("CreateTicketView", () => {
   // Story 27 — customerId query-parameter prefill.
   describe("customerId query-parameter prefill (Story 27)", () => {
     it("pre-selects the customer when the query parameter matches a loaded customer", () => {
-      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockedUseCreateTicketMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      } as never);
       mockSearchParams = new URLSearchParams({ customerId: "customer-1" });
 
       renderWithLocale("en");
@@ -198,7 +215,10 @@ describe("CreateTicketView", () => {
     });
 
     it("leaves the picker unselected when the query parameter does not match any loaded customer", () => {
-      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockedUseCreateTicketMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      } as never);
       mockSearchParams = new URLSearchParams({ customerId: "unknown-customer" });
 
       renderWithLocale("en");
@@ -208,7 +228,10 @@ describe("CreateTicketView", () => {
     });
 
     it("leaves the picker unselected (unchanged existing behavior) when no query parameter is present", () => {
-      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockedUseCreateTicketMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      } as never);
       mockSearchParams = new URLSearchParams();
 
       renderWithLocale("en");
@@ -253,7 +276,10 @@ describe("CreateTicketView", () => {
   // Story 43 — contact/department/assignee at creation.
   describe("contact/department/assignee at creation (Story 43)", () => {
     it("does not render the contact picker before a customer is selected", () => {
-      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockedUseCreateTicketMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      } as never);
 
       renderWithLocale("en");
 
@@ -261,14 +287,19 @@ describe("CreateTicketView", () => {
     });
 
     it("reveals the contact picker, populated with the selected customer's real contacts, once a customer is chosen", async () => {
-      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockedUseCreateTicketMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      } as never);
       mockedUseCustomerQuery.mockReturnValue(
         queryResult({
           data: {
             id: "customer-1",
             displayName: "Acme Inc.",
             isActive: true,
-            contacts: [{ id: "contact-1", fullName: "Jane Doe", email: null, phone: null, isPrimary: true }],
+            contacts: [
+              { id: "contact-1", fullName: "Jane Doe", email: null, phone: null, isPrimary: true },
+            ],
           },
           isSuccess: true,
         }) as never,
@@ -283,7 +314,10 @@ describe("CreateTicketView", () => {
     });
 
     it("shows only the no-specific-contact option for a customer with zero contacts", async () => {
-      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockedUseCreateTicketMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      } as never);
       mockedUseCustomerQuery.mockReturnValue(
         queryResult({
           data: { id: "customer-1", displayName: "Acme Inc.", isActive: true, contacts: [] },
@@ -318,7 +352,9 @@ describe("CreateTicketView", () => {
             id: "customer-1",
             displayName: "Acme Inc.",
             isActive: true,
-            contacts: [{ id: "contact-1", fullName: "Jane Doe", email: null, phone: null, isPrimary: true }],
+            contacts: [
+              { id: "contact-1", fullName: "Jane Doe", email: null, phone: null, isPrimary: true },
+            ],
           },
           isSuccess: true,
         }) as never,
@@ -350,7 +386,9 @@ describe("CreateTicketView", () => {
             id: "customer-1",
             displayName: "Acme Inc.",
             isActive: true,
-            contacts: [{ id: "contact-1", fullName: "Jane Doe", email: null, phone: null, isPrimary: true }],
+            contacts: [
+              { id: "contact-1", fullName: "Jane Doe", email: null, phone: null, isPrimary: true },
+            ],
           },
           isSuccess: true,
         }) as never,
@@ -363,7 +401,15 @@ describe("CreateTicketView", () => {
       );
       mockedUseUsersQuery.mockReturnValue(
         queryResult({
-          data: [{ id: "user-1", email: "agent@example.com", fullName: "Ada Lovelace", isActive: true, roles: [] }],
+          data: [
+            {
+              id: "user-1",
+              email: "agent@example.com",
+              fullName: "Ada Lovelace",
+              isActive: true,
+              roles: [],
+            },
+          ],
           isSuccess: true,
         }) as never,
       );
@@ -401,7 +447,10 @@ describe("CreateTicketView", () => {
     });
 
     it("renders an inline error for each picker when its own query fails, independently of the others", async () => {
-      mockedUseCreateTicketMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+      mockedUseCreateTicketMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      } as never);
       mockedUseCustomerQuery.mockReturnValue(queryResult({ isError: true }) as never);
       mockedUseDepartmentsQuery.mockReturnValue(queryResult({ isError: true }) as never);
       mockedUseUsersQuery.mockReturnValue(queryResult({ isError: true }) as never);

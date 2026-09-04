@@ -4,11 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { useBrandingQuery, useUpdateBrandingMutation } from "@/hooks/use-branding";
 import { ApiError } from "@/lib/api";
-import { showSuccessToast } from "@/lib/toast-store";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, Button, Input, showSuccessToast, Skeleton } from "@crm/ui";
 
 const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 

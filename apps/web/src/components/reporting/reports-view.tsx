@@ -20,11 +20,8 @@ import { downloadReportCsv } from "@/lib/reporting-api";
 import type { ReportDateRange, ReportExportPath, ReportWidgetType } from "@/lib/reporting-api";
 import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Alert, Button, Input, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 
 /** Every existing report, in the same order this screen has always shown
  * them — also the "All reports" default and the widget set a brand-new
@@ -381,7 +378,9 @@ export function ReportsView() {
                     <li key={row.feature} className="flex items-center justify-between">
                       <span className="text-slate-600">{row.feature}</span>
                       <span className="font-medium text-slate-900">
-                        {row.totalCostUsd !== null ? formatUsd(row.totalCostUsd) : t("aiUsage.costUnknown")}
+                        {row.totalCostUsd !== null
+                          ? formatUsd(row.totalCostUsd)
+                          : t("aiUsage.costUnknown")}
                       </span>
                     </li>
                   ))}
@@ -406,21 +405,26 @@ export function ReportsView() {
             exportPath="ticket-volume-by-category"
             range={range}
           >
-            {ticketVolumeByCategoryQuery.isSuccess && ticketVolumeByCategoryQuery.data.length === 0 && (
-              <p className="text-sm text-slate-500">{t("ticketVolumeByCategory.empty")}</p>
-            )}
-            {ticketVolumeByCategoryQuery.isSuccess && ticketVolumeByCategoryQuery.data.length > 0 && (
-              <ul className="flex flex-col gap-1 text-sm">
-                {ticketVolumeByCategoryQuery.data.map((row) => (
-                  <li key={row.categoryId ?? "uncategorized"} className="flex items-center justify-between">
-                    <span className="text-slate-600">
-                      {row.categoryName ?? t("ticketVolumeByCategory.uncategorized")}
-                    </span>
-                    <span className="font-medium text-slate-900">{row.count}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {ticketVolumeByCategoryQuery.isSuccess &&
+              ticketVolumeByCategoryQuery.data.length === 0 && (
+                <p className="text-sm text-slate-500">{t("ticketVolumeByCategory.empty")}</p>
+              )}
+            {ticketVolumeByCategoryQuery.isSuccess &&
+              ticketVolumeByCategoryQuery.data.length > 0 && (
+                <ul className="flex flex-col gap-1 text-sm">
+                  {ticketVolumeByCategoryQuery.data.map((row) => (
+                    <li
+                      key={row.categoryId ?? "uncategorized"}
+                      className="flex items-center justify-between"
+                    >
+                      <span className="text-slate-600">
+                        {row.categoryName ?? t("ticketVolumeByCategory.uncategorized")}
+                      </span>
+                      <span className="font-medium text-slate-900">{row.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
           </ReportCard>
         );
     }
@@ -436,7 +440,9 @@ export function ReportsView() {
           <Input
             type="date"
             value={range.from ?? ""}
-            onChange={(event) => setRange((prev) => ({ ...prev, from: event.target.value || undefined }))}
+            onChange={(event) =>
+              setRange((prev) => ({ ...prev, from: event.target.value || undefined }))
+            }
             className="w-40"
           />
         </label>
@@ -445,7 +451,9 @@ export function ReportsView() {
           <Input
             type="date"
             value={range.to ?? ""}
-            onChange={(event) => setRange((prev) => ({ ...prev, to: event.target.value || undefined }))}
+            onChange={(event) =>
+              setRange((prev) => ({ ...prev, to: event.target.value || undefined }))
+            }
             className="w-40"
           />
         </label>

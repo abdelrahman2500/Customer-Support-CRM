@@ -1,16 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { NextIntlClientProvider } from "next-intl";
 import { SuccessToaster } from "./success-toaster";
-import { useToastStore, showSuccessToast } from "@/lib/toast-store";
-import enMessages from "../../../messages/en.json";
+import { useToastStore, showSuccessToast } from "../lib/toast-store";
 
+// The two accessible names are props now, not resolved from a message
+// catalog — the primitive owns no copy. The values below are the same ones
+// each app binds from its own `common` namespace, so the assertions on
+// "Success notifications"/"Dismiss" below keep testing the same behaviour.
 function renderToaster() {
-  return render(
-    <NextIntlClientProvider locale="en" messages={enMessages}>
-      <SuccessToaster />
-    </NextIntlClientProvider>,
-  );
+  return render(<SuccessToaster regionLabel="Success notifications" dismissLabel="Dismiss" />);
 }
 
 describe("SuccessToaster", () => {

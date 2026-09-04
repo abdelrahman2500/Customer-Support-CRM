@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import * as Sentry from "@sentry/nextjs";
-import { Button } from "@/components/ui/button";
+import { Button } from "@crm/ui";
 
 /**
  * Story 96 — Navigation & Route Robustness. A minimal safety net for an

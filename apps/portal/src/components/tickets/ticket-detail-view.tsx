@@ -15,22 +15,28 @@ import { TicketAttachmentsCard } from "@/components/tickets/ticket-attachments-c
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
-import { Skeleton } from "@/components/portal/skeleton";
+import { Badge, Button, Skeleton } from "@crm/ui";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
 /**
- * Story 98 - Design System & Visual Polish. Mirrors this same file's own
- * ticket-list-view.tsx statusPillClassName exactly.
+ * Story S-2 — maps a ticket status onto one of `@crm/ui`'s semantic `Badge`
+ * variants, replacing the hand-rolled pill class string this file and
+ * `ticket-list-view.tsx` each carried a copy of.
+ *
+ * The mapping stays in this app on purpose: `@crm/ui` holds primitives and
+ * knows nothing about tickets, so `TicketStatus -> variant` is domain
+ * knowledge that belongs to a consumer. Each variant resolves to exactly the
+ * colours the pill used before (warning = amber tint, success = emerald,
+ * secondary = slate, outline = bordered), so the rendered result is
+ * unchanged apart from Badge's slightly wider padding and medium weight —
+ * which is what makes it identical to the agent workspace's own badges.
  */
-function statusPillClassName(status: string): string {
-  const base = "rounded-full border px-2 py-0.5 text-xs";
-  if (status === "OPEN")
-    return `${base} border-transparent bg-warning-surface text-warning-foreground`;
-  if (status === "RESOLVED")
-    return `${base} border-transparent bg-success-surface text-success-foreground`;
-  if (status === "CLOSED") return `${base} border-rule-strong text-ink-strong`;
-  return `${base} border-transparent bg-surface-muted text-ink`; // IN_PROGRESS
+function statusBadgeVariant(status: string): "warning" | "success" | "outline" | "secondary" {
+  if (status === "OPEN") return "warning";
+  if (status === "RESOLVED") return "success";
+  if (status === "CLOSED") return "outline";
+  return "secondary"; // IN_PROGRESS
 }
 
 /**
@@ -125,7 +131,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <div>
             <dt className="text-xs text-slate-500">{t("detail.status")}</dt>
             <dd>
-              <span className={statusPillClassName(ticket.status)}>{ticket.status}</span>
+              <Badge variant={statusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
             </dd>
           </div>
           <div>
@@ -278,13 +284,9 @@ function CsatForm({ ticketId }: { ticketId: string }) {
           {error}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={mutation.isPending || !rating}
-        className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
-      >
+      <Button type="submit" disabled={mutation.isPending || !rating} className="w-fit">
         {mutation.isPending ? t("detail.csatSubmitting") : t("detail.csatSubmit")}
-      </button>
+      </Button>
     </form>
   );
 }

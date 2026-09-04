@@ -13,6 +13,7 @@ import {
 } from "@/hooks/use-chat";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useErrorMessage } from "@/hooks/use-error-message";
+import { Button, Skeleton } from "@crm/ui";
 
 /**
  * Story 80 — AI Portal Chatbot (Foundation). Crosses
@@ -101,9 +102,7 @@ export function ChatWidget() {
         </p>
       )}
 
-      {messagesQuery.isLoading && (
-        <div className="mt-2 h-40 w-full animate-pulse rounded-md bg-slate-100" />
-      )}
+      {messagesQuery.isLoading && <Skeleton className="mt-2 h-40 w-full" />}
       {messagesQuery.isError && (
         <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {t("loadError")}
@@ -157,14 +156,15 @@ export function ChatWidget() {
 
       {messagesQuery.isSuccess && messagesQuery.data.length > 0 && (
         <div className="mt-3 flex flex-col gap-2 border-t border-slate-200 pt-3">
-          <button
+          <Button
             type="button"
             onClick={() => void handleEscalate()}
             disabled={escalate.isPending}
-            className="inline-flex h-9 w-fit items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
+            variant="outline"
+            className="w-fit"
           >
             {escalate.isPending ? t("escalating") : t("escalate")}
-          </button>
+          </Button>
           {escalateError && (
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {escalateError}
@@ -236,13 +236,13 @@ function ChatComposer({
         onKeyDown={handleKeyDown}
       />
       <div>
-        <button
+        <Button
           type="submit"
           disabled={mutation.isPending || !sessionId || !body.trim()}
-          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
+          className="w-fit"
         >
           {mutation.isPending ? t("sending") : t("send")}
-        </button>
+        </Button>
       </div>
       {error && (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

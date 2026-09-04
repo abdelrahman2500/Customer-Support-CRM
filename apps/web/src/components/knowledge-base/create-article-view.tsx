@@ -5,9 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateArticleMutation } from "@/hooks/use-knowledge-base";
 import { ApiError } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
+import { Alert, Button, Input } from "@crm/ui";
 
 /**
  * Story 51 — Create Article, mirroring `CreateSlaPolicyView`'s plain

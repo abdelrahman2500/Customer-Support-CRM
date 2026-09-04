@@ -9,6 +9,7 @@ import {
   useSendMyTicketMessageMutation,
 } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
+import { Button, Skeleton } from "@crm/ui";
 
 /**
  * Story 78 — Live Chat UI (Customer Portal side). Reads
@@ -42,9 +43,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
     <div className="rounded-md border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-slate-900">{t("detail.chatHeading")}</h2>
 
-      {messagesQuery.isLoading && (
-        <div className="mt-2 h-40 w-full animate-pulse rounded-md bg-slate-100" />
-      )}
+      {messagesQuery.isLoading && <Skeleton className="mt-2 h-40 w-full" />}
       {messagesQuery.isError && (
         <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {t("detail.chatLoadError")}
@@ -145,13 +144,9 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
         onKeyDown={handleKeyDown}
       />
       <div>
-        <button
-          type="submit"
-          disabled={mutation.isPending || !body.trim()}
-          className="inline-flex h-9 w-fit items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
-        >
+        <Button type="submit" disabled={mutation.isPending || !body.trim()} className="w-fit">
           {mutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
-        </button>
+        </Button>
       </div>
       {error && (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

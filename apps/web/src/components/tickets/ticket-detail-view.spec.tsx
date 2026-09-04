@@ -25,9 +25,14 @@ import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { ApiError } from "@/lib/api";
-import { showSuccessToast } from "@/lib/toast-store";
+import { showSuccessToast } from "@crm/ui";
 
-vi.mock("@/lib/toast-store", () => ({
+// Story S-2 — `showSuccessToast` now lives in `@crm/ui`, which also exports
+// every primitive these components render. A whole-module factory would
+// replace those too, so this spreads the real module and overrides only
+// the one function under assertion.
+vi.mock("@crm/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@crm/ui")>()),
   showSuccessToast: vi.fn(),
 }));
 
@@ -126,10 +131,15 @@ describe("TicketDetailView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useCustomersQuery).mockReturnValue(
-      queryResult({ data: [{ id: "customer-1", displayName: "Acme Inc." }], isSuccess: true }) as never,
+      queryResult({
+        data: [{ id: "customer-1", displayName: "Acme Inc." }],
+        isSuccess: true,
+      }) as never,
     );
     vi.mocked(useUsersQuery).mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
-    vi.mocked(useDepartmentsQuery).mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    vi.mocked(useDepartmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
     vi.mocked(useTicketCategoriesQuery).mockReturnValue(
       queryResult({
         data: [{ id: "category-1", branchId: "branch-1", name: "billing", isActive: true }],
@@ -384,7 +394,11 @@ describe("TicketDetailView", () => {
       const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
         options?.onSuccess?.();
       });
-      vi.mocked(useUpdateTicketMutation).mockReturnValue({ mutate, isError: false, error: null } as never);
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isError: false,
+        error: null,
+      } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
       fireEvent.click(screen.getByText("OPEN"));
@@ -402,7 +416,11 @@ describe("TicketDetailView", () => {
       const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
         options?.onSuccess?.();
       });
-      vi.mocked(useUpdateTicketMutation).mockReturnValue({ mutate, isError: false, error: null } as never);
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isError: false,
+        error: null,
+      } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
       fireEvent.click(screen.getByText("HIGH"));

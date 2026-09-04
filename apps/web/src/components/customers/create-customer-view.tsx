@@ -5,9 +5,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateCustomerMutation } from "@/hooks/use-tickets";
 import { ApiError } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
+import { Alert, Button, Input } from "@crm/ui";
 
 /**
  * Story 25 — Create Customer (plan Task 3). Submits only `{ displayName }`
@@ -37,9 +35,7 @@ export function CreateCustomerView() {
       setCreated(customer);
       setDisplayName("");
     } catch (submitError) {
-      setError(
-        submitError instanceof ApiError ? submitError.message : t("createFailed"),
-      );
+      setError(submitError instanceof ApiError ? submitError.message : t("createFailed"));
     }
   }
 

@@ -9,9 +9,7 @@ import type {
   TicketEscalatedNotificationPayload,
 } from "@/lib/notifications-store";
 import { renderNotificationTemplate } from "@/lib/notification-template-render";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Badge, Button, cn } from "@crm/ui";
 
 function isSlaDetectionPayload(
   notification: BranchNotification,

@@ -7,10 +7,7 @@ import { useCustomersQuery, useTicketsQuery, useUpdateTicketMutation } from "@/h
 import type { TicketListItem } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, Badge, Button, Skeleton } from "@crm/ui";
 
 /** Story 28 — a work queue, not a full history: only tickets still open
  * belong on the dashboard. `RESOLVED`/`CLOSED` tickets remain reachable via

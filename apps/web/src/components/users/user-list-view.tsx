@@ -15,20 +15,21 @@ import { useRolesQuery } from "@/hooks/use-roles";
 import { useAgentPresence, type PresenceStatus } from "@/hooks/use-agent-presence";
 import type { UserSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Alert,
+  Badge,
+  Button,
+  Input,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@crm/ui";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /** Same sentinel string `CreateUserView` uses for its own optional
  * department picker — kept as an equivalent local constant since
@@ -180,10 +181,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
       setFullNameDraft(user.fullName);
       return;
     }
-    mutation.mutate(
-      { fullName: trimmed },
-      { onError: () => setFullNameDraft(user.fullName) },
-    );
+    mutation.mutate({ fullName: trimmed }, { onError: () => setFullNameDraft(user.fullName) });
   }
 
   function commitEmail() {
@@ -192,10 +190,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
       setEmailDraft(user.email);
       return;
     }
-    mutation.mutate(
-      { email: trimmed },
-      { onError: () => setEmailDraft(user.email) },
-    );
+    mutation.mutate({ email: trimmed }, { onError: () => setEmailDraft(user.email) });
   }
 
   function handleToggleActiveClick() {
@@ -207,10 +202,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
   }
 
   function confirmDeactivate() {
-    mutation.mutate(
-      { isActive: false },
-      { onSuccess: () => setConfirmDeactivateOpen(false) },
-    );
+    mutation.mutate({ isActive: false }, { onSuccess: () => setConfirmDeactivateOpen(false) });
   }
 
   function confirmResetPassword() {

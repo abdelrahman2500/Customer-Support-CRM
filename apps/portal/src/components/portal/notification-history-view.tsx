@@ -10,7 +10,7 @@ import {
 import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import type { PortalNotificationSummary } from "@/lib/notifications-api";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
-import { Skeleton } from "./skeleton";
+import { Skeleton } from "@crm/ui";
 
 const TICKET_UPDATED_EVENT = "ticket.updated";
 

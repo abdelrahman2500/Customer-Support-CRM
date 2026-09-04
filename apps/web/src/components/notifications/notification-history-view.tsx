@@ -9,18 +9,8 @@ import { useCustomersQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import type { NotificationSummary } from "@/lib/notifications-api";
 import { renderNotificationTemplate } from "@/lib/notification-template-render";
 import { ApiError } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Alert } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Alert, Badge, Button, Skeleton } from "@crm/ui";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
 
 /** The real, backend-defined event-type strings this history can ever show

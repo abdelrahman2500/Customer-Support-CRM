@@ -5,9 +5,7 @@ import { useTranslations } from "next-intl";
 import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
 import type { TicketAiFeature } from "@/lib/ticket-ai-api";
 import { ApiError } from "@/lib/api";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, Button, Skeleton } from "@crm/ui";
 
 const FEATURES: TicketAiFeature[] = ["SUMMARIZE", "SUGGEST_REPLY", "CATEGORIZE"];
 
