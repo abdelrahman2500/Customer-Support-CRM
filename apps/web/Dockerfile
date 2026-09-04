@@ -7,6 +7,7 @@ FROM base AS deps
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
 COPY packages/config/package.json packages/config/
 COPY packages/shared/package.json packages/shared/
+COPY packages/ui/package.json packages/ui/
 COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile --filter @crm/web...
 
