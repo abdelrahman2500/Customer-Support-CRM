@@ -129,12 +129,13 @@ describe("DashboardView", () => {
     });
 
     // Story 98 — Design System & Visual Polish.
-    it("gives the empty state a next action, navigating to the full ticket list", () => {
+    it("gives the empty state a next action linking to the full ticket list", () => {
       renderWithLocale();
 
-      fireEvent.click(screen.getByRole("button", { name: "Browse all tickets" }));
-
-      expect(push).toHaveBeenCalledWith("/en/tickets");
+      expect(screen.getByRole("link", { name: "Browse all tickets" })).toHaveAttribute(
+        "href",
+        "/en/tickets",
+      );
     });
 
     it("queries GET /tickets scoped to the authenticated agent, not the branch-wide list", () => {
@@ -221,22 +222,30 @@ describe("DashboardView", () => {
       expect(subjects).toEqual(["Already breached", "Due soon", "No target"]);
     });
 
-    it("navigates to the ticket detail route when a row is clicked", () => {
+    it("links each row's subject to the ticket detail route", () => {
       mockTicketQueries({ mine: { data: [ticket({})] } });
 
       renderWithLocale();
-      fireEvent.click(screen.getByText("Cannot log in"));
 
-      expect(push).toHaveBeenCalledWith("/en/tickets/ticket-1");
+      expect(screen.getByRole("link", { name: "Cannot log in" })).toHaveAttribute(
+        "href",
+        "/en/tickets/ticket-1",
+      );
     });
 
-    it("navigates to the customer detail route when the customer name is clicked, without also navigating to the ticket", () => {
+    it("links the customer name to the customer, not to the ticket the row points at", () => {
       mockTicketQueries({ mine: { data: [ticket({})] } });
 
       renderWithLocale();
-      fireEvent.click(screen.getByText("Acme Inc."));
 
-      expect(push).toHaveBeenCalledWith("/en/customers/customer-1");
+      expect(screen.getByRole("link", { name: "Acme Inc." })).toHaveAttribute(
+        "href",
+        "/en/customers/customer-1",
+      );
+
+      // The row is still clickable for the mouse, so the nested customer
+      // link stops propagation rather than letting the row win.
+      fireEvent.click(screen.getByRole("link", { name: "Acme Inc." }));
       expect(push).not.toHaveBeenCalledWith("/en/tickets/ticket-1");
     });
   });
@@ -370,7 +379,7 @@ describe("DashboardView", () => {
       expect(screen.getByText("Couldn't claim this ticket. Please try again.")).toBeInTheDocument();
     });
 
-    it("still navigates to the ticket detail route when the row (not the Claim button) is clicked", () => {
+    it("still links to the ticket detail route from the row (not the Claim button)", () => {
       mockTicketQueries({
         all: {
           data: [
@@ -385,9 +394,11 @@ describe("DashboardView", () => {
       });
 
       renderWithLocale();
-      fireEvent.click(screen.getByText("Needs a home"));
 
-      expect(push).toHaveBeenCalledWith("/en/tickets/unassigned-1");
+      expect(screen.getByRole("link", { name: "Needs a home" })).toHaveAttribute(
+        "href",
+        "/en/tickets/unassigned-1",
+      );
     });
   });
 

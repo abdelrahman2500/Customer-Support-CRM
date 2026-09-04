@@ -39,7 +39,9 @@ vi.mock("@/hooks/use-portal-notification-preferences", () => ({
 const mockedUseMyNotificationsQuery = vi.mocked(useMyNotificationsQuery);
 const mockedUseMarkNotificationsReadMutation = vi.mocked(useMarkNotificationsReadMutation);
 const mockedUseMyTicketsQuery = vi.mocked(useMyTicketsQuery);
-const mockedUsePortalNotificationPreferencesQuery = vi.mocked(usePortalNotificationPreferencesQuery);
+const mockedUsePortalNotificationPreferencesQuery = vi.mocked(
+  usePortalNotificationPreferencesQuery,
+);
 const mockedUseUpdatePortalNotificationPreferenceMutation = vi.mocked(
   useUpdatePortalNotificationPreferenceMutation,
 );
@@ -100,7 +102,9 @@ describe("NotificationHistoryView", () => {
   });
 
   it("renders the notification preferences section", () => {
-    mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseMyNotificationsQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
 
     render(<NotificationHistoryView />);
 
@@ -125,7 +129,9 @@ describe("NotificationHistoryView", () => {
     // headers the populated table uses); only the placeholder rows below
     // them are `aria-hidden`, so those are asserted via the DOM directly.
     expect(screen.getByRole("columnheader", { name: "history.columns.event" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "history.columns.ticket" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "history.columns.ticket" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: "history.columns.loggedAt" }),
     ).toBeInTheDocument();
@@ -145,9 +151,7 @@ describe("NotificationHistoryView", () => {
 
   it("shows an error state with a working retry action on failure", () => {
     const refetch = vi.fn();
-    mockedUseMyNotificationsQuery.mockReturnValue(
-      queryResult({ isError: true, refetch }) as never,
-    );
+    mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isError: true, refetch }) as never);
 
     render(<NotificationHistoryView />);
 
@@ -198,15 +202,15 @@ describe("NotificationHistoryView", () => {
     expect(screen.getByText("ticket-1")).toBeInTheDocument();
   });
 
-  it("navigates to the ticket detail page when a notification's ticket link is clicked", () => {
+  it("links each notification to its locale-correct ticket detail route", () => {
     mockedUseMyNotificationsQuery.mockReturnValue(
       queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
     );
 
     render(<NotificationHistoryView />);
-    fireEvent.click(screen.getByText("ticket-1"));
 
-    expect(push).toHaveBeenCalledWith("/en/tickets/ticket-1");
+    const link = screen.getByRole("link", { name: "ticket-1" });
+    expect(link).toHaveAttribute("href", "/en/tickets/ticket-1");
   });
 
   it("maps a ticket.updated eventType to the existing eventLabel.ticketUpdated key", () => {

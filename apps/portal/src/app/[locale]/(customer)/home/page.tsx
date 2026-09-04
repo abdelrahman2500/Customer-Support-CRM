@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 
 /**
@@ -16,12 +17,12 @@ export default async function PortalHomePage() {
   return (
     <div className="rounded-md border border-slate-200 bg-white p-4">
       <p className="max-w-prose text-sm text-slate-600">{t("placeholder")}</p>
-      <a
+      <Link
         href={`/${locale}/tickets`}
         className="mt-3 inline-block text-sm font-medium text-slate-900 hover:underline"
       >
         {t("myTicketsLink")}
-      </a>
+      </Link>
     </div>
   );
 }

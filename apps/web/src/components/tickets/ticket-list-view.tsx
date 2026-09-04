@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomersQuery, useTicketsQuery, useUsersQuery } from "@/hooks/use-tickets";
@@ -114,8 +115,8 @@ export function TicketListView() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
-        <Button size="sm" onClick={() => router.push(`/${locale}/tickets/new`)}>
-          {t("list.createButton")}
+        <Button size="sm" asChild>
+          <Link href={`/${locale}/tickets/new`}>{t("list.createButton")}</Link>
         </Button>
       </div>
 
@@ -216,31 +217,29 @@ export function TicketListView() {
             {ticketsQuery.data.map((ticket) => (
               <TableRow
                 key={ticket.id}
-                role="button"
-                tabIndex={0}
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    router.push(`/${locale}/tickets/${ticket.id}`);
-                  }
-                }}
               >
                 <TableCell className="font-mono text-xs text-slate-500">
                   {ticket.id.slice(0, 8)}
                 </TableCell>
-                <TableCell className="font-medium text-slate-900">{ticket.subject}</TableCell>
+                <TableCell className="font-medium text-slate-900">
+                  <Link
+                    href={`/${locale}/tickets/${ticket.id}`}
+                    className="focus-ring rounded-sm hover:underline"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {ticket.subject}
+                  </Link>
+                </TableCell>
                 <TableCell>
-                  <button
-                    type="button"
-                    className="rounded-sm hover:underline focus-ring"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      router.push(`/${locale}/customers/${ticket.customerId}`);
-                    }}
+                  <Link
+                    href={`/${locale}/customers/${ticket.customerId}`}
+                    className="focus-ring rounded-sm hover:underline"
+                    onClick={(event) => event.stopPropagation()}
                   >
                     {customerNameById.get(ticket.customerId) ?? ticket.customerId}
-                  </button>
+                  </Link>
                 </TableCell>
                 <TableCell>
                   <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>

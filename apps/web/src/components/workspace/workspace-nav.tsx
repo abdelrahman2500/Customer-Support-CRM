@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
@@ -194,9 +195,9 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={brandingQuery.data.logoUrl} alt={t("appName")} className="h-8 w-auto" />
         ) : (
-          <a href={`/${locale}/tickets`} className="text-sm font-semibold text-slate-900">
+          <Link href={`/${locale}/tickets`} className="text-sm font-semibold text-slate-900">
             {t("appName")}
-          </a>
+          </Link>
         )}
         <div className="flex items-center gap-4 text-sm text-slate-600">
           <span>{t("signedInAs", { name: user.fullName })}</span>
@@ -252,7 +253,7 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
           // link current, so it doesn't just match on exact equality.
           const isActive = pathname === href || pathname?.startsWith(`${href}/`);
           return (
-            <a
+            <Link
               key={item.href}
               href={href}
               aria-current={isActive ? "page" : undefined}
@@ -269,7 +270,7 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
                   {unreadCount}
                 </Badge>
               )}
-            </a>
+            </Link>
           );
         })}
       </nav>

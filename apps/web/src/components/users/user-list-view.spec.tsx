@@ -188,13 +188,12 @@ describe("UserListView", () => {
     );
   });
 
-  it("navigates to /users/new when 'New user' is clicked", () => {
+  it("links 'New user' to /users/new", () => {
     mockedUseUsersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
 
     renderView();
-    fireEvent.click(screen.getByText("New user"));
 
-    expect(push).toHaveBeenCalledWith("/en/users/new");
+    expect(screen.getByRole("link", { name: "New user" })).toHaveAttribute("href", "/en/users/new");
   });
 
   it("shows a loading state while the users query is pending", () => {

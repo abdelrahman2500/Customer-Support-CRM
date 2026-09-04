@@ -79,15 +79,17 @@ describe("ArticleListView", () => {
     expect(screen.getByText("list.empty")).toBeInTheDocument();
   });
 
-  it("renders a row per article and navigates to its detail on click", () => {
+  it("renders a row per article linking to its locale-correct detail route", () => {
     mockedUsePublishedArticlesQuery.mockReturnValue(
       queryResult({ data: [baseArticle], isSuccess: true }) as never,
     );
 
     render(<ArticleListView />);
-    fireEvent.click(screen.getByText("How to reset your password"));
 
-    expect(push).toHaveBeenCalledWith("/en/knowledge-base/article-1");
+    // Story S-6: a real link, so the destination is assertable and the row
+    // can be middle-clicked or opened in a new tab.
+    const link = screen.getByRole("link", { name: "How to reset your password" });
+    expect(link).toHaveAttribute("href", "/en/knowledge-base/article-1");
   });
 
   it("falls back to the placeholder label for an unscoped category", () => {

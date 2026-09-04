@@ -103,22 +103,34 @@ describe("CustomerListView", () => {
     );
 
     render(<CustomerListView />);
-    fireEvent.click(screen.getByText("Acme Inc."));
 
-    expect(push).toHaveBeenCalledWith("/en/customers/customer-1");
+    expect(screen.getByRole("link", { name: "Acme Inc." })).toHaveAttribute(
+      "href",
+      "/en/customers/customer-1",
+    );
   });
 
-  it("navigates to the create-customer route when the create button is clicked", () => {
+  it("links the create button to the create-customer route", () => {
     mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
 
     render(<CustomerListView />);
-    fireEvent.click(screen.getByRole("button", { name: "list.createButton" }));
 
-    expect(push).toHaveBeenCalledWith("/en/customers/new");
+    expect(screen.getByRole("link", { name: "list.createButton" })).toHaveAttribute(
+      "href",
+      "/en/customers/new",
+    );
   });
 
-  // Story 98 — Design System & Visual Polish.
-  it("marks each customer row as a keyboard-accessible button, navigating on Enter", () => {
+  /**
+   * Story 98 gave each row a `role="button"`/`tabIndex` so it could be
+   * reached by keyboard. Story S-6 replaced that with a real link on the
+   * name cell, which is better on every axis the fake button was trying to
+   * approximate: it is in the tab order natively, announces itself as a
+   * link, and can be middle-clicked or opened in a new tab. The row keeps
+   * its click as a mouse convenience, so what this now asserts is that
+   * keyboard users have a genuine, focusable link to the same destination.
+   */
+  it("gives each customer row a natively focusable link to its detail route", () => {
     mockedUseCustomersQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
@@ -127,12 +139,13 @@ describe("CustomerListView", () => {
     );
 
     render(<CustomerListView />);
-    const row = screen.getByText("Acme Inc.").closest('[role="button"]');
-    expect(row).toHaveAttribute("tabIndex", "0");
 
-    fireEvent.keyDown(row!, { key: "Enter" });
-
-    expect(push).toHaveBeenCalledWith("/en/customers/customer-1");
+    const link = screen.getByRole("link", { name: "Acme Inc." });
+    expect(link).toHaveAttribute("href", "/en/customers/customer-1");
+    // A real anchor with an href is focusable without any tabIndex of its own.
+    expect(link).not.toHaveAttribute("tabIndex");
+    link.focus();
+    expect(link).toHaveFocus();
   });
 
   // Story 101 — Customer Management: List Search/Filter.

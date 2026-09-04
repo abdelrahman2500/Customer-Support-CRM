@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -164,13 +165,12 @@ export function NotificationHistoryView() {
                     </span>
                   </td>
                   <td className="px-4 py-2">
-                    <button
-                      type="button"
-                      className="rounded-sm hover:underline focus-ring"
-                      onClick={() => router.push(`/${locale}/tickets/${notification.ticketId}`)}
+                    <Link
+                      href={`/${locale}/tickets/${notification.ticketId}`}
+                      className="focus-ring rounded-sm hover:underline"
                     >
                       {ticketSubjectById.get(notification.ticketId) ?? notification.ticketId}
-                    </button>
+                    </Link>
                   </td>
                   <td className="px-4 py-2 text-slate-500">
                     {new Date(notification.loggedAt).toLocaleString(locale)}

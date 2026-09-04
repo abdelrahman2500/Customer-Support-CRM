@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomersQuery, useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
@@ -91,27 +92,23 @@ function UnclaimedTicketRow({
   return (
     <li className="flex flex-col gap-1 border-b border-slate-100 pb-2 sm:flex-row sm:items-center sm:justify-between">
       <span
-        role="button"
-        tabIndex={0}
         className="flex cursor-pointer flex-col"
         onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            router.push(`/${locale}/tickets/${ticket.id}`);
-          }
-        }}
       >
-        <span className="font-medium text-slate-800">{ticket.subject}</span>
-        <button
-          type="button"
-          className="w-fit rounded-sm text-xs text-slate-500 hover:underline focus-ring"
-          onClick={(event) => {
-            event.stopPropagation();
-            router.push(`/${locale}/customers/${ticket.customerId}`);
-          }}
+        <Link
+          href={`/${locale}/tickets/${ticket.id}`}
+          className="focus-ring w-fit rounded-sm font-medium text-slate-800 hover:underline"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {ticket.subject}
+        </Link>
+        <Link
+          href={`/${locale}/customers/${ticket.customerId}`}
+          className="focus-ring w-fit rounded-sm text-xs text-ink-subtle hover:underline"
+          onClick={(event) => event.stopPropagation()}
         >
           {customerName}
-        </button>
+        </Link>
         {mutation.isError && (
           <span className="text-xs text-red-600">
             {mutation.error instanceof ApiError && mutation.error.status === 403
@@ -229,13 +226,12 @@ export function DashboardView({ userId }: { userId: string }) {
         {myTicketsQuery.isSuccess && openTickets.length === 0 && (
           <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
             <p>{t("empty")}</p>
-            <button
-              type="button"
-              className="rounded-sm font-medium text-slate-700 hover:underline focus-ring"
-              onClick={() => router.push(`/${locale}/tickets`)}
+            <Link
+              href={`/${locale}/tickets`}
+              className="focus-ring rounded-sm font-medium text-slate-700 hover:underline"
             >
               {t("browseAllTicketsLink")}
-            </button>
+            </Link>
           </div>
         )}
 
@@ -244,28 +240,24 @@ export function DashboardView({ userId }: { userId: string }) {
             {openTickets.map((ticket) => (
               <li
                 key={ticket.id}
-                role="button"
-                tabIndex={0}
                 className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    router.push(`/${locale}/tickets/${ticket.id}`);
-                  }
-                }}
               >
                 <span className="flex flex-col">
-                  <span className="font-medium text-slate-800">{ticket.subject}</span>
-                  <button
-                    type="button"
-                    className="w-fit rounded-sm text-xs text-slate-500 hover:underline focus-ring"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      router.push(`/${locale}/customers/${ticket.customerId}`);
-                    }}
+                  <Link
+                    href={`/${locale}/tickets/${ticket.id}`}
+                    className="focus-ring w-fit rounded-sm font-medium text-slate-800 hover:underline"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {ticket.subject}
+                  </Link>
+                  <Link
+                    href={`/${locale}/customers/${ticket.customerId}`}
+                    className="focus-ring w-fit rounded-sm text-xs text-ink-subtle hover:underline"
+                    onClick={(event) => event.stopPropagation()}
                   >
                     {customerNameById.get(ticket.customerId) ?? ticket.customerId}
-                  </button>
+                  </Link>
                 </span>
                 <span className="flex items-center gap-2">
                   <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>

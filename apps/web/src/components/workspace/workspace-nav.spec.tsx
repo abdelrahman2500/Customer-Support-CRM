@@ -10,9 +10,12 @@ import { clearQueryCache } from "@/lib/query-client-registry";
 const push = vi.fn();
 const refresh = vi.fn();
 let pathname = "/en/tickets";
+// Story S-6 — mutable so a test can render under `/ar`, mirroring how
+// `pathname` above is already varied per test.
+let locale = "en";
 
 vi.mock("next/navigation", () => ({
-  useParams: () => ({ locale: "en" }),
+  useParams: () => ({ locale }),
   useRouter: () => ({ push, refresh }),
   usePathname: () => pathname,
 }));
@@ -101,7 +104,9 @@ describe("WorkspaceNav", () => {
     render(<WorkspaceNav user={user} />);
 
     expect(screen.getByText("appName")).toBeInTheDocument();
-    expect(screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`)).toBeInTheDocument();
+    expect(
+      screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`),
+    ).toBeInTheDocument();
   });
 
   it("calls the real logout, then clears the local token and query cache, and redirects to login, on sign-out", async () => {
@@ -177,6 +182,34 @@ describe("WorkspaceNav", () => {
       }
     });
 
+    /**
+     * Story S-6 — these are `next/link`s now rather than plain anchors, so
+     * every one of them is a client-side transition. The locale segment is
+     * the thing most easily lost in that change: a link built from the
+     * wrong source would either drop `/ar` or double it into `/ar/ar`.
+     */
+    it("keeps the active locale segment on every link under /ar", () => {
+      locale = "ar";
+      pathname = "/ar/tickets";
+      try {
+        render(<WorkspaceNav user={user} />);
+
+        for (const [name, href] of EXPECTED_LINKS) {
+          const arabicHref = href.replace("/en/", "/ar/");
+          expect(screen.getByRole("link", { name }), name).toHaveAttribute("href", arabicHref);
+          expect(arabicHref.startsWith("/ar/ar")).toBe(false);
+        }
+        // The logo/home link too.
+        expect(screen.getByRole("link", { name: "appName" })).toHaveAttribute(
+          "href",
+          "/ar/tickets",
+        );
+      } finally {
+        locale = "en";
+        pathname = "/en/tickets";
+      }
+    });
+
     it("labels the nav landmark with an accessible name", () => {
       render(<WorkspaceNav user={user} />);
 
@@ -188,7 +221,9 @@ describe("WorkspaceNav", () => {
 
       expect(screen.getByRole("link", { name: "appName" })).toHaveAttribute("href", "/en/tickets");
       expect(screen.getByRole("button", { name: "signOut" })).toBeInTheDocument();
-      expect(screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`)).toBeInTheDocument();
+      expect(
+        screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`),
+      ).toBeInTheDocument();
     });
   });
 
@@ -395,9 +430,7 @@ describe("WorkspaceNav", () => {
         target: { value: "branch-2::dept-2" },
       });
 
-      await waitFor(() =>
-        expect(mockedSwitchBranch).toHaveBeenCalledWith("branch-2", "dept-2"),
-      );
+      await waitFor(() => expect(mockedSwitchBranch).toHaveBeenCalledWith("branch-2", "dept-2"));
     });
   });
 

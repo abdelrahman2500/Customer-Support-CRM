@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla-policies";
@@ -43,8 +44,8 @@ export function SlaPolicyListView() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
-        <Button size="sm" onClick={() => router.push(`/${locale}/sla-policies/new`)}>
-          {t("list.createButton")}
+        <Button size="sm" asChild>
+          <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
         </Button>
       </div>
 
@@ -68,12 +69,8 @@ export function SlaPolicyListView() {
       {policiesQuery.isSuccess && policiesQuery.data.length === 0 && (
         <div className="rounded-md border border-dashed border-rule-strong p-8 text-center">
           <p className="text-sm text-ink-subtle">{t("list.empty")}</p>
-          <Button
-            size="sm"
-            className="mt-3"
-            onClick={() => router.push(`/${locale}/sla-policies/new`)}
-          >
-            {t("list.createButton")}
+          <Button size="sm" className="mt-3" asChild>
+            <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
           </Button>
         </div>
       )}

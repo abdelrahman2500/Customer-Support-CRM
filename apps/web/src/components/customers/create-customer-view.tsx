@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateCustomerMutation } from "@/hooks/use-tickets";
@@ -46,9 +47,9 @@ export function CreateCustomerView() {
       {created && (
         <Alert variant="success">
           {t("create.success", { name: created.displayName })}{" "}
-          <a className="underline" href={`/${locale}/tickets/new`}>
+          <Link className="underline" href={`/${locale}/tickets/new`}>
             {t("create.createTicketLink")}
-          </a>
+          </Link>
         </Alert>
       )}
 

@@ -120,7 +120,9 @@ describe("NotificationHistoryView", () => {
   });
 
   it("shows the empty state when the query succeeds with zero notifications", () => {
-    mockedUseNotificationsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseNotificationsQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
 
     render(<NotificationHistoryView />);
 
@@ -172,7 +174,10 @@ describe("NotificationHistoryView", () => {
       }) as never,
     );
     mockedUseCustomersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [{ id: "customer-1", displayName: "Acme Inc.", isActive: true }] }) as never,
+      queryResult({
+        isSuccess: true,
+        data: [{ id: "customer-1", displayName: "Acme Inc.", isActive: true }],
+      }) as never,
     );
     mockedUseNotificationsQuery.mockReturnValue(
       queryResult({ isSuccess: true, data: [atRiskNotification] }) as never,
@@ -195,15 +200,17 @@ describe("NotificationHistoryView", () => {
     expect(screen.getByText("unknownCustomer")).toBeInTheDocument();
   });
 
-  it("navigates to the ticket detail page when a notification's ticket link is clicked", () => {
+  it("links each notification to its locale-correct ticket detail route", () => {
     mockedUseNotificationsQuery.mockReturnValue(
       queryResult({ isSuccess: true, data: [atRiskNotification] }) as never,
     );
 
     render(<NotificationHistoryView />);
-    fireEvent.click(screen.getByText("ticket-1"));
 
-    expect(push).toHaveBeenCalledWith("/en/tickets/ticket-1");
+    expect(screen.getByRole("link", { name: "ticket-1" })).toHaveAttribute(
+      "href",
+      "/en/tickets/ticket-1",
+    );
   });
 
   it("renders the resolved target type and target time for an sla.at_risk notification", () => {
@@ -235,7 +242,9 @@ describe("NotificationHistoryView", () => {
     );
     mockedUseNotificationTemplatesQuery.mockReturnValue(
       queryResult({
-        data: [{ id: "t-1", eventType: "sla.at_risk", template: "Watch ticket {ticketId} closely" }],
+        data: [
+          { id: "t-1", eventType: "sla.at_risk", template: "Watch ticket {ticketId} closely" },
+        ],
         isSuccess: true,
       }) as never,
     );

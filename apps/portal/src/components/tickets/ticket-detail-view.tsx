@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -93,7 +94,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
   return (
     <section className="flex flex-col gap-6">
-      <a
+      <Link
         href={`/${locale}/tickets`}
         className="text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
       >
@@ -104,7 +105,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           &larr;
         </span>{" "}
         {t("detail.backToList")}
-      </a>
+      </Link>
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h1 className="text-lg font-semibold text-slate-900">{ticket.subject}</h1>

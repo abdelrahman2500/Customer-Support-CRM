@@ -92,13 +92,18 @@ describe("ArticleListView", () => {
     expect(screen.getAllByText("list.createButton").length).toBeGreaterThan(0);
   });
 
-  it("navigates to the create route when a create button is clicked", () => {
+  it("links every create affordance to the create route", () => {
     mockedUseArticlesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
 
     render(<ArticleListView />);
-    fireEvent.click(screen.getAllByText("list.createButton")[0] as HTMLElement);
 
-    expect(push).toHaveBeenCalledWith("/en/knowledge-base/new");
+    // Both the header button and the empty-state CTA are Button asChild +
+    // Link, so each is a real, middle-clickable anchor.
+    const links = screen.getAllByRole("link", { name: "list.createButton" });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "/en/knowledge-base/new");
+    }
   });
 
   it("renders a row per article once the query succeeds", () => {
@@ -120,9 +125,11 @@ describe("ArticleListView", () => {
     );
 
     render(<ArticleListView />);
-    fireEvent.click(screen.getByText("How to reset a password"));
 
-    expect(push).toHaveBeenCalledWith("/en/knowledge-base/article-1");
+    expect(screen.getByRole("link", { name: "How to reset a password" })).toHaveAttribute(
+      "href",
+      "/en/knowledge-base/article-1",
+    );
   });
 
   it("falls back to the placeholder label for an unscoped category", () => {

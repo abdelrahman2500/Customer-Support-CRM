@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -221,13 +222,12 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         />
         <p className="text-sm text-slate-500">
           {t("detail.customer")}:{" "}
-          <button
-            type="button"
-            className="rounded-sm hover:underline focus-ring"
-            onClick={() => router.push(`/${locale}/customers/${ticket.customerId}`)}
+          <Link
+            href={`/${locale}/customers/${ticket.customerId}`}
+            className="focus-ring rounded-sm hover:underline"
           >
             {customerNameById.get(ticket.customerId) ?? ticket.customerId}
-          </button>
+          </Link>
         </p>
       </div>
 
@@ -390,9 +390,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
       {aiCategoryNoMatch && (
         <Alert>
           {t("detail.aiCategoryNoMatch", { category: aiCategoryNoMatch })}{" "}
-          <a className="underline" href={`/${locale}/ticket-categories`}>
+          <Link className="underline" href={`/${locale}/ticket-categories`}>
             {t("detail.aiCategoryNoMatchLink")}
-          </a>
+          </Link>
         </Alert>
       )}
 

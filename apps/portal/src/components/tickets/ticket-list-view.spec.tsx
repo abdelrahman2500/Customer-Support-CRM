@@ -86,15 +86,15 @@ describe("TicketListView", () => {
     expect(screen.getByText("list.empty")).toBeInTheDocument();
   });
 
-  it("renders a row per ticket and navigates to its detail on click", () => {
+  it("renders a row per ticket linking to its locale-correct detail route", () => {
     mockedUseMyTicketsQuery.mockReturnValue(
       queryResult({ data: [baseTicket], isSuccess: true }) as never,
     );
 
     render(<TicketListView />);
-    fireEvent.click(screen.getByText("Cannot log in"));
 
-    expect(push).toHaveBeenCalledWith("/en/tickets/ticket-1");
+    const link = screen.getByRole("link", { name: "Cannot log in" });
+    expect(link).toHaveAttribute("href", "/en/tickets/ticket-1");
   });
 
   it("disables the create-ticket submit button until a subject is entered", () => {

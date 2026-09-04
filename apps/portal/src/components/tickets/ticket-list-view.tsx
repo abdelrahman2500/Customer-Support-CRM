@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateMyTicketMutation, useMyTicketsQuery } from "@/hooks/use-portal-tickets";
@@ -58,17 +59,16 @@ export function TicketListView() {
             {ticketsQuery.data.map((ticket) => (
               <li
                 key={ticket.id}
-                role="button"
-                tabIndex={0}
                 className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    router.push(`/${locale}/tickets/${ticket.id}`);
-                  }
-                }}
               >
-                <span className="font-medium text-slate-800">{ticket.subject}</span>
+                <Link
+                  href={`/${locale}/tickets/${ticket.id}`}
+                  className="focus-ring rounded-sm font-medium text-slate-800 hover:underline"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {ticket.subject}
+                </Link>
                 <span className="flex items-center gap-2 text-slate-500">
                   <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
                   <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>

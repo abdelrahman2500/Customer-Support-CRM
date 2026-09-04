@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Skeleton } from "@crm/ui";
@@ -42,7 +43,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
   return (
     <section className="flex flex-col gap-6">
-      <a
+      <Link
         href={`/${locale}/knowledge-base`}
         className="text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
       >
@@ -53,7 +54,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
           &larr;
         </span>{" "}
         {t("detail.backToList")}
-      </a>
+      </Link>
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h1 className="text-lg font-semibold text-slate-900">{article.title}</h1>

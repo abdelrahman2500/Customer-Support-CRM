@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -104,8 +105,8 @@ export function UserListView() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
-        <Button size="sm" onClick={() => router.push(`/${locale}/users/new`)}>
-          {t("list.createButton")}
+        <Button size="sm" asChild>
+          <Link href={`/${locale}/users/new`}>{t("list.createButton")}</Link>
         </Button>
       </div>
 

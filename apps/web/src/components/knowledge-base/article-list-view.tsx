@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useArticlesQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
@@ -31,8 +32,8 @@ export function ArticleListView() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
-        <Button size="sm" onClick={() => router.push(`/${locale}/knowledge-base/new`)}>
-          {t("list.createButton")}
+        <Button size="sm" asChild>
+          <Link href={`/${locale}/knowledge-base/new`}>{t("list.createButton")}</Link>
         </Button>
       </div>
 
@@ -70,12 +71,8 @@ export function ArticleListView() {
       {articlesQuery.isSuccess && articlesQuery.data.length === 0 && search === "" && (
         <div className="rounded-md border border-dashed border-rule-strong p-8 text-center">
           <p className="text-sm text-ink-subtle">{t("list.empty")}</p>
-          <Button
-            size="sm"
-            className="mt-3"
-            onClick={() => router.push(`/${locale}/knowledge-base/new`)}
-          >
-            {t("list.createButton")}
+          <Button size="sm" className="mt-3" asChild>
+            <Link href={`/${locale}/knowledge-base/new`}>{t("list.createButton")}</Link>
           </Button>
         </div>
       )}
@@ -130,13 +127,12 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
   return (
     <TableRow>
       <TableCell>
-        <button
-          type="button"
-          className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-ring"
-          onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
+        <Link
+          href={`/${locale}/knowledge-base/${article.id}`}
+          className="focus-ring rounded-sm text-start font-medium text-slate-800 hover:underline"
         >
           {article.title}
-        </button>
+        </Link>
       </TableCell>
       <TableCell className="text-slate-500">{article.category ?? t("list.noCategory")}</TableCell>
       <TableCell>

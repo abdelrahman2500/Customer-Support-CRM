@@ -181,8 +181,14 @@ describe("TicketListView", () => {
     });
   });
 
-  // Story 98 — Design System & Visual Polish.
-  it("marks each ticket row as a keyboard-accessible button, activated by Enter", () => {
+  /**
+   * Story 98 gave each row a `role="button"`/`tabIndex` so it could be
+   * reached by keyboard. Story S-6 replaced that with real links on the
+   * subject and customer cells, which is better on every axis the fake
+   * button approximated: natively in the tab order, announced as a link,
+   * and middle-clickable. The row keeps its click for the mouse only.
+   */
+  it("gives each ticket row natively focusable links for its ticket and its customer", () => {
     mockedUseTicketsQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
@@ -208,9 +214,17 @@ describe("TicketListView", () => {
 
     render(<TicketListView />);
 
-    const row = screen.getByText("Cannot log in").closest('[role="button"]');
-    expect(row).toHaveAttribute("tabIndex", "0");
-    // Must not throw when activated via keyboard, mirroring the click handler.
-    fireEvent.keyDown(row!, { key: "Enter" });
+    const subject = screen.getByRole("link", { name: "Cannot log in" });
+    expect(subject).toHaveAttribute("href", "/en/tickets/ticket-1");
+    expect(subject).not.toHaveAttribute("tabIndex");
+    subject.focus();
+    expect(subject).toHaveFocus();
+
+    // The customer cell is a sibling link, no longer a button nested inside
+    // a role="button" row.
+    expect(screen.getByRole("link", { name: "customer-1" })).toHaveAttribute(
+      "href",
+      "/en/customers/customer-1",
+    );
   });
 });

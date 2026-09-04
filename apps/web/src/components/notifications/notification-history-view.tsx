@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMarkNotificationsReadMutation, useNotificationsQuery } from "@/hooks/use-notifications";
@@ -53,13 +54,11 @@ function NotificationRow({
   ticketSubject,
   customerName,
   template,
-  onOpenTicket,
 }: {
   notification: NotificationSummary;
   ticketSubject: string | undefined;
   customerName: string | undefined;
   template: string | undefined;
-  onOpenTicket: () => void;
 }) {
   const t = useTranslations("notificationHistory");
   const { locale } = useParams<{ locale: string }>();
@@ -83,13 +82,12 @@ function NotificationRow({
         <Badge variant="outline">{eventLabel}</Badge>
       </TableCell>
       <TableCell>
-        <button
-          type="button"
-          className="rounded-sm hover:underline focus-ring"
-          onClick={onOpenTicket}
+        <Link
+          href={`/${locale}/tickets/${notification.ticketId}`}
+          className="focus-ring rounded-sm hover:underline"
         >
           {ticketSubject ?? notification.ticketId}
-        </button>
+        </Link>
       </TableCell>
       <TableCell className="text-slate-500">
         {customerName ?? <span className="text-ink-subtle">{t("unknownCustomer")}</span>}
@@ -260,7 +258,6 @@ export function NotificationHistoryView() {
                     ticketSubject={ticket?.subject}
                     customerName={customerName}
                     template={templateByEventType.get(notification.eventType)}
-                    onOpenTicket={() => router.push(`/${locale}/tickets/${notification.ticketId}`)}
                   />
                 );
               })}

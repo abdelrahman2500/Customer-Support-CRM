@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
@@ -121,31 +122,34 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto" />
         )}
-        <a href={`/${locale}/home`} className="rounded-md px-2 py-1.5 font-semibold text-slate-900">
+        <Link
+          href={`/${locale}/home`}
+          className="rounded-md px-2 py-1.5 font-semibold text-slate-900"
+        >
           {t("signedInAs", { name: contact.fullName })}
-        </a>
-        <a
+        </Link>
+        <Link
           href={ticketsHref}
           aria-current={isActiveHref(ticketsHref) ? "page" : undefined}
           className={linkClassName(ticketsHref)}
         >
           {tTickets("nav")}
-        </a>
-        <a
+        </Link>
+        <Link
           href={knowledgeBaseHref}
           aria-current={isActiveHref(knowledgeBaseHref) ? "page" : undefined}
           className={linkClassName(knowledgeBaseHref)}
         >
           {tKnowledgeBase("nav")}
-        </a>
-        <a
+        </Link>
+        <Link
           href={chatHref}
           aria-current={isActiveHref(chatHref) ? "page" : undefined}
           className={linkClassName(chatHref)}
         >
           {tChat("nav")}
-        </a>
-        <a
+        </Link>
+        <Link
           href={notificationsHref}
           aria-current={isActiveHref(notificationsHref) ? "page" : undefined}
           className={linkClassName(notificationsHref)}
@@ -159,7 +163,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
               {unreadCount}
             </Badge>
           )}
-        </a>
+        </Link>
       </nav>
       <div className="flex items-center gap-2">
         <select

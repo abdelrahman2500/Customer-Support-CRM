@@ -281,18 +281,26 @@ describe("CustomerDetailView", () => {
       );
 
       render(<CustomerDetailView customerId="customer-1" />);
-      fireEvent.click(screen.getByText("Cannot log in"));
 
-      expect(push).toHaveBeenCalledWith("/en/tickets/ticket-1");
+      // Story S-6: a real link, so the destination is assertable and the
+      // row can be middle-clicked or opened in a new tab.
+      expect(screen.getByRole("link", { name: "Cannot log in" })).toHaveAttribute(
+        "href",
+        "/en/tickets/ticket-1",
+      );
     });
 
-    it("navigates to tickets/new with the current customerId when 'New ticket' is clicked", () => {
+    it("links 'New ticket' to tickets/new, carrying the current customerId", () => {
       mockedUseTicketsQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
-      fireEvent.click(screen.getByText("detail.newTicketButton"));
 
-      expect(push).toHaveBeenCalledWith("/en/tickets/new?customerId=customer-1");
+      // Still styled as a button, but a real link underneath (Button asChild),
+      // so the query parameter survives an open-in-new-tab.
+      expect(screen.getByRole("link", { name: "detail.newTicketButton" })).toHaveAttribute(
+        "href",
+        "/en/tickets/new?customerId=customer-1",
+      );
     });
   });
 

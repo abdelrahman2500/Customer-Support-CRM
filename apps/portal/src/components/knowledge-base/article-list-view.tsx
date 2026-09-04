@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Input, Skeleton } from "@crm/ui";
@@ -78,17 +79,16 @@ export function ArticleListView() {
           {articlesQuery.data.map((article) => (
             <li
               key={article.id}
-              role="button"
-              tabIndex={0}
               className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2"
               onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  router.push(`/${locale}/knowledge-base/${article.id}`);
-                }
-              }}
             >
-              <span className="font-medium text-slate-800">{article.title}</span>
+              <Link
+                href={`/${locale}/knowledge-base/${article.id}`}
+                className="focus-ring rounded-sm font-medium text-slate-800 hover:underline"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {article.title}
+              </Link>
               <span className="text-slate-500">{article.category ?? t("list.noCategory")}</span>
             </li>
           ))}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomersQuery } from "@/hooks/use-tickets";
@@ -66,8 +67,8 @@ export function CustomerListView() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
-        <Button size="sm" onClick={() => router.push(`/${locale}/customers/new`)}>
-          {t("list.createButton")}
+        <Button size="sm" asChild>
+          <Link href={`/${locale}/customers/new`}>{t("list.createButton")}</Link>
         </Button>
       </div>
 
@@ -157,17 +158,18 @@ export function CustomerListView() {
             {customersQuery.data.map((customer) => (
               <TableRow
                 key={customer.id}
-                role="button"
-                tabIndex={0}
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/customers/${customer.id}`)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    router.push(`/${locale}/customers/${customer.id}`);
-                  }
-                }}
               >
-                <TableCell className="font-medium text-slate-900">{customer.displayName}</TableCell>
+                <TableCell className="font-medium text-slate-900">
+                  <Link
+                    href={`/${locale}/customers/${customer.id}`}
+                    className="focus-ring rounded-sm hover:underline"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {customer.displayName}
+                  </Link>
+                </TableCell>
                 <TableCell>
                   <Badge variant={customer.isActive ? "success" : "secondary"}>
                     {customer.isActive ? t("list.active") : t("list.inactive")}

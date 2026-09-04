@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 
 /**
@@ -15,12 +16,12 @@ export default async function LocaleNotFound() {
       <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
         <h1 className="text-xl font-semibold text-slate-900">{t("notFound.title")}</h1>
         <p className="mt-2 text-sm text-slate-600">{t("notFound.description")}</p>
-        <a
+        <Link
           href={`/${locale}/home`}
           className="mt-4 inline-block text-sm font-medium text-slate-900 hover:underline"
         >
           {t("backLinkLabel")}
-        </a>
+        </Link>
       </div>
     </main>
   );

@@ -8,9 +8,12 @@ import { clearQueryCache } from "@/lib/query-client-registry";
 
 const push = vi.fn();
 let pathname = "/en/home";
+// Story S-6 — mutable so a test can render under `/ar`, mirroring how
+// `pathname` above is already varied per test.
+let locale = "en";
 
 vi.mock("next/navigation", () => ({
-  useParams: () => ({ locale: "en" }),
+  useParams: () => ({ locale }),
   useRouter: () => ({ push }),
   usePathname: () => pathname,
 }));
@@ -88,6 +91,40 @@ describe("PortalHeader", () => {
     expect(hrefs).toContain("/en/knowledge-base");
     expect(hrefs).toContain("/en/chat");
     expect(hrefs).toContain("/en/notifications");
+  });
+
+  /**
+   * Story S-6 — the portal header's links are `next/link`s now rather than
+   * plain anchors, so each is a client-side transition. The locale segment
+   * is what a mistake here would corrupt: dropped, or doubled into
+   * `/ar/ar`.
+   */
+  it("keeps the active locale segment on every header link under /ar", () => {
+    locale = "ar";
+    pathname = "/ar/home";
+    try {
+      render(<PortalHeader contact={contact} />);
+
+      const hrefs = screen
+        .getAllByRole("link")
+        .map((link) => link.getAttribute("href") ?? "")
+        .filter(Boolean);
+
+      expect(hrefs).toContain("/ar/tickets");
+      expect(hrefs).toContain("/ar/knowledge-base");
+      expect(hrefs).toContain("/ar/chat");
+      expect(hrefs).toContain("/ar/notifications");
+      // The logo/home link too.
+      expect(hrefs).toContain("/ar/home");
+
+      for (const href of hrefs) {
+        expect(href.startsWith("/ar/"), href).toBe(true);
+        expect(href.startsWith("/ar/ar"), href).toBe(false);
+      }
+    } finally {
+      locale = "en";
+      pathname = "/en/home";
+    }
   });
 
   it("calls the real logout, then clears the local token and query cache, and redirects to login, on sign-out", async () => {

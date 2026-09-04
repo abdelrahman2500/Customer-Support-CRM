@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -142,9 +143,9 @@ export function CreateTicketView() {
               ))}
             </SelectContent>
           </Select>
-          <a className="text-xs text-slate-500 underline" href={`/${locale}/customers/new`}>
+          <Link className="text-xs text-slate-500 underline" href={`/${locale}/customers/new`}>
             {t("create.createCustomerLink")}
-          </a>
+          </Link>
         </label>
 
         {customerId && (
