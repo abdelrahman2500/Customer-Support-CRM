@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useMarkNotificationsReadMutation,
@@ -62,7 +62,6 @@ function eventLabelKeyFor(eventType: string): string {
  */
 export function NotificationHistoryView() {
   const t = useTranslations("notifications");
-  const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
   const notificationsQuery = useMyNotificationsQuery();
