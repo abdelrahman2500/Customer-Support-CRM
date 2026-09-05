@@ -2,17 +2,10 @@ import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
+import { paginate } from "../../common/pagination/paginate";
+import type { Paginated } from "../../common/pagination/paginated";
 import { resolveReportDateRange, hasDateRange } from "../reporting/report-date-range.util";
 import type { ListAuditLogsQueryDto } from "./dto/list-audit-logs-query.dto";
-
-/** Story 104 — an unfiltered, unbounded read of an ever-appending,
- * globally-written table (`AuditInterceptor` writes a row for every
- * mutating request across the whole application) is a latent query-cost
- * risk with no natural ceiling. 200 is a generous page for a human
- * reading the trail — full pagination is deliberately out of scope (see
- * this story's own plan doc's Non-Goals); narrowing by filter, not
- * paging deeper, is this story's answer to "I need to see more." */
-const MAX_AUDIT_LOG_ROWS = 200;
 
 /** Mirrors the real `AuditLog` Prisma model exactly — every column is
  * already meaningful to a reader of the audit trail (unlike
@@ -68,7 +61,7 @@ export class AuditLogsService {
    * MAX_AUDIT_LOG_ROWS` is unconditional — every caller, filtered or not,
    * is capped.
    */
-  async listAuditLogs(query: ListAuditLogsQueryDto = {}): Promise<AuditLogSummary[]> {
+  async listAuditLogs(query: ListAuditLogsQueryDto = {}): Promise<Paginated<AuditLogSummary>> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const range = resolveReportDateRange(query.from, query.to);
     const branchScope: Prisma.AuditLogWhereInput = { OR: [{ branchId }, { branchId: null }] };
@@ -92,21 +85,48 @@ export class AuditLogsService {
     const where: Prisma.AuditLogWhereInput =
       extraConditions.length > 0 ? { AND: [branchScope, ...extraConditions] } : branchScope;
 
-    const logs = await this.prisma.auditLog.findMany({
+    /**
+     * Story S-8a — `take: MAX_AUDIT_LOG_ROWS` (200) replaced by real
+     * paging. Story 104's cap was documented as "a generous page for a
+     * human reading the trail", with narrowing by filter offered as the
+     * answer to "I need to see more" — but `AuditInterceptor` writes a row
+     * for every mutating request in the application, so on a busy branch
+     * even a filtered trail passes 200 rows and the older half simply
+     * disappeared, with nothing in the response to say so.
+     *
+     * `where` is passed once and `paginate` issues both the count and the
+     * page from it, so `total` can never be computed over a wider scope
+     * than `items` — which matters here because that scope is the
+     * `branchId OR null` authorization arm, composed above.
+     *
+     * `id` is the ordering tiebreaker. `createdAt` alone is not unique:
+     * this interceptor writes several rows inside one request, and a
+     * single `INSERT ... RETURNING` batch can share a timestamp to the
+     * millisecond. Ordering by `createdAt` alone therefore lets a row
+     * appear on both page 1 and page 2, or on neither. `id` follows the
+     * same `desc` direction so the composite order stays a single
+     * consistent sequence.
+     */
+    const { items: logs, ...pagination } = await paginate(this.prisma.auditLog, {
       where,
-      orderBy: { createdAt: "desc" },
-      take: MAX_AUDIT_LOG_ROWS,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      page: query.page,
+      pageSize: query.pageSize,
     });
-    return logs.map((log) => ({
-      id: log.id,
-      actorId: log.actorId,
-      action: log.action,
-      entityType: log.entityType,
-      entityId: log.entityId,
-      branchId: log.branchId,
-      diff: log.diff,
-      ipAddress: log.ipAddress,
-      createdAt: log.createdAt,
-    }));
+
+    return {
+      ...pagination,
+      items: logs.map((log) => ({
+        id: log.id,
+        actorId: log.actorId,
+        action: log.action,
+        entityType: log.entityType,
+        entityId: log.entityId,
+        branchId: log.branchId,
+        diff: log.diff,
+        ipAddress: log.ipAddress,
+        createdAt: log.createdAt,
+      })),
+    };
   }
 }

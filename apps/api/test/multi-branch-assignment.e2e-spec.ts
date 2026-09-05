@@ -34,7 +34,11 @@ describe("Identity & Access — Multi-branch assignment + branch switching (e2e)
   }
 
   async function waitForAuditLogRow(
-    predicate: (log: { action: string; entityId: string | null; branchId: string | null }) => boolean,
+    predicate: (log: {
+      action: string;
+      entityId: string | null;
+      branchId: string | null;
+    }) => boolean,
     { timeoutMs = 5000, intervalMs = 100 }: { timeoutMs?: number; intervalMs?: number } = {},
   ): Promise<{ action: string; entityId: string | null; branchId: string | null }> {
     const deadline = Date.now() + timeoutMs;
@@ -43,7 +47,8 @@ describe("Identity & Access — Multi-branch assignment + branch switching (e2e)
         .get("/api/v1/audit-logs")
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      const match = response.body.find(predicate);
+      // Story S-8a — GET /audit-logs returns a paginated envelope.
+      const match = response.body.items.find(predicate);
       if (match) {
         return match;
       }

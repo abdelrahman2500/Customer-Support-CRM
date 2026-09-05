@@ -84,6 +84,9 @@ export type { EmptyStateProps } from "./components/empty-state";
 export { FetchingIndicator } from "./components/fetching-indicator";
 export type { FetchingIndicatorProps } from "./components/fetching-indicator";
 
+export { Pagination } from "./components/pagination";
+export type { PaginationProps } from "./components/pagination";
+
 export { QueryStateCard } from "./components/query-state-card";
 export type { QueryStateCardProps, QueryStateErrorProps } from "./components/query-state-card";
 

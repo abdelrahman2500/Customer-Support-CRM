@@ -7,7 +7,7 @@ import { useAuditLogsQuery } from "@/hooks/use-audit-logs";
 import { useUsersQuery } from "@/hooks/use-tickets";
 import type { AuditLogFilters, AuditLogSummary } from "@/lib/audit-logs-api";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, FetchingIndicator, Input, Pagination, Skeleton } from "@crm/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
 function DiffCell({ diff }: { diff: unknown }) {
@@ -68,14 +68,33 @@ function ActorCell({
  */
 export function AuditLogView() {
   const t = useTranslations("auditLogs");
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
 
+  /**
+   * Story S-8a — `page` lives in the same object as the filters, so it is
+   * part of the query key and a page change behaves exactly like a filter
+   * change. It is 1-based and left undefined until the reader actually
+   * pages, which keeps the first request identical to the pre-S-8a one.
+   */
   const [filters, setFilters] = useState<AuditLogFilters>({});
   const auditLogsQuery = useAuditLogsQuery(filters);
   const usersQuery = useUsersQuery();
 
+  /** The rows to render, whoever they came from: the current page, or the
+   * page being left still shown as placeholder data while the next one
+   * loads. `undefined` means nothing has arrived yet. */
+  const page = auditLogsQuery.data;
+  const logs = page?.items;
+
+  /**
+   * Every filter change resets to page 1 in the SAME state update.
+   * Splitting it into a separate effect would first fire a request for
+   * "page 7 of the new filter" and only then correct itself — a wasted
+   * round trip that also flashes the wrong rows.
+   */
   function updateFilter<K extends keyof AuditLogFilters>(key: K, value: string) {
-    setFilters((current) => ({ ...current, [key]: value || undefined }));
+    setFilters((current) => ({ ...current, [key]: value || undefined, page: undefined }));
   }
 
   const actorNameById = useMemo(() => {
@@ -93,7 +112,14 @@ export function AuditLogView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+        {/* Story S-8a/S-7 — the rows of the page being left stay on screen
+            while the next page loads, so this is the only signal that a
+            page change is in flight. In the heading's own row, so it adds
+            no height and cannot shift the table. */}
+        <FetchingIndicator active={auditLogsQuery.isPlaceholderData} label={tCommon("updating")} />
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1 text-xs text-slate-600">
@@ -143,7 +169,10 @@ export function AuditLogView() {
         </Button>
       </div>
 
-      {auditLogsQuery.isLoading && (
+      {/* Story S-8a — `isPending`, not `isLoading`: with placeholder data
+          in play the query only reports `pending` on a genuine first load,
+          so the skeleton appears once and never again for a page change. */}
+      {auditLogsQuery.isPending && (
         <div className="flex flex-col gap-2">
           {[0, 1, 2, 3, 4].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
@@ -162,13 +191,13 @@ export function AuditLogView() {
         </Alert>
       )}
 
-      {auditLogsQuery.isSuccess && auditLogsQuery.data.length === 0 && (
+      {logs !== undefined && logs.length === 0 && (
         <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
           {t("empty")}
         </p>
       )}
 
-      {auditLogsQuery.isSuccess && auditLogsQuery.data.length > 0 && (
+      {logs !== undefined && logs.length > 0 && (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -184,7 +213,7 @@ export function AuditLogView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {auditLogsQuery.data.map((log: AuditLogSummary) => (
+              {logs.map((log: AuditLogSummary) => (
                 <TableRow key={log.id}>
                   <TableCell className="text-slate-500">
                     {new Date(log.createdAt).toLocaleString(locale)}
@@ -213,6 +242,26 @@ export function AuditLogView() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {/* Renders nothing while there is only one page (see `Pagination`),
+          so an unfiltered short trail looks exactly as it did before.
+          Disabled while the previous page is still on screen, so a rapid
+          double-click cannot queue a second jump. */}
+      {page !== undefined && (
+        <Pagination
+          page={page.page}
+          totalPages={page.totalPages}
+          onPageChange={(next) => setFilters((current) => ({ ...current, page: next }))}
+          disabled={auditLogsQuery.isPlaceholderData}
+          label={tCommon("pagination.label")}
+          previousLabel={tCommon("pagination.previous")}
+          nextLabel={tCommon("pagination.next")}
+          indicator={tCommon("pagination.indicator", {
+            page: page.page,
+            totalPages: page.totalPages,
+          })}
+        />
       )}
     </section>
   );

@@ -34,19 +34,44 @@ export interface AuditLogFilters {
   actorId?: string;
   from?: string;
   to?: string;
+  /** Story S-8a — 1-based; omitted means the first page. */
+  page?: number;
+  /** Story S-8a — omitted means the API's own default (25). */
+  pageSize?: number;
+}
+
+/**
+ * Story S-8a — the paginated envelope `GET /audit-logs` now returns,
+ * mirroring the backend's `Paginated<T>`
+ * (`apps/api/src/common/pagination/paginated.ts`) exactly.
+ *
+ * This is the API's first paginated response, so this type is the
+ * frontend's first mirror of it. Later stories paginating other endpoints
+ * should share one generic rather than copying this shape per client file.
+ */
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 function toQueryString(filters: AuditLogFilters): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
+    // `page`/`pageSize` are numbers, so this no longer narrows to string;
+    // `0` is not a valid page anyway and the backend would reject it.
     if (value !== undefined && value !== "") {
-      params.set(key, value);
+      params.set(key, String(value));
     }
   }
   const query = params.toString();
   return query ? `?${query}` : "";
 }
 
-export function listAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogSummary[]> {
-  return apiFetch<AuditLogSummary[]>(`/audit-logs${toQueryString(filters)}`);
+export function listAuditLogs(
+  filters: AuditLogFilters = {},
+): Promise<PaginatedResponse<AuditLogSummary>> {
+  return apiFetch<PaginatedResponse<AuditLogSummary>>(`/audit-logs${toQueryString(filters)}`);
 }

@@ -3,6 +3,12 @@
     "appName": "Customer Support CRM",
     "loading": "Loading...",
     "updating": "Updating…",
+    "pagination": {
+      "label": "Pagination",
+      "previous": "Previous page",
+      "next": "Next page",
+      "indicator": "Page {page} of {totalPages}"
+    },
     "signedInAs": "Signed in as {email}",
     "notSignedIn": "Not signed in.",
     "login": "Log in",

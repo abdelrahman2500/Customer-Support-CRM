@@ -28,11 +28,33 @@ const mockedUseUsersQuery = vi.mocked(useUsersQuery);
 function queryResult(overrides: Record<string, unknown>) {
   return {
     data: undefined,
+    // Story S-8a — `isPending` is what the view branches on now, and
+    // `isPlaceholderData` drives the fetch indicator and the disabled
+    // pager. Both are part of the real v5 result, so the fake carries them.
+    isPending: false,
+    isPlaceholderData: false,
     isLoading: false,
     isError: false,
     isSuccess: false,
     error: null,
     refetch: vi.fn(),
+    ...overrides,
+  };
+}
+
+/**
+ * Story S-8a — `GET /audit-logs` returns a `Paginated<AuditLogSummary>`
+ * envelope, so the audit-log query's `data` is no longer a bare array.
+ * This builds one, defaulting to a single full page so the existing tests
+ * read as they did before.
+ */
+function page(items: unknown[], overrides: Record<string, unknown> = {}) {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    pageSize: 25,
+    totalPages: 1,
     ...overrides,
   };
 }
@@ -55,16 +77,21 @@ describe("AuditLogView", () => {
     mockedUseUsersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
   });
 
-  it("shows a loading state while the audit-logs query is pending", () => {
-    mockedUseAuditLogsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+  it("shows a skeleton on the initial load, before any page exists", () => {
+    mockedUseAuditLogsQuery.mockReturnValue(queryResult({ isPending: true }) as never);
 
-    render(<AuditLogView />);
+    const { container } = render(<AuditLogView />);
 
-    expect(screen.getAllByRole("generic").length).toBeGreaterThan(0);
+    // Previously asserted `getAllByRole("generic").length > 0`, which any
+    // `div` satisfies - it passed whether or not a skeleton rendered.
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
   it("shows the empty state when the query succeeds with zero entries", () => {
-    mockedUseAuditLogsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseAuditLogsQuery.mockReturnValue(
+      queryResult({ data: page([]), isSuccess: true }) as never,
+    );
 
     render(<AuditLogView />);
 
@@ -98,7 +125,7 @@ describe("AuditLogView", () => {
 
   it("renders a row per audit log entry with its action/entity information", () => {
     mockedUseAuditLogsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseLog] }) as never,
+      queryResult({ isSuccess: true, data: page([baseLog]) }) as never,
     );
 
     render(<AuditLogView />);
@@ -114,11 +141,19 @@ describe("AuditLogView", () => {
     mockedUseUsersQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ id: "user-1", email: "a@example.com", fullName: "Ada Lovelace", isActive: true, roles: [] }],
+        data: [
+          {
+            id: "user-1",
+            email: "a@example.com",
+            fullName: "Ada Lovelace",
+            isActive: true,
+            roles: [],
+          },
+        ],
       }) as never,
     );
     mockedUseAuditLogsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseLog] }) as never,
+      queryResult({ isSuccess: true, data: page([baseLog]) }) as never,
     );
 
     render(<AuditLogView />);
@@ -128,7 +163,7 @@ describe("AuditLogView", () => {
 
   it("falls back to the raw actor id when the user isn't in the resolved list", () => {
     mockedUseAuditLogsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseLog] }) as never,
+      queryResult({ isSuccess: true, data: page([baseLog]) }) as never,
     );
 
     render(<AuditLogView />);
@@ -138,7 +173,7 @@ describe("AuditLogView", () => {
 
   it("renders the system-actor label for a null actorId", () => {
     mockedUseAuditLogsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [{ ...baseLog, actorId: null }] }) as never,
+      queryResult({ isSuccess: true, data: page([{ ...baseLog, actorId: null }]) }) as never,
     );
 
     render(<AuditLogView />);
@@ -148,7 +183,7 @@ describe("AuditLogView", () => {
 
   it("renders a formatted diff for an entry that has one", () => {
     mockedUseAuditLogsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseLog] }) as never,
+      queryResult({ isSuccess: true, data: page([baseLog]) }) as never,
     );
 
     render(<AuditLogView />);
@@ -159,7 +194,7 @@ describe("AuditLogView", () => {
 
   it("renders the no-diff placeholder for an entry with a null diff", () => {
     mockedUseAuditLogsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [{ ...baseLog, diff: null }] }) as never,
+      queryResult({ isSuccess: true, data: page([{ ...baseLog, diff: null }]) }) as never,
     );
 
     render(<AuditLogView />);
@@ -171,7 +206,7 @@ describe("AuditLogView", () => {
     mockedUseAuditLogsQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ ...baseLog, entityId: null, branchId: null, ipAddress: null }],
+        data: page([{ ...baseLog, entityId: null, branchId: null, ipAddress: null }]),
       }) as never,
     );
 
@@ -186,7 +221,7 @@ describe("AuditLogView", () => {
   describe("filter bar (Story 104)", () => {
     beforeEach(() => {
       mockedUseAuditLogsQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [] }) as never,
+        queryResult({ isSuccess: true, data: page([]) }) as never,
       );
     });
 
@@ -247,6 +282,177 @@ describe("AuditLogView", () => {
       fireEvent.click(clearButton);
 
       expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({});
+    });
+  });
+
+  /**
+   * Story S-8a — paging behaviour. `page` lives inside the same filters
+   * object as everything else, so a page change is a new query key and
+   * inherits Story S-7's row preservation for free.
+   */
+  describe("pagination (Story S-8a)", () => {
+    const middlePage = { total: 60, page: 2, pageSize: 25, totalPages: 3 };
+
+    beforeEach(() => {
+      mockedUseAuditLogsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([baseLog], middlePage) }) as never,
+      );
+    });
+
+    it("renders no pager when everything fits on one page", () => {
+      mockedUseAuditLogsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([baseLog]) }) as never,
+      );
+
+      render(<AuditLogView />);
+
+      // A single-page trail should look exactly as it did before S-8a.
+      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    });
+
+    it("renders the pager and the current page indicator once there is more than one page", () => {
+      render(<AuditLogView />);
+
+      expect(screen.getByRole("navigation", { name: "pagination.label" })).toBeInTheDocument();
+      expect(
+        screen.getByText('pagination.indicator:{"page":2,"totalPages":3}'),
+      ).toBeInTheDocument();
+    });
+
+    it("requests the next page without touching the filters", () => {
+      render(<AuditLogView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
+
+      expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({ page: 3 });
+    });
+
+    it("requests the previous page", () => {
+      render(<AuditLogView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "pagination.previous" }));
+
+      expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({ page: 1 });
+    });
+
+    it("disables previous on the first page", () => {
+      mockedUseAuditLogsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([baseLog], { ...middlePage, page: 1 }),
+        }) as never,
+      );
+
+      render(<AuditLogView />);
+
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeEnabled();
+    });
+
+    it("disables next on the last page", () => {
+      mockedUseAuditLogsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([baseLog], { ...middlePage, page: 3 }),
+        }) as never,
+      );
+
+      render(<AuditLogView />);
+
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeEnabled();
+    });
+
+    it("keeps the previous page's rows on screen while the next one loads", () => {
+      mockedUseAuditLogsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: page([baseLog], middlePage),
+        }) as never,
+      );
+
+      const { container } = render(<AuditLogView />);
+
+      // The whole point: no skeleton swap between pages.
+      expect(screen.getByRole("table")).toBeInTheDocument();
+      expect(screen.getByText("ticket.update")).toBeInTheDocument();
+      expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+    });
+
+    it("shows a polite fetch indicator while a page change is in flight", () => {
+      mockedUseAuditLogsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: page([baseLog], middlePage),
+        }) as never,
+      );
+
+      render(<AuditLogView />);
+
+      const status = screen.getByRole("status");
+      expect(status).toHaveTextContent("updating");
+      expect(status).toHaveAttribute("aria-live", "polite");
+    });
+
+    it("blocks both controls while a page change is in flight", () => {
+      mockedUseAuditLogsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: page([baseLog], middlePage),
+        }) as never,
+      );
+
+      render(<AuditLogView />);
+
+      // Stops a rapid double-click queueing a second jump.
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
+    });
+
+    it("shows no fetch indicator once the page has landed", () => {
+      render(<AuditLogView />);
+
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    it("resets to page 1 when a filter changes, in the same update", () => {
+      render(<AuditLogView />);
+
+      const input = screen.getByPlaceholderText("filterActionPlaceholder");
+      fireEvent.change(input, { target: { value: "ticket.update" } });
+      fireEvent.blur(input);
+
+      // `page` is cleared rather than set to 1: the same request, and it
+      // keeps the query key identical to a first visit.
+      expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({
+        action: "ticket.update",
+        page: undefined,
+      });
+    });
+
+    it("resets to page 1 when the filters are cleared", () => {
+      render(<AuditLogView />);
+
+      const input = screen.getByPlaceholderText("filterActionPlaceholder");
+      fireEvent.change(input, { target: { value: "ticket.update" } });
+      fireEvent.blur(input);
+      fireEvent.click(screen.getByText("filterClear"));
+
+      expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({});
+    });
+
+    it("still shows the empty state for a genuinely empty page", () => {
+      mockedUseAuditLogsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([], { total: 0, totalPages: 1 }) }) as never,
+      );
+
+      render(<AuditLogView />);
+
+      expect(screen.getByText("empty")).toBeInTheDocument();
+      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
     });
   });
 });

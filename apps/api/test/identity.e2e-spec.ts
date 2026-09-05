@@ -391,7 +391,9 @@ describe("Identity & Access (e2e)", () => {
         .get("/api/v1/identity/users")
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      const unlockedUser = usersAfterUnlock.body.find((user: { email: string }) => user.email === email);
+      const unlockedUser = usersAfterUnlock.body.find(
+        (user: { email: string }) => user.email === email,
+      );
       expect(unlockedUser.isLocked).toBe(false);
       expect(unlockedUser.lockedUntil).toBeNull();
 
@@ -408,7 +410,9 @@ describe("Identity & Access (e2e)", () => {
         .get("/api/v1/identity/users")
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      const targetUserId = usersBefore.body.find((user: { email: string }) => user.email === email).id;
+      const targetUserId = usersBefore.body.find(
+        (user: { email: string }) => user.email === email,
+      ).id;
 
       // A second, freshly created disposable Agent — NOT the suite's
       // `secondAgentEmail`/`secondAgentPassword` outer-scope user, which
@@ -939,7 +943,9 @@ describe("Identity & Access (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     expect(
-      defaultListing.body.some((department: { id: string }) => department.id === createdDepartmentId),
+      defaultListing.body.some(
+        (department: { id: string }) => department.id === createdDepartmentId,
+      ),
     ).toBe(false);
 
     const withInactive = await request(app.getHttpServer())
@@ -1170,9 +1176,9 @@ describe("Identity & Access (e2e)", () => {
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    expect(
-      defaultListing.body.some((role: { id: string }) => role.id === customRoleId),
-    ).toBe(false);
+    expect(defaultListing.body.some((role: { id: string }) => role.id === customRoleId)).toBe(
+      false,
+    );
 
     const withInactive = await request(app.getHttpServer())
       .get("/api/v1/identity/roles?includeInactive=true")
@@ -1225,9 +1231,7 @@ describe("Identity & Access (e2e)", () => {
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    const superAdminRole = roles.body.find(
-      (role: { name: string }) => role.name === "SuperAdmin",
-    );
+    const superAdminRole = roles.body.find((role: { name: string }) => role.name === "SuperAdmin");
     expect(superAdminRole).toBeTruthy();
 
     await request(app.getHttpServer())
@@ -1346,9 +1350,7 @@ describe("Identity & Access (e2e)", () => {
       .get("/api/v1/identity/users")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    let updatedUser = users.body.find(
-      (user: { id: string }) => user.id === createdAgentUserId,
-    );
+    let updatedUser = users.body.find((user: { id: string }) => user.id === createdAgentUserId);
     expect(updatedUser).toMatchObject({ departmentId: createdDepartmentId });
 
     // Reassign to the custom role created/reactivated earlier in this suite
@@ -1381,9 +1383,7 @@ describe("Identity & Access (e2e)", () => {
       .get("/api/v1/identity/users")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    const updatedUser = users.body.find(
-      (user: { id: string }) => user.id === createdAgentUserId,
-    );
+    const updatedUser = users.body.find((user: { id: string }) => user.id === createdAgentUserId);
     expect(updatedUser).toMatchObject({ departmentId: null });
   });
 
@@ -1472,9 +1472,7 @@ describe("Identity & Access (e2e)", () => {
       .get("/api/v1/identity/roles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    const superAdminRole = roles.body.find(
-      (role: { name: string }) => role.name === "SuperAdmin",
-    );
+    const superAdminRole = roles.body.find((role: { name: string }) => role.name === "SuperAdmin");
     expect(superAdminRole).toBeTruthy();
 
     let secondSuperAdminUserId: string | null = null;
@@ -1751,7 +1749,12 @@ describe("Identity & Access — explicit audit logging (e2e)", () => {
   });
 
   async function waitForAuditLogRow(
-    predicate: (log: { action: string; actorId: string | null; entityId: string | null; diff: unknown }) => boolean,
+    predicate: (log: {
+      action: string;
+      actorId: string | null;
+      entityId: string | null;
+      diff: unknown;
+    }) => boolean,
     { timeoutMs = 5000, intervalMs = 100 }: { timeoutMs?: number; intervalMs?: number } = {},
   ): Promise<{ action: string; actorId: string | null; entityId: string | null; diff: unknown }> {
     const deadline = Date.now() + timeoutMs;
@@ -1760,7 +1763,8 @@ describe("Identity & Access — explicit audit logging (e2e)", () => {
         .get("/api/v1/audit-logs")
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      const match = response.body.find(predicate);
+      // Story S-8a — GET /audit-logs returns a paginated envelope.
+      const match = response.body.items.find(predicate);
       if (match) {
         return match;
       }

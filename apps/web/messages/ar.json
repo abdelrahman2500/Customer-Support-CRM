@@ -3,6 +3,12 @@
     "appName": "نظام إدارة خدمة العملاء",
     "loading": "جارٍ التحميل...",
     "updating": "جارٍ التحديث…",
+    "pagination": {
+      "label": "ترقيم الصفحات",
+      "previous": "الصفحة السابقة",
+      "next": "الصفحة التالية",
+      "indicator": "الصفحة {page} من {totalPages}"
+    },
     "signedInAs": "مسجّل الدخول باسم {email}",
     "notSignedIn": "لم يتم تسجيل الدخول.",
     "login": "تسجيل الدخول",
