@@ -1,6 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
+import { paginate } from "../../common/pagination/paginate";
+import type { Paginated } from "../../common/pagination/paginated";
+import type { ListNotificationsQueryDto } from "./dto/list-notifications-query.dto";
 
 /**
  * Story 36 — mirrors the real `NotificationLog` Prisma model, minus
@@ -18,15 +21,6 @@ export interface NotificationSummary {
   targetAt: Date | null;
   loggedAt: Date;
 }
-
-/** Story 106 — mirrors `AuditLogsService`'s own `MAX_AUDIT_LOG_ROWS`
- * precedent (Story 104): an agent-facing activity feed, the same
- * "recent activity, not a full archive" semantics as the audit trail.
- * `listNotifications` already orders by a fixed `loggedAt: "desc"` with
- * no user-configurable direction, so a plain `take` is sufficient — no
- * fetch-desc-then-reverse fix needed (unlike `Ticket`/`Customer`'s
- * configurable `sortDir`). */
-const MAX_NOTIFICATION_ROWS = 200;
 
 @Injectable()
 export class NotificationsService {
@@ -50,29 +44,66 @@ export class NotificationsService {
    * likewise falls back to `ticket.branchId` when the notification's own
    * column is null, so the exposed data is never confusingly inconsistent.
    */
-  async listNotifications(): Promise<NotificationSummary[]> {
+  async listNotifications(
+    query: ListNotificationsQueryDto = {},
+  ): Promise<Paginated<NotificationSummary>> {
     const { branchId } = this.tenantContext.requireBranchScope();
 
-    const notifications = await this.prisma.notificationLog.findMany({
-      // Story 88 — `customerId: null` excludes `PortalNotificationLogListener`'s
-      // rows (`ticket.updated`/agent-reply `channel.message.created`, scoped
-      // to a customer, not this endpoint's branch-wide agent audience) so
-      // this endpoint's result set is unchanged by that story.
-      where: { ticket: { branchId }, customerId: null },
-      include: { ticket: { select: { branchId: true } } },
-      orderBy: { loggedAt: "desc" },
-      take: MAX_NOTIFICATION_ROWS,
+    // Story 88 — `customerId: null` excludes `PortalNotificationLogListener`'s
+    // rows (`ticket.updated`/agent-reply `channel.message.created`, scoped
+    // to a customer, not this endpoint's branch-wide agent audience) so
+    // this endpoint's result set is unchanged by that story.
+    //
+    // Story S-8b — lifted into a named constant so `paginate` can issue the
+    // count and the page from this one object. That matters more here than
+    // for most endpoints: the branch scope runs through the `ticket`
+    // relation rather than `NotificationLog.branchId` (which is nullable
+    // and always null for escalation rows — see this method's doc comment),
+    // so a `count` that rebuilt the predicate and reached for the column
+    // instead would silently exclude every escalation from `total` while
+    // `items` still contained them.
+    const where = { ticket: { branchId }, customerId: null };
+
+    /**
+     * Story S-8b — `take: MAX_NOTIFICATION_ROWS` (200) replaced by real
+     * paging. Story 106 justified that cap as "recent activity, not a full
+     * archive", which held while there was no way to ask for more; now that
+     * there is, an agent can reach the older half of the feed instead of it
+     * silently ending at 200.
+     *
+     * `id` is the ordering tiebreaker. `loggedAt` is not unique: SLA and
+     * escalation listeners write several rows for one event, and
+     * `@@unique([eventType, ticketId, targetType, targetAt])` on this table
+     * shows how closely-related rows cluster. Ordering on `loggedAt` alone
+     * would let a row straddling a page boundary appear on both pages or
+     * neither.
+     */
+    const { items: notifications, ...pagination } = await paginate(this.prisma.notificationLog, {
+      where,
+      orderBy: [{ loggedAt: "desc" }, { id: "desc" }],
+      page: query.page,
+      pageSize: query.pageSize,
     });
 
-    return notifications.map((notification) => ({
-      id: notification.id,
-      eventType: notification.eventType,
-      ticketId: notification.ticketId,
-      branchId: notification.branchId ?? notification.ticket.branchId,
-      targetType: notification.targetType,
-      targetAt: notification.targetAt,
-      loggedAt: notification.loggedAt,
-    }));
+    return {
+      ...pagination,
+      items: notifications.map((notification) => ({
+        id: notification.id,
+        eventType: notification.eventType,
+        ticketId: notification.ticketId,
+        // Story S-8b — was `?? notification.ticket.branchId`, which needed
+        // the `ticket` relation eager-loaded purely to read one column.
+        // `where` already constrains `ticket: { branchId }`, so every row
+        // here has `ticket.branchId === branchId` by construction and the
+        // join could only ever produce that same value. Reading it from the
+        // tenant scope is identical output with one fewer join, and keeps the
+        // row shape plain enough for `paginate` to infer.
+        branchId: notification.branchId ?? branchId,
+        targetType: notification.targetType,
+        targetAt: notification.targetAt,
+        loggedAt: notification.loggedAt,
+      })),
+    };
   }
 
   /**

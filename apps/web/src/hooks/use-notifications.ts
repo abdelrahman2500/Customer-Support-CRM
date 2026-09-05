@@ -4,6 +4,8 @@ import {
   listNotifications,
   markNotificationsRead,
 } from "@/lib/notifications-api";
+import type { NotificationFilters } from "@/lib/notifications-api";
+import { preservePreviousResults } from "@/lib/list-query";
 
 /**
  * Story 39 — dedicated notification-history hook (mirroring
@@ -15,10 +17,28 @@ import {
  * growing, so it re-fetches on every mount/window-focus like the default
  * `useTicketsQuery`.
  */
-export const notificationsQueryKey = ["notifications"] as const;
+/**
+ * Story S-8b — a function of the requested page, mirroring
+ * `ticketsQueryKey`/`useAuditLogsQuery`'s own filters-as-key convention. The
+ * unread-count key below is `["notifications", "unread-count"]`, a sibling
+ * rather than a descendant of any page, so paging cannot invalidate it and
+ * its own `invalidateQueries` cannot invalidate a page.
+ */
+export const notificationsQueryKey = (filters: NotificationFilters = {}) =>
+  ["notifications", filters] as const;
 
-export function useNotificationsQuery() {
-  return useQuery({ queryKey: notificationsQueryKey, queryFn: listNotifications });
+/**
+ * Story S-8b — `filters` carries `page`/`pageSize`, so a page change is a
+ * new query key. `preservePreviousResults` (Story S-7) then keeps the page
+ * being left on screen while the next one loads, so paging never blanks the
+ * table into a skeleton.
+ */
+export function useNotificationsQuery(filters: NotificationFilters = {}) {
+  return useQuery({
+    queryKey: notificationsQueryKey(filters),
+    queryFn: () => listNotifications(filters),
+    ...preservePreviousResults,
+  });
 }
 
 /**

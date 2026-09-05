@@ -1,4 +1,7 @@
 import { apiFetch } from "./api";
+import type { PaginatedResponse } from "./paginated";
+
+export type { PaginatedResponse };
 
 /**
  * Story 40 — Audit Log Viewer. A dedicated API client file, mirroring
@@ -38,23 +41,6 @@ export interface AuditLogFilters {
   page?: number;
   /** Story S-8a — omitted means the API's own default (25). */
   pageSize?: number;
-}
-
-/**
- * Story S-8a — the paginated envelope `GET /audit-logs` now returns,
- * mirroring the backend's `Paginated<T>`
- * (`apps/api/src/common/pagination/paginated.ts`) exactly.
- *
- * This is the API's first paginated response, so this type is the
- * frontend's first mirror of it. Later stories paginating other endpoints
- * should share one generic rather than copying this shape per client file.
- */
-export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
 }
 
 function toQueryString(filters: AuditLogFilters): string {

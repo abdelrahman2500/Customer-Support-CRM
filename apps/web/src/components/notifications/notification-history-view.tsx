@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMarkNotificationsReadMutation, useNotificationsQuery } from "@/hooks/use-notifications";
 import { useNotificationTemplatesQuery } from "@/hooks/use-notification-templates";
 import { useCustomersQuery, useTicketsQuery } from "@/hooks/use-tickets";
-import type { NotificationSummary } from "@/lib/notifications-api";
+import type { NotificationFilters, NotificationSummary } from "@/lib/notifications-api";
 import { renderNotificationTemplate } from "@/lib/notification-template-render";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, FetchingIndicator, Pagination, Skeleton } from "@crm/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
 
@@ -156,12 +156,26 @@ function NotificationRow({
  */
 export function NotificationHistoryView() {
   const t = useTranslations("notificationHistory");
+  const tCommon = useTranslations("common");
 
-  const notificationsQuery = useNotificationsQuery();
+  /**
+   * Story S-8b — the requested page. There is no filter or search state on
+   * this screen (the endpoint has never had filters), so this object holds
+   * only paging; a future filter added here must clear `page` in the same
+   * `setFilters` call, the way `AuditLogView.updateFilter` does.
+   */
+  const [filters, setFilters] = useState<NotificationFilters>({});
+  const notificationsQuery = useNotificationsQuery(filters);
   const ticketsQuery = useTicketsQuery({});
   const customersQuery = useCustomersQuery();
   const templatesQuery = useNotificationTemplatesQuery();
   const markReadMutation = useMarkNotificationsReadMutation();
+
+  /** The rows to render, whoever they came from: the current page, or the
+   * page being left still shown as placeholder data while the next loads.
+   * `undefined` means nothing has arrived yet. */
+  const page = notificationsQuery.data;
+  const notifications = page?.items;
 
   const hasMarkedReadRef = useRef(false);
   useEffect(() => {
@@ -202,11 +216,24 @@ export function NotificationHistoryView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+        {/* Story S-8b/S-7 — the page being left stays on screen while the
+            next one loads, so this is the only signal a page change is in
+            flight. In the heading's own row, so it adds no height and
+            cannot shift the table. */}
+        <FetchingIndicator
+          active={notificationsQuery.isPlaceholderData}
+          label={tCommon("updating")}
+        />
+      </div>
 
       <NotificationPreferencesSection />
 
-      {notificationsQuery.isLoading && (
+      {/* Story S-8b — `isPending`, not `isLoading`: with placeholder data in
+          play the query only reports `pending` on a true first load, so the
+          skeleton appears once and never again for a page change. */}
+      {notificationsQuery.isPending && (
         <div className="flex flex-col gap-2">
           {[0, 1, 2, 3, 4].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
@@ -227,13 +254,13 @@ export function NotificationHistoryView() {
         </Alert>
       )}
 
-      {notificationsQuery.isSuccess && notificationsQuery.data.length === 0 && (
+      {notifications !== undefined && notifications.length === 0 && (
         <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
           {t("empty")}
         </p>
       )}
 
-      {notificationsQuery.isSuccess && notificationsQuery.data.length > 0 && (
+      {notifications !== undefined && notifications.length > 0 && (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -246,7 +273,7 @@ export function NotificationHistoryView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {notificationsQuery.data.map((notification) => {
+              {notifications.map((notification) => {
                 const ticket = ticketById.get(notification.ticketId);
                 const customerName = ticket ? customerNameById.get(ticket.customerId) : undefined;
                 return (
@@ -262,6 +289,26 @@ export function NotificationHistoryView() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {/* Renders nothing while there is only one page (see `Pagination`), so
+          a short feed looks exactly as it did before S-8b. Disabled while
+          the previous page is still showing, so a rapid double-click cannot
+          queue a second jump. */}
+      {page !== undefined && (
+        <Pagination
+          page={page.page}
+          totalPages={page.totalPages}
+          onPageChange={(next) => setFilters((current) => ({ ...current, page: next }))}
+          disabled={notificationsQuery.isPlaceholderData}
+          label={tCommon("pagination.label")}
+          previousLabel={tCommon("pagination.previous")}
+          nextLabel={tCommon("pagination.next")}
+          indicator={tCommon("pagination.indicator", {
+            page: page.page,
+            totalPages: page.totalPages,
+          })}
+        />
       )}
     </section>
   );

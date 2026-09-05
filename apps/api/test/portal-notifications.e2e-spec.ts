@@ -99,7 +99,9 @@ describe("Customer Portal — Notification History (e2e)", () => {
       }
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     } while (Date.now() < deadline);
-    throw new Error("Timed out waiting for the customer-scoped NotificationLog rows to be persisted");
+    throw new Error(
+      "Timed out waiting for the customer-scoped NotificationLog rows to be persisted",
+    );
   }
 
   it("rejects an unauthenticated request", async () => {
@@ -164,7 +166,9 @@ describe("Customer Portal — Notification History (e2e)", () => {
     expect(eventTypes).toContainEqual({ eventType: "channel.message.created", ticketId });
 
     // Newest first.
-    const loggedAts = response.body.map((n: { loggedAt: string }) => new Date(n.loggedAt).getTime());
+    const loggedAts = response.body.map((n: { loggedAt: string }) =>
+      new Date(n.loggedAt).getTime(),
+    );
     expect(loggedAts).toEqual([...loggedAts].sort((a, b) => b - a));
 
     // The agent-facing endpoint's result set must be unaffected by this
@@ -174,7 +178,8 @@ describe("Customer Portal — Notification History (e2e)", () => {
       .get("/api/v1/notifications")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    const agentMatch = agentResponse.body.find(
+    // Story S-8b — the agent list returns a paginated envelope.
+    const agentMatch = agentResponse.body.items.find(
       (n: { ticketId: string }) => n.ticketId === ticketId,
     );
     expect(agentMatch).toBeUndefined();
@@ -195,7 +200,9 @@ describe("Customer Portal — Notification History (e2e)", () => {
       .expect(201);
 
     await request(app.getHttpServer())
-      .patch(`/api/v1/customers/${otherCustomer.body.id}/contacts/${otherContact.body.id}/portal-password`)
+      .patch(
+        `/api/v1/customers/${otherCustomer.body.id}/contacts/${otherContact.body.id}/portal-password`,
+      )
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({ newPassword: portalPassword })
       .expect(200);
@@ -215,12 +222,8 @@ describe("Customer Portal — Notification History (e2e)", () => {
   // -------------------------------------------------------------------
 
   it("rejects an unauthenticated request on both new routes", async () => {
-    await request(app.getHttpServer())
-      .get("/api/v1/portal/notifications/unread-count")
-      .expect(401);
-    await request(app.getHttpServer())
-      .patch("/api/v1/portal/notifications/read-state")
-      .expect(401);
+    await request(app.getHttpServer()).get("/api/v1/portal/notifications/unread-count").expect(401);
+    await request(app.getHttpServer()).patch("/api/v1/portal/notifications/read-state").expect(401);
   });
 
   it("rejects an agent-audience token on both new routes", async () => {
@@ -253,7 +256,9 @@ describe("Customer Portal — Notification History (e2e)", () => {
         .expect(201);
 
       await request(app.getHttpServer())
-        .patch(`/api/v1/customers/${readStateCustomerId}/contacts/${contact.body.id}/portal-password`)
+        .patch(
+          `/api/v1/customers/${readStateCustomerId}/contacts/${contact.body.id}/portal-password`,
+        )
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .send({ newPassword: readStatePortalPassword })
         .expect(200);

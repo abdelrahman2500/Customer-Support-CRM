@@ -8,7 +8,9 @@ function buildPrismaMock() {
   return {
     notificationLog: {
       findMany: vi.fn(),
-      count: vi.fn(),
+      // Story S-8b — `paginate` issues this alongside `findMany`, so it
+      // needs a default; `getUnreadCount`'s own tests still override it.
+      count: vi.fn().mockResolvedValue(0),
     },
     user: {
       findUniqueOrThrow: vi.fn(),
@@ -76,12 +78,14 @@ describe("NotificationsService", () => {
       );
     });
 
-    it("returns an empty array when there are no notifications in the branch", async () => {
+    it("returns an empty page when there are no notifications in the branch", async () => {
       prisma.notificationLog.findMany.mockResolvedValue([]);
 
       const result = await service.listNotifications();
 
-      expect(result).toEqual([]);
+      // `totalPages` floors at 1 so a UI can say "page 1 of 1" over an
+      // empty table rather than "page 1 of 0".
+      expect(result).toEqual({ items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 });
     });
 
     it("maps sla.at_risk rows (which carry a real branchId of their own) as-is", async () => {
@@ -102,7 +106,7 @@ describe("NotificationsService", () => {
 
       const result = await service.listNotifications();
 
-      expect(result).toEqual([
+      expect(result.items).toEqual([
         {
           id: "notif-1",
           eventType: "sla.at_risk",
@@ -132,7 +136,7 @@ describe("NotificationsService", () => {
 
       const result = await service.listNotifications();
 
-      expect(result).toEqual([
+      expect(result.items).toEqual([
         {
           id: "notif-2",
           eventType: "ticket.escalated",
@@ -145,13 +149,16 @@ describe("NotificationsService", () => {
       ]);
     });
 
-    it("orders by loggedAt descending (newest first)", async () => {
+    it("orders by loggedAt descending, with id as a deterministic tiebreaker", async () => {
       prisma.notificationLog.findMany.mockResolvedValue([]);
 
       await service.listNotifications();
 
+      // Story S-8b — `loggedAt` is not unique: the SLA and escalation
+      // listeners write several rows for one event, so paging over it alone
+      // would let a row straddling a page boundary appear twice or vanish.
       expect(prisma.notificationLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { loggedAt: "desc" } }),
+        expect.objectContaining({ orderBy: [{ loggedAt: "desc" }, { id: "desc" }] }),
       );
     });
 
@@ -162,15 +169,109 @@ describe("NotificationsService", () => {
       await expect(service.listNotifications()).rejects.toThrow(/no active branch/);
     });
 
-    // Story 106 — Bounded Result Caps.
-    it("caps every query at 200 rows, unconditionally", async () => {
-      prisma.notificationLog.findMany.mockResolvedValue([]);
+    /**
+     * Story S-8b — Story 106's unconditional `take: 200` cap is replaced by
+     * real paging. Story 106 justified it as "recent activity, not a full
+     * archive", which held while there was no way to ask for more; now
+     * there is, so the older half of a busy branch's feed is reachable
+     * instead of silently ending.
+     */
+    describe("pagination (Story S-8b)", () => {
+      it("defaults to the first page at a page size of 25", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([]);
 
-      await service.listNotifications();
+        await service.listNotifications();
 
-      expect(prisma.notificationLog.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 200 }),
-      );
+        expect(prisma.notificationLog.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: 0, take: 25 }),
+        );
+      });
+
+      it("translates a page number into the right offset", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([]);
+
+        await service.listNotifications({ page: 4, pageSize: 10 });
+
+        expect(prisma.notificationLog.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: 30, take: 10 }),
+        );
+      });
+
+      it("reports the total and page count from a single count query", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([]);
+        prisma.notificationLog.count.mockResolvedValue(57);
+
+        const result = await service.listNotifications({ page: 2, pageSize: 25 });
+
+        expect(prisma.notificationLog.count).toHaveBeenCalledOnce();
+        expect(result.total).toBe(57);
+        expect(result.page).toBe(2);
+        expect(result.pageSize).toBe(25);
+        expect(result.totalPages).toBe(3);
+      });
+
+      it("returns an empty page past the end without losing the metadata", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([]);
+        prisma.notificationLog.count.mockResolvedValue(30);
+
+        const result = await service.listNotifications({ page: 99, pageSize: 10 });
+
+        expect(result.items).toEqual([]);
+        expect(result.total).toBe(30);
+        expect(result.page).toBe(99);
+        expect(result.totalPages).toBe(3);
+      });
+
+      /**
+       * The single-`where` guarantee. It matters more here than on most
+       * endpoints: the branch scope runs through the `ticket` relation
+       * rather than `NotificationLog.branchId` (nullable, and always null
+       * for escalation rows), so a `count` that rebuilt the predicate and
+       * reached for the column instead would silently drop every escalation
+       * from `total` while `items` still contained them.
+       */
+      it("counts over exactly the same where clause it fetches with", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([]);
+
+        await service.listNotifications();
+
+        const countWhere = prisma.notificationLog.count.mock.calls[0]![0]!.where;
+        const findWhere = prisma.notificationLog.findMany.mock.calls[0]![0]!.where;
+        expect(countWhere).toEqual({ ticket: { branchId: "branch-1" }, customerId: null });
+        // Not merely equal by value - literally the same object.
+        expect(countWhere).toBe(findWhere);
+      });
+
+      it("no longer joins the ticket relation just to read one column", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([]);
+
+        await service.listNotifications();
+
+        // `where` already constrains `ticket: { branchId }`, so every row
+        // returned has `ticket.branchId === branchId` by construction and
+        // the effective branchId comes from the tenant scope instead.
+        const args = prisma.notificationLog.findMany.mock.calls[0]![0]!;
+        expect(args.include).toBeUndefined();
+      });
+
+      it("still resolves a null branchId to the caller's branch", async () => {
+        const loggedAt = new Date("2026-06-02T09:00:00.000Z");
+        prisma.notificationLog.findMany.mockResolvedValue([
+          {
+            id: "notif-3",
+            eventType: "ticket.escalated",
+            ticketId: "ticket-3",
+            branchId: null,
+            targetType: null,
+            targetAt: null,
+            loggedAt,
+          },
+        ]);
+
+        const result = await service.listNotifications();
+
+        expect(result.items[0]!.branchId).toBe("branch-1");
+      });
     });
   });
 

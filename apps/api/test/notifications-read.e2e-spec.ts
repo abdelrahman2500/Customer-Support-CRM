@@ -111,17 +111,19 @@ describe("Notifications — read endpoint (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    expect(Array.isArray(response.body)).toBe(true);
+    // Story S-8b — a `Paginated<NotificationSummary>` envelope.
+    expect(Array.isArray(response.body.items)).toBe(true);
   });
 
   // Story 106 — Bounded Result Caps.
-  it("never returns more than 200 rows", async () => {
+  it("returns at most one page, and says how many rows there are in total", async () => {
     const response = await request(app.getHttpServer())
       .get("/api/v1/notifications")
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    expect(response.body.length).toBeLessThanOrEqual(200);
+    expect(response.body.items.length).toBeLessThanOrEqual(response.body.pageSize);
+    expect(response.body.total).toBeGreaterThanOrEqual(response.body.items.length);
   });
 
   it("surfaces a real, freshly-created sla.at_risk notification, scoped to the admin's branch", async () => {
@@ -141,7 +143,7 @@ describe("Notifications — read endpoint (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    const match = response.body.find(
+    const match = response.body.items.find(
       (notification: { ticketId: string; targetAt: string }) =>
         notification.ticketId === ticketId && notification.targetAt === targetAt.toISOString(),
     );
@@ -183,7 +185,7 @@ describe("Notifications — read endpoint (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    const match = response.body.find((n: { ticketId: string }) => n.ticketId === ticketId);
+    const match = response.body.items.find((n: { ticketId: string }) => n.ticketId === ticketId);
     expect(match).toMatchObject({
       eventType: TICKET_ESCALATED_EVENT,
       ticketId,
@@ -224,5 +226,171 @@ describe("Notifications — read endpoint (e2e)", () => {
       .get("/api/v1/notifications")
       .set("Authorization", `Bearer ${loginResponse.body.accessToken}`)
       .expect(200);
+  });
+
+  /**
+   * Story S-8b — paging `GET /notifications`.
+   *
+   * `NotificationLog` is written by the SLA and escalation listeners, so
+   * this table is shared, always growing and never a known size. Every
+   * assertion below is therefore relative — against the endpoint's own
+   * reported `total`, or by comparing pages to each other — rather than
+   * against a fixed row count, which is what keeps them stable when the
+   * suite is run repeatedly against the same database.
+   */
+  describe("pagination (Story S-8b)", () => {
+    function get(query: Record<string, unknown> = {}) {
+      return request(app.getHttpServer())
+        .get("/api/v1/notifications")
+        .query(query)
+        .set("Authorization", `Bearer ${adminAccessToken}`);
+    }
+
+    it("defaults to page 1 at a page size of 25", async () => {
+      const response = await get().expect(200);
+
+      expect(response.body.page).toBe(1);
+      expect(response.body.pageSize).toBe(25);
+      expect(response.body.items.length).toBeLessThanOrEqual(25);
+      expect(response.body.totalPages).toBe(Math.max(1, Math.ceil(response.body.total / 25)));
+    });
+
+    it("echoes back an explicit page and pageSize", async () => {
+      const response = await get({ page: 2, pageSize: 5 }).expect(200);
+
+      expect(response.body.page).toBe(2);
+      expect(response.body.pageSize).toBe(5);
+      expect(response.body.items.length).toBeLessThanOrEqual(5);
+    });
+
+    it("returns the first page, and a non-overlapping second page", async () => {
+      const first = await get({ page: 1, pageSize: 2 }).expect(200);
+      if (first.body.total <= 2) {
+        // Not enough rows in this database to have a second page; the
+        // assertions below would be vacuous rather than wrong.
+        expect(first.body.totalPages).toBe(1);
+        return;
+      }
+
+      const second = await get({ page: 2, pageSize: 2 }).expect(200);
+      const firstIds = first.body.items.map((n: { id: string }) => n.id);
+      const secondIds = second.body.items.map((n: { id: string }) => n.id);
+
+      expect(secondIds.length).toBeGreaterThan(0);
+      for (const id of secondIds) {
+        expect(firstIds).not.toContain(id);
+      }
+    });
+
+    it("returns the last page with at least one row", async () => {
+      const first = await get({ pageSize: 2 }).expect(200);
+      const last = await get({ page: first.body.totalPages, pageSize: 2 }).expect(200);
+
+      expect(last.body.page).toBe(first.body.totalPages);
+      expect(last.body.items.length).toBeGreaterThan(0);
+      expect(last.body.items.length).toBeLessThanOrEqual(2);
+    });
+
+    it("returns 200 with an empty page past the end, keeping the metadata accurate", async () => {
+      const first = await get({ pageSize: 5 }).expect(200);
+      const beyond = await get({ page: first.body.totalPages + 50, pageSize: 5 }).expect(200);
+
+      expect(beyond.body.items).toEqual([]);
+      expect(beyond.body.page).toBe(first.body.totalPages + 50);
+      expect(beyond.body.pageSize).toBe(5);
+      expect(beyond.body.total).toBe(first.body.total);
+      expect(beyond.body.totalPages).toBe(first.body.totalPages);
+    });
+
+    it("keeps totalPages consistent with total and pageSize", async () => {
+      const response = await get({ pageSize: 3 }).expect(200);
+
+      expect(response.body.totalPages).toBe(Math.max(1, Math.ceil(response.body.total / 3)));
+    });
+
+    it("orders deterministically enough for pages not to overlap", async () => {
+      // `loggedAt` is not unique - the listeners write several rows per
+      // event - so the service adds `id` as a tiebreaker.
+      const size = 3;
+      const pages = await Promise.all([
+        get({ page: 1, pageSize: size }).expect(200),
+        get({ page: 2, pageSize: size }).expect(200),
+        get({ page: 3, pageSize: size }).expect(200),
+      ]);
+
+      const ids = pages.flatMap((p) => p.body.items.map((n: { id: string }) => n.id));
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("keeps newest-first ordering within a page", async () => {
+      const response = await get({ pageSize: 10 }).expect(200);
+
+      const loggedAts = response.body.items.map((n: { loggedAt: string }) =>
+        new Date(n.loggedAt).getTime(),
+      );
+      expect(loggedAts).toEqual([...loggedAts].sort((a, b) => b - a));
+    });
+
+    it("resolves an effective branchId on every paginated row", async () => {
+      const response = await get({ pageSize: 100 }).expect(200);
+
+      /**
+       * Every row reports a branch, never null. Escalation rows carry a
+       * null `branchId` column (see the service doc comment) and are
+       * resolved to the caller's branch instead.
+       *
+       * Deliberately not asserting `=== adminBranchId`: a row that carries
+       * its own non-null `branchId` is passed through as-is, and that
+       * column is written independently of the ticket it points at, so it
+       * can legitimately differ from the ticket's branch. The scope this
+       * endpoint enforces is on `ticket.branchId`, not on that column -
+       * which is exactly why the service filters through the relation. The
+       * customer-scoped exclusion is asserted in
+       * `portal-notifications.e2e-spec.ts`, against rows it creates itself.
+       */
+      for (const notification of response.body.items) {
+        expect(notification.branchId).toBeTruthy();
+      }
+      expect(response.body.total).toBeGreaterThanOrEqual(response.body.items.length);
+    });
+
+    it("accepts the maximum page size", async () => {
+      const response = await get({ pageSize: 100 }).expect(200);
+
+      expect(response.body.pageSize).toBe(100);
+      expect(response.body.items.length).toBeLessThanOrEqual(100);
+    });
+
+    it("rejects a page size above the maximum rather than silently clamping it", async () => {
+      await get({ pageSize: 101 }).expect(400);
+      await get({ pageSize: 1000 }).expect(400);
+    });
+
+    it("rejects an invalid pageSize with 400", async () => {
+      await get({ pageSize: 0 }).expect(400);
+      await get({ pageSize: -1 }).expect(400);
+      await get({ pageSize: 2.5 }).expect(400);
+      await get({ pageSize: "abc" }).expect(400);
+    });
+
+    it("rejects an invalid page with 400", async () => {
+      await get({ page: 0 }).expect(400);
+      await get({ page: -1 }).expect(400);
+      await get({ page: 1.5 }).expect(400);
+      await get({ page: "abc" }).expect(400);
+    });
+
+    it("rejects an unknown query parameter, so a future filter cannot be silently ignored", async () => {
+      // `forbidNonWhitelisted` - the endpoint has no filters, and asking
+      // for one must fail loudly rather than return an unfiltered page.
+      await get({ eventType: "sla.at_risk" }).expect(400);
+    });
+
+    it("still requires authentication on a paginated request", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/notifications")
+        .query({ page: 2, pageSize: 10 })
+        .expect(401);
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { apiFetch } from "./api";
+import type { PaginatedResponse } from "./paginated";
 
 /**
  * Story 39 — Agent Workspace: Notification History. A dedicated API client
@@ -34,8 +35,33 @@ export interface NotificationSummary {
  * permission (Story 36) a plain Agent does not hold — a 403 is a real,
  * expected response this client's caller must handle, not a bug.
  */
-export function listNotifications(): Promise<NotificationSummary[]> {
-  return apiFetch<NotificationSummary[]>("/notifications");
+/**
+ * Story S-8b — 1-based `page`; omit either field for the API's own defaults
+ * (page 1, 25 rows). This endpoint has no filters, so these are the only
+ * parameters it accepts.
+ */
+export interface NotificationFilters {
+  page?: number;
+  pageSize?: number;
+}
+
+function toQueryString(filters: NotificationFilters): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined) {
+      params.set(key, String(value));
+    }
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export function listNotifications(
+  filters: NotificationFilters = {},
+): Promise<PaginatedResponse<NotificationSummary>> {
+  return apiFetch<PaginatedResponse<NotificationSummary>>(
+    `/notifications${toQueryString(filters)}`,
+  );
 }
 
 /**
