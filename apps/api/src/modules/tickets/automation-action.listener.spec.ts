@@ -119,6 +119,7 @@ describe("AutomationActionListener", () => {
         priority: "MEDIUM",
         status: "OPEN",
         customerId: "customer-1",
+        customerName: null,
         contactId: null,
         departmentId: null,
         assignedToUserId: "user-1",

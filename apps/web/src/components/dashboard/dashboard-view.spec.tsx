@@ -53,6 +53,9 @@ function mockTicketQueries(overrides: {
     if (filters && Object.prototype.hasOwnProperty.call(filters, "assignedToUserId")) {
       return mine as never;
     }
+    // Story S-8d — the unclaimed panel asks the server for unassigned
+    // tickets (`unassigned: "true"`) instead of filtering a branch-wide
+    // list client-side.
     return all as never;
   });
 }
@@ -65,6 +68,9 @@ function ticket(overrides: Record<string, unknown>) {
     priority: "MEDIUM",
     status: "OPEN",
     customerId: "customer-1",
+    // Story S-8d — resolved by the API, replacing the client-side map this
+    // screen used to build from the whole customer list.
+    customerName: "Acme Inc.",
     contactId: null,
     departmentId: null,
     assignedToUserId: "agent-1",
@@ -276,7 +282,7 @@ describe("DashboardView", () => {
       expect(screen.getByText("No unclaimed tickets right now.")).toBeInTheDocument();
     });
 
-    it("shows only unassigned, open tickets — excluding assigned, resolved, and closed ones", () => {
+    it("asks the server for unassigned tickets, and still hides resolved/closed ones", () => {
       mockTicketQueries({
         all: {
           data: [
@@ -284,12 +290,6 @@ describe("DashboardView", () => {
               id: "t-unassigned-open",
               subject: "Unassigned open",
               assignedToUserId: null,
-              status: "OPEN",
-            }),
-            ticket({
-              id: "t-assigned",
-              subject: "Already assigned",
-              assignedToUserId: "agent-9",
               status: "OPEN",
             }),
             ticket({
@@ -304,8 +304,18 @@ describe("DashboardView", () => {
 
       renderWithLocale();
 
+      /**
+       * Story S-8d — "unassigned" is the server's filter now, so the fixture
+       * holds only what the server would return and the assertion is that
+       * the request actually asked for it. Previously this screen fetched
+       * the branch-wide list and picked the unassigned rows out of it, which
+       * meant an unclaimed ticket older than the capped window could never
+       * appear at all.
+       */
+      expect(mockedUseTicketsQuery).toHaveBeenCalledWith({ unassigned: "true" });
       expect(screen.getByText("Unassigned open")).toBeInTheDocument();
-      expect(screen.queryByText("Already assigned")).not.toBeInTheDocument();
+      // The open-status rule stays client-side: `OPEN_STATUSES` is this
+      // screen's own definition of "still needs work", not an API concept.
       expect(screen.queryByText("Unassigned resolved")).not.toBeInTheDocument();
     });
 

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useCustomersQuery, useTicketsQuery, useUsersQuery } from "@/hooks/use-tickets";
+import { useTicketsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { ListTicketsFilters, TicketListItem } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
@@ -64,6 +64,11 @@ function SlaCell({ ticket }: { ticket: TicketListItem }) {
  * filter Input, appended to the same filter bar (matches `subject`/
  * `category`, case-insensitive — mirrors `ArticleListView`'s own search
  * input, added for Knowledge Base in Story 64).
+ *
+ * Story S-8d — each row's customer name comes from the ticket payload
+ * rather than a client-side id -> name map, so the list no longer depends
+ * on a second, whole-table customer fetch. Rows outside that fetch's cap
+ * used to fall back to a raw UUID.
  */
 export function TicketListView() {
   const t = useTranslations("tickets");
@@ -83,17 +88,8 @@ export function TicketListView() {
    * is genuinely nothing to show yet, which is what the state model below
    * branches on. */
   const tickets = ticketsQuery.data;
-  const customersQuery = useCustomersQuery();
   const usersQuery = useUsersQuery();
   const categoriesQuery = useTicketCategoriesQuery();
-
-  const customerNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const customer of customersQuery.data ?? []) {
-      map.set(customer.id, customer.displayName);
-    }
-    return map;
-  }, [customersQuery.data]);
 
   const userNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -276,7 +272,11 @@ export function TicketListView() {
                     className="focus-ring rounded-sm hover:underline"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    {customerNameById.get(ticket.customerId) ?? ticket.customerId}
+                    {/* Story S-8d — resolved by the API. Previously looked up
+                        in a client-side map built from the whole customer
+                        list, which fell back to a raw UUID for any customer
+                        outside the capped window. */}
+                    {ticket.customerName ?? ticket.customerId}
                   </Link>
                 </TableCell>
                 <TableCell>

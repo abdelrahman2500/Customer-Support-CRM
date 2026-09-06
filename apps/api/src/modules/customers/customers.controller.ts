@@ -4,7 +4,7 @@ import { RequirePermissions } from "../../common/auth/require-permissions.decora
 import { CreateCustomerDto } from "./dto/create-customer.dto";
 import { UpdateCustomerDto } from "./dto/update-customer.dto";
 import { ListCustomersQueryDto } from "./dto/list-customers-query.dto";
-import type { ContactSummary, CustomerSummary } from "./customers.service";
+import type { ContactSummary, CustomerSummary, CustomerOption } from "./customers.service";
 import { CustomersService } from "./customers.service";
 
 @ApiTags("customers")
@@ -23,6 +23,17 @@ export class CustomersController {
   @RequirePermissions("customer:read")
   list(@Query() query: ListCustomersQueryDto): Promise<CustomerSummary[]> {
     return this.customersService.listCustomers(query);
+  }
+
+  /**
+   * Story S-8d — declared before `@Get(":id")` so "options" is not captured
+   * as a customer id. Same `customer:read` gate as the list: it exposes a
+   * strict subset of the same rows.
+   */
+  @Get("options")
+  @RequirePermissions("customer:read")
+  listOptions(): Promise<CustomerOption[]> {
+    return this.customersService.listCustomerOptions();
   }
 
   @Get(":id")

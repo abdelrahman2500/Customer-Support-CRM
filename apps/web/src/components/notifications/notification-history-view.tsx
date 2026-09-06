@@ -6,7 +6,6 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMarkNotificationsReadMutation, useNotificationsQuery } from "@/hooks/use-notifications";
 import { useNotificationTemplatesQuery } from "@/hooks/use-notification-templates";
-import { useCustomersQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import type { NotificationFilters, NotificationSummary } from "@/lib/notifications-api";
 import { renderNotificationTemplate } from "@/lib/notification-template-render";
 import { ApiError } from "@/lib/api";
@@ -36,13 +35,12 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
 };
 
 /**
- * One notification row's ticket/customer cells, resolved through the
- * already-fetched, already-shared `useTicketsQuery({})`/`useCustomersQuery()`
- * caches — the same client-side-join convention `TicketListView`'s
- * `customerNameById`/`AuditLogView`'s `ActorCell` already established. A
- * ticket this branch's unpaginated ticket list doesn't contain (e.g. one
- * outside this lookup) falls back to the raw `ticketId`, exactly like those
- * existing fallbacks.
+ * One notification row's ticket/customer cells, read straight off the
+ * notification: the API resolves `ticketSubject`/`customerName` server-side
+ * (Story S-8d). A deleted ticket sends both as `null` and the row falls back
+ * to the raw `ticketId`/an "unknown customer" label — the same fallbacks
+ * this row has always had, now reached only when the ticket is genuinely
+ * gone rather than merely outside a fetched window.
  *
  * Story 61 — `template` is the caller's own `NotificationTemplate.template`
  * for this row's `eventType`, when one exists; falls back to the exact
@@ -125,16 +123,13 @@ function NotificationRow({
  * `NotificationsService.listNotifications`'s own `orderBy`); this view
  * renders them in that same order rather than re-sorting client-side.
  *
- * Ticket subject / customer name resolution reuses the existing,
- * already-fetched, unpaginated `useTicketsQuery({})`/`useCustomersQuery()`
- * (same client-side-join precedent as `TicketListView`/`CustomerDetailView`'s
- * "Related tickets" and `AuditLogView`'s `useUsersQuery()`-based
- * `ActorCell`) — no new backend endpoint/parameter, and neither hook is
- * modified. A resolution failure never blocks the notification list itself
- * from rendering (same independent-failure convention as
- * `CustomerDetailView`'s Contacts/Related-Tickets cards or `RoleListView`'s
- * roles/permissions sections): an unresolved row falls back to the raw
- * `ticketId`/an "unknown customer" label.
+ * Ticket subject / customer name arrive on each notification (Story S-8d),
+ * so this view issues exactly one query for the table. It previously joined
+ * client-side against `useTicketsQuery({})`/`useCustomersQuery()`, which
+ * meant two whole-table fetches to label 25 rows and a raw UUID for any
+ * ticket outside them. An unresolved row still falls back to the raw
+ * `ticketId`/an "unknown customer" label, and that fallback can no longer
+ * be triggered by the size of somebody's branch.
  *
  * Story 58 — `NotificationPreferencesSection` rendered above the history
  * table, entirely independent of `notificationsQuery`'s own `notification:read`
@@ -153,6 +148,12 @@ function NotificationRow({
  * A `useRef` guard, not an effect dependency array trick, is what makes
  * this "once" rather than "every time the query refetches/re-succeeds"
  * (e.g. on window refocus).
+ *
+ * Story S-8d — supersedes Story 39's id -> name maps. `ticketSubject` and
+ * `customerName` now arrive on each notification, so this screen no
+ * longer fetches the ticket and customer lists to label its rows. That
+ * also fixes the gap Story 39 documented: a notification about a ticket
+ * outside the fetched window used to render a raw UUID.
  */
 export function NotificationHistoryView() {
   const t = useTranslations("notificationHistory");
@@ -166,8 +167,6 @@ export function NotificationHistoryView() {
    */
   const [filters, setFilters] = useState<NotificationFilters>({});
   const notificationsQuery = useNotificationsQuery(filters);
-  const ticketsQuery = useTicketsQuery({});
-  const customersQuery = useCustomersQuery();
   const templatesQuery = useNotificationTemplatesQuery();
   const markReadMutation = useMarkNotificationsReadMutation();
 
@@ -192,22 +191,6 @@ export function NotificationHistoryView() {
     }
     return map;
   }, [templatesQuery.data]);
-
-  const ticketById = useMemo(() => {
-    const map = new Map<string, { subject: string; customerId: string }>();
-    for (const ticket of ticketsQuery.data ?? []) {
-      map.set(ticket.id, { subject: ticket.subject, customerId: ticket.customerId });
-    }
-    return map;
-  }, [ticketsQuery.data]);
-
-  const customerNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const customer of customersQuery.data ?? []) {
-      map.set(customer.id, customer.displayName);
-    }
-    return map;
-  }, [customersQuery.data]);
 
   const forbidden =
     notificationsQuery.isError &&
@@ -273,19 +256,21 @@ export function NotificationHistoryView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {notifications.map((notification) => {
-                const ticket = ticketById.get(notification.ticketId);
-                const customerName = ticket ? customerNameById.get(ticket.customerId) : undefined;
-                return (
-                  <NotificationRow
-                    key={notification.id}
-                    notification={notification}
-                    ticketSubject={ticket?.subject}
-                    customerName={customerName}
-                    template={templateByEventType.get(notification.eventType)}
-                  />
-                );
-              })}
+              {/* Story S-8d — both names now arrive resolved on the row
+                  itself, so this no longer joins two client-side maps built
+                  from the whole ticket and customer lists. `?? undefined`
+                  keeps `NotificationRow`s existing optional-prop contract,
+                  which already renders the id / an unknown-customer label
+                  when either is missing. */}
+              {notifications.map((notification) => (
+                <NotificationRow
+                  key={notification.id}
+                  notification={notification}
+                  ticketSubject={notification.ticketSubject ?? undefined}
+                  customerName={notification.customerName ?? undefined}
+                  template={templateByEventType.get(notification.eventType)}
+                />
+              ))}
             </TableBody>
           </Table>
         </div>

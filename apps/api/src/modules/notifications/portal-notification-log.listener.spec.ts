@@ -40,6 +40,7 @@ const updatedEvent = {
     priority: "URGENT" as const,
     status: "OPEN" as const,
     customerId: "customer-1",
+    customerName: null,
     contactId: null,
     departmentId: null,
     assignedToUserId: null,

@@ -5,7 +5,7 @@ import { CreateTicketView } from "./create-ticket-view";
 import {
   useCreateTicketMutation,
   useCustomerQuery,
-  useCustomersQuery,
+  useCustomerOptionsQuery,
   useDepartmentsQuery,
   useUsersQuery,
 } from "@/hooks/use-tickets";
@@ -37,7 +37,7 @@ const mockedShowSuccessToast = vi.mocked(showSuccessToast);
 
 vi.mock("@/hooks/use-tickets", () => ({
   useCreateTicketMutation: vi.fn(),
-  useCustomersQuery: vi.fn(),
+  useCustomerOptionsQuery: vi.fn(),
   useCustomerQuery: vi.fn(),
   useDepartmentsQuery: vi.fn(),
   useUsersQuery: vi.fn(),
@@ -48,7 +48,7 @@ vi.mock("@/hooks/use-ticket-categories", () => ({
 }));
 
 const mockedUseCreateTicketMutation = vi.mocked(useCreateTicketMutation);
-const mockedUseCustomersQuery = vi.mocked(useCustomersQuery);
+const mockedUseCustomersQuery = vi.mocked(useCustomerOptionsQuery);
 const mockedUseCustomerQuery = vi.mocked(useCustomerQuery);
 const mockedUseDepartmentsQuery = vi.mocked(useDepartmentsQuery);
 const mockedUseUsersQuery = vi.mocked(useUsersQuery);

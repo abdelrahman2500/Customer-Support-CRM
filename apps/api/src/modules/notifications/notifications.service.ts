@@ -13,6 +13,22 @@ import type { ListNotificationsQueryDto } from "./dto/list-notifications-query.d
  * `createdAt`/`updatedAt`).
  */
 export interface NotificationSummary {
+  /**
+   * Story S-8d — the related ticket's subject and its customer's display
+   * name, resolved server-side.
+   *
+   * The notification history screen used to resolve both by fetching the
+   * entire ticket and customer lists and building id -> name maps in the
+   * browser; its own comment described them as the "already-fetched,
+   * unpaginated" queries. Both are now paginated, so those maps would
+   * cover 25 rows out of thousands and nearly every notification would
+   * render a raw UUID.
+   *
+   * `null` when the ticket has been deleted, which the screen already
+   * handles by falling back to the id.
+   */
+  ticketSubject: string | null;
+  customerName: string | null;
   id: string;
   eventType: string;
   ticketId: string;
@@ -85,12 +101,32 @@ export class NotificationsService {
       pageSize: query.pageSize,
     });
 
+    /**
+     * One extra query for the page, not a join.
+     *
+     * `paginate` drives a Prisma delegate and infers its row type from it,
+     * so threading an `include` through would mean giving up that
+     * inference. Resolving afterwards keeps the pagination path plain and
+     * costs a single `findMany` over at most `pageSize` ids — 25 by
+     * default — which is bounded in a way the client-side maps never were.
+     */
+    const ticketIds = [...new Set(notifications.map((notification) => notification.ticketId))];
+    const tickets = ticketIds.length
+      ? await this.prisma.ticket.findMany({
+          where: { id: { in: ticketIds } },
+          select: { id: true, subject: true, customer: { select: { displayName: true } } },
+        })
+      : [];
+    const ticketById = new Map(tickets.map((ticket) => [ticket.id, ticket]));
+
     return {
       ...pagination,
       items: notifications.map((notification) => ({
         id: notification.id,
         eventType: notification.eventType,
         ticketId: notification.ticketId,
+        ticketSubject: ticketById.get(notification.ticketId)?.subject ?? null,
+        customerName: ticketById.get(notification.ticketId)?.customer?.displayName ?? null,
         // Story S-8b — was `?? notification.ticket.branchId`, which needed
         // the `ticket` relation eager-loaded purely to read one column.
         // `where` already constrains `ticket: { branchId }`, so every row
@@ -214,6 +250,10 @@ export class NotificationsService {
    * resolves `branchId` through it) since `customerId` is a first-class,
    * directly-filterable column on rows this method returns.
    */
+  /** Story S-8d — `ticketSubject`/`customerName` are `null` here for the
+   * same reason `branchId`/`targetType` already are: the portal screen
+   * shows its own ticket links and never needed either. Keeping one shape
+   * matters more than trimming two nulls. */
   async listNotificationsForCustomer(customerId: string): Promise<NotificationSummary[]> {
     const notifications = await this.prisma.notificationLog.findMany({
       where: { customerId },
@@ -224,6 +264,8 @@ export class NotificationsService {
       id: notification.id,
       eventType: notification.eventType,
       ticketId: notification.ticketId,
+      ticketSubject: null,
+      customerName: null,
       branchId: notification.branchId,
       targetType: notification.targetType,
       targetAt: notification.targetAt,

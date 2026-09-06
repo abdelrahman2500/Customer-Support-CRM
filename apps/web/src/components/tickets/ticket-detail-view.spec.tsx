@@ -117,6 +117,9 @@ const baseTicket = {
   subject: "Cannot log in",
   categoryId: "category-1",
   categoryName: "billing",
+  // Story S-8d — resolved by the API alongside `categoryName`, rather than
+  // looked up client-side from the whole customer list.
+  customerName: "Acme Inc.",
   priority: "HIGH",
   status: "OPEN",
   customerId: "customer-1",

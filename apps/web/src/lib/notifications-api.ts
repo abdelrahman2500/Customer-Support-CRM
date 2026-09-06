@@ -23,6 +23,9 @@ export interface NotificationSummary {
   id: string;
   eventType: string;
   ticketId: string;
+  /** Story S-8d — resolved server-side; `null` when the ticket is gone. */
+  ticketSubject: string | null;
+  customerName: string | null;
   branchId: string | null;
   targetType: string | null;
   targetAt: string | null;

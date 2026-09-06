@@ -19,6 +19,9 @@ export interface TicketSummary {
   priority: TicketPriority;
   status: TicketStatus;
   customerId: string;
+  /** Story S-8d — resolved server-side, replacing the client-side id -> name
+   * map every ticket screen used to build from the whole customer list. */
+  customerName: string | null;
   contactId: string | null;
   departmentId: string | null;
   assignedToUserId: string | null;
@@ -139,6 +142,12 @@ export interface ListTicketsFilters {
   search?: string;
   sortBy?: "createdAt" | "updatedAt";
   sortDir?: "asc" | "desc";
+  /** Story S-8d — narrow to one customer server-side, instead of fetching
+   * the branch list and filtering it in the browser. */
+  customerId?: string;
+  /** Story S-8d — `"true"` for tickets with no assignee. A string because
+   * a query param cannot carry a real null, mirroring `isActive`. */
+  unassigned?: "true" | "false";
 }
 
 /** Story 101 — widened from `ListTicketsFilters`-only to also accept
@@ -248,6 +257,22 @@ export function listCustomers(filters: ListCustomersFilters = {}): Promise<Custo
   return apiFetch<CustomerSummary[]>(`/customers${toQueryString(filters)}`);
 }
 
+/**
+ * Story S-8d — the picker lookup, separate from the browsable list.
+ *
+ * `GET /customers` is paginated, so a `<Select>` populated from it could
+ * only ever offer one page of customers. This returns every customer in the
+ * branch as an id/label pair, which is what a picker needs and all it needs.
+ */
+export interface CustomerOption {
+  id: string;
+  displayName: string;
+}
+
+export function listCustomerOptions(): Promise<CustomerOption[]> {
+  return apiFetch<CustomerOption[]>("/customers/options");
+}
+
 export function getCustomer(id: string): Promise<CustomerDetail> {
   return apiFetch<CustomerDetail>(`/customers/${id}`);
 }
@@ -273,7 +298,10 @@ export interface CreateContactInput {
   isPrimary?: boolean;
 }
 
-export function createContact(customerId: string, input: CreateContactInput): Promise<ContactSummary> {
+export function createContact(
+  customerId: string,
+  input: CreateContactInput,
+): Promise<ContactSummary> {
   return apiFetch<ContactSummary>(`/customers/${customerId}/contacts`, {
     method: "POST",
     body: JSON.stringify(input),

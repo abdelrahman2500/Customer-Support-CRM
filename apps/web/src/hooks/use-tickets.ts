@@ -16,6 +16,7 @@ import {
   getTicketNotes,
   getTicketSlaTarget,
   listBranches,
+  listCustomerOptions,
   listCustomers,
   listDepartments,
   listTickets,
@@ -146,6 +147,20 @@ export function useCustomerQuery(id: string) {
     queryKey: ["customer", id],
     queryFn: () => getCustomer(id),
     enabled: Boolean(id),
+  });
+}
+
+/**
+ * Story S-8d — every customer in the branch as an id/label pair, for
+ * pickers. Cached like the other reference-data lookups (`useUsersQuery`
+ * below) rather than like the browsable customer list, because that is what
+ * it is: a select's options, not a screen's worth of rows.
+ */
+export function useCustomerOptionsQuery() {
+  return useQuery({
+    queryKey: ["customer-options"],
+    queryFn: listCustomerOptions,
+    staleTime: 5 * 60_000,
   });
 }
 

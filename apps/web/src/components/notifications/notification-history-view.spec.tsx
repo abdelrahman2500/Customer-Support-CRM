@@ -92,6 +92,11 @@ const atRiskNotification = {
   id: "notif-1",
   eventType: "sla.at_risk",
   ticketId: "ticket-1",
+  // Story S-8d — both null here on purpose: the fallback tests below cover
+  // a ticket whose row could not be resolved. The resolved case supplies
+  // its own values.
+  ticketSubject: null,
+  customerName: null,
   branchId: "branch-1",
   targetType: "response",
   targetAt: "2024-01-01T13:00:00.000Z",
@@ -194,21 +199,14 @@ describe("NotificationHistoryView", () => {
     expect(rows[2]).toHaveTextContent("ticket-2");
   });
 
-  it("resolves the ticket subject and customer name from the existing tickets/customers queries", () => {
-    mockedUseTicketsQuery.mockReturnValue(
-      queryResult({
-        isSuccess: true,
-        data: [{ id: "ticket-1", subject: "Cannot log in", customerId: "customer-1" }],
-      }) as never,
-    );
-    mockedUseCustomersQuery.mockReturnValue(
-      queryResult({
-        isSuccess: true,
-        data: [{ id: "customer-1", displayName: "Acme Inc.", isActive: true }],
-      }) as never,
-    );
+  it("renders the ticket subject and customer name resolved by the API", () => {
     mockedUseNotificationsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
+      queryResult({
+        isSuccess: true,
+        data: page([
+          { ...atRiskNotification, ticketSubject: "Cannot log in", customerName: "Acme Inc." },
+        ]),
+      }) as never,
     );
 
     render(<NotificationHistoryView />);

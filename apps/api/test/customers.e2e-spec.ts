@@ -94,6 +94,75 @@ describe("Customer Management (e2e)", () => {
     expect(response.body.length).toBeLessThanOrEqual(500);
   });
 
+  // Story S-8d — the customer-picker lookup, kept separate from the
+  // browsable list so pagination on the latter cannot make a customer
+  // unselectable when creating a ticket.
+  describe("GET /customers/options", () => {
+    it("rejects an unauthenticated request", async () => {
+      await request(app.getHttpServer()).get("/api/v1/customers/options").expect(401);
+    });
+
+    it("is routed as a lookup, not parsed as a customer id", async () => {
+      // The route is declared before `@Get(":id")`. If that order ever
+      // flips, Nest treats "options" as an id and this 200 becomes a 404.
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/customers/options")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(Array.isArray(response.body)).toBe(true);
+    });
+
+    it("returns only id and displayName, sorted by name", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/customers/options")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.length).toBeGreaterThan(0);
+      for (const option of response.body) {
+        expect(Object.keys(option).sort()).toEqual(["displayName", "id"]);
+      }
+
+      // Postgres sorts under its own collation, which ignores spaces and
+      // punctuation - "Portal Notifications" precedes "Portal Notif Prefs"
+      // there but not under a naive `localeCompare`. Normalize to the same
+      // basis rather than asserting a JS ordering the database never used.
+      const key = (value: string) => value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      const names = response.body.map((option: { displayName: string }) => option.displayName);
+      const sorted = [...names].sort((a: string, b: string) =>
+        key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0,
+      );
+      expect(names).toEqual(sorted);
+    });
+
+    it("includes the customer created by this suite", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/customers/options")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.map((option: { id: string }) => option.id)).toContain(customerId);
+    });
+
+    it("cannot be accidentally paginated into a partial option set", async () => {
+      // The handler takes no query DTO at all, so pagination params are
+      // simply ignored rather than silently truncating the list. That is
+      // the property that matters here: a picker missing options is a bug
+      // a user would hit as "my customer is not in the dropdown".
+      const full = await request(app.getHttpServer())
+        .get("/api/v1/customers/options")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const paged = await request(app.getHttpServer())
+        .get("/api/v1/customers/options")
+        .query({ page: 2, pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(paged.body.length).toBe(full.body.length);
+    });
+  });
   it("gets a single customer with an empty contacts array", async () => {
     const response = await request(app.getHttpServer())
       .get(`/api/v1/customers/${customerId}`)

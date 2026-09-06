@@ -200,7 +200,10 @@ describe("TicketsService", () => {
           subject: "Cannot log in",
           categoryId: null,
         },
-        include: { category: { select: { name: true } } },
+        include: {
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
       });
       expect(result.status).toBe("OPEN");
       expect(result.priority).toBe("MEDIUM");
@@ -240,7 +243,10 @@ describe("TicketsService", () => {
           subject: "Cannot log in",
           categoryId: null,
         },
-        include: { category: { select: { name: true } } },
+        include: {
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
       });
     });
 
@@ -295,7 +301,11 @@ describe("TicketsService", () => {
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
         orderBy: { createdAt: "desc" },
-        include: { slaTarget: true, category: { select: { name: true } } },
+        include: {
+          slaTarget: true,
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
         take: 500,
       });
     });
@@ -306,14 +316,20 @@ describe("TicketsService", () => {
 
       await service.listTickets({ status: "OPEN" });
 
-      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 500 }),
-      );
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 500 }));
     });
 
     it("fetches desc and reverses in memory for the default (asc) direction, reproducing the exact pre-Story-105 order", async () => {
-      const older = { ...baseTicketRow, id: "ticket-older", createdAt: new Date("2024-01-01T00:00:00.000Z") };
-      const newer = { ...baseTicketRow, id: "ticket-newer", createdAt: new Date("2024-01-05T00:00:00.000Z") };
+      const older = {
+        ...baseTicketRow,
+        id: "ticket-older",
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      };
+      const newer = {
+        ...baseTicketRow,
+        id: "ticket-newer",
+        createdAt: new Date("2024-01-05T00:00:00.000Z"),
+      };
       // Prisma, asked for `desc`, would itself return newest-first.
       prisma.ticket.findMany.mockResolvedValue([newer, older]);
 
@@ -323,8 +339,16 @@ describe("TicketsService", () => {
     });
 
     it("does not reverse when sortDir is explicitly desc", async () => {
-      const older = { ...baseTicketRow, id: "ticket-older", createdAt: new Date("2024-01-01T00:00:00.000Z") };
-      const newer = { ...baseTicketRow, id: "ticket-newer", createdAt: new Date("2024-01-05T00:00:00.000Z") };
+      const older = {
+        ...baseTicketRow,
+        id: "ticket-older",
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      };
+      const newer = {
+        ...baseTicketRow,
+        id: "ticket-newer",
+        createdAt: new Date("2024-01-05T00:00:00.000Z"),
+      };
       prisma.ticket.findMany.mockResolvedValue([newer, older]);
 
       const result = await service.listTickets({ sortDir: "desc" });
@@ -379,6 +403,7 @@ describe("TicketsService", () => {
           priority: "MEDIUM",
           status: "OPEN",
           customerId: "customer-1",
+          customerName: null,
           contactId: null,
           departmentId: null,
           assignedToUserId: null,
@@ -506,8 +531,120 @@ describe("TicketsService", () => {
       await expect(service.getTicket("missing-id")).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.ticket.findFirst).toHaveBeenCalledWith({
         where: { id: "missing-id", branchId: "branch-1" },
-        include: { category: { select: { name: true } } },
+        include: {
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
       });
+    });
+  });
+
+  // Story S-8d — filters that let the dashboard and customer-detail screens
+  // ask the server the question they used to answer client-side.
+  describe("listTickets filters (Story S-8d)", () => {
+    it("narrows to one customer's tickets when customerId is given", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ customerId: "customer-7" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { branchId: "branch-1", customerId: "customer-7" },
+        }),
+      );
+    });
+
+    it("narrows to unclaimed tickets when unassigned=true", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ unassigned: "true" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { branchId: "branch-1", assignedToUserId: null },
+        }),
+      );
+    });
+
+    it("narrows to claimed tickets when unassigned=false", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ unassigned: "false" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { branchId: "branch-1", assignedToUserId: { not: null } },
+        }),
+      );
+    });
+
+    it("omits both filters entirely when neither is supplied", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({});
+
+      // Absent must mean "no constraint", not "match null" — otherwise the
+      // plain ticket list would silently show only unassigned tickets.
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1" } }),
+      );
+    });
+
+    it("composes customerId with the existing status filter rather than replacing it", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ customerId: "customer-7", status: "OPEN" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { branchId: "branch-1", status: "OPEN", customerId: "customer-7" },
+        }),
+      );
+    });
+
+    it("composes unassigned with department scoping instead of overriding it", async () => {
+      tenantContext.roles = ["DeptOnly"];
+      tenantContext.departmentId = "dept-1";
+      prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ unassigned: "true" });
+
+      // A department-scoped agent asking for unclaimed work must not thereby
+      // see unclaimed work outside their own department.
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            branchId: "branch-1",
+            assignedToUserId: null,
+            OR: [{ departmentId: "dept-1" }, { departmentId: null }],
+          },
+        }),
+      );
+    });
+
+    it("returns the customer's display name on each summary", async () => {
+      prisma.ticket.findMany.mockResolvedValue([
+        {
+          id: "ticket-1",
+          branchId: "branch-1",
+          customerId: "customer-7",
+          subject: "Cannot log in",
+          status: "OPEN",
+          priority: "MEDIUM",
+          categoryId: null,
+          category: null,
+          customer: { displayName: "Acme Corp" },
+          departmentId: null,
+          assignedToUserId: null,
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
+
+      const result = await service.listTickets({});
+
+      expect(result[0]!.customerName).toBe("Acme Corp");
     });
   });
 
@@ -576,7 +713,10 @@ describe("TicketsService", () => {
           branchId: "branch-1",
           OR: [{ departmentId: "dept-1" }, { departmentId: null }],
         },
-        include: { category: { select: { name: true } } },
+        include: {
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
       });
     });
 
@@ -642,7 +782,12 @@ describe("TicketsService", () => {
     });
 
     it("throws NotFoundException when moving to a department outside the caller's branch, before updating or emitting", async () => {
-      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", categoryId: null, priority: "MEDIUM", departmentId: null });
+      prisma.ticket.findFirst.mockResolvedValue({
+        id: "ticket-1",
+        categoryId: null,
+        priority: "MEDIUM",
+        departmentId: null,
+      });
       prisma.department.findFirst.mockResolvedValue(null);
 
       await expect(
@@ -699,9 +844,9 @@ describe("TicketsService", () => {
         assignedToUserId: null,
       });
 
-      await expect(
-        service.updateTicket("ticket-1", { departmentId: "dept-1" }),
-      ).resolves.toEqual({ id: "ticket-1" });
+      await expect(service.updateTicket("ticket-1", { departmentId: "dept-1" })).resolves.toEqual({
+        id: "ticket-1",
+      });
       expect(prisma.ticket.update).toHaveBeenCalledOnce();
     });
 
@@ -725,9 +870,9 @@ describe("TicketsService", () => {
         assignedToUserId: null,
       });
 
-      await expect(
-        service.updateTicket("ticket-1", { departmentId: "dept-2" }),
-      ).resolves.toEqual({ id: "ticket-1" });
+      await expect(service.updateTicket("ticket-1", { departmentId: "dept-2" })).resolves.toEqual({
+        id: "ticket-1",
+      });
       expect(prisma.role.findMany).not.toHaveBeenCalled();
     });
 
@@ -750,7 +895,10 @@ describe("TicketsService", () => {
       expect(prisma.ticket.update).toHaveBeenCalledWith({
         where: { id: "ticket-1" },
         data: { status: "IN_PROGRESS" },
-        include: { category: { select: { name: true } } },
+        include: {
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
       });
       expect(eventEmitter.emit).toHaveBeenCalledOnce();
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
@@ -930,7 +1078,10 @@ describe("TicketsService", () => {
         assignedToUserId: null,
       });
 
-      await service.updateTicket("ticket-1", { categoryId: "technical", priority: "URGENT" as never });
+      await service.updateTicket("ticket-1", {
+        categoryId: "technical",
+        priority: "URGENT" as never,
+      });
 
       expect(eventEmitter.emit).toHaveBeenCalledTimes(2);
       const recategorizedCalls = eventEmitter.emit.mock.calls.filter(
@@ -959,7 +1110,10 @@ describe("TicketsService", () => {
       expect(prisma.ticket.update).toHaveBeenCalledWith({
         where: { id: "ticket-1" },
         data: { assignedToUserId: "user-1" },
-        include: { category: { select: { name: true } } },
+        include: {
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
       });
       expect(eventEmitter.emit).toHaveBeenCalledOnce();
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_UPDATED_EVENT, {
@@ -1006,7 +1160,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "RESOLVED", resolvedAt: NOW },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
       });
 
@@ -1025,7 +1182,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "CLOSED", resolvedAt: NOW },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
       });
 
@@ -1044,7 +1204,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "IN_PROGRESS", resolvedAt: null },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
       });
 
@@ -1063,7 +1226,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "OPEN", resolvedAt: null },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
       });
 
@@ -1082,7 +1248,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "CLOSED" },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
       });
 
@@ -1101,7 +1270,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { status: "IN_PROGRESS" },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
       });
 
@@ -1120,7 +1292,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenCalledWith({
           where: { id: "ticket-1" },
           data: { subject: "New subject" },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
       });
 
@@ -1138,7 +1313,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenLastCalledWith({
           where: { id: "ticket-1" },
           data: { status: "RESOLVED", resolvedAt: NOW },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
 
         // Reopen.
@@ -1154,7 +1332,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenLastCalledWith({
           where: { id: "ticket-1" },
           data: { status: "OPEN", resolvedAt: null },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
 
         // Resolve again, later.
@@ -1172,7 +1353,10 @@ describe("TicketsService", () => {
         expect(prisma.ticket.update).toHaveBeenLastCalledWith({
           where: { id: "ticket-1" },
           data: { status: "RESOLVED", resolvedAt: LATER },
-          include: { category: { select: { name: true } } },
+          include: {
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
         });
       });
     });
@@ -1269,9 +1453,7 @@ describe("TicketsService", () => {
     it("throws NotFoundException for an unknown/out-of-scope ticket id", async () => {
       prisma.ticket.findFirst.mockResolvedValue(null);
 
-      await expect(service.getTicketNotes("missing-id")).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(service.getTicketNotes("missing-id")).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.ticketNote.findMany).not.toHaveBeenCalled();
     });
 
@@ -1335,7 +1517,9 @@ describe("TicketsService", () => {
         createdAt: new Date("2026-01-01T00:00:00.000Z"),
       });
 
-      const result = await service.createTicketNote("ticket-1", { body: "Called the customer back." });
+      const result = await service.createTicketNote("ticket-1", {
+        body: "Called the customer back.",
+      });
 
       expect(prisma.ticketNote.create).toHaveBeenCalledWith({
         data: { ticketId: "ticket-1", authorUserId: "user-1", body: "Called the customer back." },
@@ -1399,7 +1583,10 @@ describe("TicketsService", () => {
           subject: "Cannot log in",
           categoryId: null,
         },
-        include: { category: { select: { name: true } } },
+        include: {
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
       });
       expect(prisma.ticketCategory.findFirst).not.toHaveBeenCalled();
       expect(result.customerId).toBe("customer-1");
@@ -1490,7 +1677,10 @@ describe("TicketsService", () => {
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: { customerId: "customer-1" },
         orderBy: { createdAt: "desc" },
-        include: { category: { select: { name: true } } },
+        include: {
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
       });
     });
 
@@ -1507,12 +1697,15 @@ describe("TicketsService", () => {
     it("throws NotFoundException for a ticket belonging to a different customer or unknown id", async () => {
       prisma.ticket.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getTicketForCustomer("ticket-1", "customer-1"),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.getTicketForCustomer("ticket-1", "customer-1")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
       expect(prisma.ticket.findFirst).toHaveBeenCalledWith({
         where: { id: "ticket-1", customerId: "customer-1" },
-        include: { category: { select: { name: true } } },
+        include: {
+          category: { select: { name: true } },
+          customer: { select: { displayName: true } },
+        },
       });
     });
   });
@@ -1584,15 +1777,17 @@ describe("TicketsService", () => {
     it.each(["RESOLVED", "CLOSED"])(
       "creates the feedback when the ticket is %s",
       async (status) => {
-        prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", customerId: "customer-1", status });
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          customerId: "customer-1",
+          status,
+        });
         prisma.ticketCsatResponse.create.mockResolvedValue({ id: "csat-1" });
 
-        const result = await service.submitCsatForCustomer(
-          "ticket-1",
-          "customer-1",
-          "contact-1",
-          { rating: 4, comment: "Good" },
-        );
+        const result = await service.submitCsatForCustomer("ticket-1", "customer-1", "contact-1", {
+          rating: 4,
+          comment: "Good",
+        });
 
         expect(prisma.ticketCsatResponse.create).toHaveBeenCalledWith({
           data: {
@@ -1658,9 +1853,9 @@ describe("TicketsService", () => {
     it("throws NotFoundException for a ticket belonging to a different customer or unknown id", async () => {
       prisma.ticket.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getCsatForCustomer("ticket-1", "customer-1"),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.getCsatForCustomer("ticket-1", "customer-1")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
       expect(prisma.ticketCsatResponse.findUnique).not.toHaveBeenCalled();
     });
 

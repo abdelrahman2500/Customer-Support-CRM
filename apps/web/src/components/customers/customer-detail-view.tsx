@@ -331,6 +331,12 @@ function AddContactForm({ customerId }: { customerId: string }) {
  * `AttachmentsCard` component `TicketDetailView` (Story 66) already built
  * — the same shared list-plus-upload-form shape, parametrized to
  * `{ type: "customer", id: customerId }`.
+ *
+ * Story S-8d — supersedes Story 27's client-side derivation of Related
+ * Tickets. The backend `customerId` filter Story 27 explicitly declined
+ * to add now exists, so this card asks for the customer's tickets
+ * directly. Same rendered result, minus the dependency on the whole
+ * ticket list being present in one response.
  */
 /**
  * Story 97 — Loading & Skeleton UX. Replaces the previous generic
@@ -370,10 +376,14 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const customerQuery = useCustomerQuery(customerId);
-  const ticketsQuery = useTicketsQuery({});
-  const relatedTickets = (ticketsQuery.data ?? []).filter(
-    (ticket) => ticket.customerId === customerId,
-  );
+  /**
+   * Story S-8d — asks the server for this customer's tickets instead of
+   * fetching the branch-wide list and filtering it here. The old shape
+   * returned the newest 500 tickets branch-wide, so a customer whose
+   * tickets fell outside that window appeared to have none at all.
+   */
+  const ticketsQuery = useTicketsQuery({ customerId });
+  const relatedTickets = ticketsQuery.data ?? [];
   const updateCustomerMutation = useUpdateCustomerMutation(customerId);
   const [displayNameDraft, setDisplayNameDraft] = useState<string | null>(null);
 

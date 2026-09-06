@@ -11,8 +11,14 @@ import { io } from "socket.io-client";
 import type { Socket } from "socket.io-client";
 import { AppModule } from "../src/app.module";
 import { RedisIoAdapter } from "../src/realtime/redis-io.adapter";
-import { TICKET_UPDATED_EVENT, TICKET_ESCALATED_EVENT } from "../src/modules/tickets/tickets.events";
-import type { TicketUpdatedEvent, TicketEscalatedEvent } from "../src/modules/tickets/tickets.events";
+import {
+  TICKET_UPDATED_EVENT,
+  TICKET_ESCALATED_EVENT,
+} from "../src/modules/tickets/tickets.events";
+import type {
+  TicketUpdatedEvent,
+  TicketEscalatedEvent,
+} from "../src/modules/tickets/tickets.events";
 import { CHANNEL_MESSAGE_CREATED_EVENT } from "../src/modules/channels/channel-messages.events";
 import type { ChannelMessageCreatedEvent } from "../src/modules/channels/channel-messages.events";
 
@@ -105,7 +111,10 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
 
   function waitForDisconnect(client: Socket, timeoutMs = 5000): Promise<void> {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("timed out waiting for disconnect")), timeoutMs);
+      const timer = setTimeout(
+        () => reject(new Error("timed out waiting for disconnect")),
+        timeoutMs,
+      );
       client.once("disconnect", () => {
         clearTimeout(timer);
         resolve();
@@ -203,6 +212,7 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
         priority: "MEDIUM",
         status: "OPEN",
         customerId: ticket.customerId,
+        customerName: null,
         contactId: null,
         departmentId: null,
         assignedToUserId: null,
@@ -316,64 +326,61 @@ describe("Realtime / Socket.IO Foundation (e2e)", () => {
     });
   });
 
-  it(
-    "fans a relayed event out across two app instances via the Redis adapter",
-    async () => {
-      // A second, independent AppModule instance, its own gateway, its own
-      // RedisIoAdapter — connected to the SAME real Redis as `app`. Follows
-      // `sla-timers-producer.e2e-spec.ts`'s own two-real-instance-against-
-      // real-Redis shape.
-      const moduleRefB = await Test.createTestingModule({ imports: [AppModule] }).compile();
-      const appB = moduleRefB.createNestApplication();
-      const eventEmitterB = moduleRefB.get(EventEmitter2);
-      const redisIoAdapterB = new RedisIoAdapter(appB);
-      await redisIoAdapterB.connectToRedis();
-      appB.useWebSocketAdapter(redisIoAdapterB);
-      await appB.init();
-      await appB.listen(0);
+  it("fans a relayed event out across two app instances via the Redis adapter", async () => {
+    // A second, independent AppModule instance, its own gateway, its own
+    // RedisIoAdapter — connected to the SAME real Redis as `app`. Follows
+    // `sla-timers-producer.e2e-spec.ts`'s own two-real-instance-against-
+    // real-Redis shape.
+    const moduleRefB = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const appB = moduleRefB.createNestApplication();
+    const eventEmitterB = moduleRefB.get(EventEmitter2);
+    const redisIoAdapterB = new RedisIoAdapter(appB);
+    await redisIoAdapterB.connectToRedis();
+    appB.useWebSocketAdapter(redisIoAdapterB);
+    await appB.init();
+    await appB.listen(0);
 
-      try {
-        const ticket = await createTicket();
+    try {
+      const ticket = await createTicket();
 
-        // Client connects to instance A only (this suite's own `app`).
-        const clientA = connect(adminAccessToken);
-        await waitForConnect(clientA);
-        await join(clientA, `ticket:${ticket.id}`);
+      // Client connects to instance A only (this suite's own `app`).
+      const clientA = connect(adminAccessToken);
+      await waitForConnect(clientA);
+      await join(clientA, `ticket:${ticket.id}`);
 
-        const received = waitForEvent<TicketUpdatedEvent>(clientA, TICKET_UPDATED_EVENT);
+      const received = waitForEvent<TicketUpdatedEvent>(clientA, TICKET_UPDATED_EVENT);
 
-        // Emitted on instance B's own EventEmitter2 — instance A's socket
-        // only receives this if the Redis adapter is actually fanning
-        // events out across instances, not merely broadcasting within
-        // instance B's own in-memory Socket.IO rooms (which have no
-        // connected sockets at all).
-        eventEmitterB.emit(TICKET_UPDATED_EVENT, {
-          ticket: {
-            id: ticket.id,
-            subject: "cross-instance relay",
-            categoryId: null,
-            categoryName: null,
-            priority: "MEDIUM",
-            status: "OPEN",
-            customerId: ticket.customerId,
-            contactId: null,
-            departmentId: null,
-            assignedToUserId: null,
-            createdAt: new Date("2024-01-01T00:00:00.000Z"),
-            updatedAt: new Date("2024-01-01T00:00:00.000Z"),
-          },
-          actorUserId: null,
-        } satisfies TicketUpdatedEvent);
+      // Emitted on instance B's own EventEmitter2 — instance A's socket
+      // only receives this if the Redis adapter is actually fanning
+      // events out across instances, not merely broadcasting within
+      // instance B's own in-memory Socket.IO rooms (which have no
+      // connected sockets at all).
+      eventEmitterB.emit(TICKET_UPDATED_EVENT, {
+        ticket: {
+          id: ticket.id,
+          subject: "cross-instance relay",
+          categoryId: null,
+          categoryName: null,
+          priority: "MEDIUM",
+          status: "OPEN",
+          customerId: ticket.customerId,
+          customerName: null,
+          contactId: null,
+          departmentId: null,
+          assignedToUserId: null,
+          createdAt: new Date("2024-01-01T00:00:00.000Z"),
+          updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+        },
+        actorUserId: null,
+      } satisfies TicketUpdatedEvent);
 
-        const payload = await received;
-        expect(payload.ticket.id).toBe(ticket.id);
-        expect(payload.ticket.subject).toBe("cross-instance relay");
-      } finally {
-        await appB.close();
-      }
-    },
-    20_000,
-  );
+      const payload = await received;
+      expect(payload.ticket.id).toBe(ticket.id);
+      expect(payload.ticket.subject).toBe("cross-instance relay");
+    } finally {
+      await appB.close();
+    }
+  }, 20_000);
 
   // ---------------------------------------------------------------------
   // Story 77 — Customer Portal Live Chat. Decided V1 scope: authenticated

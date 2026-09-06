@@ -42,6 +42,37 @@ export class ListTicketsQueryDto {
   @IsUUID()
   assignedToUserId?: string;
 
+  /**
+   * Story S-8d — narrow to one customer's tickets server-side.
+   *
+   * `CustomerDetailView` previously fetched the branch-wide list and
+   * filtered it in the browser, which meant a customer whose tickets fell
+   * outside the capped window appeared to have none. Asking the server the
+   * question the screen actually has fixes that, and is what lets
+   * `GET /tickets` be paginated without the screen breaking further.
+   */
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  customerId?: string;
+
+  /**
+   * Story S-8d — tickets with no assignee.
+   *
+   * A separate flag rather than `assignedToUserId=null`, because that
+   * field is a `@IsUUID()` equality filter and a query string cannot carry
+   * a real null. Same validated-string-literal shape
+   * `ListCustomersQueryDto.isActive` already uses for the same reason.
+   *
+   * The dashboard's "unclaimed" panel used to filter client-side over the
+   * newest 500 tickets, so an *older* unclaimed ticket — precisely the one
+   * most needing attention — could never appear.
+   */
+  @ApiProperty({ required: false, enum: ["true", "false"] })
+  @IsOptional()
+  @IsIn(["true", "false"])
+  unassigned?: "true" | "false";
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()

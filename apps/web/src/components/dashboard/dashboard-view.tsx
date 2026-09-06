@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useCustomersQuery, useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
+import { useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
 import type { TicketListItem } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
@@ -154,6 +154,14 @@ function UnclaimedTicketRow({
  * and cannot express "no assignee" as a query parameter, so this queue
  * lives here, using the same client-side-filtering pattern already
  * established, rather than inventing a new backend contract.
+ *
+ * Story S-8d — supersedes Story 29's client-side narrowing. "Unclaimed"
+ * is now asked of the server (`GET /tickets?unassigned=true`) instead of
+ * being filtered out of the branch-wide list, and the customer name
+ * arrives on the ticket rather than from a separate customer fetch. Story
+ * 28's own-tickets section is unchanged. The Story 29 approach could not
+ * survive pagination — and was already lossy, since an unclaimed ticket
+ * outside the list's cap was invisible here.
  */
 export function DashboardView({ userId }: { userId: string }) {
   const t = useTranslations("dashboard");
@@ -161,16 +169,19 @@ export function DashboardView({ userId }: { userId: string }) {
   const { locale } = useParams<{ locale: string }>();
 
   const myTicketsQuery = useTicketsQuery({ assignedToUserId: userId });
-  const allTicketsQuery = useTicketsQuery({});
-  const customersQuery = useCustomersQuery();
-
-  const customerNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const customer of customersQuery.data ?? []) {
-      map.set(customer.id, customer.displayName);
-    }
-    return map;
-  }, [customersQuery.data]);
+  /**
+   * Story S-8d — asks the server for unclaimed tickets instead of fetching
+   * the branch-wide list and filtering it here.
+   *
+   * The old `useTicketsQuery({})` returned the newest 500 tickets and this
+   * screen then picked the unassigned ones out of them, so an unclaimed
+   * ticket older than that window could never appear — and the oldest
+   * unclaimed ticket is exactly the one most needing attention. Asking the
+   * question server-side fixes that outright, and it is what lets
+   * `GET /tickets` be paginated without this panel silently narrowing
+   * further.
+   */
+  const unclaimedTicketsQuery = useTicketsQuery({ unassigned: "true" });
 
   // `now` is computed once per fetched result, alongside the filter/sort
   // that depends on it, so the ordering and the on-screen remaining-time
@@ -187,14 +198,15 @@ export function DashboardView({ userId }: { userId: string }) {
 
   const { unclaimedTickets, now: unclaimedNow } = useMemo(() => {
     const now = new Date();
+    // `assignedToUserId === null` is the server's job now; the open-status
+    // filter stays here because `OPEN_STATUSES` is this screen's own
+    // definition of "still needs work" (Story 28), not an API concept.
     const unclaimedTickets = sortByUrgency(
-      (allTicketsQuery.data ?? []).filter(
-        (ticket) => ticket.assignedToUserId === null && OPEN_STATUSES.has(ticket.status),
-      ),
+      (unclaimedTicketsQuery.data ?? []).filter((ticket) => OPEN_STATUSES.has(ticket.status)),
       now,
     );
     return { unclaimedTickets, now };
-  }, [allTicketsQuery.data]);
+  }, [unclaimedTicketsQuery.data]);
 
   return (
     <section className="flex flex-col gap-4">
@@ -256,7 +268,8 @@ export function DashboardView({ userId }: { userId: string }) {
                     className="focus-ring w-fit rounded-sm text-xs text-ink-subtle hover:underline"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    {customerNameById.get(ticket.customerId) ?? ticket.customerId}
+                    {/* Story S-8d — resolved by the API. */}
+                    {ticket.customerName ?? ticket.customerId}
                   </Link>
                 </span>
                 <span className="flex items-center gap-2">
@@ -275,7 +288,7 @@ export function DashboardView({ userId }: { userId: string }) {
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("unassignedHeading")}</h2>
 
-        {allTicketsQuery.isLoading && (
+        {unclaimedTicketsQuery.isLoading && (
           <div className="mt-2 flex flex-col gap-2">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
@@ -283,28 +296,28 @@ export function DashboardView({ userId }: { userId: string }) {
           </div>
         )}
 
-        {allTicketsQuery.isError && (
+        {unclaimedTicketsQuery.isError && (
           <Alert variant="destructive" className="mt-2 flex items-center justify-between">
             <span>{t("unassignedError")}</span>
-            <Button variant="outline" size="sm" onClick={() => allTicketsQuery.refetch()}>
+            <Button variant="outline" size="sm" onClick={() => unclaimedTicketsQuery.refetch()}>
               {t("retry")}
             </Button>
           </Alert>
         )}
 
-        {allTicketsQuery.isSuccess && unclaimedTickets.length === 0 && (
+        {unclaimedTicketsQuery.isSuccess && unclaimedTickets.length === 0 && (
           <p className="mt-2 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
             {t("unassignedEmpty")}
           </p>
         )}
 
-        {allTicketsQuery.isSuccess && unclaimedTickets.length > 0 && (
+        {unclaimedTicketsQuery.isSuccess && unclaimedTickets.length > 0 && (
           <ul className="mt-2 flex flex-col gap-2 text-sm">
             {unclaimedTickets.map((ticket) => (
               <UnclaimedTicketRow
                 key={ticket.id}
                 ticket={ticket}
-                customerName={customerNameById.get(ticket.customerId) ?? ticket.customerId}
+                customerName={ticket.customerName ?? ticket.customerId}
                 now={unclaimedNow}
                 currentUserId={userId}
               />

@@ -38,6 +38,7 @@ const ticket: TicketSummary = {
   priority: "MEDIUM",
   status: "OPEN",
   customerId: "customer-1",
+  customerName: null,
   contactId: null,
   departmentId: null,
   assignedToUserId: null,
@@ -176,7 +177,9 @@ describe("SlaTargetListener", () => {
       await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
 
       expect(prisma.slaTicketTarget.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ slaPolicyId: "policy-earlier" }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ slaPolicyId: "policy-earlier" }),
+        }),
       );
     });
 

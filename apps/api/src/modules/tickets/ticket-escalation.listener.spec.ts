@@ -101,6 +101,7 @@ describe("TicketEscalationListener", () => {
           priority: "MEDIUM",
           status: "OPEN",
           customerId: "customer-1",
+          customerName: null,
           contactId: null,
           departmentId: null,
           assignedToUserId: null,

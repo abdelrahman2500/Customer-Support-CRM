@@ -11,8 +11,14 @@ import { io } from "socket.io-client";
 import type { Socket } from "socket.io-client";
 import { AppModule } from "../src/app.module";
 import { RedisIoAdapter } from "../src/realtime/redis-io.adapter";
-import { SLA_AT_RISK_EVENT, SLA_BREACHED_EVENT } from "../src/modules/sla-policies/sla-detection.events";
-import type { SlaAtRiskEvent, SlaBreachedEvent } from "../src/modules/sla-policies/sla-detection.events";
+import {
+  SLA_AT_RISK_EVENT,
+  SLA_BREACHED_EVENT,
+} from "../src/modules/sla-policies/sla-detection.events";
+import type {
+  SlaAtRiskEvent,
+  SlaBreachedEvent,
+} from "../src/modules/sla-policies/sla-detection.events";
 import { TICKET_ESCALATED_EVENT } from "../src/modules/tickets/tickets.events";
 import type { TicketEscalatedEvent } from "../src/modules/tickets/tickets.events";
 
@@ -214,6 +220,7 @@ describe("In-App Notification Delivery (e2e)", () => {
         priority: "MEDIUM",
         status: "OPEN",
         customerId: ticket.customerId,
+        customerName: null,
         contactId: null,
         departmentId: null,
         assignedToUserId: null,

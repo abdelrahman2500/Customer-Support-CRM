@@ -94,6 +94,59 @@ describe("CustomersService", () => {
     });
   });
 
+  describe("listCustomerOptions", () => {
+    it("scopes to the caller's branch and returns only id + displayName", async () => {
+      prisma.customer.findMany.mockResolvedValue([
+        { id: "customer-2", displayName: "Acme Corp" },
+        { id: "customer-1", displayName: "Zenith Ltd" },
+      ]);
+
+      const result = await service.listCustomerOptions();
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.customer.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1" },
+        select: { id: true, displayName: true },
+        orderBy: [{ displayName: "asc" }, { id: "asc" }],
+      });
+      expect(result).toEqual([
+        { id: "customer-2", displayName: "Acme Corp" },
+        { id: "customer-1", displayName: "Zenith Ltd" },
+      ]);
+    });
+
+    it("takes no page/pageSize: a picker has to be able to offer every option", async () => {
+      prisma.customer.findMany.mockResolvedValue([]);
+
+      await service.listCustomerOptions();
+
+      // Story S-8d — the whole reason this endpoint exists separately from
+      // `GET /customers`. If it ever grew `skip`/`take`, customers past
+      // the first page would become unselectable when creating a ticket.
+      const args = prisma.customer.findMany.mock.calls[0]![0];
+      expect(args).not.toHaveProperty("skip");
+      expect(args).not.toHaveProperty("take");
+    });
+
+    it("does not filter out inactive customers", async () => {
+      prisma.customer.findMany.mockResolvedValue([]);
+
+      await service.listCustomerOptions();
+
+      // Matches what the picker showed before this endpoint existed, so no
+      // existing ticket-creation flow loses an option it used to have.
+      expect(prisma.customer.findMany.mock.calls[0]![0].where).toEqual({ branchId: "branch-1" });
+    });
+
+    it("refuses to run without an active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, tenantContext);
+
+      await expect(service.listCustomerOptions()).rejects.toThrow(/no active branch/);
+      expect(prisma.customer.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe("listCustomers", () => {
     it("scopes the query to the caller's active branch", async () => {
       // Story 106 — fetched `desc`, then reversed for the default `asc`.
@@ -203,9 +256,7 @@ describe("CustomersService", () => {
 
       await service.listCustomers({ isActive: "true" });
 
-      expect(prisma.customer.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 500 }),
-      );
+      expect(prisma.customer.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 500 }));
     });
   });
 
@@ -382,9 +433,9 @@ describe("CustomersService", () => {
     it("throws NotFoundException for an unknown branch id", async () => {
       prisma.branch.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOrCreateContactForWebForm("missing-branch", input)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.findOrCreateContactForWebForm("missing-branch", input),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.branch.findFirst).toHaveBeenCalledWith({
         where: { id: "missing-branch", isActive: true },
       });
@@ -460,7 +511,10 @@ describe("CustomersService", () => {
       prisma.branch.findFirst.mockResolvedValue({ id: "branch-2", isActive: true });
       prisma.contact.findFirst.mockResolvedValue(null);
       prisma.customer.create.mockResolvedValue({ id: "customer-branch-2", branchId: "branch-2" });
-      prisma.contact.create.mockResolvedValue({ id: "contact-branch-2", customerId: "customer-branch-2" });
+      prisma.contact.create.mockResolvedValue({
+        id: "contact-branch-2",
+        customerId: "customer-branch-2",
+      });
 
       const result = await service.findOrCreateContactForWebForm("branch-2", input);
 

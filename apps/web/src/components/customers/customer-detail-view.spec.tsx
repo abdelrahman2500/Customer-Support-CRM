@@ -200,7 +200,7 @@ describe("CustomerDetailView", () => {
       expect(screen.getByText("detail.ticketsEmpty")).toBeInTheDocument();
     });
 
-    it("lists only tickets whose customerId matches this customer, filtered client-side", () => {
+    it("asks the server for this customer's tickets, rather than filtering a branch-wide list", () => {
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
@@ -213,22 +213,21 @@ describe("CustomerDetailView", () => {
               customerId: "customer-1",
               createdAt: "2026-01-01T00:00:00.000Z",
             },
-            {
-              id: "ticket-2",
-              subject: "Unrelated ticket",
-              status: "OPEN",
-              priority: "LOW",
-              customerId: "customer-other",
-              createdAt: "2026-01-02T00:00:00.000Z",
-            },
           ],
         }) as never,
       );
 
       render(<CustomerDetailView customerId="customer-1" />);
 
+      /**
+       * Story S-8d — the screen used to fetch the branch-wide list and keep
+       * the rows whose `customerId` matched, which meant a customer whose
+       * tickets fell outside the capped window appeared to have none. The
+       * filter is the server's job now, so what matters is that the request
+       * carries it - and that the returned rows are rendered as given.
+       */
+      expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith({ customerId: "customer-1" });
       expect(screen.getByText("Cannot log in")).toBeInTheDocument();
-      expect(screen.queryByText("Unrelated ticket")).not.toBeInTheDocument();
     });
 
     // Story 98 — Design System & Visual Polish.

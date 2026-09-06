@@ -218,24 +218,132 @@ describe("Ticketing (e2e)", () => {
     expect(ticket.slaTarget).toBeNull();
   });
 
+  // Story S-8d — the two filters that let the dashboard and customer-detail
+  // screens stop fetching the whole branch list and narrowing it in the
+  // browser.
+  describe("customerId / unassigned filters (Story S-8d)", () => {
+    it("returns every listed ticket with its customer display name resolved", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const ticket = response.body.find((entry: { id: string }) => entry.id === ticketId);
+      expect(ticket).toBeDefined();
+      expect(typeof ticket.customerName).toBe("string");
+      expect(ticket.customerName.length).toBeGreaterThan(0);
+    });
+
+    it("narrows the list to a single customer", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ customerId })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.length).toBeGreaterThan(0);
+      for (const ticket of response.body) {
+        expect(ticket.customerId).toBe(customerId);
+      }
+      expect(response.body.map((t: { id: string }) => t.id)).toContain(ticketId);
+    });
+
+    it("returns an empty list for a customer with no tickets", async () => {
+      const emptyCustomer = await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName: `No Tickets Fixture ${randomUUID()}` })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ customerId: emptyCustomer.body.id })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+
+    it("returns only unclaimed tickets for unassigned=true", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ unassigned: "true" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      for (const ticket of response.body) {
+        expect(ticket.assignedToUserId).toBeNull();
+      }
+    });
+
+    it("returns only claimed tickets for unassigned=false", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ unassigned: "false" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      for (const ticket of response.body) {
+        expect(ticket.assignedToUserId).not.toBeNull();
+      }
+    });
+
+    it("partitions the list: unassigned=true and =false together cover it exactly", async () => {
+      const all = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const unclaimed = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ unassigned: "true" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const claimed = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ unassigned: "false" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      // Catches the filter being dropped (either side equalling the whole
+      // list) or inverted, without depending on absolute fixture counts.
+      expect(unclaimed.body.length + claimed.body.length).toBe(all.body.length);
+    });
+
+    it("rejects a non-boolean unassigned value with 400", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ unassigned: "maybe" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(400);
+    });
+
+    it("composes customerId with an existing filter rather than replacing it", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ customerId, status: "OPEN" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      for (const ticket of response.body) {
+        expect(ticket.customerId).toBe(customerId);
+        expect(ticket.status).toBe("OPEN");
+      }
+    });
+  });
   it("filters the ticket list by status, priority, category, and assignedToUserId", async () => {
     const byStatus = await request(app.getHttpServer())
       .get("/api/v1/tickets")
       .query({ status: "OPEN" })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    expect(
-      byStatus.body.every((entry: { status: string }) => entry.status === "OPEN"),
-    ).toBe(true);
+    expect(byStatus.body.every((entry: { status: string }) => entry.status === "OPEN")).toBe(true);
 
     const byUnrelatedStatus = await request(app.getHttpServer())
       .get("/api/v1/tickets")
       .query({ status: "CLOSED" })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    expect(
-      byUnrelatedStatus.body.map((entry: { id: string }) => entry.id),
-    ).not.toContain(ticketId);
+    expect(byUnrelatedStatus.body.map((entry: { id: string }) => entry.id)).not.toContain(ticketId);
   });
 
   it("rejects an invalid status filter value with a validation error", async () => {
@@ -433,17 +541,13 @@ describe("Ticketing (e2e)", () => {
     expect(history).toHaveLength(3);
     expect(history[0]?.eventType).toBe("ticket.created");
 
-    const updatedEntry = history.find(
-      (entry) => entry.eventType === "ticket.updated",
-    );
+    const updatedEntry = history.find((entry) => entry.eventType === "ticket.updated");
     expect(updatedEntry).toBeDefined();
     expect(updatedEntry?.actorUserId).toBe(adminUserId);
     expect(updatedEntry?.snapshot.status).toBe("IN_PROGRESS");
     expect(updatedEntry?.snapshot.priority).toBe("HIGH");
 
-    const recategorizedEntry = history.find(
-      (entry) => entry.eventType === "ticket.recategorized",
-    );
+    const recategorizedEntry = history.find((entry) => entry.eventType === "ticket.recategorized");
     expect(recategorizedEntry).toBeDefined();
     expect(recategorizedEntry?.actorUserId).toBe(adminUserId);
     expect(recategorizedEntry?.snapshot.priority).toBe("HIGH");
@@ -1093,7 +1197,9 @@ describe("Ticketing (e2e)", () => {
         .expect(201);
 
       const waitingJobs = await queue.getJobs(["waiting", "active", "completed"]);
-      const job = waitingJobs.find((candidate) => candidate.data.aiPromptLogId === response.body.id);
+      const job = waitingJobs.find(
+        (candidate) => candidate.data.aiPromptLogId === response.body.id,
+      );
       expect(job).toBeDefined();
       expect(job?.data).toMatchObject({
         aiPromptLogId: response.body.id,

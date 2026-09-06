@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -18,6 +23,18 @@ const BCRYPT_ROUNDS = 12;
  * database, a comparable operational scale to `Ticket`), so the same
  * fixed cap applies at the same size. */
 const MAX_CUSTOMER_ROWS = 500;
+
+/**
+ * Story S-8d — the shape a picker needs, and nothing else.
+ *
+ * Deliberately not `CustomerSummary`: a `<Select>` of customers needs an
+ * id and a label, so sending `isActive`/`createdAt` for every row would be
+ * payload the caller throws away.
+ */
+export interface CustomerOption {
+  id: string;
+  displayName: string;
+}
 
 export interface CustomerSummary {
   id: string;
@@ -84,6 +101,33 @@ export class CustomersService {
    * exceeds the cap, freeze there forever — reversing a `desc`-fetched,
    * capped array reproduces the exact `asc` list a direct query would
    * have returned whenever the true row count is at or under the cap. */
+  /**
+   * Story S-8d — a lookup for customer *pickers*, separate from the browsable
+   * list.
+   *
+   * `CreateTicketView`'s customer `<Select>` was populated from
+   * `GET /customers`, which is about to be paginated: a page of 25 would
+   * make almost every customer unselectable, which is worse than the
+   * current 500-row cap rather than better. A picker and a browsable table
+   * are genuinely different reads — one needs *every* option to be
+   * choosable, the other needs to be bounded — so they get different
+   * endpoints instead of one compromise.
+   *
+   * Ordered by name because that is how a human scans a picker, unlike the
+   * list's recency ordering. Same branch scope as every other read here;
+   * inactive customers are included, matching what the picker showed
+   * before, so no existing ticket-creation flow changes.
+   */
+  async listCustomerOptions(): Promise<CustomerOption[]> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const customers = await this.prisma.customer.findMany({
+      where: { branchId },
+      select: { id: true, displayName: true },
+      orderBy: [{ displayName: "asc" }, { id: "asc" }],
+    });
+    return customers;
+  }
+
   async listCustomers(query: ListCustomersQueryDto = {}): Promise<CustomerSummary[]> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const sortBy = query.sortBy ?? "createdAt";
@@ -91,9 +135,7 @@ export class CustomersService {
     const customers = await this.prisma.customer.findMany({
       where: {
         branchId,
-        ...(query.search
-          ? { displayName: { contains: query.search, mode: "insensitive" } }
-          : {}),
+        ...(query.search ? { displayName: { contains: query.search, mode: "insensitive" } } : {}),
         ...(query.isActive !== undefined ? { isActive: query.isActive === "true" } : {}),
       },
       orderBy: { [sortBy]: "desc" },
@@ -255,7 +297,9 @@ export class CustomersService {
       throw new NotFoundException("Contact not found");
     }
     if (!existing.email) {
-      throw new BadRequestException("This contact has no email on file — portal login requires one");
+      throw new BadRequestException(
+        "This contact has no email on file — portal login requires one",
+      );
     }
 
     const duplicate = await this.prisma.contact.findFirst({

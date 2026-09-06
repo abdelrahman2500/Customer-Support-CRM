@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@prisma/client";
 import type { TicketPriority, TicketStatus } from "@prisma/client";
@@ -58,6 +63,19 @@ export interface TicketSummary {
   priority: TicketPriority;
   status: TicketStatus;
   customerId: string;
+  /**
+   * Story S-8d — the customer's display name, resolved through the
+   * `customer` relation exactly as `categoryName` is (never denormalized
+   * onto `Ticket`).
+   *
+   * Before this, every screen showing a ticket resolved the name itself by
+   * fetching the *entire* customer list and building an id -> name map
+   * client-side. That was already wrong — `GET /customers` was capped at
+   * 500, so a ticket belonging to an older customer rendered a raw UUID —
+   * and it is what blocked paginating `/customers` at all, since a page of
+   * 25 would have left almost every row unresolved.
+   */
+  customerName: string | null;
   contactId: string | null;
   departmentId: string | null;
   assignedToUserId: string | null;
@@ -68,7 +86,12 @@ export interface TicketSummary {
 /** Story 120 — spread into a Prisma `include` wherever a `Ticket` row is
  * turned into a `TicketSummary`, so `categoryName` is always resolved via
  * the relation, never denormalized. */
-const CATEGORY_NAME_INCLUDE = { category: { select: { name: true } } } as const;
+const CATEGORY_NAME_INCLUDE = {
+  category: { select: { name: true } },
+  // Story S-8d — joined for the same reason and in the same place, so a
+  // caller cannot resolve one name and forget the other.
+  customer: { select: { displayName: true } },
+} as const;
 
 /**
  * Story 23 — the same shape `SlaTargetsService.getSlaTargetForTicket`
@@ -221,8 +244,13 @@ export class TicketsService {
       ...(query.status !== undefined ? { status: query.status } : {}),
       ...(query.priority !== undefined ? { priority: query.priority } : {}),
       ...(query.categoryId !== undefined ? { categoryId: query.categoryId } : {}),
-      ...(query.assignedToUserId !== undefined
-        ? { assignedToUserId: query.assignedToUserId }
+      ...(query.assignedToUserId !== undefined ? { assignedToUserId: query.assignedToUserId } : {}),
+      ...(query.customerId !== undefined ? { customerId: query.customerId } : {}),
+      // Story S-8d — `unassigned=true` means "no assignee", `false` means
+      // "has one", so the flag never has to be combined with
+      // `assignedToUserId` to express either.
+      ...(query.unassigned !== undefined
+        ? { assignedToUserId: query.unassigned === "true" ? null : { not: null } }
         : {}),
     };
     // Story 105 — capping a `sortDir: "asc"` query as-written would fetch
@@ -311,9 +339,7 @@ export class TicketsService {
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.departmentId !== undefined ? { departmentId: dto.departmentId } : {}),
-        ...(dto.assignedToUserId !== undefined
-          ? { assignedToUserId: dto.assignedToUserId }
-          : {}),
+        ...(dto.assignedToUserId !== undefined ? { assignedToUserId: dto.assignedToUserId } : {}),
         ...(resolvedAtUpdate !== undefined ? { resolvedAt: resolvedAtUpdate } : {}),
       },
       include: CATEGORY_NAME_INCLUDE,
@@ -431,10 +457,7 @@ export class TicketsService {
       throw new NotFoundException("Contact not found");
     }
 
-    const categoryId = await this.resolveCategoryIdByName(
-      contact.customer.branchId,
-      dto.category,
-    );
+    const categoryId = await this.resolveCategoryIdByName(contact.customer.branchId, dto.category);
 
     const ticket = await this.prisma.ticket.create({
       data: {
@@ -531,10 +554,7 @@ export class TicketsService {
       });
       return { id: response.id };
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new ConflictException("Feedback has already been submitted for this ticket");
       }
       throw error;
@@ -674,9 +694,7 @@ export class TicketsService {
       return;
     }
     if (newDepartmentId !== this.tenantContext.departmentId) {
-      throw new BadRequestException(
-        "Your role can only assign tickets within your own department",
-      );
+      throw new BadRequestException("Your role can only assign tickets within your own department");
     }
   }
 
@@ -773,6 +791,10 @@ export function toTicketSummary(ticket: {
   priority: TicketPriority;
   status: TicketStatus;
   customerId: string;
+  /** Optional for the same reason `category` is: a bare `.update()` result
+   * used only for an event payload includes no relations, and
+   * `customerName` resolves to `null` there. */
+  customer?: { displayName: string } | null;
   contactId: string | null;
   departmentId: string | null;
   assignedToUserId: string | null;
@@ -787,6 +809,7 @@ export function toTicketSummary(ticket: {
     priority: ticket.priority,
     status: ticket.status,
     customerId: ticket.customerId,
+    customerName: ticket.customer?.displayName ?? null,
     contactId: ticket.contactId,
     departmentId: ticket.departmentId,
     assignedToUserId: ticket.assignedToUserId,

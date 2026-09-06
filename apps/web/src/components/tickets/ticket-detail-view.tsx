@@ -7,7 +7,6 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useCreateTicketNoteMutation,
-  useCustomersQuery,
   useDepartmentsQuery,
   useTicketCsatQuery,
   useTicketEscalationsQuery,
@@ -69,7 +68,8 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * loading/error/empty/populated shape as History/Escalations) and an inline
  * add-note form using `useCreateTicketNoteMutation`. Author names are
  * resolved via a `userNameById` memo built from the already-fetched
- * `useUsersQuery()` data, mirroring `customerNameById`'s exact shape.
+ * `useUsersQuery()` data. (It used to mirror a `customerNameById` memo
+ * of the same shape; Story S-8d removed that one — see below.)
  *
  * Story 55 — a new, read-only "Customer Satisfaction" card, appended after
  * History, reading `GET /tickets/:id/csat` via `useTicketCsatQuery`. An
@@ -108,6 +108,10 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * Categories screen instead of silently failing or auto-creating one (see
  * `TicketCategoriesService`'s own doc comment for why creation stays a
  * deliberate, separate action).
+ *
+ * Story S-8d — the customer name arrives on the ticket itself instead of
+ * being looked up in a map built from the whole customer list, so this
+ * screen no longer fetches that list at all.
  */
 /**
  * Story 97 — Loading & Skeleton UX. Replaces the previous generic
@@ -161,7 +165,6 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const slaTargetQuery = useTicketSlaTargetQuery(ticketId);
   const escalationsQuery = useTicketEscalationsQuery(ticketId);
   const notesQuery = useTicketNotesQuery(ticketId);
-  const customersQuery = useCustomersQuery();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
   const categoriesQuery = useTicketCategoriesQuery();
@@ -170,14 +173,6 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
   const [subjectDraft, setSubjectDraft] = useState<string | null>(null);
   const [aiCategoryNoMatch, setAiCategoryNoMatch] = useState<string | null>(null);
-
-  const customerNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const customer of customersQuery.data ?? []) {
-      map.set(customer.id, customer.displayName);
-    }
-    return map;
-  }, [customersQuery.data]);
 
   const userNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -225,7 +220,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             href={`/${locale}/customers/${ticket.customerId}`}
             className="focus-ring rounded-sm hover:underline"
           >
-            {customerNameById.get(ticket.customerId) ?? ticket.customerId}
+            {/* Story S-8d — resolved by the API. */}
+            {ticket.customerName ?? ticket.customerId}
           </Link>
         </p>
       </div>

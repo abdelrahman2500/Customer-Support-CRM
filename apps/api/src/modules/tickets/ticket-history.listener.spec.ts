@@ -29,6 +29,7 @@ const ticket: TicketSummary = {
   priority: "MEDIUM",
   status: "OPEN",
   customerId: "customer-1",
+  customerName: null,
   contactId: null,
   departmentId: null,
   assignedToUserId: null,
@@ -63,7 +64,9 @@ describe("TicketHistoryListener", () => {
     it("does not throw when persistence fails — it catches and logs instead", async () => {
       prisma.ticketHistoryEntry.create.mockRejectedValue(new Error("db unavailable"));
 
-      await expect(listener.onTicketCreated({ ticket, actorUserId: "user-1" })).resolves.toBeUndefined();
+      await expect(
+        listener.onTicketCreated({ ticket, actorUserId: "user-1" }),
+      ).resolves.toBeUndefined();
     });
   });
 
@@ -84,7 +87,9 @@ describe("TicketHistoryListener", () => {
     it("does not throw when persistence fails — it catches and logs instead", async () => {
       prisma.ticketHistoryEntry.create.mockRejectedValue(new Error("db unavailable"));
 
-      await expect(listener.onTicketUpdated({ ticket, actorUserId: "user-1" })).resolves.toBeUndefined();
+      await expect(
+        listener.onTicketUpdated({ ticket, actorUserId: "user-1" }),
+      ).resolves.toBeUndefined();
     });
   });
 

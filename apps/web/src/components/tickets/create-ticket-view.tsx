@@ -6,8 +6,8 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useCreateTicketMutation,
+  useCustomerOptionsQuery,
   useCustomerQuery,
-  useCustomersQuery,
   useDepartmentsQuery,
   useUsersQuery,
 } from "@/hooks/use-tickets";
@@ -49,6 +49,12 @@ const UNSET_CATEGORY = "__unset__";
  * exactly as `CreateUserView`/`TicketDetailView` already do. All three are
  * optional and, left untouched, produce the exact same payload this screen
  * has always sent.
+ *
+ * Story S-8d — the customer picker reads `GET /customers/options`, a
+ * lookup endpoint returning every customer as `{ id, displayName }`,
+ * instead of sharing the browsable `GET /customers` cache. A picker has
+ * to offer every option; a browsable list has to stay bounded. The
+ * `customerId` deep-link (Story 27) resolves against the same options.
  */
 export function CreateTicketView() {
   const t = useTranslations("tickets");
@@ -67,7 +73,10 @@ export function CreateTicketView() {
   const [assignedToUserId, setAssignedToUserId] = useState<string>(UNSET_ASSIGNEE);
   const [error, setError] = useState<string | null>(null);
 
-  const customersQuery = useCustomersQuery();
+  // Story S-8d — the picker reads the dedicated options lookup, not the
+  // browsable customer list: that list is paginated, so a <Select> built
+  // from it could only ever offer one page of customers.
+  const customersQuery = useCustomerOptionsQuery();
   const customerDetailQuery = useCustomerQuery(customerId);
   const departmentsQuery = useDepartmentsQuery();
   const usersQuery = useUsersQuery();

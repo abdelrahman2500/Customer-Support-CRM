@@ -6,6 +6,9 @@ import type { TenantContext } from "../../common/tenant/tenant-context";
 
 function buildPrismaMock() {
   return {
+    // Story S-8d — `listNotifications` resolves each page's ticket subjects
+    // and customer names with one bounded follow-up query.
+    ticket: { findMany: vi.fn().mockResolvedValue([]) },
     notificationLog: {
       findMany: vi.fn(),
       // Story S-8b — `paginate` issues this alongside `findMany`, so it
@@ -111,6 +114,8 @@ describe("NotificationsService", () => {
           id: "notif-1",
           eventType: "sla.at_risk",
           ticketId: "ticket-1",
+          ticketSubject: null,
+          customerName: null,
           branchId: "branch-1",
           targetType: "response",
           targetAt,
@@ -141,6 +146,8 @@ describe("NotificationsService", () => {
           id: "notif-2",
           eventType: "ticket.escalated",
           ticketId: "ticket-2",
+          ticketSubject: null,
+          customerName: null,
           branchId: "branch-1",
           targetType: null,
           targetAt: null,
@@ -176,6 +183,76 @@ describe("NotificationsService", () => {
      * there is, so the older half of a busy branch's feed is reachable
      * instead of silently ending.
      */
+    describe("resolved ticket/customer names (Story S-8d)", () => {
+      const row = (id: string, ticketId: string) => ({
+        id,
+        eventType: "ticket.escalated",
+        ticketId,
+        branchId: null,
+        targetType: null,
+        targetAt: null,
+        loggedAt: new Date("2026-06-01T10:00:00.000Z"),
+        ticket: { branchId: "branch-1" },
+      });
+
+      it("embeds the ticket subject and its customer name on each row", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([row("notif-1", "ticket-1")]);
+        prisma.ticket.findMany.mockResolvedValue([
+          { id: "ticket-1", subject: "Cannot log in", customer: { displayName: "Acme Corp" } },
+        ]);
+
+        const result = await service.listNotifications();
+
+        expect(result.items[0]!.ticketSubject).toBe("Cannot log in");
+        expect(result.items[0]!.customerName).toBe("Acme Corp");
+      });
+
+      it("asks for each distinct ticket once, however many notifications reference it", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([
+          row("notif-1", "ticket-1"),
+          row("notif-2", "ticket-1"),
+          row("notif-3", "ticket-2"),
+        ]);
+        prisma.ticket.findMany.mockResolvedValue([
+          { id: "ticket-1", subject: "First", customer: { displayName: "Acme Corp" } },
+          { id: "ticket-2", subject: "Second", customer: { displayName: "Zenith Ltd" } },
+        ]);
+
+        const result = await service.listNotifications();
+
+        // One bounded follow-up query for the page - not one per row.
+        expect(prisma.ticket.findMany).toHaveBeenCalledOnce();
+        expect(prisma.ticket.findMany).toHaveBeenCalledWith({
+          where: { id: { in: ["ticket-1", "ticket-2"] } },
+          select: { id: true, subject: true, customer: { select: { displayName: true } } },
+        });
+        expect(result.items.map((item) => item.ticketSubject)).toEqual([
+          "First",
+          "First",
+          "Second",
+        ]);
+      });
+
+      it("skips the follow-up query entirely for an empty page", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([]);
+
+        await service.listNotifications();
+
+        expect(prisma.ticket.findMany).not.toHaveBeenCalled();
+      });
+
+      it("falls back to null when the referenced ticket no longer exists", async () => {
+        prisma.notificationLog.findMany.mockResolvedValue([row("notif-1", "deleted-ticket")]);
+        prisma.ticket.findMany.mockResolvedValue([]);
+
+        const result = await service.listNotifications();
+
+        // The history screen renders the raw ticketId in this case rather
+        // than dropping the notification.
+        expect(result.items[0]!.ticketSubject).toBeNull();
+        expect(result.items[0]!.customerName).toBeNull();
+      });
+    });
     describe("pagination (Story S-8b)", () => {
       it("defaults to the first page at a page size of 25", async () => {
         prisma.notificationLog.findMany.mockResolvedValue([]);
@@ -318,6 +395,8 @@ describe("NotificationsService", () => {
           id: "notif-3",
           eventType: "ticket.updated",
           ticketId: "ticket-1",
+          ticketSubject: null,
+          customerName: null,
           branchId: null,
           targetType: null,
           targetAt: null,

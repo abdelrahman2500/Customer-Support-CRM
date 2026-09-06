@@ -238,6 +238,83 @@ describe("Notifications — read endpoint (e2e)", () => {
    * against a fixed row count, which is what keeps them stable when the
    * suite is run repeatedly against the same database.
    */
+  // Story S-8d — the history screen used to label these rows by fetching
+  // the whole ticket and customer lists and joining client-side, which
+  // pagination would have reduced to 25 rows of lookup for thousands of
+  // notifications. The names now come down with the notification.
+  describe("resolved ticket subject / customer name (Story S-8d)", () => {
+    it("returns the real subject and customer display name on a freshly-created notification", async () => {
+      const displayName = `S8d Resolution Customer ${randomUUID()}`;
+      const subject = `S8d resolution subject ${randomUUID()}`;
+
+      const customer = await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName })
+        .expect(201);
+      const ticket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId: customer.body.id, subject })
+        .expect(201);
+
+      const targetAt = new Date("2030-02-02T00:00:00.000Z");
+      eventEmitter.emit(SLA_AT_RISK_EVENT, {
+        ticketId: ticket.body.id,
+        branchId: adminBranchId,
+        targetType: "response",
+        targetAt,
+      });
+      await waitForNotificationLogRow(ticket.body.id, targetAt);
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/notifications")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const match = response.body.items.find(
+        (notification: { ticketId: string }) => notification.ticketId === ticket.body.id,
+      );
+      expect(match).toMatchObject({ ticketSubject: subject, customerName: displayName });
+    });
+
+    it("resolves both names on every row of a page, without a per-row fallback to the raw id", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/notifications")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items.length).toBeGreaterThan(0);
+      for (const notification of response.body.items) {
+        // Every notification is scoped through an existing ticket relation,
+        // so nothing on a page the caller can see should resolve to null.
+        expect(notification.ticketSubject).not.toBeNull();
+        expect(notification.customerName).not.toBeNull();
+      }
+    });
+
+    it("keeps resolving names on a deeper page, not just the first", async () => {
+      const first = await request(app.getHttpServer())
+        .get("/api/v1/notifications")
+        .query({ page: 1, pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      if (first.body.totalPages < 2) return;
+
+      const second = await request(app.getHttpServer())
+        .get("/api/v1/notifications")
+        .query({ page: 2, pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(second.body.items.length).toBeGreaterThan(0);
+      for (const notification of second.body.items) {
+        expect(typeof notification.ticketSubject).toBe("string");
+        expect(typeof notification.customerName).toBe("string");
+      }
+    });
+  });
   describe("pagination (Story S-8b)", () => {
     function get(query: Record<string, unknown> = {}) {
       return request(app.getHttpServer())

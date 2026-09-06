@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BranchNotificationRealtimeListener } from "./branch-notification-realtime.listener";
-import { SLA_AT_RISK_EVENT, SLA_BREACHED_EVENT } from "../modules/sla-policies/sla-detection.events";
+import {
+  SLA_AT_RISK_EVENT,
+  SLA_BREACHED_EVENT,
+} from "../modules/sla-policies/sla-detection.events";
 import { TICKET_ESCALATED_EVENT } from "../modules/tickets/tickets.events";
 import type { RealtimeGateway } from "./realtime.gateway";
 import type { PrismaService } from "../prisma/prisma.service";
@@ -47,6 +50,7 @@ const ticketSummary = {
   priority: "MEDIUM" as const,
   status: "OPEN" as const,
   customerId: "customer-1",
+  customerName: null,
   contactId: null,
   departmentId: null,
   assignedToUserId: null,
