@@ -319,7 +319,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
               disabled={assignmentMutation.isPending || rolesQuery.isLoading}
               onValueChange={(value) => assignmentMutation.mutate({ roleId: value })}
             >
-              <SelectTrigger className="min-w-[10rem]">
+              <SelectTrigger className="min-w-[10rem]" aria-label={t("list.roleLabel")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -349,7 +349,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
                 })
               }
             >
-              <SelectTrigger className="min-w-[10rem]">
+              <SelectTrigger className="min-w-[10rem]" aria-label={t("list.departmentLabel")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

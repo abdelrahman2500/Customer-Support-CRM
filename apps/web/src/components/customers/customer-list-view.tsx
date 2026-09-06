@@ -33,6 +33,22 @@ import {
 const ALL_VALUE = "__all__";
 
 /**
+ * A11Y-2 — the semantic counterpart to `SortIndicator`'s visual arrow.
+ * `SortIndicator`'s own doc comment notes `aria-sort` is "the caller's to
+ * set" since only the caller owns the `<th>`; this is that setter, mirrored
+ * in `TicketListView` for its own two sortable columns.
+ */
+function sortAriaValue(
+  filters: ListCustomersFilters,
+  column: NonNullable<ListCustomersFilters["sortBy"]>,
+): "ascending" | "descending" | "none" {
+  if (filters.sortBy !== column) {
+    return "none";
+  }
+  return filters.sortDir === "asc" ? "ascending" : "descending";
+}
+
+/**
  * Story 26 — Customer List. Mirrors `TicketListView`'s structure exactly.
  *
  * Story 101 — the filter bar (search + isActive) and sortable
@@ -116,7 +132,7 @@ export function CustomerListView() {
             value={filters.isActive ?? ALL_VALUE}
             onValueChange={(value) => updateFilter("isActive", value)}
           >
-            <SelectTrigger className="min-w-[10rem]">
+            <SelectTrigger className="min-w-[10rem]" aria-label={t("list.filterStatus")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -162,7 +178,7 @@ export function CustomerListView() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>
+              <TableHead aria-sort={sortAriaValue(filters, "displayName")}>
                 <button
                   type="button"
                   className="rounded-sm hover:underline focus-ring"
@@ -175,7 +191,7 @@ export function CustomerListView() {
                 </button>
               </TableHead>
               <TableHead>{t("list.columns.status")}</TableHead>
-              <TableHead>
+              <TableHead aria-sort={sortAriaValue(filters, "createdAt")}>
                 <button
                   type="button"
                   className="rounded-sm hover:underline focus-ring"

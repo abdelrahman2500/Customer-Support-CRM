@@ -433,7 +433,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               updateCustomerMutation.mutate({ isActive: value === "active" })
             }
           >
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-32" aria-label={t("list.filterStatus")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -114,7 +114,9 @@ describe("AutomationRulesView", () => {
   });
 
   it("shows the empty state when there are no rules yet", () => {
-    mockedUseAutomationRulesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseAutomationRulesQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
 
     render(<AutomationRulesView />);
 
@@ -210,7 +212,9 @@ describe("AutomationRulesView", () => {
   });
 
   it("disables the create-rule submit button until a name is entered", () => {
-    mockedUseAutomationRulesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseAutomationRulesQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
 
     render(<AutomationRulesView />);
 
@@ -242,7 +246,9 @@ describe("AutomationRulesView", () => {
     it("resolves actionSetDepartmentId through the departments list", () => {
       mockedUseAutomationRulesQuery.mockReturnValue(
         queryResult({
-          data: [{ ...baseRule, actionSetCategoryId: "category-1", actionSetDepartmentId: "dept-1" }],
+          data: [
+            { ...baseRule, actionSetCategoryId: "category-1", actionSetDepartmentId: "dept-1" },
+          ],
           isSuccess: true,
         }) as never,
       );
@@ -264,7 +270,9 @@ describe("AutomationRulesView", () => {
           isSuccess: true,
         }) as never,
       );
-      mockedUseDepartmentsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+      mockedUseDepartmentsQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
 
       render(<AutomationRulesView />);
 
@@ -273,7 +281,9 @@ describe("AutomationRulesView", () => {
 
     it("submits actionSetCategoryId/actionSetDepartmentId only when filled in", async () => {
       const mutateAsync = vi.fn().mockResolvedValue({});
-      mockedUseAutomationRulesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
       mockedUseCreateAutomationRuleMutation.mockReturnValue(
         mutationResult({ mutateAsync }) as never,
       );
@@ -283,7 +293,9 @@ describe("AutomationRulesView", () => {
       fireEvent.change(screen.getByLabelText("nameLabel"), {
         target: { value: "Auto-categorize" },
       });
-      fireEvent.click(within(screen.getByText("actionSetCategoryLabel").closest("label")!).getByRole("combobox"));
+      fireEvent.click(
+        within(screen.getByText("actionSetCategoryLabel").closest("label")!).getByRole("combobox"),
+      );
       fireEvent.click(await screen.findByRole("option", { name: "billing" }));
 
       const form = screen.getByText("createSubmit").closest("form") as HTMLFormElement;
@@ -295,6 +307,25 @@ describe("AutomationRulesView", () => {
         );
       });
       expect(mutateAsync.mock.calls[0]?.[0]).not.toHaveProperty("actionSetDepartmentId");
+    });
+
+    // A11Y-2 — each of these four Selects previously had no accessible
+    // name (the test above worked around it with `within(...).getByRole`
+    // scoped to the wrapping `<label>`); each now carries its own
+    // `aria-label` matching the visible text next to it.
+    it("gives the create-form's four pickers accessible names", () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      expect(screen.getByRole("combobox", { name: "conditionCategoryLabel" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "actionAssignToLabel" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "actionSetCategoryLabel" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("combobox", { name: "actionSetDepartmentLabel" }),
+      ).toBeInTheDocument();
     });
   });
 });

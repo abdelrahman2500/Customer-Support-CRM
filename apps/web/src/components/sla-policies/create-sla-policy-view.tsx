@@ -96,7 +96,7 @@ export function CreateSlaPolicyView() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.category")}
           <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.category")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -113,7 +113,7 @@ export function CreateSlaPolicyView() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.priority")}
           <Select value={priority} onValueChange={setPriority}>
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.priority")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

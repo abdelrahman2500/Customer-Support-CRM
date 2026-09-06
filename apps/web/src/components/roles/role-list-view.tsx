@@ -111,7 +111,7 @@ function RoleRow({
         <TableCell className="text-slate-500">{role.permissions.length}</TableCell>
         <TableCell>
           <Select value={role.ticketVisibilityScope} onValueChange={changeVisibilityScope}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40" aria-label={t("list.columns.visibility")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

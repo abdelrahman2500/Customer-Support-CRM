@@ -488,6 +488,43 @@ describe("TicketListView", () => {
       );
     });
 
+    // A11Y-2 — `aria-sort`, the semantic counterpart to `SortIndicator`'s
+    // visual arrow. Previously absent on every sortable header in the app.
+    it('reflects the active sort column and direction via aria-sort on the <th>, and "none" on the rest', () => {
+      render(<TicketListView />);
+
+      // Default is createdAt desc (Story 128).
+      expect(
+        screen.getByRole("columnheader", { name: /list\.columns\.createdAt/ }),
+      ).toHaveAttribute("aria-sort", "descending");
+      expect(
+        screen.getByRole("columnheader", { name: /list\.columns\.updatedAt/ }),
+      ).toHaveAttribute("aria-sort", "none");
+
+      fireEvent.click(screen.getByRole("button", { name: /list\.columns\.updatedAt/ }));
+
+      expect(
+        screen.getByRole("columnheader", { name: /list\.columns\.updatedAt/ }),
+      ).toHaveAttribute("aria-sort", "ascending");
+      expect(
+        screen.getByRole("columnheader", { name: /list\.columns\.createdAt/ }),
+      ).toHaveAttribute("aria-sort", "none");
+    });
+
+    // A11Y-2 — each filter Select previously had no `aria-label`,
+    // `aria-labelledby` or associated `<label>` reliable across screen
+    // readers; each now carries its own `aria-label`.
+    it("gives each filter combobox an accessible name", () => {
+      render(<TicketListView />);
+
+      expect(screen.getByRole("combobox", { name: "list.filterStatus" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "list.filterPriority" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "list.filterCategory" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("combobox", { name: "list.filterAssignedAgent" }),
+      ).toBeInTheDocument();
+    });
+
     it("resets to the first page when a filter changes", () => {
       render(<TicketListView />);
 

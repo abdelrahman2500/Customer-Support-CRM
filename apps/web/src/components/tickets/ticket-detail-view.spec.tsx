@@ -434,6 +434,24 @@ describe("TicketDetailView", () => {
       );
     });
 
+    // A11Y-2 — each of these five Selects sat inside a `<label>` wrapping a
+    // Radix trigger, which doesn't reliably associate for a `role="combobox"`
+    // element across screen readers; each now carries its own `aria-label`
+    // matching the visible label text next to it.
+    it("gives the status, priority, category, assigned-agent and department pickers accessible names", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByRole("combobox", { name: "detail.status" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "detail.priority" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "detail.category" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "detail.assignedAgent" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "detail.department" })).toBeInTheDocument();
+    });
+
     it("does not show a success toast when the status-update mutation is not yet successful", async () => {
       vi.mocked(useTicketQuery).mockReturnValue(
         queryResult({ data: baseTicket, isSuccess: true }) as never,

@@ -467,12 +467,16 @@ describe("CreateTicketView", () => {
 
   // Story 97 — Loading & Skeleton UX.
   //
-  // A `Select` trigger has no accessible name distinct from its wrapping
-  // `<label>` — the accname spec excludes a nested labelable control's own
-  // content from its wrapping label's computed name (the same constraint
-  // `user-list-view.spec.tsx`'s own established convention documents) — so
+  // Written when a `Select` trigger had no accessible name distinct from
+  // its wrapping `<label>` (the accname spec excludes a nested labelable
+  // control's own content from its wrapping label's computed name) — so
   // these tests locate a combobox via its wrapping `<label>` rather than
-  // `getByRole("combobox", { name })`.
+  // `getByRole("combobox", { name })`. A11Y-2 gave every trigger here its
+  // own `aria-label` (which takes precedence over that computation), so a
+  // new test right below this one now uses `getByRole("combobox", { name
+  // })` directly — these existing tests are left as-is rather than
+  // rewritten, since both approaches now work and there is nothing broken
+  // to fix in them.
   describe("dependent-select loading states (Story 97)", () => {
     it("disables the customer select and shows a loading placeholder while the customer list is loading", () => {
       mockedUseCustomersQuery.mockReturnValue({ data: undefined, isLoading: true } as never);
@@ -526,6 +530,19 @@ describe("CreateTicketView", () => {
       const comboboxes = screen.getAllByRole("combobox");
       expect(comboboxes[3]).not.toBeDisabled();
       expect(comboboxes[4]).not.toBeDisabled();
+    });
+
+    // A11Y-2 — each of the six pickers on this form now carries its own
+    // `aria-label`, resolvable directly rather than only via its wrapping
+    // `<label>` (see this describe block's own doc comment above).
+    it("gives every picker on this form an accessible name matching its visible label", () => {
+      renderWithLocale("en");
+
+      expect(screen.getByRole("combobox", { name: "Customer" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Category" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Priority" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Department" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Assigned agent" })).toBeInTheDocument();
     });
   });
 });

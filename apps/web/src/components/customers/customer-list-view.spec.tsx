@@ -267,6 +267,48 @@ describe("CustomerListView", () => {
         sortDir: "desc",
       });
     });
+
+    // A11Y-2 — `aria-sort`, the semantic counterpart to `SortIndicator`'s
+    // visual arrow. Previously absent on every sortable header in the app.
+    it('reflects the active sort column and direction via aria-sort on the <th>, and "none" on the rest', () => {
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([{ id: "customer-1", displayName: "Acme Inc.", isActive: true }]),
+        }) as never,
+      );
+
+      render(<CustomerListView />);
+      const nameHeader = screen.getByRole("columnheader", { name: /list\.columns\.name/ });
+      const createdAtHeader = screen.getByRole("columnheader", {
+        name: /list\.columns\.createdAt/,
+      });
+      // Default sort is createdAt asc (asserted above in this same describe block).
+      expect(nameHeader).toHaveAttribute("aria-sort", "none");
+      expect(createdAtHeader).toHaveAttribute("aria-sort", "ascending");
+
+      fireEvent.click(screen.getByRole("button", { name: /list\.columns\.name/ }));
+
+      expect(screen.getByRole("columnheader", { name: /list\.columns\.name/ })).toHaveAttribute(
+        "aria-sort",
+        "ascending",
+      );
+      expect(
+        screen.getByRole("columnheader", { name: /list\.columns\.createdAt/ }),
+      ).toHaveAttribute("aria-sort", "none");
+    });
+
+    // A11Y-2 — this Select previously had no `aria-label`, `aria-labelledby`
+    // or associated `<label>`, relying only on implicit wrapping.
+    it("gives the status filter combobox an accessible name", () => {
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({ data: page([]), isSuccess: true }) as never,
+      );
+
+      render(<CustomerListView />);
+
+      expect(screen.getByRole("combobox", { name: "list.filterStatus" })).toBeInTheDocument();
+    });
   });
   /** Story S-8e — `GET /customers` is paginated, replacing the Story 106
    * 500-row cap. Mirrors `TicketListView`'s own pager tests. */

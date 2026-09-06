@@ -250,7 +250,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               )
             }
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("detail.status")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -277,7 +277,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               )
             }
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("detail.priority")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -296,7 +296,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             disabled={mutation.isPending || categoriesQuery.isLoading}
             onValueChange={(value) => mutation.mutate({ categoryId: value })}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("detail.category")}>
               <SelectValue
                 placeholder={
                   categoriesQuery.isLoading ? t("detail.optionsLoading") : t("detail.noCategory")
@@ -322,7 +322,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             disabled={mutation.isPending || usersQuery.isLoading}
             onValueChange={(value) => mutation.mutate({ assignedToUserId: value })}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("detail.assignedAgent")}>
               <SelectValue
                 placeholder={
                   usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")
@@ -345,7 +345,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             disabled={mutation.isPending || departmentsQuery.isLoading}
             onValueChange={(value) => mutation.mutate({ departmentId: value })}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("detail.department")}>
               <SelectValue
                 placeholder={
                   departmentsQuery.isLoading ? t("detail.optionsLoading") : t("detail.noDepartment")

@@ -137,7 +137,7 @@ export function CreateTicketView() {
             onValueChange={handleCustomerChange}
             disabled={customersQuery.isLoading}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.customer")}>
               <SelectValue
                 placeholder={
                   customersQuery.isLoading ? t("create.optionsLoading") : t("create.selectCustomer")
@@ -165,7 +165,7 @@ export function CreateTicketView() {
               onValueChange={setContactId}
               disabled={customerDetailQuery.isLoading}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-label={t("create.contact")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -199,7 +199,7 @@ export function CreateTicketView() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.category")}
           <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.category")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -216,7 +216,7 @@ export function CreateTicketView() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.priority")}
           <Select value={priority} onValueChange={setPriority}>
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.priority")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -237,7 +237,7 @@ export function CreateTicketView() {
             onValueChange={setDepartmentId}
             disabled={departmentsQuery.isLoading}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.department")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -264,7 +264,7 @@ export function CreateTicketView() {
             onValueChange={setAssignedToUserId}
             disabled={usersQuery.isLoading}
           >
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.assignedAgent")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

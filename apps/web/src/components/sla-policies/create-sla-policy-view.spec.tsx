@@ -204,4 +204,14 @@ describe("CreateSlaPolicyView", () => {
 
     expect(screen.getByRole("button", { name: "Creating..." })).toBeDisabled();
   });
+
+  // A11Y-2 — the Category and Priority pickers previously had no
+  // accessible name distinct from their wrapping `<label>`; each now
+  // carries its own `aria-label` matching the visible text next to it.
+  it("gives the Category and Priority pickers accessible names", () => {
+    renderWithLocale("en");
+
+    expect(screen.getByRole("combobox", { name: "Category" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Priority" })).toBeInTheDocument();
+  });
 });

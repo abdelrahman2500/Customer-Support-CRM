@@ -377,6 +377,14 @@ describe("CustomerDetailView", () => {
       expect(mutate).toHaveBeenCalledWith({ isActive: false });
     });
 
+    // A11Y-2 — this Select had no label of any kind; it's now named the
+    // same as the list view's own status filter (`list.filterStatus`).
+    it("gives the status combobox an accessible name", () => {
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByRole("combobox", { name: "list.filterStatus" })).toBeInTheDocument();
+    });
+
     it("shows a forbidden-specific message when a customer edit is rejected with 403", () => {
       mockedUseUpdateCustomerMutation.mockReturnValue(
         idleMutation({ isError: true, error: new ApiError("Forbidden", 403) }) as never,

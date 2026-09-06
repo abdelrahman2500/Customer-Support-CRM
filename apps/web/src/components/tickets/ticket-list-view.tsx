@@ -37,6 +37,22 @@ const STATUS_OPTIONS = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
 const PRIORITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
 const ALL_VALUE = "__all__";
 
+/**
+ * A11Y-2 — the semantic counterpart to `SortIndicator`'s visual arrow.
+ * `SortIndicator`'s own doc comment notes `aria-sort` is "the caller's to
+ * set" since only the caller owns the `<th>`; this is that setter, mirrored
+ * in `CustomerListView` for its own two sortable columns.
+ */
+function sortAriaValue(
+  filters: ListTicketsFilters,
+  column: NonNullable<ListTicketsFilters["sortBy"]>,
+): "ascending" | "descending" | "none" {
+  if (filters.sortBy !== column) {
+    return "none";
+  }
+  return filters.sortDir === "asc" ? "ascending" : "descending";
+}
+
 function SlaCell({ ticket }: { ticket: TicketListItem }) {
   const t = useTranslations("tickets");
   const status = deriveSlaStatus(ticket.slaTarget);
@@ -233,7 +249,7 @@ export function TicketListView() {
               <TableHead>{t("list.columns.category")}</TableHead>
               <TableHead>{t("list.columns.assignedAgent")}</TableHead>
               <TableHead>{t("list.columns.sla")}</TableHead>
-              <TableHead>
+              <TableHead aria-sort={sortAriaValue(filters, "createdAt")}>
                 <button
                   type="button"
                   className="rounded-sm hover:underline focus-ring"
@@ -245,7 +261,7 @@ export function TicketListView() {
                   />
                 </button>
               </TableHead>
-              <TableHead>
+              <TableHead aria-sort={sortAriaValue(filters, "updatedAt")}>
                 <button
                   type="button"
                   className="rounded-sm hover:underline focus-ring"
@@ -361,7 +377,7 @@ function FilterSelect({
     <label className="flex flex-col gap-1 text-xs text-slate-600">
       {label}
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="min-w-[10rem]">
+        <SelectTrigger className="min-w-[10rem]" aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

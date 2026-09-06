@@ -115,7 +115,7 @@ export function CreateUserView() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.branch")}
           <Select value={branchId} onValueChange={setBranchId}>
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.branch")}>
               <SelectValue placeholder={t("create.selectBranch")} />
             </SelectTrigger>
             <SelectContent>
@@ -134,7 +134,7 @@ export function CreateUserView() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.department")}
           <Select value={departmentId} onValueChange={setDepartmentId}>
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.department")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -154,7 +154,7 @@ export function CreateUserView() {
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           {t("create.role")}
           <Select value={roleId} onValueChange={setRoleId}>
-            <SelectTrigger>
+            <SelectTrigger aria-label={t("create.role")}>
               <SelectValue placeholder={t("create.selectRole")} />
             </SelectTrigger>
             <SelectContent>

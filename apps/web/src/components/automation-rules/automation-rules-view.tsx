@@ -283,7 +283,7 @@ function AddAutomationRuleForm() {
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("conditionCategoryLabel")}
           <Select value={conditionCategoryId} onValueChange={setConditionCategoryId}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40" aria-label={t("conditionCategoryLabel")}>
               <SelectValue placeholder={t("anyCategory")} />
             </SelectTrigger>
             <SelectContent>
@@ -298,7 +298,7 @@ function AddAutomationRuleForm() {
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("actionAssignToLabel")}
           <Select value={actionAssignToUserId} onValueChange={setActionAssignToUserId}>
-            <SelectTrigger className="w-56">
+            <SelectTrigger className="w-56" aria-label={t("actionAssignToLabel")}>
               <SelectValue placeholder={t("actionAssignToPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
@@ -313,7 +313,7 @@ function AddAutomationRuleForm() {
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("actionSetCategoryLabel")}
           <Select value={actionSetCategoryId} onValueChange={setActionSetCategoryId}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40" aria-label={t("actionSetCategoryLabel")}>
               <SelectValue placeholder={t("noAction")} />
             </SelectTrigger>
             <SelectContent>
@@ -328,7 +328,7 @@ function AddAutomationRuleForm() {
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("actionSetDepartmentLabel")}
           <Select value={actionSetDepartmentId} onValueChange={setActionSetDepartmentId}>
-            <SelectTrigger className="w-56">
+            <SelectTrigger className="w-56" aria-label={t("actionSetDepartmentLabel")}>
               <SelectValue placeholder={t("noAction")} />
             </SelectTrigger>
             <SelectContent>

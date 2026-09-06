@@ -500,6 +500,20 @@ describe("UserListView", () => {
 
       expect(assignmentMutate).toHaveBeenCalledWith({ departmentId: null });
     });
+
+    // A11Y-2 — previously an adjacent, unassociated <span>; a screen reader
+    // announced both as unlabeled comboboxes (recon finding). Named queries
+    // now resolve each picker directly, without positional indexing.
+    it("gives the Role and Department pickers accessible names matching their visible labels", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+
+      renderView();
+
+      expect(screen.getByRole("combobox", { name: "Role" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Department" })).toBeInTheDocument();
+    });
   });
 
   it("shows independent load-error messages for the Role and Department pickers", () => {

@@ -608,6 +608,31 @@ describe("RoleListView", () => {
 
       expect(mutate).toHaveBeenCalledWith({ ticketVisibilityScope: "DEPARTMENT" });
     });
+
+    // A11Y-2 — this Select previously had no label of any kind (recon
+    // finding: zero text, no aria-label, nothing nearby), unlike every
+    // other Select in the app. It now announces the same text sighted
+    // users see in the column header above it.
+    it("gives the visibility-scope combobox an accessible name matching its column header", () => {
+      mockedUseManagedRolesQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: [
+            {
+              id: "role-1",
+              name: "Viewer",
+              permissions: [],
+              isActive: true,
+              ticketVisibilityScope: "BRANCH",
+            },
+          ],
+        }) as never,
+      );
+
+      renderView();
+
+      expect(screen.getByRole("combobox", { name: "Ticket visibility" })).toBeInTheDocument();
+    });
   });
 
   describe("bilingual rendering", () => {

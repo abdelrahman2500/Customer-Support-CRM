@@ -58,12 +58,17 @@ function renderWithLocale(locale: "en" | "ar" = "en") {
 describe("CreateUserView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedUseBranchesQuery.mockReturnValue(queryResult({ data: oneBranch, isSuccess: true }) as never);
+    mockedUseBranchesQuery.mockReturnValue(
+      queryResult({ data: oneBranch, isSuccess: true }) as never,
+    );
     mockedUseDepartmentsQuery.mockReturnValue(
       queryResult({ data: oneDepartment, isSuccess: true }) as never,
     );
     mockedUseRolesQuery.mockReturnValue(queryResult({ data: oneRole, isSuccess: true }) as never);
-    mockedUseCreateUserMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    mockedUseCreateUserMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
   });
 
   it("renders the form with the real branch/department/role options loaded (English)", () => {
@@ -256,5 +261,16 @@ describe("CreateUserView", () => {
     renderWithLocale("en");
 
     expect(screen.getByRole("button", { name: "Creating..." })).toBeDisabled();
+  });
+
+  // A11Y-2 — the Branch, Department and Role pickers previously had no
+  // accessible name distinct from their wrapping `<label>`; each now
+  // carries its own `aria-label` matching the visible text next to it.
+  it("gives the Branch, Department and Role pickers accessible names", () => {
+    renderWithLocale("en");
+
+    expect(screen.getByRole("combobox", { name: "Branch" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Department" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Role" })).toBeInTheDocument();
   });
 });
