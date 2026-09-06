@@ -225,7 +225,7 @@ export class TicketsService {
   async listTickets(query: ListTicketsQueryDto = {}): Promise<Paginated<TicketListItem>> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const sortBy = query.sortBy ?? "createdAt";
-    const sortDir = query.sortDir ?? "asc";
+    const sortDir = query.sortDir ?? "desc";
 
     // Story S-9 — `status` and `statuses` constrain the same column, so one
     // would silently overwrite the other in the `where` below. Rejecting is

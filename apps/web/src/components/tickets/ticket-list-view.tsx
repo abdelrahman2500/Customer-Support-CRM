@@ -79,7 +79,7 @@ export function TicketListView() {
 
   const [filters, setFilters] = useState<ListTicketsFilters>({
     sortBy: "createdAt",
-    sortDir: "asc",
+    sortDir: "desc",
   });
 
   const ticketsQuery = useTicketsQuery(filters);

@@ -138,6 +138,19 @@ describe("TicketListView", () => {
     expect(screen.getByText("Cannot log in")).toBeInTheDocument();
   });
 
+  it("starts with newest-created tickets first", () => {
+    mockedUseTicketsQuery.mockReturnValue(
+      queryResult({ data: page([]), isSuccess: true }) as never,
+    );
+
+    render(<TicketListView />);
+
+    expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith({
+      sortBy: "createdAt",
+      sortDir: "desc",
+    });
+  });
+
   // Story 70 — Ticket Search Foundation.
   it("commits the search filter on blur, passing it through to useTicketsQuery", () => {
     mockedUseTicketsQuery.mockReturnValue(
@@ -461,7 +474,17 @@ describe("TicketListView", () => {
       fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
 
       expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
-        expect.objectContaining({ page: 3, sortBy: "createdAt", sortDir: "asc" }),
+        expect.objectContaining({ page: 3, sortBy: "createdAt", sortDir: "desc" }),
+      );
+    });
+
+    it("toggles the active Created At sort from descending to ascending", () => {
+      render(<TicketListView />);
+
+      fireEvent.click(screen.getByRole("button", { name: /list.columns.createdAt/ }));
+
+      expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sortBy: "createdAt", sortDir: "asc", page: undefined }),
       );
     });
 
@@ -488,7 +511,18 @@ describe("TicketListView", () => {
       // A re-sort reorders the whole result set, so the old page number
       // points somewhere unrelated.
       expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
-        expect.objectContaining({ sortBy: "updatedAt", page: undefined }),
+        expect.objectContaining({ sortBy: "updatedAt", sortDir: "asc", page: undefined }),
+      );
+    });
+
+    it("preserves an explicit sort while navigating pages", () => {
+      render(<TicketListView />);
+
+      fireEvent.click(screen.getByRole("button", { name: /list.columns.updatedAt/ }));
+      fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
+
+      expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 3, sortBy: "updatedAt", sortDir: "asc" }),
       );
     });
 

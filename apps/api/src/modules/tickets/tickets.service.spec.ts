@@ -293,7 +293,7 @@ describe("TicketsService", () => {
       slaTarget: null,
     };
 
-    it("scopes the query to the caller's active branch and defaults to createdAt asc, with no filters", async () => {
+    it("scopes the query to the caller's active branch and defaults to createdAt desc, with no filters", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
 
       await service.listTickets();
@@ -304,7 +304,7 @@ describe("TicketsService", () => {
       // `take` is the page size rather than a fixed cap.
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         include: {
           slaTarget: true,
           category: { select: { name: true } },
@@ -340,24 +340,34 @@ describe("TicketsService", () => {
         id: "ticket-newer",
         createdAt: new Date("2024-01-05T00:00:00.000Z"),
       };
-      // Prisma, asked for `asc`, returns oldest-first - and that is now
-      // what is asked for, so the rows pass straight through. Story 105
-      // asked for `desc` and reversed, which only matched a direct `asc`
-      // query while the branch stayed under the cap.
-      prisma.ticket.findMany.mockResolvedValue([older, newer]);
+      // Prisma, asked for `desc`, returns newest-first - and that is now
+      // what the default asks for, so the rows pass straight through. Story
+      // 105 asked for `desc` and reversed, which only matched a direct
+      // `asc` query while the branch stayed under the cap.
+      prisma.ticket.findMany.mockResolvedValue([newer, older]);
 
       const result = await service.listTickets();
 
       expect(prisma.ticket.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
+        expect.objectContaining({ orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
       );
       expect(result.items.map((t: TicketListItem) => t.id)).toEqual([
-        "ticket-older",
         "ticket-newer",
+        "ticket-older",
       ]);
     });
 
-    it("does not reverse when sortDir is explicitly desc", async () => {
+    it("uses the id desc tie-breaker when createdAt values are equal", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets();
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
+      );
+    });
+
+    it("preserves explicit ascending sorting", async () => {
       const older = {
         ...baseTicketRow,
         id: "ticket-older",
@@ -368,14 +378,27 @@ describe("TicketsService", () => {
         id: "ticket-newer",
         createdAt: new Date("2024-01-05T00:00:00.000Z"),
       };
-      prisma.ticket.findMany.mockResolvedValue([newer, older]);
+      prisma.ticket.findMany.mockResolvedValue([older, newer]);
 
-      const result = await service.listTickets({ sortDir: "desc" });
+      const result = await service.listTickets({ sortDir: "asc" });
 
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
+      );
       expect(result.items.map((t: TicketListItem) => t.id)).toEqual([
-        "ticket-newer",
         "ticket-older",
+        "ticket-newer",
       ]);
+    });
+
+    it("preserves explicit descending sorting", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ sortDir: "desc" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
+      );
     });
 
     it("applies status/priority/categoryId/assignedToUserId filters independently and in combination", async () => {
@@ -567,7 +590,7 @@ describe("TicketsService", () => {
     it("orders through the slaTarget relation, with createdAt breaking ties", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
 
-      await service.listTickets({ sortBy: "slaUrgency" });
+      await service.listTickets({ sortBy: "slaUrgency", sortDir: "asc" });
 
       expect(prisma.ticket.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -660,6 +683,7 @@ describe("TicketsService", () => {
         unassigned: "true",
         statuses: ["OPEN", "IN_PROGRESS"],
         sortBy: "slaUrgency",
+        sortDir: "asc",
       });
 
       // Exactly the request the dashboard's unclaimed panel makes.

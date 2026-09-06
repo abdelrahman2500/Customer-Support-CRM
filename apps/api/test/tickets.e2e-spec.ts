@@ -193,11 +193,10 @@ describe("Ticketing (e2e)", () => {
   });
 
   it("lists tickets in the caller's active branch, including the new one", async () => {
-    // Story S-8e — one page, ordered `createdAt` ascending by default, so
-    // this suite's freshly-created ticket is on the last page rather than
-    // the first. Narrowing to the suite's own customer keeps the test about
-    // what it was always about (the new ticket is listed, under branch
-    // scope) instead of about which page it landed on.
+    // Story S-8e — one page, ordered `createdAt` descending by default.
+    // Narrowing to the suite's own customer keeps the test about what it was
+    // always about (the new ticket is listed, under branch scope) instead of
+    // about the surrounding fixture order.
     const response = await request(app.getHttpServer())
       .get("/api/v1/tickets")
       .query({ customerId })
