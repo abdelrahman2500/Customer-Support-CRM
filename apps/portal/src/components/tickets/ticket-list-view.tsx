@@ -7,7 +7,15 @@ import { useTranslations } from "next-intl";
 import { useCreateMyTicketMutation, useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
-import { Badge, Button, Input, Skeleton, showSuccessToast } from "@crm/ui";
+import {
+  Badge,
+  Button,
+  FetchingIndicator,
+  Input,
+  Pagination,
+  Skeleton,
+  showSuccessToast,
+} from "@crm/ui";
 
 /**
  * Story 53 — Customer Portal — Submit & Track Own Tickets. Mirrors
@@ -15,21 +23,38 @@ import { Badge, Button, Input, Skeleton, showSuccessToast } from "@crm/ui";
  * `AddDepartmentForm`'s "smallest UI surface for a one-field(ish) create"
  * convention — plain HTML/Tailwind, no shared UI component library exists
  * in `apps/portal` (Story 52 precedent).
+ *
+ * PORTAL-1 — Portal My Tickets Pagination. `useMyTicketsQuery`'s response is
+ * now a `Paginated<PortalTicketSummary>` envelope instead of a flat array,
+ * mirroring the portal's own `ArticleListView`'s page state/`Pagination`/
+ * `FetchingIndicator` usage exactly (Story S-8c). No filtering/search/sort
+ * is added — this list has none of those, unlike the agent workspace's own
+ * ticket list.
  */
 export function TicketListView() {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
-  const ticketsQuery = useMyTicketsQuery();
+  /** 1-based; `undefined` until the reader pages. */
+  const [page, setPage] = useState<number | undefined>(undefined);
+  const ticketsQuery = useMyTicketsQuery(page);
+  const ticketPage = ticketsQuery.data;
+  const tickets = ticketPage?.items;
 
   return (
     <section className="flex flex-col gap-6">
       {/* Story 98 — p-4, not p-6: matches apps/web's own dominant card
           padding convention (see that app's data cards throughout). */}
       <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          {/* In the heading's own row, so it adds no height and cannot
+              shift the list below it — mirrors ArticleListView exactly. */}
+          <FetchingIndicator active={ticketsQuery.isPlaceholderData} label={tCommon("updating")} />
+        </div>
 
-        {ticketsQuery.isLoading && (
+        {ticketsQuery.isPending && (
           <div className="mt-3 flex flex-col gap-2">
             {[0, 1, 2].map((row) => (
               <Skeleton key={row} className="h-10 w-full" />
@@ -50,13 +75,13 @@ export function TicketListView() {
           </div>
         )}
 
-        {ticketsQuery.isSuccess && ticketsQuery.data.length === 0 && (
+        {tickets !== undefined && tickets.length === 0 && (
           <p className="mt-3 text-sm text-slate-500">{t("list.empty")}</p>
         )}
 
-        {ticketsQuery.isSuccess && ticketsQuery.data.length > 0 && (
+        {tickets !== undefined && tickets.length > 0 && (
           <ol className="mt-3 flex flex-col gap-2 text-sm">
-            {ticketsQuery.data.map((ticket) => (
+            {tickets.map((ticket) => (
               <li
                 key={ticket.id}
                 className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2"
@@ -76,6 +101,27 @@ export function TicketListView() {
               </li>
             ))}
           </ol>
+        )}
+
+        {ticketPage !== undefined && (
+          <div className="mt-3">
+            {/* Story S-8c — the shared pager, same primitive the agent
+                workspace and this portal's own KB list use. Renders nothing
+                for a single page. */}
+            <Pagination
+              page={ticketPage.page}
+              totalPages={ticketPage.totalPages}
+              onPageChange={setPage}
+              disabled={ticketsQuery.isPlaceholderData}
+              label={tCommon("pagination.label")}
+              previousLabel={tCommon("pagination.previous")}
+              nextLabel={tCommon("pagination.next")}
+              indicator={tCommon("pagination.indicator", {
+                page: ticketPage.page,
+                totalPages: ticketPage.totalPages,
+              })}
+            />
+          </div>
         )}
       </div>
 

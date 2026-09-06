@@ -9,6 +9,7 @@ import {
   sendMyTicketMessage,
   submitMyTicketCsat,
 } from "@/lib/tickets-api";
+import { preservePreviousResults } from "@/lib/list-query";
 import type {
   ChannelMessageSummary,
   CreateChannelMessageInput,
@@ -21,14 +22,25 @@ import type {
  * convention exactly: a mutation only ever invalidates the query cache on a
  * real, successful response — the UI always renders the re-fetched,
  * authoritative state, never an assumed one.
+ *
+ * PORTAL-1 — `myTicketsQueryKey` becomes a function of `page`, mirroring
+ * `usePublishedArticlesQuery`'s own `publishedArticlesQueryKey(search, ...,
+ * page)` convention: paging is a key change like any other, so it inherits
+ * Story S-7's row preservation for free.
  */
-export const myTicketsQueryKey = ["portal-tickets"] as const;
+export const myTicketsQueryKey = (page?: number) => ["portal-tickets", page ?? 1] as const;
 export const myTicketQueryKey = (id: string) => ["portal-tickets", id] as const;
 export const myTicketHistoryQueryKey = (id: string) => ["portal-tickets", id, "history"] as const;
 export const myTicketCsatQueryKey = (id: string) => ["portal-tickets", id, "csat"] as const;
 
-export function useMyTicketsQuery() {
-  return useQuery({ queryKey: myTicketsQueryKey, queryFn: listMyTickets });
+/** PORTAL-1 — 1-based; `undefined` until the reader pages, mirroring
+ * `usePublishedArticlesQuery`'s own convention exactly. */
+export function useMyTicketsQuery(page?: number) {
+  return useQuery({
+    queryKey: myTicketsQueryKey(page),
+    queryFn: () => listMyTickets({ page }),
+    ...preservePreviousResults,
+  });
 }
 
 export function useMyTicketQuery(id: string) {
@@ -47,7 +59,11 @@ export function useCreateMyTicketMutation() {
   return useMutation({
     mutationFn: (input: CreatePortalTicketInput) => createMyTicket(input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: myTicketsQueryKey });
+      // Broad `["portal-tickets"]`, not `myTicketsQueryKey()`: a new
+      // ticket's page depends on how many the customer already has, so
+      // every cached page is invalidated, mirroring `apps/web`'s own
+      // `useCreateTicketMutation`'s `["tickets"]` precedent.
+      void queryClient.invalidateQueries({ queryKey: ["portal-tickets"] });
     },
   });
 }

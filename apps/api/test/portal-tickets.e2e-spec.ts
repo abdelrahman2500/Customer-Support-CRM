@@ -133,14 +133,16 @@ describe("Customer Portal — Tickets (e2e)", () => {
       .expect(400);
   });
 
-  it("returns [] for a customer with no tickets yet", async () => {
+  // PORTAL-1 — Portal My Tickets Pagination. Paginated envelope, matching
+  // every other paginated list endpoint (`Paginated<T>`).
+  it("returns an empty paginated envelope for a customer with no tickets yet", async () => {
     const token = await loginAsPortalContact(contactEmail);
 
     const response = await request(app.getHttpServer())
       .get("/api/v1/portal/tickets")
       .set("Authorization", `Bearer ${token}`)
       .expect(200);
-    expect(response.body).toEqual([]);
+    expect(response.body).toEqual({ items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 });
   });
 
   it("submits a ticket scoped to the contact's own customer, with no client-controlled scope fields accepted", async () => {
@@ -179,8 +181,32 @@ describe("Customer Portal — Tickets (e2e)", () => {
       .set("Authorization", `Bearer ${token}`)
       .expect(200);
 
-    const ids = response.body.map((ticket: { id: string }) => ticket.id);
+    expect(response.body.total).toBeGreaterThan(0);
+    const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
     expect(ids).toContain(ticketId);
+  });
+
+  it("paginates: page 1 with pageSize=1 returns exactly one item and totalPages matches total", async () => {
+    const token = await loginAsPortalContact(contactEmail);
+
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/portal/tickets?page=1&pageSize=1")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(response.body.items).toHaveLength(1);
+    expect(response.body.page).toBe(1);
+    expect(response.body.pageSize).toBe(1);
+    expect(response.body.totalPages).toBe(response.body.total);
+  });
+
+  it("returns a validation error for a pageSize above the shared maximum", async () => {
+    const token = await loginAsPortalContact(contactEmail);
+
+    await request(app.getHttpServer())
+      .get("/api/v1/portal/tickets?pageSize=101")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(400);
   });
 
   it("gets the ticket's detail", async () => {
@@ -226,7 +252,7 @@ describe("Customer Portal — Tickets (e2e)", () => {
       .get("/api/v1/portal/tickets")
       .set("Authorization", `Bearer ${otherToken}`)
       .expect(200);
-    expect(response.body).toEqual([]);
+    expect(response.body).toEqual({ items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 });
   });
 
   it("returns 404 for an unknown ticket id", async () => {
@@ -332,7 +358,9 @@ describe("Customer Portal — Tickets (e2e)", () => {
   // authorization mechanism.
   describe("Live Chat messages", () => {
     it("rejects every route without a token", async () => {
-      await request(app.getHttpServer()).get(`/api/v1/portal/tickets/${ticketId}/messages`).expect(401);
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets/${ticketId}/messages`)
+        .expect(401);
       await request(app.getHttpServer())
         .post(`/api/v1/portal/tickets/${ticketId}/messages`)
         .send({ body: "Hi" })

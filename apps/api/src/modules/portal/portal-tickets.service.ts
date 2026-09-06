@@ -5,6 +5,7 @@ import type {
   TicketHistoryEntrySummary,
   TicketSummary,
 } from "../tickets/tickets.service";
+import type { Paginated } from "../../common/pagination/paginated";
 import { TicketChannelService } from "../tickets/ticket-channel.service";
 import type { ChannelMessageSummary } from "../channels/channel-messages.service";
 import { AiChatService } from "../ai/ai-chat.service";
@@ -52,9 +53,15 @@ export class PortalTicketsService {
     return this.ticketsService.createTicketForContact(contactId, dto);
   }
 
-  async listTickets(contactId: string): Promise<TicketSummary[]> {
+  /** PORTAL-1 — `pagination` passes straight through to
+   * `TicketsService.listTicketsForCustomer`; this method resolves
+   * `customerId` and nothing else. */
+  async listTickets(
+    contactId: string,
+    pagination: { page?: number; pageSize?: number } = {},
+  ): Promise<Paginated<TicketSummary>> {
     const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
-    return this.ticketsService.listTicketsForCustomer(customerId);
+    return this.ticketsService.listTicketsForCustomer(customerId, pagination);
   }
 
   async getTicket(contactId: string, ticketId: string): Promise<TicketSummary> {
@@ -98,7 +105,12 @@ export class PortalTicketsService {
     dto: CreateChannelMessageDto,
   ): Promise<ChannelMessageSummary> {
     const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
-    return this.ticketChannelService.createCustomerMessage(ticketId, customerId, contactId, dto.body);
+    return this.ticketChannelService.createCustomerMessage(
+      ticketId,
+      customerId,
+      contactId,
+      dto.body,
+    );
   }
 
   async getMessages(contactId: string, ticketId: string): Promise<ChannelMessageSummary[]> {

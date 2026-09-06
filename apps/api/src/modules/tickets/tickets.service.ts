@@ -524,21 +524,48 @@ export class TicketsService {
 
   /**
    * Every ticket belonging to a Customer, newest first — a deliberate
-   * deviation from `listTickets`'s own `createdAt asc` default (plan Design
-   * item 8): a customer-facing "my tickets" view reads naturally
-   * newest-first, and this is a new, separate list, not an extension of the
-   * agent one. Scoped by `customerId` alone (docs/architecture/08-supporting-domains.md:
+   * deviation from `listTickets`'s own default (plan Design item 8): a
+   * customer-facing "my tickets" view reads naturally newest-first, and
+   * this is a new, separate list, not an extension of the agent one.
+   * Scoped by `customerId` alone (docs/architecture/08-supporting-domains.md:
    * "every portal query adds `customerId = currentCustomer.id`" — every
    * contact at a Customer sees that Customer's tickets, not only ones they
    * personally opened).
+   *
+   * PORTAL-1 — paginated via the same `paginate()` helper and `id`
+   * tie-breaker every other list endpoint already uses (Story S-8a-e); no
+   * `sortBy`/filter params are added, mirroring `ListNotificationsQueryDto`'s
+   * "endpoint has no filters to preserve" precedent. Story 105's own
+   * Non-Goals explicitly deferred this exact list ("no evidence of a
+   * comparable risk there") back when no pagination precedent existed yet —
+   * that precedent now exists, so this closes the gap it left open.
    */
-  async listTicketsForCustomer(customerId: string): Promise<TicketSummary[]> {
-    const tickets = await this.prisma.ticket.findMany({
-      where: { customerId },
-      orderBy: { createdAt: "desc" },
-      include: CATEGORY_NAME_INCLUDE,
-    });
-    return tickets.map(toTicketSummary);
+  async listTicketsForCustomer(
+    customerId: string,
+    pagination: { page?: number; pageSize?: number } = {},
+  ): Promise<Paginated<TicketSummary>> {
+    // The delegate is wrapped rather than passed directly for the same
+    // reason `listTickets` above wraps it: `paginate`'s `PaginatableDelegate`
+    // has no `include`, and the wrapper adds only that — `where` still comes
+    // from `paginate`'s single `options.where`.
+    const { items: tickets, ...page } = await paginate(
+      {
+        count: (args: { where: Prisma.TicketWhereInput }) => this.prisma.ticket.count(args),
+        findMany: (args: {
+          where: Prisma.TicketWhereInput;
+          orderBy: Prisma.TicketOrderByWithRelationInput[];
+          skip: number;
+          take: number;
+        }) => this.prisma.ticket.findMany({ ...args, include: CATEGORY_NAME_INCLUDE }),
+      },
+      {
+        where: { customerId },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+      },
+    );
+    return { ...page, items: tickets.map(toTicketSummary) };
   }
 
   async getTicketForCustomer(id: string, customerId: string): Promise<TicketSummary> {

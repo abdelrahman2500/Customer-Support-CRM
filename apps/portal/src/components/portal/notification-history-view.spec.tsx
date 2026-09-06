@@ -82,7 +82,13 @@ describe("NotificationHistoryView", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedUseMyTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    // PORTAL-1 — `useMyTicketsQuery` now resolves a `Paginated<T>` envelope.
+    mockedUseMyTicketsQuery.mockReturnValue(
+      queryResult({
+        data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+        isSuccess: true,
+      }) as never,
+    );
     mockedUsePortalNotificationPreferencesQuery.mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -180,7 +186,13 @@ describe("NotificationHistoryView", () => {
     mockedUseMyTicketsQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ id: "ticket-1", subject: "Cannot log in" }],
+        data: {
+          items: [{ id: "ticket-1", subject: "Cannot log in" }],
+          total: 1,
+          page: 1,
+          pageSize: 25,
+          totalPages: 1,
+        },
       }) as never,
     );
     mockedUseMyNotificationsQuery.mockReturnValue(

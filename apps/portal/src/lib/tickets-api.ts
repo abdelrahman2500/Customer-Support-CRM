@@ -1,4 +1,5 @@
 import { apiFetch } from "./api";
+import type { PaginatedResponse } from "./paginated";
 
 /**
  * Story 53 — Customer Portal — Submit & Track Own Tickets. Mirrors the
@@ -66,8 +67,30 @@ export interface SubmitCsatInput {
   comment?: string;
 }
 
-export function listMyTickets(): Promise<PortalTicketSummary[]> {
-  return apiFetch<PortalTicketSummary[]>("/portal/tickets");
+/**
+ * PORTAL-1 — Portal My Tickets Pagination. Mirrors
+ * `knowledge-base-api.ts`'s own `toQueryString` convention: an omitted
+ * `page`/`pageSize` produces the exact same request every existing caller
+ * already sends.
+ */
+function toQueryString(pagination: { page?: number; pageSize?: number } = {}): string {
+  const params = new URLSearchParams();
+  if (pagination.page !== undefined) {
+    params.set("page", String(pagination.page));
+  }
+  if (pagination.pageSize !== undefined) {
+    params.set("pageSize", String(pagination.pageSize));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export function listMyTickets(
+  pagination: { page?: number; pageSize?: number } = {},
+): Promise<PaginatedResponse<PortalTicketSummary>> {
+  return apiFetch<PaginatedResponse<PortalTicketSummary>>(
+    `/portal/tickets${toQueryString(pagination)}`,
+  );
 }
 
 export function getMyTicket(id: string): Promise<PortalTicketSummary> {
@@ -78,9 +101,7 @@ export function getMyTicketHistory(id: string): Promise<PortalTicketHistoryEntry
   return apiFetch<PortalTicketHistoryEntry[]>(`/portal/tickets/${id}/history`);
 }
 
-export function createMyTicket(
-  input: CreatePortalTicketInput,
-): Promise<PortalTicketSummary> {
+export function createMyTicket(input: CreatePortalTicketInput): Promise<PortalTicketSummary> {
   return apiFetch<PortalTicketSummary>("/portal/tickets", {
     method: "POST",
     body: JSON.stringify(input),
@@ -97,10 +118,7 @@ export function getMyTicketCsat(id: string): Promise<PortalTicketCsat | undefine
   return apiFetch<PortalTicketCsat | undefined>(`/portal/tickets/${id}/csat`);
 }
 
-export function submitMyTicketCsat(
-  id: string,
-  input: SubmitCsatInput,
-): Promise<{ id: string }> {
+export function submitMyTicketCsat(id: string, input: SubmitCsatInput): Promise<{ id: string }> {
   return apiFetch<{ id: string }>(`/portal/tickets/${id}/csat`, {
     method: "POST",
     body: JSON.stringify(input),

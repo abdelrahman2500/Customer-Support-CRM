@@ -1913,14 +1913,19 @@ describe("TicketsService", () => {
   });
 
   describe("listTicketsForCustomer", () => {
-    it("scopes the query to the given customerId, ordered createdAt desc", async () => {
+    // PORTAL-1 — paginated: the id tie-breaker follows createdAt desc, and
+    // the query is a page (skip/take), not the whole table.
+    it("scopes the query to the given customerId, ordered createdAt desc with an id tie-breaker, paginated", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
 
       await service.listTicketsForCustomer("customer-1");
 
+      expect(prisma.ticket.count).toHaveBeenCalledWith({ where: { customerId: "customer-1" } });
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: { customerId: "customer-1" },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
         include: {
           category: { select: { name: true } },
           customer: { select: { displayName: true } },
@@ -1928,12 +1933,63 @@ describe("TicketsService", () => {
       });
     });
 
-    it("returns [] for a customer with no tickets", async () => {
+    it("returns a paginated envelope with items: [] for a customer with no tickets", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
+      prisma.ticket.count.mockResolvedValue(0);
 
       const result = await service.listTicketsForCustomer("customer-1");
 
-      expect(result).toEqual([]);
+      expect(result).toEqual({ items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 });
+    });
+
+    it("forwards an explicit page/pageSize to skip/take", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+      prisma.ticket.count.mockResolvedValue(0);
+
+      await service.listTicketsForCustomer("customer-1", { page: 3, pageSize: 10 });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 10 }),
+      );
+    });
+
+    it("maps each row through toTicketSummary", async () => {
+      const row = {
+        id: "ticket-1",
+        subject: "Cannot log in",
+        categoryId: "category-1",
+        category: { name: "billing" },
+        priority: "MEDIUM" as const,
+        status: "OPEN" as const,
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2024-01-02T00:00:00.000Z"),
+      };
+      prisma.ticket.findMany.mockResolvedValue([row]);
+      prisma.ticket.count.mockResolvedValue(1);
+
+      const result = await service.listTicketsForCustomer("customer-1");
+
+      expect(result.items).toEqual([
+        {
+          id: "ticket-1",
+          subject: "Cannot log in",
+          categoryId: "category-1",
+          categoryName: "billing",
+          priority: "MEDIUM",
+          status: "OPEN",
+          customerId: "customer-1",
+          customerName: null,
+          contactId: null,
+          departmentId: null,
+          assignedToUserId: null,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        },
+      ]);
     });
   });
 

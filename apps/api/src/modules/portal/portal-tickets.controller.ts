@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UploadedFile,
@@ -15,6 +16,7 @@ import type { Request, Response } from "express";
 import type { JwtAccessTokenClaims } from "@crm/shared";
 import { PortalRoute } from "../../common/auth/portal-route.decorator";
 import { PortalCreateTicketDto } from "./dto/portal-create-ticket.dto";
+import { ListPortalTicketsQueryDto } from "./dto/list-portal-tickets-query.dto";
 import { SubmitCsatDto } from "./dto/submit-csat.dto";
 import { CreateChannelMessageDto } from "../tickets/dto/create-channel-message.dto";
 import type {
@@ -22,6 +24,7 @@ import type {
   TicketHistoryEntrySummary,
   TicketSummary,
 } from "../tickets/tickets.service";
+import type { Paginated } from "../../common/pagination/paginated";
 import type { ChannelMessageSummary } from "../channels/channel-messages.service";
 import type {
   AttachmentSummary,
@@ -44,19 +47,26 @@ export class PortalTicketsController {
 
   @PortalRoute()
   @Post()
-  create(
-    @Req() request: Request,
-    @Body() dto: PortalCreateTicketDto,
-  ): Promise<TicketSummary> {
+  create(@Req() request: Request, @Body() dto: PortalCreateTicketDto): Promise<TicketSummary> {
     const contact = request.user as JwtAccessTokenClaims;
     return this.portalTicketsService.createTicket(contact.sub, dto);
   }
 
+  /** PORTAL-1 — paginated, mirroring every other list endpoint's
+   * `page`/`pageSize` query params (Story S-8a-e's own precedent); no other
+   * filters exist for this list (see `ListPortalTicketsQueryDto`'s own doc
+   * comment). */
   @PortalRoute()
   @Get()
-  list(@Req() request: Request): Promise<TicketSummary[]> {
+  list(
+    @Req() request: Request,
+    @Query() query: ListPortalTicketsQueryDto,
+  ): Promise<Paginated<TicketSummary>> {
     const contact = request.user as JwtAccessTokenClaims;
-    return this.portalTicketsService.listTickets(contact.sub);
+    return this.portalTicketsService.listTickets(contact.sub, {
+      page: query.page,
+      pageSize: query.pageSize,
+    });
   }
 
   @PortalRoute()
@@ -161,10 +171,7 @@ export class PortalTicketsController {
 
   @PortalRoute()
   @Get(":id/attachments")
-  listAttachments(
-    @Req() request: Request,
-    @Param("id") id: string,
-  ): Promise<AttachmentSummary[]> {
+  listAttachments(@Req() request: Request, @Param("id") id: string): Promise<AttachmentSummary[]> {
     const contact = request.user as JwtAccessTokenClaims;
     return this.portalTicketsService.listAttachments(contact.sub, id);
   }

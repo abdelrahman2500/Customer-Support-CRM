@@ -76,9 +76,19 @@ export function NotificationHistoryView() {
     }
   }, [notificationsQuery.isSuccess, markReadMutation]);
 
+  /**
+   * PORTAL-1 — `useMyTicketsQuery()` now resolves a paginated envelope
+   * (`.items`, page 1 by default) rather than every ticket the customer
+   * has. This join was already documented above as a best-effort
+   * resolution whose miss falls back to the raw `ticketId`, never a
+   * blocking failure — a notification for a ticket outside the first page
+   * now takes that same, already-existing fallback path instead of a hard
+   * guarantee of resolution. Widening this join is Customer Portal
+   * Notification Pagination's own concern, not this story's.
+   */
   const ticketSubjectById = useMemo(() => {
     const map = new Map<string, string>();
-    for (const ticket of ticketsQuery.data ?? []) {
+    for (const ticket of ticketsQuery.data?.items ?? []) {
       map.set(ticket.id, ticket.subject);
     }
     return map;

@@ -81,20 +81,36 @@ describe("PortalTicketsService", () => {
     expect(result).toEqual({ id: "ticket-1" });
   });
 
-  it("listTickets resolves customerId from the authenticated contact, then delegates", async () => {
+  it("listTickets resolves customerId from the authenticated contact, then delegates with no pagination given", async () => {
     portalService.getAuthenticatedContact.mockResolvedValue({
       id: "contact-1",
       email: "jane@example.com",
       fullName: "Jane Doe",
       customerId: "customer-1",
     });
-    ticketsService.listTicketsForCustomer.mockResolvedValue([]);
+    const page = { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 };
+    ticketsService.listTicketsForCustomer.mockResolvedValue(page);
 
     const result = await service.listTickets("contact-1");
 
     expect(portalService.getAuthenticatedContact).toHaveBeenCalledWith("contact-1");
-    expect(ticketsService.listTicketsForCustomer).toHaveBeenCalledWith("customer-1");
-    expect(result).toEqual([]);
+    expect(ticketsService.listTicketsForCustomer).toHaveBeenCalledWith("customer-1", {});
+    expect(result).toEqual(page);
+  });
+
+  // PORTAL-1 — Portal My Tickets Pagination.
+  it("listTickets forwards an explicit page/pageSize to listTicketsForCustomer", async () => {
+    portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
+    const page = { items: [], total: 0, page: 2, pageSize: 10, totalPages: 1 };
+    ticketsService.listTicketsForCustomer.mockResolvedValue(page);
+
+    const result = await service.listTickets("contact-1", { page: 2, pageSize: 10 });
+
+    expect(ticketsService.listTicketsForCustomer).toHaveBeenCalledWith("customer-1", {
+      page: 2,
+      pageSize: 10,
+    });
+    expect(result).toEqual(page);
   });
 
   it("getTicket resolves customerId, then delegates with the ticket id", async () => {
@@ -182,7 +198,12 @@ describe("PortalTicketsService", () => {
     it("resolves customerId, then delegates to AttachmentsService.uploadAttachmentForCustomer with the contact id", async () => {
       portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
       attachmentsService.uploadAttachmentForCustomer.mockResolvedValue({ id: "attachment-1" });
-      const file = { originalname: "a.png", size: 10, mimetype: "image/png", buffer: Buffer.from("x") };
+      const file = {
+        originalname: "a.png",
+        size: 10,
+        mimetype: "image/png",
+        buffer: Buffer.from("x"),
+      };
 
       const result = await service.uploadAttachment("contact-1", "ticket-1", file);
 
@@ -215,9 +236,15 @@ describe("PortalTicketsService", () => {
   describe("getAttachmentDownloadUrl", () => {
     it("resolves customerId, then delegates with the ticket and attachment ids", async () => {
       portalService.getAuthenticatedContact.mockResolvedValue({ customerId: "customer-1" });
-      attachmentsService.getDownloadUrlForCustomer.mockResolvedValue("https://example.test/presigned");
+      attachmentsService.getDownloadUrlForCustomer.mockResolvedValue(
+        "https://example.test/presigned",
+      );
 
-      const result = await service.getAttachmentDownloadUrl("contact-1", "ticket-1", "attachment-1");
+      const result = await service.getAttachmentDownloadUrl(
+        "contact-1",
+        "ticket-1",
+        "attachment-1",
+      );
 
       expect(attachmentsService.getDownloadUrlForCustomer).toHaveBeenCalledWith(
         "ticket-1",
@@ -233,7 +260,12 @@ describe("PortalTicketsService", () => {
     it("creates a ticket with a subject derived from the first CUSTOMER message, replays the transcript, and records the escalation", async () => {
       const messages = [
         { id: "m1", role: "CUSTOMER", body: "Cannot log in to my account", createdAt: new Date() },
-        { id: "m2", role: "ASSISTANT", body: "Have you tried resetting your password?", createdAt: new Date() },
+        {
+          id: "m2",
+          role: "ASSISTANT",
+          body: "Have you tried resetting your password?",
+          createdAt: new Date(),
+        },
       ];
       aiChatService.getEscalationContext.mockResolvedValue({
         id: "session-1",
