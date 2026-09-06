@@ -7,6 +7,8 @@ import { SlaTimersProducer, SLA_TIMERS_QUEUE } from "./sla-timers.producer";
 import { SlaTimerEventsBridgeProcessor, SLA_TIMER_EVENTS_QUEUE } from "./sla-timer-events-bridge.processor";
 import { AiProcessingProducer, AI_PROCESSING_QUEUE } from "./ai-processing.producer";
 import { AiProcessingEventsBridgeProcessor, AI_PROCESSING_EVENTS_QUEUE } from "./ai-processing-events-bridge.processor";
+import { TaskRemindersProducer, TASK_REMINDERS_QUEUE } from "./task-reminders.producer";
+import { TaskReminderEventsBridgeProcessor, TASK_REMINDER_EVENTS_QUEUE } from "./task-reminder-events-bridge.processor";
 
 /**
  * Owns `apps/api`'s BullMQ producer connection — one place all of
@@ -18,6 +20,10 @@ import { AiProcessingEventsBridgeProcessor, AI_PROCESSING_EVENTS_QUEUE } from ".
  * Story 76 — `ai-processing` (produced here, consumed by `apps/worker`)
  * and `ai-processing-events` (consumed here, produced by `apps/worker`)
  * are the identically-shaped AI hand-back bridge.
+ *
+ * RM-03 — `task-reminders` (produced here, consumed by `apps/worker`) and
+ * `task-reminder-events` (consumed here, produced by `apps/worker`) are
+ * the identically-shaped task-reminder hand-back bridge.
  */
 @Module({
   imports: [
@@ -33,6 +39,8 @@ import { AiProcessingEventsBridgeProcessor, AI_PROCESSING_EVENTS_QUEUE } from ".
     BullModule.registerQueue({ name: SLA_TIMER_EVENTS_QUEUE }),
     BullModule.registerQueue({ name: AI_PROCESSING_QUEUE }),
     BullModule.registerQueue({ name: AI_PROCESSING_EVENTS_QUEUE }),
+    BullModule.registerQueue({ name: TASK_REMINDERS_QUEUE }),
+    BullModule.registerQueue({ name: TASK_REMINDER_EVENTS_QUEUE }),
   ],
   providers: [
     HealthCheckProducer,
@@ -40,7 +48,9 @@ import { AiProcessingEventsBridgeProcessor, AI_PROCESSING_EVENTS_QUEUE } from ".
     SlaTimerEventsBridgeProcessor,
     AiProcessingProducer,
     AiProcessingEventsBridgeProcessor,
+    TaskRemindersProducer,
+    TaskReminderEventsBridgeProcessor,
   ],
-  exports: [HealthCheckProducer, SlaTimersProducer, AiProcessingProducer],
+  exports: [HealthCheckProducer, SlaTimersProducer, AiProcessingProducer, TaskRemindersProducer],
 })
 export class QueuesModule {}

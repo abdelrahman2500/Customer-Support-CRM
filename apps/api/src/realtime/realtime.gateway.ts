@@ -278,6 +278,14 @@ export class RealtimeGateway
       return membership !== null;
     }
 
+    // RM-03 — Agent Tasks & Reminders. Unlike `agent:(.+):presence`, no
+    // same-branch-membership fallback: a task is strictly personal, so
+    // only the owning agent's own socket may ever join its room.
+    const taskMatch = /^agent:(.+):tasks$/.exec(room);
+    if (taskMatch) {
+      return taskMatch[1] === claims.userId;
+    }
+
     return false;
   }
 

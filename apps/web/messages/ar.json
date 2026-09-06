@@ -553,7 +553,25 @@
     "claiming": "جارٍ الاستلام...",
     "claimForbidden": "لا تملك صلاحية استلام هذه التذكرة.",
     "claimFailed": "تعذّر استلام هذه التذكرة. حاول مرة أخرى.",
-    "browseAllTicketsLink": "تصفّح كل التذاكر"
+    "browseAllTicketsLink": "تصفّح كل التذاكر",
+    "tasks": {
+      "heading": "مهامي",
+      "error": "تعذّر تحميل مهامك.",
+      "empty": "لا توجد مهام مفتوحة.",
+      "titleLabel": "العنوان",
+      "dueLabel": "الاستحقاق",
+      "priorityLabel": "الأولوية",
+      "createSubmit": "إضافة مهمة",
+      "createSubmitting": "جارٍ الإضافة...",
+      "createFailed": "تعذّر إنشاء هذه المهمة. حاول مرة أخرى.",
+      "actionForbidden": "لا تملك صلاحية القيام بذلك.",
+      "actionFailed": "تعذّر تحديث هذه المهمة. حاول مرة أخرى.",
+      "completeButton": "إتمام",
+      "deleteButton": "حذف",
+      "deleteConfirmTitle": "حذف المهمة؟",
+      "deleteConfirmDescription": "سيتم حذف \"{title}\" نهائيًا.",
+      "overdue": "متأخرة"
+    }
   },
   "notifications": {
     "regionLabel": "الإشعارات",

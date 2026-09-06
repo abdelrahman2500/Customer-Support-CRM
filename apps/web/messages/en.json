@@ -553,7 +553,25 @@
     "claiming": "Claiming...",
     "claimForbidden": "You don't have permission to claim this ticket.",
     "claimFailed": "Couldn't claim this ticket. Please try again.",
-    "browseAllTicketsLink": "Browse all tickets"
+    "browseAllTicketsLink": "Browse all tickets",
+    "tasks": {
+      "heading": "My Tasks",
+      "error": "Couldn't load your tasks.",
+      "empty": "You have no open tasks.",
+      "titleLabel": "Title",
+      "dueLabel": "Due",
+      "priorityLabel": "Priority",
+      "createSubmit": "Add task",
+      "createSubmitting": "Adding...",
+      "createFailed": "Couldn't create this task. Please try again.",
+      "actionForbidden": "You don't have permission to do that.",
+      "actionFailed": "Couldn't update this task. Please try again.",
+      "completeButton": "Complete",
+      "deleteButton": "Delete",
+      "deleteConfirmTitle": "Delete task?",
+      "deleteConfirmDescription": "This will permanently delete \"{title}\".",
+      "overdue": "Overdue"
+    }
   },
   "notifications": {
     "regionLabel": "Notifications",

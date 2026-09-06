@@ -5,6 +5,7 @@ import { TicketRealtimeListener } from "./ticket-realtime.listener";
 import { ChatRealtimeListener } from "./chat-realtime.listener";
 import { BranchNotificationRealtimeListener } from "./branch-notification-realtime.listener";
 import { CustomerNotificationRealtimeListener } from "./customer-notification-realtime.listener";
+import { TaskRealtimeListener } from "./task-realtime.listener";
 import { PresenceService } from "./presence.service";
 
 /**
@@ -35,6 +36,11 @@ import { PresenceService } from "./presence.service";
  * (`RealtimeGateway.authorizeRoom`'s own new customer-only branch) — the
  * Customer Portal's own mirror of `BranchNotificationRealtimeListener`,
  * fully independent of it and of `TicketRealtimeListener`/`ticket:{id}`.
+ *
+ * RM-03 — `TaskRealtimeListener` registered the same way, reacting to
+ * `task.reminder_due` and relaying into `agent:{ownerUserId}:tasks`
+ * (`RealtimeGateway.authorizeRoom`'s own new `agent:(.+):tasks` branch) —
+ * fully independent of every other listener here.
  */
 @Module({
   imports: [AuthModule],
@@ -44,6 +50,7 @@ import { PresenceService } from "./presence.service";
     ChatRealtimeListener,
     BranchNotificationRealtimeListener,
     CustomerNotificationRealtimeListener,
+    TaskRealtimeListener,
     PresenceService,
   ],
 })

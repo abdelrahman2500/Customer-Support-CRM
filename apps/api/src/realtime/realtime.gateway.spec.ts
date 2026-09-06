@@ -521,6 +521,34 @@ describe("RealtimeGateway", () => {
       expect(client.emit).not.toHaveBeenCalled();
     });
 
+    // RM-03 — Agent Tasks & Reminders. Unlike agent:{id}:presence, no
+    // same-branch-membership fallback: a task is strictly personal.
+    it("always allows joining the caller's own agent:{id}:tasks room", async () => {
+      const client = connectedClient();
+
+      const result = await gateway.onJoin(client as never, { room: "agent:user-1:tasks" });
+
+      expect(result).toEqual({ ok: true });
+      expect(prisma.userBranchRole.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("denies joining another agent's tasks room even when they share the caller's branch", async () => {
+      const client = connectedClient();
+
+      const result = await gateway.onJoin(client as never, { room: "agent:user-2:tasks" });
+
+      expect(result).toEqual({ ok: false });
+      expect(prisma.userBranchRole.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("denies a customer joining agent:{id}:tasks — agent-only", async () => {
+      const client = connectedCustomerClient();
+
+      const result = await gateway.onJoin(client as never, { room: "agent:contact-1:tasks" });
+
+      expect(result).toEqual({ ok: false });
+    });
+
     it("denies an unrecognized room shape by default", async () => {
       const client = connectedClient();
 

@@ -27,6 +27,7 @@ import { PortalModule } from "./modules/portal/portal.module";
 import { ReportingModule } from "./modules/reporting/reporting.module";
 import { AttachmentsModule } from "./modules/attachments/attachments.module";
 import { AiModule } from "./modules/ai/ai.module";
+import { TasksModule } from "./modules/tasks/tasks.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 
 @Module({
@@ -55,6 +56,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
     ReportingModule,
     AttachmentsModule,
     AiModule,
+    TasksModule,
     RealtimeModule,
   ],
   providers: [

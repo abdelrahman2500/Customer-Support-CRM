@@ -3,6 +3,12 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { DashboardView } from "./dashboard-view";
 import { useCustomersQuery, useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
+import {
+  useCreateTaskMutation,
+  useDeleteTaskMutation,
+  useTasksQuery,
+  useUpdateTaskMutation,
+} from "@/hooks/use-tasks";
 import { ApiError } from "@/lib/api";
 import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
@@ -20,9 +26,27 @@ vi.mock("@/hooks/use-tickets", () => ({
   useUpdateTicketMutation: vi.fn(),
 }));
 
+// RM-03 — `TasksPanel` (mounted inside `DashboardView`) calls these real
+// hooks; mocked here the same way every other data hook in this spec is,
+// so these tests never depend on a real `QueryClientProvider`/network call.
+vi.mock("@/hooks/use-tasks", () => ({
+  tasksQueryKey: ["tasks"],
+  useTasksQuery: vi.fn(),
+  useCreateTaskMutation: vi.fn(),
+  useUpdateTaskMutation: vi.fn(),
+  useDeleteTaskMutation: vi.fn(),
+}));
+vi.mock("@/hooks/use-task-reminders", () => ({
+  useTaskReminders: vi.fn(),
+}));
+
 const mockedUseTicketsQuery = vi.mocked(useTicketsQuery);
 const mockedUseCustomersQuery = vi.mocked(useCustomersQuery);
 const mockedUseUpdateTicketMutation = vi.mocked(useUpdateTicketMutation);
+const mockedUseTasksQuery = vi.mocked(useTasksQuery);
+const mockedUseCreateTaskMutation = vi.mocked(useCreateTaskMutation);
+const mockedUseUpdateTaskMutation = vi.mocked(useUpdateTaskMutation);
+const mockedUseDeleteTaskMutation = vi.mocked(useDeleteTaskMutation);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -128,6 +152,25 @@ describe("DashboardView", () => {
       isPending: false,
       isError: false,
       error: null,
+    } as never);
+    // RM-03 — `TasksPanel`'s own default fixture; its detailed behavior is
+    // covered by `tasks-panel.spec.tsx`, not re-tested here.
+    mockedUseTasksQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 } }) as never,
+    );
+    mockedUseCreateTaskMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
+    mockedUseUpdateTaskMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+    mockedUseDeleteTaskMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
     } as never);
   });
 
@@ -468,5 +511,13 @@ describe("DashboardView", () => {
     expect(screen.getByText("لا توجد تذاكر مفتوحة مُسندة إليك.")).toBeInTheDocument();
     expect(screen.getByText("التذاكر غير المُسندة")).toBeInTheDocument();
     expect(screen.getByText("لا توجد تذاكر غير مُسندة حاليًا.")).toBeInTheDocument();
+  });
+
+  // RM-03 — confirms the wiring only; TasksPanel's own behavior is covered
+  // in full by tasks-panel.spec.tsx.
+  it("mounts the Tasks panel", () => {
+    renderWithLocale();
+
+    expect(screen.getByText("My Tasks")).toBeInTheDocument();
   });
 });

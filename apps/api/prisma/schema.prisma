@@ -16,7 +16,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   extensions = [pgvector(map: "vector"), pg_trgm]
-  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base", "ai", "channels", "reporting"]
+  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base", "ai", "channels", "reporting", "tasks"]
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +96,8 @@ model User {
   uploadedAttachments         TicketAttachment[]
   uploadedCustomerAttachments CustomerAttachment[]
   channelMessages             ChannelMessage[]
+  /// RM-03 — this agent's own personal tasks.
+  tasks                       Task[]
   /// Story 92 — this agent's own "read up to" cursor over `NotificationLog`
   /// (a per-recipient timestamp, not a column on `NotificationLog` itself,
   /// since those rows are shared by every agent in a branch — see
@@ -311,6 +313,8 @@ model Customer {
   /// Story 88 — the portal-scoped half of `NotificationLog`; see that
   /// model's own `customerId` doc comment.
   notificationLogs NotificationLog[]
+  /// RM-03 — tasks referencing this customer (`Task.customerId`), optional.
+  tasks            Task[]
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
@@ -509,6 +513,8 @@ model Ticket {
   attachments       TicketAttachment[]
   channelMessages   ChannelMessage[]
   aiPromptLogs      AiPromptLog[]
+  /// RM-03 — tasks referencing this ticket (`Task.ticketId`), optional.
+  tasks             Task[]
   /// Story 85 — bare Prisma back-relation for `ChatSession.escalatedTicketId`;
   /// carries no database column of its own (the FK/unique constraint lives
   /// entirely on `ChatSession`).
@@ -1438,4 +1444,66 @@ model ReportDashboardWidget {
   @@unique([dashboardId, widgetType])
   @@map("report_dashboard_widgets")
   @@schema("reporting")
+}
+
+/// RM-03 — Agent Tasks & Reminders. Mirrors `TicketPriority`'s exact
+/// 4-value shape; a dedicated enum rather than reusing `TicketPriority`
+/// across schemas, mirroring `SlaPolicy.priority`/`ReportWidgetType`'s own
+/// precedent of a domain owning its own vocabulary rather than reaching
+/// into another schema's enum.
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@schema("tasks")
+}
+
+/// RM-03 — a personal agent task, optionally tied to a ticket and/or a
+/// customer. Deliberately no `branchId`/`departmentId`: unlike `Ticket`,
+/// a task is never department/branch-wide visible — it is always scoped
+/// to its own `ownerUserId` (mirrors `TicketNote.authorUserId`'s "scope
+/// derives from a required, real relationship" precedent, not
+/// `Ticket.branchId`'s own "shared, branch-wide resource" shape).
+/// `ticketId`/`customerId` are independent and both optional: a task can
+/// be fully standalone, ticket-only, customer-only, or both — creating/
+/// updating either validates the referenced row is in the caller's own
+/// branch scope via the existing `TicketsService.getTicket`/
+/// `CustomersService.getCustomer` authorization (never re-derived here).
+///
+/// `completedAt` alone represents completion (`null` = open) — no
+/// separate status enum: unlike `Ticket`'s 4-state lifecycle, a task is
+/// genuinely binary, so a second field would be redundant.
+///
+/// `dueAt` doubles as the reminder time — no separate `reminderAt`: no
+/// story has disclosed a need for "remind me before the due time", so a
+/// second field would exist only for theoretical future use.
+/// `reminderSentAt` is the idempotency marker `TaskReminderProcessor`
+/// (apps/worker) atomically claims via a conditional `updateMany`,
+/// mirroring `SlaTicketTarget`'s own `...NotifiedAt` claim pattern
+/// exactly — never fired twice for the same task, and never fired again
+/// after `dueAt`/`completedAt` change (see that processor's own doc
+/// comment for the exact claim mechanics).
+model Task {
+  id             String        @id @default(uuid())
+  ownerUserId    String        @map("owner_user_id")
+  owner          User          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  title          String
+  notes          String?
+  priority       TaskPriority  @default(MEDIUM)
+  ticketId       String?       @map("ticket_id")
+  ticket         Ticket?       @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  customerId     String?       @map("customer_id")
+  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  dueAt          DateTime?     @map("due_at")
+  reminderSentAt DateTime?     @map("reminder_sent_at")
+  completedAt    DateTime?     @map("completed_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@index([ownerUserId])
+  @@index([dueAt])
+  @@map("tasks")
+  @@schema("tasks")
 }

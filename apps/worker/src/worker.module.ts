@@ -7,6 +7,8 @@ import { SlaTimerProcessor, SLA_TIMERS_QUEUE } from "./queues/sla-timer.processo
 import { SLA_TIMER_EVENTS_QUEUE } from "./queues/sla-timer-events.types";
 import { AiProcessingProcessor, AI_PROCESSING_QUEUE } from "./queues/ai-processing.processor";
 import { AI_PROCESSING_EVENTS_QUEUE } from "./queues/ai-processing-events.types";
+import { TaskReminderProcessor, TASK_REMINDERS_QUEUE } from "./queues/task-reminder.processor";
+import { TASK_REMINDER_EVENTS_QUEUE } from "./queues/task-reminder-events.types";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AiProviderModule } from "./ai/ai-provider.module";
 import { PinoLoggerService } from "./common/logging/pino-logger.service";
@@ -26,6 +28,8 @@ import { PinoLoggerService } from "./common/logging/pino-logger.service";
     BullModule.registerQueue({ name: SLA_TIMER_EVENTS_QUEUE }),
     BullModule.registerQueue({ name: AI_PROCESSING_QUEUE }),
     BullModule.registerQueue({ name: AI_PROCESSING_EVENTS_QUEUE }),
+    BullModule.registerQueue({ name: TASK_REMINDERS_QUEUE }),
+    BullModule.registerQueue({ name: TASK_REMINDER_EVENTS_QUEUE }),
     PrismaModule,
     AiProviderModule,
   ],
@@ -33,6 +37,7 @@ import { PinoLoggerService } from "./common/logging/pino-logger.service";
     HealthProcessor,
     SlaTimerProcessor,
     AiProcessingProcessor,
+    TaskReminderProcessor,
     // Story 111 — resolved via `app.get(PinoLoggerService)` in `main.ts`.
     PinoLoggerService,
   ],

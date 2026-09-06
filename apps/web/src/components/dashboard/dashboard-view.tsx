@@ -10,6 +10,7 @@ import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { ApiError } from "@/lib/api";
 import { Alert, Badge, Button, Skeleton } from "@crm/ui";
+import { TasksPanel } from "./tasks-panel";
 
 /** Story 28 — a work queue, not a full history: only tickets still open
  * belong on the dashboard. `RESOLVED`/`CLOSED` tickets remain reachable via
@@ -303,6 +304,8 @@ export function DashboardView({ userId }: { userId: string }) {
           </ul>
         )}
       </div>
+
+      <TasksPanel userId={userId} />
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("unassignedHeading")}</h2>
