@@ -254,22 +254,39 @@ export class NotificationsService {
    * same reason `branchId`/`targetType` already are: the portal screen
    * shows its own ticket links and never needed either. Keeping one shape
    * matters more than trimming two nulls. */
-  async listNotificationsForCustomer(customerId: string): Promise<NotificationSummary[]> {
-    const notifications = await this.prisma.notificationLog.findMany({
+  /**
+   * PORTAL-2 — paginated via the same `paginate()` helper and `id`
+   * tie-breaker `listNotifications()` above already uses; no `include`
+   * needed (unlike `TicketsService.listTicketsForCustomer`'s wrapped
+   * delegate), so the plain Prisma delegate is passed straight through.
+   * No `sortBy`/filter params are added — this list has none, mirroring
+   * `ListPortalNotificationsQueryDto`'s "endpoint has no filters to
+   * preserve" precedent.
+   */
+  async listNotificationsForCustomer(
+    customerId: string,
+    pagination: { page?: number; pageSize?: number } = {},
+  ): Promise<Paginated<NotificationSummary>> {
+    const { items: notifications, ...page } = await paginate(this.prisma.notificationLog, {
       where: { customerId },
-      orderBy: { loggedAt: "desc" },
+      orderBy: [{ loggedAt: "desc" }, { id: "desc" }],
+      page: pagination.page,
+      pageSize: pagination.pageSize,
     });
 
-    return notifications.map((notification) => ({
-      id: notification.id,
-      eventType: notification.eventType,
-      ticketId: notification.ticketId,
-      ticketSubject: null,
-      customerName: null,
-      branchId: notification.branchId,
-      targetType: notification.targetType,
-      targetAt: notification.targetAt,
-      loggedAt: notification.loggedAt,
-    }));
+    return {
+      ...page,
+      items: notifications.map((notification) => ({
+        id: notification.id,
+        eventType: notification.eventType,
+        ticketId: notification.ticketId,
+        ticketSubject: null,
+        customerName: null,
+        branchId: notification.branchId,
+        targetType: notification.targetType,
+        targetAt: notification.targetAt,
+        loggedAt: notification.loggedAt,
+      })),
+    };
   }
 }

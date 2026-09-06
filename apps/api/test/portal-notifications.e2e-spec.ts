@@ -115,14 +115,16 @@ describe("Customer Portal — Notification History (e2e)", () => {
       .expect(401);
   });
 
-  it("returns [] for a customer with no notification history yet", async () => {
+  // PORTAL-2 — Customer Portal Notification Pagination. Paginated
+  // envelope, matching every other paginated list endpoint (`Paginated<T>`).
+  it("returns an empty paginated envelope for a customer with no notification history yet", async () => {
     const token = await loginAsPortalContact(contactEmail);
 
     const response = await request(app.getHttpServer())
       .get("/api/v1/portal/notifications")
       .set("Authorization", `Bearer ${token}`)
       .expect(200);
-    expect(response.body).toEqual([]);
+    expect(response.body).toEqual({ items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 });
   });
 
   it("persists and surfaces ticket.updated and agent-reply notifications, and keeps GET /notifications unaffected", async () => {
@@ -158,7 +160,8 @@ describe("Customer Portal — Notification History (e2e)", () => {
       .set("Authorization", `Bearer ${token}`)
       .expect(200);
 
-    const eventTypes = response.body.map((n: { eventType: string; ticketId: string }) => ({
+    expect(response.body.total).toBeGreaterThanOrEqual(2);
+    const eventTypes = response.body.items.map((n: { eventType: string; ticketId: string }) => ({
       eventType: n.eventType,
       ticketId: n.ticketId,
     }));
@@ -166,7 +169,7 @@ describe("Customer Portal — Notification History (e2e)", () => {
     expect(eventTypes).toContainEqual({ eventType: "channel.message.created", ticketId });
 
     // Newest first.
-    const loggedAts = response.body.map((n: { loggedAt: string }) =>
+    const loggedAts = response.body.items.map((n: { loggedAt: string }) =>
       new Date(n.loggedAt).getTime(),
     );
     expect(loggedAts).toEqual([...loggedAts].sort((a, b) => b - a));
@@ -213,7 +216,30 @@ describe("Customer Portal — Notification History (e2e)", () => {
       .get("/api/v1/portal/notifications")
       .set("Authorization", `Bearer ${otherToken}`)
       .expect(200);
-    expect(response.body).toEqual([]);
+    expect(response.body).toEqual({ items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 });
+  });
+
+  it("paginates: page 1 with pageSize=1 returns exactly one item and totalPages matches total", async () => {
+    const token = await loginAsPortalContact(contactEmail);
+
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/portal/notifications?page=1&pageSize=1")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(response.body.items).toHaveLength(1);
+    expect(response.body.page).toBe(1);
+    expect(response.body.pageSize).toBe(1);
+    expect(response.body.totalPages).toBe(response.body.total);
+  });
+
+  it("returns a validation error for a pageSize above the shared maximum", async () => {
+    const token = await loginAsPortalContact(contactEmail);
+
+    await request(app.getHttpServer())
+      .get("/api/v1/portal/notifications?pageSize=101")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(400);
   });
 
   // -------------------------------------------------------------------

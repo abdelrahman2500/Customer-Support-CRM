@@ -4,6 +4,7 @@ import {
   listMyNotifications,
   markNotificationsRead,
 } from "@/lib/notifications-api";
+import { preservePreviousResults } from "@/lib/list-query";
 
 /**
  * Story 89 — dedicated notification-history hook, distinct from
@@ -14,11 +15,23 @@ import {
  * mutation exists on this screen, and a notification history is a log
  * that keeps growing, so it re-fetches on every mount/window-focus like
  * the default `useMyTicketsQuery`.
+ *
+ * PORTAL-2 — `myNotificationsQueryKey` becomes a function of `page`,
+ * mirroring `myTicketsQueryKey(page)`'s own convention (PORTAL-1): paging
+ * is a key change like any other, so it inherits Story S-7's row
+ * preservation for free.
  */
-export const myNotificationsQueryKey = ["portal-notifications"] as const;
+export const myNotificationsQueryKey = (page?: number) =>
+  ["portal-notifications", page ?? 1] as const;
 
-export function useMyNotificationsQuery() {
-  return useQuery({ queryKey: myNotificationsQueryKey, queryFn: listMyNotifications });
+/** PORTAL-2 — 1-based; `undefined` until the reader pages, mirroring
+ * `useMyTicketsQuery`'s own convention exactly. */
+export function useMyNotificationsQuery(page?: number) {
+  return useQuery({
+    queryKey: myNotificationsQueryKey(page),
+    queryFn: () => listMyNotifications({ page }),
+    ...preservePreviousResults,
+  });
 }
 
 /**

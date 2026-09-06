@@ -49,12 +49,20 @@ const mockedUseUpdatePortalNotificationPreferenceMutation = vi.mocked(
 function queryResult(overrides: Record<string, unknown>) {
   return {
     data: undefined,
-    isLoading: false,
+    isPending: false,
     isError: false,
     isSuccess: false,
+    isPlaceholderData: false,
     refetch: vi.fn(),
     ...overrides,
   };
+}
+
+/** PORTAL-2 — `useMyNotificationsQuery` now resolves a `Paginated<T>`
+ * envelope, not a flat array. Mirrors `ticket-list-view.spec.tsx`'s own
+ * `ticketPage()` helper exactly (PORTAL-1). */
+function notificationPage(items: unknown[], overrides: Record<string, unknown> = {}) {
+  return { items, total: items.length, page: 1, pageSize: 25, totalPages: 1, ...overrides };
 }
 
 const ticketUpdatedNotification = {
@@ -109,7 +117,7 @@ describe("NotificationHistoryView", () => {
 
   it("renders the notification preferences section", () => {
     mockedUseMyNotificationsQuery.mockReturnValue(
-      queryResult({ data: [], isSuccess: true }) as never,
+      queryResult({ data: notificationPage([]), isSuccess: true }) as never,
     );
 
     render(<NotificationHistoryView />);
@@ -118,7 +126,7 @@ describe("NotificationHistoryView", () => {
   });
 
   it("shows a loading state while the notifications query is pending", () => {
-    mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+    mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isPending: true }) as never);
 
     const { container } = render(<NotificationHistoryView />);
 
@@ -127,7 +135,7 @@ describe("NotificationHistoryView", () => {
 
   // Story 97 — Loading & Skeleton UX.
   it("shapes the loading state as the real 3-column table, not generic row bars", () => {
-    mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+    mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isPending: true }) as never);
 
     const { container } = render(<NotificationHistoryView />);
 
@@ -147,7 +155,7 @@ describe("NotificationHistoryView", () => {
 
   it("shows the empty state when the query succeeds with zero notifications", () => {
     mockedUseMyNotificationsQuery.mockReturnValue(
-      queryResult({ data: [], isSuccess: true }) as never,
+      queryResult({ data: notificationPage([]), isSuccess: true }) as never,
     );
 
     render(<NotificationHistoryView />);
@@ -170,7 +178,7 @@ describe("NotificationHistoryView", () => {
     mockedUseMyNotificationsQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [ticketUpdatedNotification, newReplyNotification],
+        data: notificationPage([ticketUpdatedNotification, newReplyNotification]),
       }) as never,
     );
 
@@ -196,7 +204,10 @@ describe("NotificationHistoryView", () => {
       }) as never,
     );
     mockedUseMyNotificationsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+      queryResult({
+        isSuccess: true,
+        data: notificationPage([ticketUpdatedNotification]),
+      }) as never,
     );
 
     render(<NotificationHistoryView />);
@@ -206,7 +217,10 @@ describe("NotificationHistoryView", () => {
 
   it("falls back to the raw ticketId when the ticket isn't in the resolved list", () => {
     mockedUseMyNotificationsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+      queryResult({
+        isSuccess: true,
+        data: notificationPage([ticketUpdatedNotification]),
+      }) as never,
     );
 
     render(<NotificationHistoryView />);
@@ -216,7 +230,10 @@ describe("NotificationHistoryView", () => {
 
   it("links each notification to its locale-correct ticket detail route", () => {
     mockedUseMyNotificationsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+      queryResult({
+        isSuccess: true,
+        data: notificationPage([ticketUpdatedNotification]),
+      }) as never,
     );
 
     render(<NotificationHistoryView />);
@@ -227,7 +244,10 @@ describe("NotificationHistoryView", () => {
 
   it("maps a ticket.updated eventType to the existing eventLabel.ticketUpdated key", () => {
     mockedUseMyNotificationsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+      queryResult({
+        isSuccess: true,
+        data: notificationPage([ticketUpdatedNotification]),
+      }) as never,
     );
 
     render(<NotificationHistoryView />);
@@ -237,7 +257,7 @@ describe("NotificationHistoryView", () => {
 
   it("maps a channel.message.created eventType to the existing eventLabel.newReply key", () => {
     mockedUseMyNotificationsQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [newReplyNotification] }) as never,
+      queryResult({ isSuccess: true, data: notificationPage([newReplyNotification]) }) as never,
     );
 
     render(<NotificationHistoryView />);
@@ -249,7 +269,10 @@ describe("NotificationHistoryView", () => {
   describe("mark-as-read on mount", () => {
     it("triggers mark-as-read exactly once after the notifications query succeeds", async () => {
       mockedUseMyNotificationsQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [ticketUpdatedNotification] }) as never,
+        queryResult({
+          isSuccess: true,
+          data: notificationPage([ticketUpdatedNotification]),
+        }) as never,
       );
 
       render(<NotificationHistoryView />);
@@ -257,8 +280,8 @@ describe("NotificationHistoryView", () => {
       await waitFor(() => expect(markRead).toHaveBeenCalledTimes(1));
     });
 
-    it("never triggers mark-as-read while the query is loading", () => {
-      mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+    it("never triggers mark-as-read while the query is pending", () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(queryResult({ isPending: true }) as never);
 
       render(<NotificationHistoryView />);
 
@@ -273,6 +296,134 @@ describe("NotificationHistoryView", () => {
       render(<NotificationHistoryView />);
 
       expect(markRead).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * PORTAL-2 — Customer Portal Notification Pagination. Mirrors
+   * `ticket-list-view.spec.tsx`'s own "pagination (PORTAL-1)" describe
+   * block exactly — same primitive, same fetch semantics.
+   */
+  describe("pagination (PORTAL-2)", () => {
+    const middlePage = { total: 60, page: 2, pageSize: 25, totalPages: 3 };
+
+    beforeEach(() => {
+      mockedUseMyNotificationsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: notificationPage([ticketUpdatedNotification], middlePage),
+        }) as never,
+      );
+    });
+
+    it("renders no pager when the notifications fit on one page", () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: notificationPage([ticketUpdatedNotification]),
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    });
+
+    it("renders the pager and page indicator once there is more than one page", () => {
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByRole("navigation", { name: "pagination.label" })).toBeInTheDocument();
+      expect(screen.getByText("pagination.indicator")).toBeInTheDocument();
+    });
+
+    it("requests the next page", () => {
+      render(<NotificationHistoryView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
+
+      expect(mockedUseMyNotificationsQuery).toHaveBeenLastCalledWith(3);
+    });
+
+    it("requests the previous page", () => {
+      render(<NotificationHistoryView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "pagination.previous" }));
+
+      expect(mockedUseMyNotificationsQuery).toHaveBeenLastCalledWith(1);
+    });
+
+    it("disables previous on the first page", () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: notificationPage([ticketUpdatedNotification], { ...middlePage, page: 1 }),
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeEnabled();
+    });
+
+    it("disables next on the last page", () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: notificationPage([ticketUpdatedNotification], { ...middlePage, page: 3 }),
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeEnabled();
+    });
+
+    it("keeps the previous page's rows on screen while the next one loads", () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: notificationPage([ticketUpdatedNotification], middlePage),
+        }) as never,
+      );
+
+      const { container } = render(<NotificationHistoryView />);
+
+      expect(screen.getByText("ticket-1")).toBeInTheDocument();
+      expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+    });
+
+    it("shows a polite fetch indicator while a page change is in flight", () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: notificationPage([ticketUpdatedNotification], middlePage),
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      const status = screen.getByRole("status");
+      expect(status).toHaveTextContent("updating");
+      expect(status).toHaveAttribute("aria-live", "polite");
+    });
+
+    it("blocks both controls while a page change is in flight", () => {
+      mockedUseMyNotificationsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: notificationPage([ticketUpdatedNotification], middlePage),
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
     });
   });
 });

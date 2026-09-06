@@ -1,10 +1,12 @@
-import { Controller, Get, Patch, Req } from "@nestjs/common";
+import { Controller, Get, Patch, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Request } from "express";
 import type { JwtAccessTokenClaims } from "@crm/shared";
 import { PortalRoute } from "../../common/auth/portal-route.decorator";
 import type { NotificationSummary } from "../notifications/notifications.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import type { Paginated } from "../../common/pagination/paginated";
+import { ListPortalNotificationsQueryDto } from "./dto/list-portal-notifications-query.dto";
 import { PortalService } from "./portal.service";
 
 /**
@@ -32,12 +34,21 @@ export class PortalNotificationsController {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  /** PORTAL-2 — paginated, mirroring every other list endpoint's
+   * `page`/`pageSize` query params; no other filters exist for this list
+   * (see `ListPortalNotificationsQueryDto`'s own doc comment). */
   @PortalRoute()
   @Get()
-  async list(@Req() request: Request): Promise<NotificationSummary[]> {
+  async list(
+    @Req() request: Request,
+    @Query() query: ListPortalNotificationsQueryDto,
+  ): Promise<Paginated<NotificationSummary>> {
     const contact = request.user as JwtAccessTokenClaims;
     const { customerId } = await this.portalService.getAuthenticatedContact(contact.sub);
-    return this.notificationsService.listNotificationsForCustomer(customerId);
+    return this.notificationsService.listNotificationsForCustomer(customerId, {
+      page: query.page,
+      pageSize: query.pageSize,
+    });
   }
 
   @PortalRoute()

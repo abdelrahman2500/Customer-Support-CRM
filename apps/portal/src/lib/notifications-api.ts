@@ -1,4 +1,5 @@
 import { apiFetch } from "./api";
+import type { PaginatedResponse } from "./paginated";
 
 /**
  * Story 89 — Customer Portal: Notification History (Frontend). A dedicated
@@ -27,13 +28,35 @@ export interface PortalNotificationSummary {
 }
 
 /**
- * `GET /portal/notifications` — read-only, no query parameters, requires
- * only the portal audience (`@PortalRoute()`), no extra permission check
- * (unlike the agent-facing `GET /notifications`, which requires
- * `notification:read`).
+ * PORTAL-2 — Customer Portal Notification Pagination. Mirrors
+ * `tickets-api.ts`'s own `toQueryString` convention: an omitted
+ * `page`/`pageSize` produces the exact same request every existing caller
+ * already sends.
  */
-export function listMyNotifications(): Promise<PortalNotificationSummary[]> {
-  return apiFetch<PortalNotificationSummary[]>("/portal/notifications");
+function toQueryString(pagination: { page?: number; pageSize?: number } = {}): string {
+  const params = new URLSearchParams();
+  if (pagination.page !== undefined) {
+    params.set("page", String(pagination.page));
+  }
+  if (pagination.pageSize !== undefined) {
+    params.set("pageSize", String(pagination.pageSize));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+/**
+ * `GET /portal/notifications` — requires only the portal audience
+ * (`@PortalRoute()`), no extra permission check (unlike the agent-facing
+ * `GET /notifications`, which requires `notification:read`). No filters
+ * exist for this list, only pagination.
+ */
+export function listMyNotifications(
+  pagination: { page?: number; pageSize?: number } = {},
+): Promise<PaginatedResponse<PortalNotificationSummary>> {
+  return apiFetch<PaginatedResponse<PortalNotificationSummary>>(
+    `/portal/notifications${toQueryString(pagination)}`,
+  );
 }
 
 /**

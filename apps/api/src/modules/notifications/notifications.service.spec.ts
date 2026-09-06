@@ -353,24 +353,43 @@ describe("NotificationsService", () => {
   });
 
   describe("listNotificationsForCustomer", () => {
-    it("filters directly by customerId, orders by loggedAt descending, and never touches TenantContext", async () => {
+    // PORTAL-2 — paginated: the id tie-breaker follows loggedAt desc, and
+    // the query is a page (skip/take), not the whole table.
+    it("filters directly by customerId, orders by loggedAt descending with an id tie-breaker, paginated, and never touches TenantContext", async () => {
       prisma.notificationLog.findMany.mockResolvedValue([]);
 
       await service.listNotificationsForCustomer("customer-1");
 
       expect(tenantContext.requireBranchScope).not.toHaveBeenCalled();
+      expect(prisma.notificationLog.count).toHaveBeenCalledWith({
+        where: { customerId: "customer-1" },
+      });
       expect(prisma.notificationLog.findMany).toHaveBeenCalledWith({
         where: { customerId: "customer-1" },
-        orderBy: { loggedAt: "desc" },
+        orderBy: [{ loggedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
       });
     });
 
-    it("returns an empty array when the customer has no notification history", async () => {
+    it("returns a paginated envelope with items: [] when the customer has no notification history", async () => {
       prisma.notificationLog.findMany.mockResolvedValue([]);
+      prisma.notificationLog.count.mockResolvedValue(0);
 
       const result = await service.listNotificationsForCustomer("customer-1");
 
-      expect(result).toEqual([]);
+      expect(result).toEqual({ items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 });
+    });
+
+    it("forwards an explicit page/pageSize to skip/take", async () => {
+      prisma.notificationLog.findMany.mockResolvedValue([]);
+      prisma.notificationLog.count.mockResolvedValue(0);
+
+      await service.listNotificationsForCustomer("customer-1", { page: 3, pageSize: 10 });
+
+      expect(prisma.notificationLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 10 }),
+      );
     });
 
     it("maps rows to NotificationSummary, with branchId/targetType/targetAt as stored (always null for portal rows)", async () => {
@@ -387,10 +406,11 @@ describe("NotificationsService", () => {
           customerId: "customer-1",
         },
       ]);
+      prisma.notificationLog.count.mockResolvedValue(1);
 
       const result = await service.listNotificationsForCustomer("customer-1");
 
-      expect(result).toEqual([
+      expect(result.items).toEqual([
         {
           id: "notif-3",
           eventType: "ticket.updated",
