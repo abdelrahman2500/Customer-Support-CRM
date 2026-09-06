@@ -28,6 +28,10 @@ function buildPrismaMock() {
     contactRefreshToken: {
       updateMany: vi.fn(),
     },
+    customerNote: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+    },
     $transaction: vi.fn((arg: unknown) => {
       if (Array.isArray(arg)) {
         return Promise.all(arg);
@@ -37,8 +41,9 @@ function buildPrismaMock() {
   };
 }
 
-function buildTenantContextMock(branchId: string | null = "branch-1") {
+function buildTenantContextMock(branchId: string | null = "branch-1", userId: string | null = "user-1") {
   return {
+    userId,
     requireBranchScope: vi.fn(() => {
       if (!branchId) {
         throw new Error("TenantContext: no active branch on this request");
@@ -749,6 +754,121 @@ describe("CustomersService", () => {
         where: { contactId: "contact-1", revokedAt: null },
         data: { revokedAt: expect.any(Date) },
       });
+    });
+  });
+
+  // RM-02 — Customer Notes. Mirrors `TicketsService`'s own
+  // `getTicketNotes`/`createTicketNote` test shape exactly.
+  describe("listCustomerNotes", () => {
+    it("throws NotFoundException for an unknown/out-of-scope customer id", async () => {
+      prisma.customer.findFirst.mockResolvedValue(null);
+
+      await expect(service.listCustomerNotes("missing-id")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.customerNote.findMany).not.toHaveBeenCalled();
+    });
+
+    it("returns [] for a customer with no notes", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customerNote.findMany.mockResolvedValue([]);
+
+      const result = await service.listCustomerNotes("customer-1");
+
+      expect(result).toEqual([]);
+    });
+
+    it("scopes and orders notes chronologically (asc) once the customer is confirmed in scope", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customerNote.findMany.mockResolvedValue([
+        {
+          id: "note-1",
+          customerId: "customer-1",
+          authorUserId: "user-1",
+          body: "Prefers email over phone.",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
+
+      const result = await service.listCustomerNotes("customer-1");
+
+      expect(prisma.customerNote.findMany).toHaveBeenCalledWith({
+        where: { customerId: "customer-1" },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(result).toEqual([
+        {
+          id: "note-1",
+          customerId: "customer-1",
+          authorUserId: "user-1",
+          body: "Prefers email over phone.",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
+    });
+
+    it("never returns another customer's notes (tenant/customer isolation)", async () => {
+      // requireCustomerInScope itself only looks up { id, branchId } — a
+      // customer-1-scoped id belonging to a different branch already 404s
+      // before findMany is ever reached; this proves the findMany call
+      // itself is always filtered to the one customerId in scope, never a
+      // caller-supplied filter that could widen it.
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customerNote.findMany.mockResolvedValue([]);
+
+      await service.listCustomerNotes("customer-1");
+
+      expect(prisma.customerNote.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { customerId: "customer-1" } }),
+      );
+    });
+  });
+
+  describe("createCustomerNote", () => {
+    it("throws NotFoundException for a customer not in the caller's branch, never creating a note", async () => {
+      prisma.customer.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createCustomerNote("missing-id", { body: "Some note" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.customerNote.create).not.toHaveBeenCalled();
+    });
+
+    it("creates the note as the authenticated actor, never a caller-supplied author", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customerNote.create.mockResolvedValue({
+        id: "note-1",
+        customerId: "customer-1",
+        authorUserId: "user-1",
+        body: "Prefers email over phone.",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+
+      const result = await service.createCustomerNote("customer-1", {
+        body: "Prefers email over phone.",
+      });
+
+      expect(prisma.customerNote.create).toHaveBeenCalledWith({
+        data: { customerId: "customer-1", authorUserId: "user-1", body: "Prefers email over phone." },
+      });
+      expect(result).toEqual({
+        id: "note-1",
+        customerId: "customer-1",
+        authorUserId: "user-1",
+        body: "Prefers email over phone.",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+    });
+
+    it("throws when there is no active user on the request", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      tenantContext = buildTenantContextMock("branch-1", null);
+      service = createService(prisma, tenantContext);
+
+      await expect(
+        service.createCustomerNote("customer-1", { body: "x" }),
+      ).rejects.toThrow(/no authenticated user/);
+      expect(prisma.customerNote.create).not.toHaveBeenCalled();
     });
   });
 });

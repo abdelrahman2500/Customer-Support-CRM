@@ -5,10 +5,12 @@ import { preservePreviousResults } from "@/lib/list-query";
 import {
   createContact,
   createCustomer,
+  createCustomerNote,
   createTicket,
   createTicketNote,
   createUser,
   getCustomer,
+  getCustomerNotes,
   getTicket,
   getTicketCsat,
   getTicketEscalations,
@@ -34,6 +36,7 @@ import {
 import type {
   CreateContactInput,
   CreateCustomerInput,
+  CreateCustomerNoteInput,
   CreateTicketInput,
   CreateTicketNoteInput,
   CreateUserInput,
@@ -53,6 +56,8 @@ export const ticketQueryKey = (id: string) => ["ticket", id] as const;
 export const ticketHistoryQueryKey = (id: string) => ["ticket", id, "history"] as const;
 export const ticketSlaTargetQueryKey = (id: string) => ["ticket", id, "sla-target"] as const;
 export const ticketEscalationsQueryKey = (id: string) => ["ticket", id, "escalations"] as const;
+/** RM-02 — mirrors `ticketNotesQueryKey`. */
+export const customerNotesQueryKey = (id: string) => ["customer", id, "notes"] as const;
 export const ticketNotesQueryKey = (id: string) => ["ticket", id, "notes"] as const;
 export const ticketCsatQueryKey = (id: string) => ["ticket", id, "csat"] as const;
 
@@ -146,6 +151,16 @@ export function useCustomerQuery(id: string) {
   return useQuery({
     queryKey: ["customer", id],
     queryFn: () => getCustomer(id),
+    enabled: Boolean(id),
+  });
+}
+
+/** RM-02 — mirrors `useTicketNotesQuery`: no `staleTime`, since this is
+ * per-customer event data (not infrequently-changing reference data). */
+export function useCustomerNotesQuery(id: string) {
+  return useQuery({
+    queryKey: customerNotesQueryKey(id),
+    queryFn: () => getCustomerNotes(id),
     enabled: Boolean(id),
   });
 }
@@ -407,6 +422,19 @@ export function useCreateTicketNoteMutation(id: string) {
     mutationFn: (input: CreateTicketNoteInput) => createTicketNote(id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ticketNotesQueryKey(id) });
+    },
+  });
+}
+
+/** RM-02 — never applies optimistically, same convention as
+ * `useCreateTicketNoteMutation`: only a successful `POST /customers/:id/notes`
+ * invalidates this customer's notes query. */
+export function useCreateCustomerNoteMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateCustomerNoteInput) => createCustomerNote(id, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: customerNotesQueryKey(id) });
     },
   });
 }

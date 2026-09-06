@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useCreateContactMutation,
+  useCreateCustomerNoteMutation,
+  useCustomerNotesQuery,
   useCustomerQuery,
   useRevokeContactPortalAccessMutation,
   useSetContactPortalPasswordMutation,
   useTicketsQuery,
   useUpdateContactMutation,
   useUpdateCustomerMutation,
+  useUsersQuery,
 } from "@/hooks/use-tickets";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { ApiError } from "@/lib/api";
@@ -307,6 +310,59 @@ function AddContactForm({ customerId }: { customerId: string }) {
 }
 
 /**
+ * RM-02 — the smallest UI surface for a one-field create (mirrors
+ * `TicketDetailView`'s own `AddNoteForm` exactly): an inline textarea +
+ * submit button below the notes list, never optimistic — a successful
+ * `POST /customers/:id/notes` invalidates the notes query and the real,
+ * re-fetched list is what renders the new note.
+ */
+function AddCustomerNoteForm({ customerId }: { customerId: string }) {
+  const t = useTranslations("customers");
+  const errorMessage = useErrorMessage();
+  const [body, setBody] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useCreateCustomerNoteMutation(customerId);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setError(null);
+    try {
+      await mutation.mutateAsync({ body: body.trim() });
+      setBody("");
+    } catch (submitError) {
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.notesCreateFailed"),
+        }),
+      );
+    }
+  }
+
+  return (
+    <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+      <label className="sr-only" htmlFor="customer-note-body">
+        {t("detail.notesPlaceholder")}
+      </label>
+      <textarea
+        id="customer-note-body"
+        className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+        rows={3}
+        value={body}
+        placeholder={t("detail.notesPlaceholder")}
+        onChange={(event) => setBody(event.target.value)}
+      />
+      <div>
+        <Button type="submit" size="sm" disabled={mutation.isPending || !body.trim()}>
+          {mutation.isPending ? t("detail.notesSubmitting") : t("detail.notesSubmit")}
+        </Button>
+      </div>
+      {error && <Alert variant="destructive">{error}</Alert>}
+    </form>
+  );
+}
+
+/**
  * Story 26 — Customer Detail. Mirrors `TicketDetailView`'s structure: a
  * loading/error/content shape, the same 404-vs-generic error distinction,
  * and a bordered card per section.
@@ -357,7 +413,7 @@ export function CustomerDetailSkeleton() {
         <Skeleton className="h-8 w-28" />
       </div>
 
-      {["contacts", "tickets", "attachments"].map((section) => (
+      {["contacts", "tickets", "notes", "attachments"].map((section) => (
         <div key={section} className="rounded-md border border-slate-200 bg-white p-4">
           <Skeleton className="h-4 w-32" />
           <div className="mt-2 flex flex-col gap-2">
@@ -393,6 +449,16 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
   const relatedTickets = relatedTicketsPage?.items ?? [];
   const updateCustomerMutation = useUpdateCustomerMutation(customerId);
   const [displayNameDraft, setDisplayNameDraft] = useState<string | null>(null);
+  // RM-02 — Customer Notes.
+  const notesQuery = useCustomerNotesQuery(customerId);
+  const usersQuery = useUsersQuery();
+  const userNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const user of usersQuery.data ?? []) {
+      map.set(user.id, user.fullName);
+    }
+    return map;
+  }, [usersQuery.data]);
 
   if (customerQuery.isLoading) {
     return <CustomerDetailSkeleton />;
@@ -542,6 +608,37 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
             })}
           />
         )}
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-slate-900">{t("detail.notesHeading")}</h2>
+        {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+        {notesQuery.isError && (
+          <Alert variant="destructive" className="mt-2">
+            {t("detail.notesError")}
+          </Alert>
+        )}
+        {notesQuery.isSuccess && notesQuery.data.length === 0 && (
+          <p className="mt-2 text-sm text-slate-500">{t("detail.notesEmpty")}</p>
+        )}
+        {notesQuery.isSuccess && notesQuery.data.length > 0 && (
+          <ol className="mt-2 flex flex-col gap-2 text-sm">
+            {notesQuery.data.map((note) => (
+              <li key={note.id} className="border-b border-slate-100 pb-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-slate-800">
+                    {userNameById.get(note.authorUserId) ?? note.authorUserId}
+                  </span>
+                  <span className="text-slate-500">
+                    {new Date(note.createdAt).toLocaleString(locale)}
+                  </span>
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-slate-700">{note.body}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+        <AddCustomerNoteForm customerId={customerId} />
       </div>
 
       <AttachmentsCard

@@ -91,6 +91,8 @@ model User {
   assignedTickets             Ticket[]
   ticketHistoryEntries        TicketHistoryEntry[]
   ticketNotes                 TicketNote[]
+  /// RM-02 — this agent's own authored customer notes.
+  customerNotes               CustomerNote[]
   automationRules             AutomationRule[]
   notificationPreferences     NotificationPreference[]
   uploadedAttachments         TicketAttachment[]
@@ -315,6 +317,8 @@ model Customer {
   notificationLogs NotificationLog[]
   /// RM-03 — tasks referencing this customer (`Task.customerId`), optional.
   tasks            Task[]
+  /// RM-02 — free-text, agent-only notes on this customer.
+  notes            CustomerNote[]
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
@@ -371,6 +375,28 @@ model Contact {
   @@unique([customerId, email])
   @@index([customerId])
   @@map("contacts")
+  @@schema("customers")
+}
+
+/// RM-02 — free-text, agent-only note on a Customer — mirrors `TicketNote`
+/// exactly (append-only, no update/delete route, `authorUserId` required
+/// never nullable — a note can only ever result from a deliberate,
+/// authenticated agent action). Never customer-visible: no Customer Portal
+/// endpoint reads this table, the same "internal-only" guarantee
+/// `TicketNote` already gives. No `branchId` of its own — scoping is
+/// always derived from the parent Customer, the same way `TicketNote` has
+/// none and derives scope from the parent Ticket.
+model CustomerNote {
+  id           String   @id @default(uuid())
+  customerId   String   @map("customer_id")
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  authorUserId String   @map("author_user_id")
+  author       User     @relation(fields: [authorUserId], references: [id])
+  body         String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([customerId])
+  @@map("customer_notes")
   @@schema("customers")
 }
 

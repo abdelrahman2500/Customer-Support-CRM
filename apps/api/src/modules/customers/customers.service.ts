@@ -16,6 +16,7 @@ import type { CreateContactDto } from "./dto/create-contact.dto";
 import type { UpdateContactDto } from "./dto/update-contact.dto";
 import type { SetContactPortalPasswordDto } from "./dto/set-contact-portal-password.dto";
 import type { ListCustomersQueryDto } from "./dto/list-customers-query.dto";
+import type { CreateCustomerNoteDto } from "./dto/create-customer-note.dto";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -51,6 +52,15 @@ export interface ContactSummary {
    * Lets the frontend show a "Revoke" affordance only when there is
    * something to revoke. */
   hasPortalAccess: boolean;
+}
+
+/** RM-02 — mirrors `TicketNoteSummary` exactly. */
+export interface CustomerNoteSummary {
+  id: string;
+  customerId: string;
+  authorUserId: string;
+  body: string;
+  createdAt: Date;
 }
 
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
@@ -358,6 +368,37 @@ export class CustomersService {
     return { id: contactId };
   }
 
+  /** RM-02 — mirrors `TicketsService.getTicketNotes` exactly: oldest-first,
+   * append-only, so the list itself is the note's own complete history —
+   * no separate audit/history entry is written for a note, the same way
+   * `TicketNote` creation writes no `TicketHistoryEntry` of its own. */
+  async listCustomerNotes(customerId: string): Promise<CustomerNoteSummary[]> {
+    await this.requireCustomerInScope(customerId);
+    const notes = await this.prisma.customerNote.findMany({
+      where: { customerId },
+      orderBy: { createdAt: "asc" },
+    });
+    return notes.map(toCustomerNoteSummary);
+  }
+
+  /** RM-02 — mirrors `TicketsService.createTicketNote` exactly. No domain
+   * event is emitted: unlike `Ticket`, no agent-facing realtime room keyed
+   * by `customerId` exists to relay one into, and creating one merely to
+   * carry a single note-added event would be new event architecture this
+   * story's own scope explicitly rules out. */
+  async createCustomerNote(
+    customerId: string,
+    dto: CreateCustomerNoteDto,
+  ): Promise<CustomerNoteSummary> {
+    await this.requireCustomerInScope(customerId);
+    const authorUserId = this.requireAuthenticatedUserId();
+
+    const note = await this.prisma.customerNote.create({
+      data: { customerId, authorUserId, body: dto.body },
+    });
+    return toCustomerNoteSummary(note);
+  }
+
   // ---------------------------------------------------------------------
   // internals
   // ---------------------------------------------------------------------
@@ -394,6 +435,33 @@ export class CustomersService {
       throw new NotFoundException("Customer not found");
     }
   }
+
+  /** RM-02 — mirrors `TicketsService.requireAuthenticatedUserId` exactly:
+   * an author is never accepted from the caller, only ever resolved from
+   * `TenantContext` (validated token claims). */
+  private requireAuthenticatedUserId(): string {
+    const userId = this.tenantContext.userId;
+    if (!userId) {
+      throw new Error("TenantContext: no authenticated user on this request");
+    }
+    return userId;
+  }
+}
+
+function toCustomerNoteSummary(note: {
+  id: string;
+  customerId: string;
+  authorUserId: string;
+  body: string;
+  createdAt: Date;
+}): CustomerNoteSummary {
+  return {
+    id: note.id,
+    customerId: note.customerId,
+    authorUserId: note.authorUserId,
+    body: note.body,
+    createdAt: note.createdAt,
+  };
 }
 
 function toCustomerSummary(customer: {

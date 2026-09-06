@@ -500,4 +500,213 @@ describe("Customer Management (e2e)", () => {
         .expect(400);
     });
   });
+
+  // RM-02 — Customer Notes.
+  describe("customer notes (RM-02)", () => {
+    let notesCustomerId: string;
+    let otherNotesCustomerId: string;
+
+    beforeAll(async () => {
+      const customer = await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName: `Notes Fixture Customer ${randomUUID()}` })
+        .expect(201);
+      notesCustomerId = customer.body.id;
+
+      const other = await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName: `Notes Fixture Other Customer ${randomUUID()}` })
+        .expect(201);
+      otherNotesCustomerId = other.body.id;
+    });
+
+    it("rejects an unauthenticated request on both routes", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${notesCustomerId}/notes`)
+        .send({ body: "x" })
+        .expect(401);
+      await request(app.getHttpServer())
+        .get(`/api/v1/customers/${notesCustomerId}/notes`)
+        .expect(401);
+    });
+
+    it("returns 404 for a customer that doesn't exist", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${randomUUID()}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "x" })
+        .expect(404);
+      await request(app.getHttpServer())
+        .get(`/api/v1/customers/${randomUUID()}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("rejects an empty body with a validation error", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "" })
+        .expect(400);
+    });
+
+    // Story 100's own default Agent grant already includes `customer:create`/
+    // `customer:read`/`customer:update` (see the "allows an Agent-role
+    // user... to create a customer" test above, same file) — this proves
+    // the same real, seeded default grant reaches the notes routes too,
+    // rather than testing against a synthetically-permissioned role.
+    it("allows an Agent-role user with the default customer:update/customer:read grant", async () => {
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const agentEmail = `agent-notes-${randomUUID()}@example.com`;
+      const agentPassword = "agent-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: agentPassword,
+          fullName: "Test Agent Notes",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+      const agentAccessToken = agentLogin.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .send({ body: "Agent-created note" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .get(`/api/v1/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(200);
+    });
+
+    // A freshly created role starts with zero permissions (`POST
+    // /identity/roles` accepts only a name — see `CreateRoleDto`) — the
+    // one real way to prove a caller genuinely lacking `customer:update`/
+    // `customer:read` is rejected, since the seeded `Agent` role already
+    // holds both (confirmed above).
+    it("rejects a role with no customer permissions at all (403)", async () => {
+      const role = await request(app.getHttpServer())
+        .post("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ name: `No Customer Access ${randomUUID()}` })
+        .expect(201);
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const restrictedEmail = `no-customer-access-${randomUUID()}@example.com`;
+      const restrictedPassword = "restricted-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: restrictedEmail,
+          password: restrictedPassword,
+          fullName: "No Customer Access",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: role.body.id,
+        })
+        .expect(201);
+      const restrictedLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: restrictedEmail, password: restrictedPassword })
+        .expect(200);
+      const restrictedAccessToken = restrictedLogin.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${restrictedAccessToken}`)
+        .send({ body: "Should not be created" })
+        .expect(403);
+      await request(app.getHttpServer())
+        .get(`/api/v1/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${restrictedAccessToken}`)
+        .expect(403);
+    });
+
+    it("persists a real note with the correct author and timestamp, ordered oldest-first", async () => {
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const first = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "First note." })
+        .expect(201);
+      const second = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Second note." })
+        .expect(201);
+
+      expect(first.body).toMatchObject({
+        customerId: notesCustomerId,
+        authorUserId: me.body.id,
+        body: "First note.",
+      });
+      expect(typeof first.body.createdAt).toBe("string");
+
+      const list = await request(app.getHttpServer())
+        .get(`/api/v1/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const ids = list.body.map((note: { id: string }) => note.id);
+      expect(ids.indexOf(first.body.id)).toBeLessThan(ids.indexOf(second.body.id));
+    });
+
+    it("never leaks a note into a different customer's list (customer isolation)", async () => {
+      const forOtherCustomer = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${otherNotesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "This belongs to the other customer." })
+        .expect(201);
+
+      const notesForFirstCustomer = await request(app.getHttpServer())
+        .get(`/api/v1/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(
+        notesForFirstCustomer.body.some((note: { id: string }) => note.id === forOtherCustomer.body.id),
+      ).toBe(false);
+    });
+
+    it("is never exposed anywhere on the Customer Portal surface", async () => {
+      // No portal route reads customer_notes at all — confirmed by a
+      // repo-wide search of apps/api/src/modules/portal during recon.
+      // Asserted here as a guard against a future accidental exposure:
+      // the portal's own auth guard rejects an agent-audience token
+      // outright, and there is no portal-prefixed notes route to even
+      // attempt this against.
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/customers/${notesCustomerId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+  });
 });

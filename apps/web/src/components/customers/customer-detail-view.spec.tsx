@@ -3,12 +3,15 @@ import { act, render, screen, fireEvent, waitFor, within } from "@testing-librar
 import { CustomerDetailView } from "./customer-detail-view";
 import {
   useCreateContactMutation,
+  useCreateCustomerNoteMutation,
+  useCustomerNotesQuery,
   useCustomerQuery,
   useRevokeContactPortalAccessMutation,
   useSetContactPortalPasswordMutation,
   useTicketsQuery,
   useUpdateContactMutation,
   useUpdateCustomerMutation,
+  useUsersQuery,
 } from "@/hooks/use-tickets";
 import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { ApiError } from "@/lib/api";
@@ -33,6 +36,9 @@ vi.mock("@/hooks/use-tickets", () => ({
   useUpdateContactMutation: vi.fn(),
   useSetContactPortalPasswordMutation: vi.fn(),
   useRevokeContactPortalAccessMutation: vi.fn(),
+  useCustomerNotesQuery: vi.fn(),
+  useCreateCustomerNoteMutation: vi.fn(),
+  useUsersQuery: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-attachments", () => ({
@@ -49,6 +55,9 @@ const mockedUseSetContactPortalPasswordMutation = vi.mocked(useSetContactPortalP
 const mockedUseRevokeContactPortalAccessMutation = vi.mocked(useRevokeContactPortalAccessMutation);
 const mockedUseAttachmentsQuery = vi.mocked(useAttachmentsQuery);
 const mockedUseUploadAttachmentMutation = vi.mocked(useUploadAttachmentMutation);
+const mockedUseCustomerNotesQuery = vi.mocked(useCustomerNotesQuery);
+const mockedUseCreateCustomerNoteMutation = vi.mocked(useCreateCustomerNoteMutation);
+const mockedUseUsersQuery = vi.mocked(useUsersQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -109,6 +118,12 @@ describe("CustomerDetailView", () => {
     // pre-existing tests are unaffected.
     mockedUseAttachmentsQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
     mockedUseUploadAttachmentMutation.mockReturnValue(idleMutation() as never);
+    // RM-02 — every render path also calls `useCustomerNotesQuery`/
+    // `useUsersQuery` (the new Notes card); default to an empty, successful
+    // result so pre-existing tests are unaffected.
+    mockedUseCustomerNotesQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
+    mockedUseUsersQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
+    mockedUseCreateCustomerNoteMutation.mockReturnValue(idleMutation() as never);
   });
 
   it("shows a loading state while the customer query is pending", () => {
@@ -799,6 +814,182 @@ describe("CustomerDetailView", () => {
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(file);
       });
+    });
+  });
+
+  describe("Notes card (RM-02)", () => {
+    beforeEach(() => {
+      mockedUseCustomerQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: { id: "customer-1", displayName: "Acme Inc.", isActive: true, contacts: [] },
+        }) as never,
+      );
+    });
+
+    it("renders a skeleton while notes are loading", () => {
+      mockedUseCustomerNotesQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      const heading = screen.getByText("detail.notesHeading");
+      const card = heading.parentElement as HTMLElement;
+      expect(card.querySelector(".animate-pulse")).toBeInTheDocument();
+    });
+
+    it("renders an inline error when notes fail to load", () => {
+      mockedUseCustomerNotesQuery.mockReturnValue(
+        queryResult({ isError: true, error: new ApiError("Server error", 500) }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.notesError")).toBeInTheDocument();
+    });
+
+    it("renders the empty message when there are no notes", () => {
+      mockedUseCustomerNotesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
+    });
+
+    it("renders each note's resolved author name and timestamp", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "user-1", fullName: "Jane Agent" }],
+          isSuccess: true,
+        }) as never,
+      );
+      const notes = [
+        {
+          id: "note-1",
+          customerId: "customer-1",
+          authorUserId: "user-1",
+          body: "Called the customer back.",
+          createdAt: "2024-01-01T10:05:00.000Z",
+        },
+      ];
+      mockedUseCustomerNotesQuery.mockReturnValue(
+        queryResult({ data: notes, isSuccess: true }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("Jane Agent")).toBeInTheDocument();
+      expect(screen.getByText("Called the customer back.")).toBeInTheDocument();
+      expect(
+        screen.getByText(new Date(notes[0]!.createdAt).toLocaleString("en")),
+      ).toBeInTheDocument();
+    });
+
+    it("falls back to the raw authorUserId when the author isn't found in the users list", () => {
+      const notes = [
+        {
+          id: "note-1",
+          customerId: "customer-1",
+          authorUserId: "user-unknown",
+          body: "Note from an unresolvable author.",
+          createdAt: "2024-01-01T10:05:00.000Z",
+        },
+      ];
+      mockedUseCustomerNotesQuery.mockReturnValue(
+        queryResult({ data: notes, isSuccess: true }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("user-unknown")).toBeInTheDocument();
+    });
+
+    it("disables the submit button until the note body is non-empty", () => {
+      mockedUseCustomerNotesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      const submit = screen.getByText("detail.notesSubmit");
+      expect(submit).toBeDisabled();
+
+      fireEvent.change(screen.getByPlaceholderText("detail.notesPlaceholder"), {
+        target: { value: "A new note" },
+      });
+
+      expect(submit).not.toBeDisabled();
+    });
+
+    it("submits the exact { body } payload and clears the field on success", async () => {
+      mockedUseCustomerNotesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "note-new" });
+      mockedUseCreateCustomerNoteMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      const textarea = screen.getByPlaceholderText(
+        "detail.notesPlaceholder",
+      ) as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: "A new note" } });
+      fireEvent.click(screen.getByText("detail.notesSubmit"));
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mutateAsync).toHaveBeenCalledWith({ body: "A new note" });
+      expect(textarea.value).toBe("");
+    });
+
+    it("shows the backend's own error message when adding a note fails", async () => {
+      mockedUseCustomerNotesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Note too long", 400));
+      mockedUseCreateCustomerNoteMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      fireEvent.change(screen.getByPlaceholderText("detail.notesPlaceholder"), {
+        target: { value: "A new note" },
+      });
+      fireEvent.click(screen.getByText("detail.notesSubmit"));
+
+      expect(await screen.findByText("Note too long")).toBeInTheDocument();
+    });
+
+    it("shows the shared network-failure message for a non-ApiError failure", async () => {
+      mockedUseCustomerNotesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      const mutateAsync = vi.fn().mockRejectedValue(new Error("network down"));
+      mockedUseCreateCustomerNoteMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      fireEvent.change(screen.getByPlaceholderText("detail.notesPlaceholder"), {
+        target: { value: "A new note" },
+      });
+      fireEvent.click(screen.getByText("detail.notesSubmit"));
+
+      expect(await screen.findByText("errors.network")).toBeInTheDocument();
+    });
+
+    it("does not interfere with the Related Tickets card's own rendering", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+      mockedUseCustomerNotesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.ticketsEmpty")).toBeInTheDocument();
+      expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
   });
 

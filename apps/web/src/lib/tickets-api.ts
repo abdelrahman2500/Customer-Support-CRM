@@ -396,6 +396,40 @@ export function revokeContactPortalAccess(
   );
 }
 
+/** RM-02 — mirrors the backend's `CustomerNoteSummary` exactly
+ * (`apps/api/src/modules/customers/customers.service.ts`), itself modeled on
+ * `TicketNoteSummary` above. */
+export interface CustomerNoteSummary {
+  id: string;
+  customerId: string;
+  authorUserId: string;
+  body: string;
+  createdAt: string;
+}
+
+/** RM-02 — `GET /customers/:id/notes` (`customer:read`), returns `[]` when
+ * the customer has no notes yet (not a 404) — mirrors `getTicketNotes`'s own
+ * list-read convention. */
+export function getCustomerNotes(id: string): Promise<CustomerNoteSummary[]> {
+  return apiFetch<CustomerNoteSummary[]>(`/customers/${id}/notes`);
+}
+
+/** RM-02 — mirrors the existing `CreateCustomerNoteDto` exactly
+ * (`apps/api/src/modules/customers/dto/create-customer-note.dto.ts`). */
+export interface CreateCustomerNoteInput {
+  body: string;
+}
+
+export function createCustomerNote(
+  id: string,
+  input: CreateCustomerNoteInput,
+): Promise<CustomerNoteSummary> {
+  return apiFetch<CustomerNoteSummary>(`/customers/${id}/notes`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function listUsers(): Promise<UserSummary[]> {
   return apiFetch<UserSummary[]>("/identity/users");
 }
