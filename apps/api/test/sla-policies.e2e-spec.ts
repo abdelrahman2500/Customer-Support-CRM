@@ -158,6 +158,113 @@ describe("SLA Policies (e2e)", () => {
     expect(after.body.isActive).toBe(false);
   });
 
+  // Story S-9 — a policy may not resolve before it responds. This is what
+  // lets `GET /tickets?sortBy=slaUrgency` order by `responseTargetAt`
+  // alone and still agree with the SLA badge the UI renders, which uses
+  // the earlier of the two targets.
+  describe("target ordering (Story S-9)", () => {
+    /**
+     * Every policy created below is branch-wide (no department/category/
+     * priority), which means it matches EVERY ticket in the seeded branch.
+     * Left active, it makes `SlaTargetListener` compute an SLA target for
+     * tickets belonging to other spec files, breaking their fixtures — this
+     * suite runs before `tickets` and `ticket-recategorization`, both of
+     * which assert on the absence of a target. The suite's own first test
+     * has the same hazard and is saved by the later "updates the policy"
+     * test deactivating it; these tests clean up after themselves instead
+     * of relying on that.
+     */
+    async function createdPolicy(body: Record<string, number>): Promise<string> {
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/sla-policies")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send(body)
+        .expect(201);
+      return response.body.id as string;
+    }
+
+    async function deactivate(id: string): Promise<void> {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/sla-policies/${id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ isActive: false })
+        .expect(200);
+    }
+
+    it("rejects creating a policy whose resolution target precedes its response target", async () => {
+      await request(app.getHttpServer())
+        .post("/api/v1/sla-policies")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ responseTargetMinutes: 480, resolutionTargetMinutes: 60 })
+        .expect(400);
+    });
+
+    it("accepts equal response and resolution targets", async () => {
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/sla-policies")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ responseTargetMinutes: 45, resolutionTargetMinutes: 45 })
+        .expect(201);
+
+      try {
+        // Tied, not inverted - a coherent policy.
+        expect(response.body.responseTargetMinutes).toBe(45);
+        expect(response.body.resolutionTargetMinutes).toBe(45);
+      } finally {
+        await deactivate(response.body.id as string);
+      }
+    });
+
+    it("rejects an update that inverts the pair using only the resolution target", async () => {
+      const id = await createdPolicy({ responseTargetMinutes: 60, resolutionTargetMinutes: 480 });
+
+      try {
+        // The body is legal in isolation; only the STORED response target
+        // reveals the inversion, which is why the rule cannot live on the DTO.
+        await request(app.getHttpServer())
+          .patch(`/api/v1/sla-policies/${id}`)
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .send({ resolutionTargetMinutes: 30 })
+          .expect(400);
+
+        const after = await request(app.getHttpServer())
+          .get(`/api/v1/sla-policies/${id}`)
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .expect(200);
+        expect(after.body.resolutionTargetMinutes).toBe(480);
+      } finally {
+        await deactivate(id);
+      }
+    });
+
+    it("rejects an update that inverts the pair using only the response target", async () => {
+      const id = await createdPolicy({ responseTargetMinutes: 60, resolutionTargetMinutes: 480 });
+
+      try {
+        await request(app.getHttpServer())
+          .patch(`/api/v1/sla-policies/${id}`)
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .send({ responseTargetMinutes: 600 })
+          .expect(400);
+      } finally {
+        await deactivate(id);
+      }
+    });
+
+    it("allows an update that keeps the pair ordered", async () => {
+      const id = await createdPolicy({ responseTargetMinutes: 60, resolutionTargetMinutes: 480 });
+
+      try {
+        await request(app.getHttpServer())
+          .patch(`/api/v1/sla-policies/${id}`)
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .send({ resolutionTargetMinutes: 240 })
+          .expect(200);
+      } finally {
+        await deactivate(id);
+      }
+    });
+  });
   it("rejects updating with an unknown departmentId with 404", async () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/sla-policies/${policyId}`)

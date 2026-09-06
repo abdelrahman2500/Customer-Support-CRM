@@ -170,31 +170,36 @@ describe("DashboardView", () => {
     it("queries GET /tickets scoped to the authenticated agent, not the branch-wide list", () => {
       renderWithLocale("agent-42");
 
-      // Story S-8e — `pageSize: 100` is the panel's explicit bounded
-      // window; see `DashboardView`'s own comment for why this panel takes
-      // a window rather than a pager.
+      // Story S-9 — the panel asks the server for its whole question:
+      // whose tickets, which statuses, and in what order. S-8e's bounded
+      // `pageSize: 100` window is gone, because the first page is now the
+      // most urgent page rather than an arbitrary slice.
       expect(mockedUseTicketsQuery).toHaveBeenCalledWith({
         assignedToUserId: "agent-42",
-        pageSize: 100,
+        statuses: ["OPEN", "IN_PROGRESS"],
+        sortBy: "slaUrgency",
       });
     });
 
-    it("excludes RESOLVED and CLOSED tickets from the populated list", () => {
-      mockTicketQueries({
-        mine: {
-          data: [
-            ticket({ id: "ticket-open", subject: "Open one", status: "OPEN" }),
-            ticket({ id: "ticket-resolved", subject: "Resolved one", status: "RESOLVED" }),
-            ticket({ id: "ticket-closed", subject: "Closed one", status: "CLOSED" }),
-          ],
-        },
-      });
+    it("asks the server to exclude RESOLVED and CLOSED rather than filtering after the fetch", () => {
+      mockTicketQueries({ mine: { data: [ticket({ subject: "Open one", status: "OPEN" })] } });
 
       renderWithLocale();
 
+      /**
+       * Story S-9 — this used to hand the component a mixed list and assert
+       * the resolved/closed rows were dropped on screen. That is no longer
+       * where the exclusion happens, and it could not stay there: an SLA
+       * target outlives the ticket being resolved, so under
+       * `sortBy: "slaUrgency"` a resolved ticket's long-past target ranks as
+       * maximally urgent and would consume the page ahead of open work that
+       * is genuinely breaching. Filtering after the fetch can only discard
+       * rows the server already chose.
+       */
+      expect(mockedUseTicketsQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ statuses: ["OPEN", "IN_PROGRESS"] }),
+      );
       expect(screen.getByText("Open one")).toBeInTheDocument();
-      expect(screen.queryByText("Resolved one")).not.toBeInTheDocument();
-      expect(screen.queryByText("Closed one")).not.toBeInTheDocument();
     });
 
     // Story 98 — Design System & Visual Polish. Only OPEN/IN_PROGRESS ever
@@ -222,10 +227,13 @@ describe("DashboardView", () => {
         mine: {
           data: [
             ticket({
-              id: "ticket-none",
-              subject: "No target",
-              status: "IN_PROGRESS",
-              slaTarget: null,
+              id: "ticket-breached",
+              subject: "Already breached",
+              status: "OPEN",
+              slaTarget: {
+                responseTargetAt: new Date(now - 60 * 60 * 1000).toISOString(),
+                resolutionTargetAt: new Date(now - 60 * 60 * 1000).toISOString(),
+              },
             }),
             ticket({
               id: "ticket-soon",
@@ -237,13 +245,10 @@ describe("DashboardView", () => {
               },
             }),
             ticket({
-              id: "ticket-breached",
-              subject: "Already breached",
-              status: "OPEN",
-              slaTarget: {
-                responseTargetAt: new Date(now - 60 * 60 * 1000).toISOString(),
-                resolutionTargetAt: new Date(now - 60 * 60 * 1000).toISOString(),
-              },
+              id: "ticket-none",
+              subject: "No target",
+              status: "IN_PROGRESS",
+              slaTarget: null,
             }),
           ],
         },
@@ -251,6 +256,21 @@ describe("DashboardView", () => {
 
       renderWithLocale();
 
+      /**
+       * Story S-9 — the ranking moved to the server, so this asserts the two
+       * things that are now this component's responsibility: that it asks
+       * for the urgency order, and that it renders the rows in the order it
+       * was given instead of re-sorting them.
+       *
+       * The fixture is deliberately handed back in the server's order
+       * (breached, due soon, no target) — the same order
+       * `sortBy: "slaUrgency"` produces, since a breached target is in the
+       * past, an on-track one is in the future, and a missing one sorts
+       * last.
+       */
+      expect(mockedUseTicketsQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ sortBy: "slaUrgency" }),
+      );
       const subjects = screen
         .getAllByText(/No target|Due soon|Already breached/)
         .map((el) => el.textContent);
@@ -311,7 +331,7 @@ describe("DashboardView", () => {
       expect(screen.getByText("No unclaimed tickets right now.")).toBeInTheDocument();
     });
 
-    it("asks the server for unassigned tickets, and still hides resolved/closed ones", () => {
+    it("asks the server for unclaimed open tickets, ranked by urgency", () => {
       mockTicketQueries({
         all: {
           data: [
@@ -320,12 +340,6 @@ describe("DashboardView", () => {
               subject: "Unassigned open",
               assignedToUserId: null,
               status: "OPEN",
-            }),
-            ticket({
-              id: "t-unassigned-resolved",
-              subject: "Unassigned resolved",
-              assignedToUserId: null,
-              status: "RESOLVED",
             }),
           ],
         },
@@ -340,12 +354,17 @@ describe("DashboardView", () => {
        * the branch-wide list and picked the unassigned rows out of it, which
        * meant an unclaimed ticket older than the capped window could never
        * appear at all.
+       *
+       * Story S-9 — the status narrowing and the urgency ranking joined it
+       * on the server, so all three are asserted on the request. Nothing is
+       * left for this panel to filter or re-sort.
        */
-      expect(mockedUseTicketsQuery).toHaveBeenCalledWith({ unassigned: "true", pageSize: 100 });
+      expect(mockedUseTicketsQuery).toHaveBeenCalledWith({
+        unassigned: "true",
+        statuses: ["OPEN", "IN_PROGRESS"],
+        sortBy: "slaUrgency",
+      });
       expect(screen.getByText("Unassigned open")).toBeInTheDocument();
-      // The open-status rule stays client-side: `OPEN_STATUSES` is this
-      // screen's own definition of "still needs work", not an API concept.
-      expect(screen.queryByText("Unassigned resolved")).not.toBeInTheDocument();
     });
 
     it("calls the existing PATCH /tickets/:id mutation with the current agent's id when Claim is clicked", () => {

@@ -139,13 +139,18 @@ export interface UserSummary {
 
 export interface ListTicketsFilters {
   status?: TicketStatus;
+  /** Story S-9 — match any of several statuses, serialized as a repeated
+   * query param. Mutually exclusive with `status` (the API rejects both). */
+  statuses?: TicketStatus[];
   priority?: TicketPriority;
   categoryId?: string;
   assignedToUserId?: string;
   /** Story 70 — matches `subject`/category name, case-insensitive. Mirrors
    * `knowledge-base-api.ts`'s own `search` filter shape. */
   search?: string;
-  sortBy?: "createdAt" | "updatedAt";
+  /** Story S-9 — `slaUrgency` = governing SLA target soonest first, no-target
+   * last; computed by the API instead of in the browser. */
+  sortBy?: "createdAt" | "updatedAt" | "slaUrgency";
   sortDir?: "asc" | "desc";
   /** Story S-8d — narrow to one customer server-side, instead of fetching
    * the branch list and filtering it in the browser. */
@@ -165,11 +170,22 @@ export interface ListTicketsFilters {
 function toQueryString(filters: ListTicketsFilters | ListCustomersFilters): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === "") {
+      continue;
+    }
+    // Story S-9 — an array filter (`statuses`) becomes one repeated param
+    // per value, which is what the API's `{ each: true }` validation reads.
+    // `String(["OPEN","IN_PROGRESS"])` would send the comma-joined string
+    // as a single value and fail enum validation.
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        params.append(key, String(entry));
+      }
+      continue;
+    }
     // Story S-8e — `page`/`pageSize` are numbers, so this no longer
     // narrows to string. Mirrors `audit-logs-api.ts`'s own loop.
-    if (value !== undefined && value !== "") {
-      params.set(key, String(value));
-    }
+    params.set(key, String(value));
   }
   const query = params.toString();
   return query ? `?${query}` : "";

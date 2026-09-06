@@ -563,6 +563,122 @@ describe("TicketsService", () => {
 
   // Story S-8d — filters that let the dashboard and customer-detail screens
   // ask the server the question they used to answer client-side.
+  describe("listTickets slaUrgency ordering (Story S-9)", () => {
+    it("orders through the slaTarget relation, with createdAt breaking ties", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ sortBy: "slaUrgency" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [
+            { slaTarget: { responseTargetAt: "asc" } },
+            { createdAt: "asc" },
+            { id: "asc" },
+          ],
+        }),
+      );
+    });
+
+    it("does not emit a rank/breached term: the target order already implies it", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ sortBy: "slaUrgency" });
+
+      // A breached ticket's target is in the past and an on-track one's is
+      // in the future, so ascending target order puts breached first with
+      // no extra term - which is also why this ordering needs no `now`.
+      const args = prisma.ticket.findMany.mock.calls[0]![0];
+      expect(JSON.stringify(args.orderBy)).not.toContain("breach");
+      expect(args.orderBy).toHaveLength(3);
+    });
+
+    it("honours sortDir on the relation sort", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ sortBy: "slaUrgency", sortDir: "desc" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [
+            { slaTarget: { responseTargetAt: "desc" } },
+            { createdAt: "desc" },
+            { id: "desc" },
+          ],
+        }),
+      );
+    });
+
+    it("leaves the scalar sorts untouched", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ sortBy: "updatedAt", sortDir: "desc" });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ updatedAt: "desc" }, { id: "desc" }] }),
+      );
+    });
+  });
+
+  describe("listTickets statuses filter (Story S-9)", () => {
+    it("matches any of the given statuses", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ statuses: ["OPEN", "IN_PROGRESS"] });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { branchId: "branch-1", status: { in: ["OPEN", "IN_PROGRESS"] } },
+        }),
+      );
+    });
+
+    it("counts over the same status predicate it fetches with", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+      prisma.ticket.count.mockResolvedValue(0);
+
+      await service.listTickets({ statuses: ["OPEN"] });
+
+      expect(prisma.ticket.count).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", status: { in: ["OPEN"] } },
+      });
+    });
+
+    it("rejects status and statuses together rather than letting one clobber the other", async () => {
+      // Both constrain the same column, so spreading them into one `where`
+      // would silently drop whichever came first.
+      await expect(
+        service.listTickets({ status: "OPEN", statuses: ["IN_PROGRESS"] }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.ticket.findMany).not.toHaveBeenCalled();
+    });
+
+    it("composes with the unassigned filter and the urgency sort", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({
+        unassigned: "true",
+        statuses: ["OPEN", "IN_PROGRESS"],
+        sortBy: "slaUrgency",
+      });
+
+      // Exactly the request the dashboard's unclaimed panel makes.
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            branchId: "branch-1",
+            assignedToUserId: null,
+            status: { in: ["OPEN", "IN_PROGRESS"] },
+          },
+          orderBy: [
+            { slaTarget: { responseTargetAt: "asc" } },
+            { createdAt: "asc" },
+            { id: "asc" },
+          ],
+        }),
+      );
+    });
+  });
   describe("listTickets pagination (Story S-8e)", () => {
     it("translates a page number into the right offset", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);

@@ -1,4 +1,5 @@
 import { ApiProperty, IntersectionType } from "@nestjs/swagger";
+import { Transform } from "class-transformer";
 import { IsEnum, IsIn, IsOptional, IsString, IsUUID } from "class-validator";
 import { TicketPriority, TicketStatus } from "@prisma/client";
 import { PaginationQueryDto } from "../../../common/pagination/pagination-query.dto";
@@ -36,6 +37,33 @@ export class ListTicketsQueryDto extends IntersectionType(PaginationQueryDto) {
   @IsOptional()
   @IsEnum(TicketStatus)
   status?: TicketStatus;
+
+  /**
+   * Story S-9 — match any of several statuses (`?statuses=OPEN&statuses=IN_PROGRESS`).
+   *
+   * The dashboard's panels mean "still needs work", which is two statuses,
+   * and they used to express that by filtering the fetched rows in the
+   * browser. That was survivable while they ordered client-side too, but
+   * it cannot survive `sortBy=slaUrgency`: an SLA target outlives the
+   * ticket being resolved (`SlaTargetListener` only deletes a target on
+   * recategorization with no matching policy, never on resolution), so a
+   * long-since-resolved ticket sorts as maximally urgent and would fill
+   * the page ahead of open work that is actually breaching.
+   *
+   * A generic multi-value filter rather than an `openOnly` flag: which
+   * statuses count as "needs work" stays the screen's own definition
+   * (Story 28's `OPEN_STATUSES`), and only the mechanism moves here.
+   *
+   * A single-valued query string arrives as a bare string, so it is
+   * normalized to an array before `each` validation runs.
+   */
+  @ApiProperty({ required: false, isArray: true, enum: TicketStatus })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined ? undefined : Array.isArray(value) ? value : [value],
+  )
+  @IsEnum(TicketStatus, { each: true })
+  statuses?: TicketStatus[];
 
   @ApiProperty({ required: false, enum: TicketPriority })
   @IsOptional()
@@ -88,10 +116,27 @@ export class ListTicketsQueryDto extends IntersectionType(PaginationQueryDto) {
   @IsString()
   search?: string;
 
-  @ApiProperty({ required: false, enum: ["createdAt", "updatedAt"] })
+  /**
+   * Story S-9 — `slaUrgency` orders by the ticket's governing SLA target,
+   * soonest first, with tickets that have no target last.
+   *
+   * This is the ordering the dashboard's panels always wanted and used to
+   * compute in the browser from each row's embedded `slaTarget`. It is
+   * expressible as a plain relation sort because a policy can no longer
+   * resolve before it responds (see `SlaPoliciesService.assertTargetOrdering`):
+   * with the pair guaranteed non-inverted, `responseTargetAt` IS
+   * `LEAST(responseTargetAt, resolutionTargetAt)`, the value
+   * `deriveSlaStatus` treats as governing.
+   *
+   * The breached-before-on-track split needs no separate term: a breached
+   * ticket's target is in the past and an on-track one's is in the future,
+   * so ordering by the target ascending already puts breached first — which
+   * also means this ordering does not depend on the current time.
+   */
+  @ApiProperty({ required: false, enum: ["createdAt", "updatedAt", "slaUrgency"] })
   @IsOptional()
-  @IsIn(["createdAt", "updatedAt"])
-  sortBy?: "createdAt" | "updatedAt";
+  @IsIn(["createdAt", "updatedAt", "slaUrgency"])
+  sortBy?: "createdAt" | "updatedAt" | "slaUrgency";
 
   @ApiProperty({ required: false, enum: ["asc", "desc"] })
   @IsOptional()

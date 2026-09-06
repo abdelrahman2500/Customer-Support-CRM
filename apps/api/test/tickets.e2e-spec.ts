@@ -384,6 +384,121 @@ describe("Ticketing (e2e)", () => {
     expect(updatedAts).toEqual(sorted);
   });
 
+  // Story S-9 — server-side SLA-urgency ordering and the multi-status
+  // filter the dashboard's panels need to use it.
+  describe("slaUrgency ordering / statuses filter (Story S-9)", () => {
+    it("puts tickets with no SLA target after every ticket that has one", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ sortBy: "slaUrgency", pageSize: 100 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      // Prisma rejects an explicit `nulls: "last"` inside a relation sort,
+      // so the service relies on Postgres's default for an ascending sort.
+      // That default is the whole basis of the ordering, so it is asserted
+      // rather than assumed.
+      const hasTarget = response.body.items.map(
+        (t: { slaTarget: unknown }) => t.slaTarget !== null,
+      );
+      const firstNull = hasTarget.indexOf(false);
+      if (firstNull !== -1) {
+        expect(hasTarget.slice(firstNull).every((present: boolean) => !present)).toBe(true);
+      }
+    });
+
+    it("orders the targeted tickets by their governing target, soonest first", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ sortBy: "slaUrgency", pageSize: 100 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const targets = response.body.items
+        .filter((t: { slaTarget: unknown }) => t.slaTarget !== null)
+        .map((t: { slaTarget: { responseTargetAt: string; resolutionTargetAt: string } }) =>
+          Math.min(
+            new Date(t.slaTarget.responseTargetAt).getTime(),
+            new Date(t.slaTarget.resolutionTargetAt).getTime(),
+          ),
+        );
+
+      // The governing target is the EARLIER of the two (what the agent-facing
+      // status uses). Ordering by `responseTargetAt` equals ordering by that
+      // minimum only because a policy can no longer resolve before it
+      // responds - so this asserts the minimum is non-decreasing, which is
+      // the property that actually matters.
+      const sorted = [...targets].sort((a: number, b: number) => a - b);
+      expect(targets).toEqual(sorted);
+    });
+
+    it("filters to several statuses at once", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ statuses: ["OPEN", "IN_PROGRESS"], pageSize: 100 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items.length).toBeGreaterThan(0);
+      for (const ticket of response.body.items) {
+        expect(["OPEN", "IN_PROGRESS"]).toContain(ticket.status);
+      }
+    });
+
+    it("accepts a single statuses value, not only a repeated one", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ statuses: "OPEN" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      // A one-value query string arrives as a bare string; the DTO normalizes
+      // it to an array before `each` validation.
+      for (const ticket of response.body.items) {
+        expect(ticket.status).toBe("OPEN");
+      }
+    });
+
+    it("rejects an unknown status inside statuses with 400", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ statuses: ["OPEN", "NOT_A_STATUS"] })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(400);
+    });
+
+    it("rejects status and statuses supplied together with 400", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ status: "OPEN", statuses: ["IN_PROGRESS"] })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(400);
+    });
+
+    it("rejects an unknown sortBy with 400", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ sortBy: "slaUrgencyy" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(400);
+    });
+
+    it("composes the urgency sort with statuses and pagination", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ sortBy: "slaUrgency", statuses: ["OPEN", "IN_PROGRESS"], page: 1, pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      // Exactly the request the dashboard's panels now make.
+      expect(response.body.items.length).toBeLessThanOrEqual(5);
+      expect(response.body).toMatchObject({ page: 1, pageSize: 5 });
+      for (const ticket of response.body.items) {
+        expect(["OPEN", "IN_PROGRESS"]).toContain(ticket.status);
+      }
+    });
+  });
+
   // Story S-8e — pagination replaces Story 105's Bounded Result Cap.
   describe("pagination (Story S-8e)", () => {
     it("returns a page envelope rather than a bare array", async () => {

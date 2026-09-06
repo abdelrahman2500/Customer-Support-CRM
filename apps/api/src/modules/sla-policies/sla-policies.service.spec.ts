@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { SlaPoliciesService } from "./sla-policies.service";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
@@ -171,6 +171,120 @@ describe("SlaPoliciesService", () => {
       expect(prisma.slaPolicy.findFirst).toHaveBeenCalledWith({
         where: { id: "missing-id", branchId: "branch-1" },
       });
+    });
+  });
+
+  /**
+   * Story S-9 — a policy may not resolve before it responds.
+   *
+   * This is what makes `sortBy=slaUrgency` orderable by `responseTargetAt`
+   * alone: with the pair guaranteed non-inverted, that column IS
+   * `LEAST(response, resolution)`, the target the agent-facing SLA status
+   * treats as governing.
+   */
+  describe("target ordering (Story S-9)", () => {
+    it("rejects a create whose resolution target precedes its response target", async () => {
+      await expect(
+        service.createSlaPolicy({
+          ...baseDto,
+          responseTargetMinutes: 480,
+          resolutionTargetMinutes: 60,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.slaPolicy.create).not.toHaveBeenCalled();
+    });
+
+    it("allows equal targets: respond and resolve within the same window", async () => {
+      prisma.slaPolicy.create.mockResolvedValue({
+        id: "policy-1",
+        departmentId: null,
+        categoryId: null,
+        priority: null,
+        responseTargetMinutes: 30,
+        resolutionTargetMinutes: 30,
+        isActive: true,
+      });
+
+      await service.createSlaPolicy({
+        ...baseDto,
+        responseTargetMinutes: 30,
+        resolutionTargetMinutes: 30,
+      });
+
+      // Equal leaves the two targets tied, never inverted.
+      expect(prisma.slaPolicy.create).toHaveBeenCalledOnce();
+    });
+
+    it("rejects an update that would invert the pair via BOTH fields", async () => {
+      prisma.slaPolicy.findFirst.mockResolvedValue({
+        id: "policy-1",
+        responseTargetMinutes: 60,
+        resolutionTargetMinutes: 480,
+      });
+
+      await expect(
+        service.updateSlaPolicy("policy-1", {
+          responseTargetMinutes: 480,
+          resolutionTargetMinutes: 60,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.slaPolicy.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects an update that inverts the pair by lowering ONLY the resolution target", async () => {
+      prisma.slaPolicy.findFirst.mockResolvedValue({
+        id: "policy-1",
+        responseTargetMinutes: 60,
+        resolutionTargetMinutes: 480,
+      });
+
+      // The reason this rule lives in the service and not on the DTO: the
+      // request body alone is legal in isolation, and only the stored
+      // response target reveals the inversion.
+      await expect(
+        service.updateSlaPolicy("policy-1", { resolutionTargetMinutes: 30 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.slaPolicy.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects an update that inverts the pair by raising ONLY the response target", async () => {
+      prisma.slaPolicy.findFirst.mockResolvedValue({
+        id: "policy-1",
+        responseTargetMinutes: 60,
+        resolutionTargetMinutes: 480,
+      });
+
+      await expect(
+        service.updateSlaPolicy("policy-1", { responseTargetMinutes: 600 }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.slaPolicy.update).not.toHaveBeenCalled();
+    });
+
+    it("allows an update that keeps the pair ordered", async () => {
+      prisma.slaPolicy.findFirst.mockResolvedValue({
+        id: "policy-1",
+        responseTargetMinutes: 60,
+        resolutionTargetMinutes: 480,
+      });
+
+      await service.updateSlaPolicy("policy-1", { resolutionTargetMinutes: 240 });
+
+      expect(prisma.slaPolicy.update).toHaveBeenCalledWith({
+        where: { id: "policy-1" },
+        data: { resolutionTargetMinutes: 240 },
+      });
+    });
+
+    it("does not reject an update that touches neither target", async () => {
+      prisma.slaPolicy.findFirst.mockResolvedValue({
+        id: "policy-1",
+        responseTargetMinutes: 60,
+        resolutionTargetMinutes: 480,
+      });
+
+      await service.updateSlaPolicy("policy-1", { isActive: false });
+
+      expect(prisma.slaPolicy.update).toHaveBeenCalledOnce();
     });
   });
 

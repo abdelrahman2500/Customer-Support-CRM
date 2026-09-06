@@ -26,6 +26,14 @@ test("an agent signs in, opens a ticket, and resolves it", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/tickets$/);
 
+  // Story S-9 — the list is paginated and ordered oldest-first by default,
+  // so a freshly-created ticket is on the LAST page, not the first. Finding
+  // it by search is also how an agent would actually reach it in a branch
+  // with thousands of tickets. (The search filter commits on blur.)
+  const search = page.getByPlaceholder("Search by subject or category...");
+  await search.fill(subject);
+  await search.blur();
+
   await page.getByText(subject).click();
   await expect(page).toHaveURL(/\/tickets\/[^/]+$/);
 

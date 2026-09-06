@@ -226,10 +226,19 @@ export class TicketsService {
     const { branchId } = this.tenantContext.requireBranchScope();
     const sortBy = query.sortBy ?? "createdAt";
     const sortDir = query.sortDir ?? "asc";
+
+    // Story S-9 — `status` and `statuses` constrain the same column, so one
+    // would silently overwrite the other in the `where` below. Rejecting is
+    // better than picking a winner: a caller that sent both meant something
+    // this endpoint cannot express.
+    if (query.status !== undefined && query.statuses !== undefined) {
+      throw new BadRequestException("Provide either status or statuses, not both");
+    }
     const where: Prisma.TicketWhereInput = {
       branchId,
       ...(await this.resolveSearchAndVisibilityFilter(query.search)),
       ...(query.status !== undefined ? { status: query.status } : {}),
+      ...(query.statuses !== undefined ? { status: { in: query.statuses } } : {}),
       ...(query.priority !== undefined ? { priority: query.priority } : {}),
       ...(query.categoryId !== undefined ? { categoryId: query.categoryId } : {}),
       ...(query.assignedToUserId !== undefined ? { assignedToUserId: query.assignedToUserId } : {}),
@@ -286,7 +295,27 @@ export class TicketsService {
       },
       {
         where,
-        orderBy: [{ [sortBy]: sortDir }, { id: sortDir }],
+        /**
+         * Story S-9 — `slaUrgency` sorts through the `slaTarget` relation.
+         *
+         * Prisma orders a to-one relation with a LEFT JOIN, and Postgres
+         * puts NULLs last for an ascending sort, so tickets with no SLA
+         * target land after every ticket that has one — matching what the
+         * browser-side comparator did with `+Infinity`. (Prisma rejects an
+         * explicit `nulls: "last"` inside a relation sort, so this relies
+         * on that default; the e2e suite asserts the placement.)
+         *
+         * `createdAt` breaks ties among the no-target rows, which is the
+         * order the dashboard's panels already showed them in.
+         */
+        orderBy:
+          sortBy === "slaUrgency"
+            ? [
+                { slaTarget: { responseTargetAt: sortDir } },
+                { createdAt: sortDir },
+                { id: sortDir },
+              ]
+            : [{ [sortBy]: sortDir }, { id: sortDir }],
         page: query.page,
         pageSize: query.pageSize,
       },

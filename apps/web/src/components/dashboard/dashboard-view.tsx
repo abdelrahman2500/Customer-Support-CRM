@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
-import type { TicketListItem } from "@/lib/tickets-api";
+import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { ApiError } from "@/lib/api";
@@ -16,33 +16,24 @@ import { Alert, Badge, Button, Skeleton } from "@crm/ui";
  * the existing Ticket List. Story 29 reuses this same set for the
  * "Unclaimed tickets" section — an unassigned ticket that's already
  * resolved/closed has nothing left to claim. */
-const OPEN_STATUSES = new Set(["OPEN", "IN_PROGRESS"]);
+/** Story 28/29 — this screen's own definition of "still needs work".
+ * Story S-9 — a typed list rather than a `Set`: it is now sent to the API
+ * as the panels' `statuses` filter instead of being tested with `.has`
+ * after the fetch, so it has to be exactly the API's own union. */
+const OPEN_STATUSES: readonly TicketStatus[] = ["OPEN", "IN_PROGRESS"];
 
 /**
- * SLA-urgency sort key: breached tickets first, then on-track tickets by
- * soonest remaining target, then tickets with no target last. This only
- * orders values `deriveSlaStatus` already computes — no new "at risk"
- * threshold or business rule is introduced (plan Design/§6: presentation
- * ordering only).
+ * Story S-9 — the SLA-urgency ranking these panels show is now
+ * `GET /tickets?sortBy=slaUrgency`, and the `slaSortKey`/`sortByUrgency`
+ * helpers that lived here are gone with it.
+ *
+ * They ranked breached-first, then soonest-target, then no-target last.
+ * That key is equal to plain "governing target ascending, nulls last": a
+ * breached ticket's target is in the past and an on-track one's is in the
+ * future, so the rank term never changed the order — which is also why the
+ * ranking never actually depended on `now`. `deriveSlaStatus` is still
+ * used below, for the per-row badge and remaining-time text, which do.
  */
-function slaSortKey(ticket: TicketListItem, now: Date): { rank: number; targetAt: number } {
-  const status = deriveSlaStatus(ticket.slaTarget, now);
-  if (status.kind === "breached") {
-    return { rank: 0, targetAt: status.targetAt.getTime() };
-  }
-  if (status.kind === "on-track") {
-    return { rank: 1, targetAt: status.targetAt.getTime() };
-  }
-  return { rank: 2, targetAt: Number.POSITIVE_INFINITY };
-}
-
-function sortByUrgency(tickets: TicketListItem[], now: Date): TicketListItem[] {
-  return tickets.slice().sort((a, b) => {
-    const ka = slaSortKey(a, now);
-    const kb = slaSortKey(b, now);
-    return ka.rank !== kb.rank ? ka.rank - kb.rank : ka.targetAt - kb.targetAt;
-  });
-}
 
 function SlaPresentation({ ticket, now }: { ticket: TicketListItem; now: Date }) {
   const t = useTranslations("tickets");
@@ -140,11 +131,16 @@ function UnclaimedTicketRow({
  * Story 28 — replaces the Story 23 `/dashboard` redirect stub. Fetches the
  * authenticated agent's own tickets via the existing `GET
  * /tickets?assignedToUserId=` filter (Story 23) — never the branch-wide
- * list. Client-side, the already-fetched result is narrowed to open work
- * and ordered by SLA urgency (see `slaSortKey`) — mirroring the same
+ * list. No filter/sort/search UI — this is a fixed, pre-scoped view
+ * (plan §6/§9).
+ *
+ * Story S-9 — supersedes Story 28's and Story 29's client-side refinement.
+ * Narrowing to open work and ranking by SLA urgency are both the server's
+ * answer now, so the panels render the page they are given, in order. The
  * "fetch the already-scoped result, refine client-side" precedent Story 27
- * established for `CustomerDetailView`'s Related Tickets section. No
- * filter/sort/search UI — this is a fixed, pre-scoped view (plan §6/§9).
+ * established is what pagination made untenable: refining after the fetch
+ * can only ever discard rows from a window the server chose on some other
+ * basis.
  *
  * Story 29 — adds a second, independent "Unclaimed tickets" section: the
  * same unfiltered `GET /tickets` call `CustomerDetailView`/`TicketListView`
@@ -169,25 +165,30 @@ export function DashboardView({ userId }: { userId: string }) {
   const { locale } = useParams<{ locale: string }>();
 
   /**
-   * Story S-8e — an explicit, bounded window rather than a pager.
+   * Story S-9 — the server now answers both of this screen's questions.
    *
-   * Both panels order by SLA urgency (`sortByUrgency`), which is computed
-   * in the browser from each ticket's SLA target and cannot be expressed
-   * as a Prisma `orderBy`: the key is `LEAST(responseTargetAt,
-   * resolutionTargetAt)` on a relation, with no-SLA rows last. So the
-   * server cannot return "the 25 most urgent", and a pager over a
-   * `createdAt` order would let page 2 hold a more urgent ticket than
-   * page 1 - worse than no pager at all.
+   * S-8e had to take a bounded 100-row window here because the urgency
+   * ranking was computed in the browser: the server could not return "the
+   * 25 most urgent", so a pager would have let page 2 hold a more urgent
+   * ticket than page 1. `sortBy: "slaUrgency"` removes that constraint —
+   * the first page IS the most urgent page, which is exactly what a
+   * dashboard panel wants — so the window and its documented caveat both
+   * go away.
    *
-   * `pageSize: 100` (the API's maximum) makes the window explicit and
-   * bounded. It is narrower than the 500-row cap this replaces, and that
-   * is a real, named limitation: in a branch with more than 100 open
-   * tickets in either panel, the urgency ordering is over the 100 most
-   * recent rather than over everything. Ranking these panels server-side
-   * would need the SLA key in SQL, which is its own change.
+   * `statuses` has to move server-side with the ordering, not stay a
+   * client-side filter. An SLA target outlives the ticket being resolved,
+   * so a resolved ticket's long-past target ranks as maximally urgent;
+   * filtering after the fetch would let those fill the page ahead of open
+   * work that is genuinely breaching. Which statuses count as "still needs
+   * work" is still this screen's own definition (Story 28's
+   * `OPEN_STATUSES`) — only the filtering moved.
    */
-  const PANEL_WINDOW = 100;
-  const myTicketsQuery = useTicketsQuery({ assignedToUserId: userId, pageSize: PANEL_WINDOW });
+  const PANEL_STATUSES = [...OPEN_STATUSES];
+  const myTicketsQuery = useTicketsQuery({
+    assignedToUserId: userId,
+    statuses: PANEL_STATUSES,
+    sortBy: "slaUrgency",
+  });
   /**
    * Story S-8d — asks the server for unclaimed tickets instead of fetching
    * the branch-wide list and filtering it here.
@@ -200,33 +201,30 @@ export function DashboardView({ userId }: { userId: string }) {
    * `GET /tickets` be paginated without this panel silently narrowing
    * further.
    */
-  const unclaimedTicketsQuery = useTicketsQuery({ unassigned: "true", pageSize: PANEL_WINDOW });
+  const unclaimedTicketsQuery = useTicketsQuery({
+    unassigned: "true",
+    statuses: PANEL_STATUSES,
+    sortBy: "slaUrgency",
+  });
 
   // `now` is computed once per fetched result, alongside the filter/sort
   // that depends on it, so the ordering and the on-screen remaining-time
   // text (rendered from the same `now`, passed to `SlaPresentation` below)
   // can never disagree with each other.
   const { openTickets, now } = useMemo(() => {
+    // Story S-9 — the rows arrive already narrowed and already ranked. `now`
+    // is still computed once per result, because the remaining-time text
+    // `SlaPresentation` renders is derived from it and must not disagree
+    // with itself across a row.
     const now = new Date();
-    const openTickets = sortByUrgency(
-      (myTicketsQuery.data?.items ?? []).filter((ticket) => OPEN_STATUSES.has(ticket.status)),
-      now,
-    );
-    return { openTickets, now };
+    return { openTickets: myTicketsQuery.data?.items ?? [], now };
   }, [myTicketsQuery.data]);
 
   const { unclaimedTickets, now: unclaimedNow } = useMemo(() => {
+    // Story S-9 — see above: assignment, status and ranking are all the
+    // server's answer now.
     const now = new Date();
-    // `assignedToUserId === null` is the server's job now; the open-status
-    // filter stays here because `OPEN_STATUSES` is this screen's own
-    // definition of "still needs work" (Story 28), not an API concept.
-    const unclaimedTickets = sortByUrgency(
-      (unclaimedTicketsQuery.data?.items ?? []).filter((ticket) =>
-        OPEN_STATUSES.has(ticket.status),
-      ),
-      now,
-    );
-    return { unclaimedTickets, now };
+    return { unclaimedTickets: unclaimedTicketsQuery.data?.items ?? [], now };
   }, [unclaimedTicketsQuery.data]);
 
   return (
