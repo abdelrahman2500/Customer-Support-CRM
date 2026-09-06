@@ -7,6 +7,8 @@ import {
 import { Prisma } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { PrismaService } from "../../prisma/prisma.service";
+import { paginate } from "../../common/pagination/paginate";
+import type { Paginated } from "../../common/pagination/paginated";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateCustomerDto } from "./dto/create-customer.dto";
 import type { UpdateCustomerDto } from "./dto/update-customer.dto";
@@ -16,13 +18,6 @@ import type { SetContactPortalPasswordDto } from "./dto/set-contact-portal-passw
 import type { ListCustomersQueryDto } from "./dto/list-customers-query.dto";
 
 const BCRYPT_ROUNDS = 12;
-
-/** Story 106 — mirrors `TicketsService`'s own `MAX_TICKET_ROWS` precedent
- * (Story 105): `Customer` is now this codebase's single largest
- * unbounded table (confirmed at 1182 rows in this session's dev
- * database, a comparable operational scale to `Ticket`), so the same
- * fixed cap applies at the same size. */
-const MAX_CUSTOMER_ROWS = 500;
 
 /**
  * Story S-8d — the shape a picker needs, and nothing else.
@@ -91,16 +86,6 @@ export class CustomersService {
    * equality filter, and omitting every param reproduces this method's
    * exact pre-Story-101 query/order byte-for-byte.
    */
-  /** Story 106 — the DB fetch always requests `desc` on the chosen
-   * `sortBy`, regardless of the caller's requested `sortDir`; a requested
-   * `sortDir: "asc"` (the default) is restored by reversing the
-   * already-fetched, already-capped array in memory. Mirrors
-   * `TicketsService.listTickets`'s own identical fix (Story 105) and its
-   * exact reasoning: capping a literal `sortDir: "asc"` query as-written
-   * would fetch the *oldest* `MAX_CUSTOMER_ROWS` rows and, once a branch
-   * exceeds the cap, freeze there forever — reversing a `desc`-fetched,
-   * capped array reproduces the exact `asc` list a direct query would
-   * have returned whenever the true row count is at or under the cap. */
   /**
    * Story S-8d — a lookup for customer *pickers*, separate from the browsable
    * list.
@@ -128,23 +113,41 @@ export class CustomersService {
     return customers;
   }
 
-  async listCustomers(query: ListCustomersQueryDto = {}): Promise<CustomerSummary[]> {
+  /**
+   * Story S-8e — real pagination replaces the Story 106 row cap.
+   *
+   * Story 106 could not honour `sortDir: "asc"` directly: a capped
+   * ascending query returns the *oldest* 500 rows and, once a branch
+   * passes the cap, freezes there — every customer created afterwards
+   * silently missing. It worked around that by always fetching `desc`
+   * and reversing the array in memory, which reproduces the right list
+   * only while the branch stays under the cap. With `skip`/`take` the
+   * requested direction is simply the direction queried, so the
+   * workaround and its caveat both go away, and rows past the old cap
+   * become reachable rather than invisible.
+   *
+   * `id` is the ordering tiebreaker, following `sortDir` so the composite
+   * order stays one consistent sequence. Neither `createdAt` nor
+   * `displayName` is unique — bulk-seeded customers share a timestamp to
+   * the millisecond, and two customers may genuinely share a name — and
+   * offset paging over a non-unique sort repeats a row on one page while
+   * dropping it from the next.
+   */
+  async listCustomers(query: ListCustomersQueryDto = {}): Promise<Paginated<CustomerSummary>> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const sortBy = query.sortBy ?? "createdAt";
     const sortDir = query.sortDir ?? "asc";
-    const customers = await this.prisma.customer.findMany({
+    const { items: customers, ...pagination } = await paginate(this.prisma.customer, {
       where: {
         branchId,
         ...(query.search ? { displayName: { contains: query.search, mode: "insensitive" } } : {}),
         ...(query.isActive !== undefined ? { isActive: query.isActive === "true" } : {}),
       },
-      orderBy: { [sortBy]: "desc" },
-      take: MAX_CUSTOMER_ROWS,
+      orderBy: [{ [sortBy]: sortDir }, { id: sortDir }],
+      page: query.page,
+      pageSize: query.pageSize,
     });
-    if (sortDir === "asc") {
-      customers.reverse();
-    }
-    return customers.map(toCustomerSummary);
+    return { ...pagination, items: customers.map(toCustomerSummary) };
   }
 
   async getCustomer(id: string): Promise<CustomerSummary & { contacts: ContactSummary[] }> {

@@ -8,6 +8,8 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@prisma/client";
 import type { TicketPriority, TicketStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { paginate } from "../../common/pagination/paginate";
+import type { Paginated } from "../../common/pagination/paginated";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateTicketDto } from "./dto/create-ticket.dto";
 import type { UpdateTicketDto } from "./dto/update-ticket.dto";
@@ -37,20 +39,6 @@ import type {
  * tier boundary to decide when `Ticket.resolvedAt` changes.
  */
 const RESOLVED_STATUSES = new Set<TicketStatus>(["RESOLVED", "CLOSED"]);
-
-/** Story 105 — `Ticket` is this application's highest-write-volume table;
- * an unfiltered `listTickets` call had no natural ceiling. Mirrors
- * `AuditLogsService`'s own `MAX_AUDIT_LOG_ROWS` precedent (Story 104) —
- * fixed, documented, unconditionally applied — set higher than that
- * story's `200`: confirmed directly against this session's own dev
- * database that a single seeded branch already holds 991 rows from
- * accumulated e2e/test activity alone, so 500 comfortably covers a real
- * team's day-to-day open+recent backlog without being a routinely-hit
- * ceiling. Full pagination is deliberately out of scope (see this
- * story's own plan doc) — narrowing via the existing `status`/
- * `priority`/`category`/`assignedToUserId`/`search` filters is the tool
- * for "I need to see a specific ticket," not paging deeper. */
-const MAX_TICKET_ROWS = 500;
 
 export interface TicketSummary {
   id: string;
@@ -234,7 +222,7 @@ export class TicketsService {
    * would mean a department-scoped search could silently drop its own
    * branch/department authorization. See `resolveSearchAndVisibilityFilter`.
    */
-  async listTickets(query: ListTicketsQueryDto = {}): Promise<TicketListItem[]> {
+  async listTickets(query: ListTicketsQueryDto = {}): Promise<Paginated<TicketListItem>> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const sortBy = query.sortBy ?? "createdAt";
     const sortDir = query.sortDir ?? "asc";
@@ -253,30 +241,57 @@ export class TicketsService {
         ? { assignedToUserId: query.unassigned === "true" ? null : { not: null } }
         : {}),
     };
-    // Story 105 — capping a `sortDir: "asc"` query as-written would fetch
-    // the OLDEST `MAX_TICKET_ROWS` rows and, once a branch ever exceeds
-    // the cap, freeze there forever: every ticket created afterward would
-    // silently never appear in the default (ascending, no-filter) view —
-    // the opposite of what a cap should protect against, and a real,
-    // reproducible regression (confirmed against this session's own dev
-    // database, which already holds 991 tickets in one branch). Instead,
-    // the DB fetch always requests the most-recent-`MAX_TICKET_ROWS`
-    // slice (`desc`), and a `sortDir: "asc"` request is restored by
-    // reversing that already-fetched, already-capped array in memory —
-    // when the true row count is at or under the cap, reversing a `desc`
-    // list reproduces the exact `asc` list a direct query would have
-    // returned, so this is behavior-identical to before Story 105 for
-    // every branch that hasn't hit the cap yet.
-    const tickets = await this.prisma.ticket.findMany({
-      where,
-      orderBy: { [sortBy]: "desc" },
-      include: { slaTarget: true, ...CATEGORY_NAME_INCLUDE },
-      take: MAX_TICKET_ROWS,
-    });
-    if (sortDir === "asc") {
-      tickets.reverse();
-    }
-    return tickets.map((ticket) => ({
+    /**
+     * Story S-8e — real offset paging replaces the Story 105 row cap.
+     *
+     * Story 105 could not run a capped `sortDir: "asc"` query directly:
+     * it would fetch the OLDEST 500 rows and, once a branch passed the
+     * cap, freeze there forever — every ticket created afterwards
+     * silently absent from the default view. It compensated by always
+     * fetching the newest 500 `desc` and reversing that array in memory,
+     * which reproduces the correct `asc` list only while the branch stays
+     * under the cap. `skip`/`take` makes the requested direction the
+     * direction actually queried, so both the workaround and its "only
+     * while under the cap" caveat go away, and the rows the cap hid
+     * become reachable.
+     *
+     * The delegate is wrapped rather than passed directly because
+     * `paginate`'s `PaginatableDelegate` has no `include` — it infers the
+     * row type from the delegate, and threading Prisma's include-payload
+     * generics through it would complicate the shared helper for one
+     * call site. The wrapper adds ONLY the `include`: `where` still comes
+     * from `paginate`'s single `options.where` and is spread into both
+     * queries, so the guarantee that `total` cannot be counted over a
+     * wider scope than `items` — which here is the branch/department
+     * authorization arm composed above — is untouched.
+     *
+     * `id` is the tiebreaker, following `sortDir`. Neither `createdAt`
+     * nor `updatedAt` is unique: bulk-seeded tickets share a timestamp to
+     * the millisecond, and offset paging over a non-unique sort shows a
+     * row on two pages or on neither.
+     */
+    const { items: tickets, ...pagination } = await paginate(
+      {
+        count: (args: { where: Prisma.TicketWhereInput }) => this.prisma.ticket.count(args),
+        findMany: (args: {
+          where: Prisma.TicketWhereInput;
+          orderBy: Prisma.TicketOrderByWithRelationInput[];
+          skip: number;
+          take: number;
+        }) =>
+          this.prisma.ticket.findMany({
+            ...args,
+            include: { slaTarget: true, ...CATEGORY_NAME_INCLUDE },
+          }),
+      },
+      {
+        where,
+        orderBy: [{ [sortBy]: sortDir }, { id: sortDir }],
+        page: query.page,
+        pageSize: query.pageSize,
+      },
+    );
+    const items = tickets.map((ticket) => ({
       ...toTicketSummary(ticket),
       slaTarget: ticket.slaTarget
         ? {
@@ -287,6 +302,7 @@ export class TicketsService {
           }
         : null,
     }));
+    return { ...pagination, items };
   }
 
   async getTicket(id: string): Promise<TicketSummary> {

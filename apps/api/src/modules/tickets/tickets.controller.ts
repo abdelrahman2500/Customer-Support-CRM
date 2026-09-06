@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Res } from "@nestjs/c
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
+import type { Paginated } from "../../common/pagination/paginated";
 import { CreateTicketDto } from "./dto/create-ticket.dto";
 import { UpdateTicketDto } from "./dto/update-ticket.dto";
 import { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
@@ -38,7 +39,7 @@ export class TicketsController {
 
   @Get()
   @RequirePermissions("ticket:read")
-  list(@Query() query: ListTicketsQueryDto): Promise<TicketListItem[]> {
+  list(@Query() query: ListTicketsQueryDto): Promise<Paginated<TicketListItem>> {
     return this.ticketsService.listTickets(query);
   }
 
@@ -136,10 +137,7 @@ export class TicketsController {
    * TicketAiService.getAiResult's own doc comment). */
   @Get(":id/ai/:logId")
   @RequirePermissions("ticket:read")
-  getAiResult(
-    @Param("id") id: string,
-    @Param("logId") logId: string,
-  ): Promise<AiResultResponse> {
+  getAiResult(@Param("id") id: string, @Param("logId") logId: string): Promise<AiResultResponse> {
     return this.ticketAiService.getAiResult(id, logId);
   }
 

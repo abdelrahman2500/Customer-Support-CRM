@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { CustomersService } from "./customers.service";
+import type { CustomerSummary } from "./customers.service";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 
@@ -15,6 +16,8 @@ function buildPrismaMock() {
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
+      // Story S-8e — see the matching note in `tickets.service.spec.ts`.
+      count: vi.fn().mockResolvedValue(0),
     },
     contact: {
       create: vi.fn(),
@@ -148,33 +151,45 @@ describe("CustomersService", () => {
   });
 
   describe("listCustomers", () => {
+    /** Story S-8e — the default page: `asc` is now queried as `asc` (Story
+     * 106 had to query `desc` and reverse), with `id` as the tiebreaker. */
+    const DEFAULT_PAGE = {
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      skip: 0,
+      take: 25,
+    };
+
     it("scopes the query to the caller's active branch", async () => {
-      // Story 106 — fetched `desc`, then reversed for the default `asc`.
       prisma.customer.findMany.mockResolvedValue([
         { id: "customer-1", displayName: "Acme Corp", isActive: true },
       ]);
+      prisma.customer.count.mockResolvedValue(1);
 
       const result = await service.listCustomers();
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { createdAt: "desc" },
-        take: 500,
+        ...DEFAULT_PAGE,
       });
-      expect(result).toEqual([{ id: "customer-1", displayName: "Acme Corp", isActive: true }]);
+      expect(result).toEqual({
+        items: [{ id: "customer-1", displayName: "Acme Corp", isActive: true }],
+        total: 1,
+        page: 1,
+        pageSize: 25,
+        totalPages: 1,
+      });
     });
 
     // Story 101 — search/isActive/sort query params.
-    it("omitting every query param reproduces the exact pre-Story-101 query, now capped", async () => {
+    it("omitting every query param asks for the first page, unfiltered", async () => {
       prisma.customer.findMany.mockResolvedValue([]);
 
       await service.listCustomers({});
 
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { createdAt: "desc" },
-        take: 500,
+        ...DEFAULT_PAGE,
       });
     });
 
@@ -188,8 +203,7 @@ describe("CustomersService", () => {
           branchId: "branch-1",
           displayName: { contains: "acme", mode: "insensitive" },
         },
-        orderBy: { createdAt: "desc" },
-        take: 500,
+        ...DEFAULT_PAGE,
       });
     });
 
@@ -200,8 +214,7 @@ describe("CustomersService", () => {
 
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", isActive: true },
-        orderBy: { createdAt: "desc" },
-        take: 500,
+        ...DEFAULT_PAGE,
       });
     });
 
@@ -212,8 +225,7 @@ describe("CustomersService", () => {
 
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", isActive: false },
-        orderBy: { createdAt: "desc" },
-        take: 500,
+        ...DEFAULT_PAGE,
       });
     });
 
@@ -224,39 +236,105 @@ describe("CustomersService", () => {
 
       expect(prisma.customer.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { displayName: "desc" },
-        take: 500,
+        orderBy: [{ displayName: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
       });
     });
 
-    // Story 106 — a Bounded Result Cap (mirrors Story 105's own fix).
-    it("fetches desc and reverses in memory for the default (asc) direction, reproducing the exact pre-Story-106 order", async () => {
-      const older = { id: "customer-older", displayName: "Alpha", isActive: true };
-      const newer = { id: "customer-newer", displayName: "Beta", isActive: true };
-      // Prisma, asked for `desc`, would itself return newest-first.
-      prisma.customer.findMany.mockResolvedValue([newer, older]);
+    // Story S-8e — pagination, replacing Story 106's 500-row cap.
+    describe("pagination (Story S-8e)", () => {
+      it("queries the requested direction directly instead of reversing in memory", async () => {
+        const older = { id: "customer-older", displayName: "Alpha", isActive: true };
+        const newer = { id: "customer-newer", displayName: "Beta", isActive: true };
+        // Prisma, asked for `asc`, returns oldest-first - and that is now
+        // exactly what is asked for, so the service passes it straight
+        // through. Story 106 asked for `desc` and reversed the array,
+        // which only reproduced the right list below the cap.
+        prisma.customer.findMany.mockResolvedValue([older, newer]);
 
-      const result = await service.listCustomers();
+        const result = await service.listCustomers();
 
-      expect(result.map((c) => c.id)).toEqual(["customer-older", "customer-newer"]);
-    });
+        expect(prisma.customer.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
+        );
+        expect(result.items.map((c: CustomerSummary) => c.id)).toEqual([
+          "customer-older",
+          "customer-newer",
+        ]);
+      });
 
-    it("does not reverse when sortDir is explicitly desc", async () => {
-      const older = { id: "customer-older", displayName: "Alpha", isActive: true };
-      const newer = { id: "customer-newer", displayName: "Beta", isActive: true };
-      prisma.customer.findMany.mockResolvedValue([newer, older]);
+      it("does not reverse when sortDir is explicitly desc", async () => {
+        const older = { id: "customer-older", displayName: "Alpha", isActive: true };
+        const newer = { id: "customer-newer", displayName: "Beta", isActive: true };
+        prisma.customer.findMany.mockResolvedValue([newer, older]);
 
-      const result = await service.listCustomers({ sortDir: "desc" });
+        const result = await service.listCustomers({ sortDir: "desc" });
 
-      expect(result.map((c) => c.id)).toEqual(["customer-newer", "customer-older"]);
-    });
+        expect(result.items.map((c: CustomerSummary) => c.id)).toEqual([
+          "customer-newer",
+          "customer-older",
+        ]);
+      });
 
-    it("caps every query at 500 rows, unconditionally", async () => {
-      prisma.customer.findMany.mockResolvedValue([]);
+      it("no longer caps the query at a fixed row count", async () => {
+        prisma.customer.findMany.mockResolvedValue([]);
 
-      await service.listCustomers({ isActive: "true" });
+        await service.listCustomers({ isActive: "true" });
 
-      expect(prisma.customer.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 500 }));
+        // Story 106's unconditional `take: 500` made every row past it
+        // unreachable; `take` is now the page size and `skip` reaches the
+        // rest.
+        const args = prisma.customer.findMany.mock.calls[0]![0];
+        expect(args.take).toBe(25);
+        expect(args.skip).toBe(0);
+      });
+
+      it("translates a page number into the right offset", async () => {
+        prisma.customer.findMany.mockResolvedValue([]);
+
+        await service.listCustomers({ page: 3, pageSize: 10 });
+
+        expect(prisma.customer.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: 20, take: 10 }),
+        );
+      });
+
+      it("counts over exactly the same where clause it fetches with", async () => {
+        prisma.customer.findMany.mockResolvedValue([]);
+        prisma.customer.count.mockResolvedValue(0);
+
+        await service.listCustomers({ search: "acme", isActive: "true" });
+
+        // A `total` counted over a wider scope than `items` would report
+        // rows the caller cannot reach - here, customers in another branch.
+        const where = {
+          branchId: "branch-1",
+          displayName: { contains: "acme", mode: "insensitive" },
+          isActive: true,
+        };
+        expect(prisma.customer.count).toHaveBeenCalledWith({ where });
+        expect(prisma.customer.findMany).toHaveBeenCalledWith(expect.objectContaining({ where }));
+      });
+
+      it("reports the total and page count from the count query", async () => {
+        prisma.customer.findMany.mockResolvedValue([]);
+        prisma.customer.count.mockResolvedValue(57);
+
+        const result = await service.listCustomers({ pageSize: 25 });
+
+        expect(result.total).toBe(57);
+        expect(result.totalPages).toBe(3);
+      });
+
+      it("returns an empty page past the end without losing the metadata", async () => {
+        prisma.customer.findMany.mockResolvedValue([]);
+        prisma.customer.count.mockResolvedValue(5);
+
+        const result = await service.listCustomers({ page: 99 });
+
+        expect(result).toEqual({ items: [], total: 5, page: 99, pageSize: 25, totalPages: 1 });
+      });
     });
   });
 

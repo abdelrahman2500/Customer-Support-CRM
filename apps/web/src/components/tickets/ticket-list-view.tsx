@@ -14,6 +14,7 @@ import {
   Button,
   FetchingIndicator,
   Input,
+  Pagination,
   QueryStateCard,
   Skeleton,
   SortIndicator,
@@ -82,12 +83,15 @@ export function TicketListView() {
   });
 
   const ticketsQuery = useTicketsQuery(filters);
-  /** Story S-7 — the rows to render, whoever they came from: a completed
-   * fetch, the previous filters kept as placeholder data, or the last
-   * success still standing behind a failed refetch. `undefined` means there
-   * is genuinely nothing to show yet, which is what the state model below
-   * branches on. */
-  const tickets = ticketsQuery.data;
+  /** Story S-7 — whoever they came from: a completed fetch, the previous
+   * filters kept as placeholder data, or the last success still standing
+   * behind a failed refetch. `undefined` means there is genuinely nothing
+   * to show yet, which is what the state model below branches on.
+   *
+   * Story S-8e — the response is now a page envelope, so the rows are one
+   * level in and the pager reads its position off the same object. */
+  const page = ticketsQuery.data;
+  const tickets = page?.items;
   const usersQuery = useUsersQuery();
   const categoriesQuery = useTicketCategoriesQuery();
 
@@ -107,16 +111,24 @@ export function TicketListView() {
     return map;
   }, [categoriesQuery.data]);
 
+  /** Story S-8e — a filter change resets to page 1 in the SAME state
+   * update. Doing it in a follow-up effect would fire one request for
+   * "page 7 of the new filter" and only then correct itself, exactly as
+   * `AuditLogView` documents. */
   function updateFilter<K extends keyof ListTicketsFilters>(key: K, value: string) {
     setFilters((current) => ({
       ...current,
       [key]: value === ALL_VALUE ? undefined : (value as ListTicketsFilters[K]),
+      page: undefined,
     }));
   }
 
   function toggleSort(field: "createdAt" | "updatedAt") {
     setFilters((current) => ({
       ...current,
+      // Story S-8e — a re-sort reorders the whole result set, so page 7
+      // of the old order means nothing in the new one.
+      page: undefined,
       sortBy: field,
       sortDir: current.sortBy === field && current.sortDir === "asc" ? "desc" : "asc",
     }));
@@ -307,6 +319,26 @@ export function TicketListView() {
           </TableBody>
         </Table>
       </QueryStateCard>
+
+      {/* Story S-8e — renders nothing while there is only one page (see
+          `Pagination`), so a small branch's list looks exactly as it did
+          before. Disabled while the previous page is still on screen, so a
+          rapid double-click cannot queue a second jump. */}
+      {page !== undefined && (
+        <Pagination
+          page={page.page}
+          totalPages={page.totalPages}
+          onPageChange={(next) => setFilters((current) => ({ ...current, page: next }))}
+          disabled={ticketsQuery.isPlaceholderData}
+          label={tCommon("pagination.label")}
+          previousLabel={tCommon("pagination.previous")}
+          nextLabel={tCommon("pagination.next")}
+          indicator={tCommon("pagination.indicator", {
+            page: page.page,
+            totalPages: page.totalPages,
+          })}
+        />
+      )}
     </section>
   );
 }

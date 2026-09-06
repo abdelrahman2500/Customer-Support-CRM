@@ -47,6 +47,24 @@ function queryResult(overrides: Record<string, unknown>) {
   };
 }
 
+/**
+ * Story S-8e — `GET /tickets` and `GET /customers` return a
+ * `Paginated<T>` envelope, so these queries' `data` is no longer a bare
+ * array. Builds one, defaulting to a single full page so the existing
+ * tests read exactly as they did before. Mirrors
+ * `audit-log-view.spec.tsx`'s own helper.
+ */
+function page(items: unknown[], overrides: Record<string, unknown> = {}) {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    pageSize: 25,
+    totalPages: 1,
+    ...overrides,
+  };
+}
+
 describe("TicketListView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,7 +89,9 @@ describe("TicketListView", () => {
   });
 
   it("shows the empty state when the query succeeds with zero tickets", () => {
-    mockedUseTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseTicketsQuery.mockReturnValue(
+      queryResult({ data: page([]), isSuccess: true }) as never,
+    );
 
     render(<TicketListView />);
 
@@ -93,7 +113,7 @@ describe("TicketListView", () => {
     mockedUseTicketsQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [
+        data: page([
           {
             id: "ticket-1",
             subject: "Cannot log in",
@@ -109,7 +129,7 @@ describe("TicketListView", () => {
             updatedAt: "2024-01-02T00:00:00.000Z",
             slaTarget: null,
           },
-        ],
+        ]),
       }) as never,
     );
 
@@ -120,7 +140,9 @@ describe("TicketListView", () => {
 
   // Story 70 — Ticket Search Foundation.
   it("commits the search filter on blur, passing it through to useTicketsQuery", () => {
-    mockedUseTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseTicketsQuery.mockReturnValue(
+      queryResult({ data: page([]), isSuccess: true }) as never,
+    );
 
     render(<TicketListView />);
     const input = screen.getByPlaceholderText("list.searchPlaceholder");
@@ -133,7 +155,9 @@ describe("TicketListView", () => {
   });
 
   it("does not commit the search filter when blurred unchanged (empty)", () => {
-    mockedUseTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseTicketsQuery.mockReturnValue(
+      queryResult({ data: page([]), isSuccess: true }) as never,
+    );
 
     render(<TicketListView />);
     fireEvent.blur(screen.getByPlaceholderText("list.searchPlaceholder"));
@@ -170,7 +194,7 @@ describe("TicketListView", () => {
       ["CLOSED", "border-rule-strong"],
     ])("gives %s status a distinct visual treatment", (status, expectedClass) => {
       mockedUseTicketsQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [ticketWith(status)] }) as never,
+        queryResult({ isSuccess: true, data: page([ticketWith(status)]) }) as never,
       );
 
       render(<TicketListView />);
@@ -182,7 +206,7 @@ describe("TicketListView", () => {
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [ticketWith("OPEN"), ticketWith("RESOLVED")],
+          data: page([ticketWith("OPEN"), ticketWith("RESOLVED")]),
         }) as never,
       );
 
@@ -203,7 +227,7 @@ describe("TicketListView", () => {
     mockedUseTicketsQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [
+        data: page([
           {
             id: "ticket-1",
             subject: "Cannot log in",
@@ -219,7 +243,7 @@ describe("TicketListView", () => {
             updatedAt: "2024-01-02T00:00:00.000Z",
             slaTarget: null,
           },
-        ],
+        ]),
       }) as never,
     );
 
@@ -270,7 +294,7 @@ describe("TicketListView", () => {
     it("keeps the previous rows on screen while a new filter resolves", () => {
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({
-          data: [ticket()],
+          data: page([ticket()]),
           isSuccess: true,
           // The shape TanStack reports for a new key backed by the previous
           // key's data: content, not pending.
@@ -289,7 +313,7 @@ describe("TicketListView", () => {
 
     it("shows a polite background-fetch indicator over the surviving rows", () => {
       mockedUseTicketsQuery.mockReturnValue(
-        queryResult({ data: [ticket()], isSuccess: true, isPlaceholderData: true }) as never,
+        queryResult({ data: page([ticket()]), isSuccess: true, isPlaceholderData: true }) as never,
       );
 
       render(<TicketListView />);
@@ -303,7 +327,7 @@ describe("TicketListView", () => {
 
     it("shows no indicator once the new results have landed", () => {
       mockedUseTicketsQuery.mockReturnValue(
-        queryResult({ data: [ticket()], isSuccess: true }) as never,
+        queryResult({ data: page([ticket()]), isSuccess: true }) as never,
       );
 
       render(<TicketListView />);
@@ -313,14 +337,14 @@ describe("TicketListView", () => {
 
     it("replaces the previous rows when the new results arrive", () => {
       mockedUseTicketsQuery.mockReturnValue(
-        queryResult({ data: [ticket()], isSuccess: true, isPlaceholderData: true }) as never,
+        queryResult({ data: page([ticket()]), isSuccess: true, isPlaceholderData: true }) as never,
       );
       const { rerender } = render(<TicketListView />);
       expect(screen.getByRole("link", { name: "Cannot log in" })).toBeInTheDocument();
 
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({
-          data: [ticket({ id: "ticket-2", subject: "Refund not received" })],
+          data: page([ticket({ id: "ticket-2", subject: "Refund not received" })]),
           isSuccess: true,
         }) as never,
       );
@@ -334,7 +358,7 @@ describe("TicketListView", () => {
       const refetch = vi.fn();
       mockedUseTicketsQuery.mockReturnValue(
         // v5 keeps `data` from the last success through an error.
-        queryResult({ data: [ticket()], isError: true, refetch }) as never,
+        queryResult({ data: page([ticket()]), isError: true, refetch }) as never,
       );
 
       render(<TicketListView />);
@@ -365,17 +389,123 @@ describe("TicketListView", () => {
     });
 
     it("shows the empty state only when the resolved query really has no rows", () => {
-      mockedUseTicketsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ data: page([]), isSuccess: true }) as never,
+      );
       const { rerender, container } = render(<TicketListView />);
       expect(screen.getByText("list.empty")).toBeInTheDocument();
 
       // A refetch in progress over previous rows must NOT read as empty.
       mockedUseTicketsQuery.mockReturnValue(
-        queryResult({ data: [ticket()], isSuccess: true, isPlaceholderData: true }) as never,
+        queryResult({ data: page([ticket()]), isSuccess: true, isPlaceholderData: true }) as never,
       );
       rerender(<TicketListView />);
       expect(screen.queryByText("list.empty")).not.toBeInTheDocument();
       expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+    });
+  });
+  /**
+   * Story S-8e — `GET /tickets` is paginated, replacing the Story 105
+   * 500-row cap. `page` lives inside the same filters object as every
+   * other filter, so a page change is a new query key and inherits Story
+   * S-7's row preservation for free.
+   */
+  describe("pagination (Story S-8e)", () => {
+    const middlePage = { total: 60, page: 2, pageSize: 25, totalPages: 3 };
+    const row = {
+      id: "ticket-1",
+      subject: "Cannot log in",
+      categoryId: null,
+      categoryName: null,
+      priority: "MEDIUM",
+      status: "OPEN",
+      customerId: "customer-1",
+      customerName: "Acme Inc.",
+      contactId: null,
+      departmentId: null,
+      assignedToUserId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      slaTarget: null,
+    };
+
+    beforeEach(() => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([row], middlePage) }) as never,
+      );
+    });
+
+    it("renders no pager when everything fits on one page", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([row]) }) as never,
+      );
+
+      render(<TicketListView />);
+
+      // A small branch's list should look exactly as it did before S-8e.
+      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    });
+
+    it("renders the pager and the current page indicator once there is more than one page", () => {
+      render(<TicketListView />);
+
+      expect(screen.getByRole("navigation", { name: "pagination.label" })).toBeInTheDocument();
+      expect(
+        screen.getByText('pagination.indicator:{"page":2,"totalPages":3}'),
+      ).toBeInTheDocument();
+    });
+
+    it("requests the next page without touching the filters", () => {
+      render(<TicketListView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
+
+      expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 3, sortBy: "createdAt", sortDir: "asc" }),
+      );
+    });
+
+    it("resets to the first page when a filter changes", () => {
+      render(<TicketListView />);
+
+      // Otherwise the next request asks for "page 2 of the new filter",
+      // which is very often empty - the user sees a blank table for a
+      // filter that has plenty of matches.
+      const input = screen.getByPlaceholderText("list.searchPlaceholder");
+      fireEvent.change(input, { target: { value: "login" } });
+      fireEvent.blur(input);
+
+      expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ search: "login", page: undefined }),
+      );
+    });
+
+    it("resets to the first page when the sort changes", () => {
+      render(<TicketListView />);
+
+      fireEvent.click(screen.getByRole("button", { name: /list.columns.updatedAt/ }));
+
+      // A re-sort reorders the whole result set, so the old page number
+      // points somewhere unrelated.
+      expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sortBy: "updatedAt", page: undefined }),
+      );
+    });
+
+    it("disables both controls while the previous page is still on screen", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: page([row], middlePage),
+        }) as never,
+      );
+
+      render(<TicketListView />);
+
+      // A rapid double-click must not queue a second jump.
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
     });
   });
 });

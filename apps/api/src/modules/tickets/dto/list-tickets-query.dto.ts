@@ -1,6 +1,7 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, IntersectionType } from "@nestjs/swagger";
 import { IsEnum, IsIn, IsOptional, IsString, IsUUID } from "class-validator";
 import { TicketPriority, TicketStatus } from "@prisma/client";
+import { PaginationQueryDto } from "../../../common/pagination/pagination-query.dto";
 
 /**
  * Story 23 — mechanical, same-response-shape extension of `GET /tickets`:
@@ -20,8 +21,17 @@ import { TicketPriority, TicketStatus } from "@prisma/client";
  *
  * Story 120 — `category` (free text) replaced by `categoryId` (exact-id
  * equality filter), mirroring `Ticket.category`'s own schema change.
+ *
+ * Story S-8e — `page`/`pageSize` finally close the gap this DTO's own
+ * Story 23 comment opened ("No pagination — no precedent anywhere in this
+ * codebase to extend"). That precedent now exists: `PaginationQueryDto`
+ * and the `paginate` helper (Story S-8a), already carrying audit logs,
+ * notifications and the knowledge base. Composed with `IntersectionType`
+ * for the same reason `ListAuditLogsQueryDto` does — it copies both
+ * classes' validation and Swagger metadata, and this class has its own
+ * long-standing filter set to keep.
  */
-export class ListTicketsQueryDto {
+export class ListTicketsQueryDto extends IntersectionType(PaginationQueryDto) {
   @ApiProperty({ required: false, enum: TicketStatus })
   @IsOptional()
   @IsEnum(TicketStatus)

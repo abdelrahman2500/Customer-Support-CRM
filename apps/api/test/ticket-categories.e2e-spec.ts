@@ -298,7 +298,7 @@ describe("Ticket Categories (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      expect(response.body.map((t: { id: string }) => t.id)).toContain(ticket.body.id);
+      expect(response.body.items.map((t: { id: string }) => t.id)).toContain(ticket.body.id);
     });
   });
 });

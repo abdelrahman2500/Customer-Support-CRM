@@ -168,7 +168,26 @@ export function DashboardView({ userId }: { userId: string }) {
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
-  const myTicketsQuery = useTicketsQuery({ assignedToUserId: userId });
+  /**
+   * Story S-8e — an explicit, bounded window rather than a pager.
+   *
+   * Both panels order by SLA urgency (`sortByUrgency`), which is computed
+   * in the browser from each ticket's SLA target and cannot be expressed
+   * as a Prisma `orderBy`: the key is `LEAST(responseTargetAt,
+   * resolutionTargetAt)` on a relation, with no-SLA rows last. So the
+   * server cannot return "the 25 most urgent", and a pager over a
+   * `createdAt` order would let page 2 hold a more urgent ticket than
+   * page 1 - worse than no pager at all.
+   *
+   * `pageSize: 100` (the API's maximum) makes the window explicit and
+   * bounded. It is narrower than the 500-row cap this replaces, and that
+   * is a real, named limitation: in a branch with more than 100 open
+   * tickets in either panel, the urgency ordering is over the 100 most
+   * recent rather than over everything. Ranking these panels server-side
+   * would need the SLA key in SQL, which is its own change.
+   */
+  const PANEL_WINDOW = 100;
+  const myTicketsQuery = useTicketsQuery({ assignedToUserId: userId, pageSize: PANEL_WINDOW });
   /**
    * Story S-8d — asks the server for unclaimed tickets instead of fetching
    * the branch-wide list and filtering it here.
@@ -181,7 +200,7 @@ export function DashboardView({ userId }: { userId: string }) {
    * `GET /tickets` be paginated without this panel silently narrowing
    * further.
    */
-  const unclaimedTicketsQuery = useTicketsQuery({ unassigned: "true" });
+  const unclaimedTicketsQuery = useTicketsQuery({ unassigned: "true", pageSize: PANEL_WINDOW });
 
   // `now` is computed once per fetched result, alongside the filter/sort
   // that depends on it, so the ordering and the on-screen remaining-time
@@ -190,7 +209,7 @@ export function DashboardView({ userId }: { userId: string }) {
   const { openTickets, now } = useMemo(() => {
     const now = new Date();
     const openTickets = sortByUrgency(
-      (myTicketsQuery.data ?? []).filter((ticket) => OPEN_STATUSES.has(ticket.status)),
+      (myTicketsQuery.data?.items ?? []).filter((ticket) => OPEN_STATUSES.has(ticket.status)),
       now,
     );
     return { openTickets, now };
@@ -202,7 +221,9 @@ export function DashboardView({ userId }: { userId: string }) {
     // filter stays here because `OPEN_STATUSES` is this screen's own
     // definition of "still needs work" (Story 28), not an API concept.
     const unclaimedTickets = sortByUrgency(
-      (unclaimedTicketsQuery.data ?? []).filter((ticket) => OPEN_STATUSES.has(ticket.status)),
+      (unclaimedTicketsQuery.data?.items ?? []).filter((ticket) =>
+        OPEN_STATUSES.has(ticket.status),
+      ),
       now,
     );
     return { unclaimedTickets, now };

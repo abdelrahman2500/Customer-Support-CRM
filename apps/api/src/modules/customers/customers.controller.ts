@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
+import type { Paginated } from "../../common/pagination/paginated";
 import { CreateCustomerDto } from "./dto/create-customer.dto";
 import { UpdateCustomerDto } from "./dto/update-customer.dto";
 import { ListCustomersQueryDto } from "./dto/list-customers-query.dto";
@@ -21,7 +22,7 @@ export class CustomersController {
 
   @Get()
   @RequirePermissions("customer:read")
-  list(@Query() query: ListCustomersQueryDto): Promise<CustomerSummary[]> {
+  list(@Query() query: ListCustomersQueryDto): Promise<Paginated<CustomerSummary>> {
     return this.customersService.listCustomers(query);
   }
 

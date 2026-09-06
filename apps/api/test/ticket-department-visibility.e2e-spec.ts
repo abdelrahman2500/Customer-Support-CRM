@@ -25,6 +25,7 @@ describe("Ticket Department-Scoped Visibility (e2e)", () => {
   let app: INestApplication;
   let adminAccessToken: string;
   let deptScopedAccessToken: string;
+  let customerId: string;
   let deptAId: string;
   let deptBId: string;
   let deptATicketId: string;
@@ -112,7 +113,7 @@ describe("Ticket Department-Scoped Visibility (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .send({ displayName: `Dept Visibility Fixture Customer ${randomUUID()}` })
       .expect(201);
-    const customerId = customer.body.id;
+    customerId = customer.body.id;
 
     const deptATicket = await request(app.getHttpServer())
       .post("/api/v1/tickets")
@@ -141,12 +142,17 @@ describe("Ticket Department-Scoped Visibility (e2e)", () => {
   });
 
   it("a DEPARTMENT-scoped caller's GET /tickets includes only their department's ticket and the unassigned one", async () => {
+    // Story S-8e — `GET /tickets` returns one page now. Narrowing to this
+    // suite's own customer puts all three fixtures on it; the visibility
+    // assertion below is unchanged and just as strong, since a customer
+    // filter must never widen what a department-scoped caller can see.
     const response = await request(app.getHttpServer())
       .get("/api/v1/tickets")
+      .query({ customerId })
       .set("Authorization", `Bearer ${deptScopedAccessToken}`)
       .expect(200);
 
-    const ids = response.body.map((ticket: { id: string }) => ticket.id);
+    const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
     expect(ids).toContain(deptATicketId);
     expect(ids).toContain(unassignedTicketId);
     expect(ids).not.toContain(deptBTicketId);
@@ -171,12 +177,14 @@ describe("Ticket Department-Scoped Visibility (e2e)", () => {
   });
 
   it("a BRANCH-scoped caller (the seed admin, default scope) still sees every ticket — unchanged, pre-Story-68 behavior", async () => {
+    // Story S-8e — see the note above on paging and the customer filter.
     const response = await request(app.getHttpServer())
       .get("/api/v1/tickets")
+      .query({ customerId })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    const ids = response.body.map((ticket: { id: string }) => ticket.id);
+    const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
     expect(ids).toContain(deptATicketId);
     expect(ids).toContain(deptBTicketId);
     expect(ids).toContain(unassignedTicketId);
@@ -194,11 +202,11 @@ describe("Ticket Department-Scoped Visibility (e2e)", () => {
   it("composes search with Story 68's department-visibility filter — a matching term never surfaces a different department's ticket", async () => {
     const response = await request(app.getHttpServer())
       .get("/api/v1/tickets")
-      .query({ search: "ticket" })
+      .query({ search: "ticket", customerId })
       .set("Authorization", `Bearer ${deptScopedAccessToken}`)
       .expect(200);
 
-    const ids = response.body.map((ticket: { id: string }) => ticket.id);
+    const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
     expect(ids).toContain(deptATicketId);
     expect(ids).toContain(unassignedTicketId);
     expect(ids).not.toContain(deptBTicketId);

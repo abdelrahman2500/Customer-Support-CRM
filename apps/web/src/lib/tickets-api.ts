@@ -1,4 +1,5 @@
 import { apiFetch, ApiError } from "./api";
+import type { PaginatedResponse } from "./paginated";
 
 export type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
@@ -90,6 +91,10 @@ export interface ListCustomersFilters {
   isActive?: "true" | "false";
   sortBy?: "displayName" | "createdAt";
   sortDir?: "asc" | "desc";
+  /** Story S-8e — 1-based; omitted means the first page. */
+  page?: number;
+  /** Story S-8e — omitted means the API's own default (25). */
+  pageSize?: number;
 }
 
 /** Mirrors `apps/api/src/modules/customers/customers.service.ts`'s `ContactSummary`. */
@@ -148,6 +153,10 @@ export interface ListTicketsFilters {
   /** Story S-8d — `"true"` for tickets with no assignee. A string because
    * a query param cannot carry a real null, mirroring `isActive`. */
   unassigned?: "true" | "false";
+  /** Story S-8e — 1-based; omitted means the first page. */
+  page?: number;
+  /** Story S-8e — omitted means the API's own default (25). */
+  pageSize?: number;
 }
 
 /** Story 101 — widened from `ListTicketsFilters`-only to also accept
@@ -156,16 +165,23 @@ export interface ListTicketsFilters {
 function toQueryString(filters: ListTicketsFilters | ListCustomersFilters): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
+    // Story S-8e — `page`/`pageSize` are numbers, so this no longer
+    // narrows to string. Mirrors `audit-logs-api.ts`'s own loop.
     if (value !== undefined && value !== "") {
-      params.set(key, value);
+      params.set(key, String(value));
     }
   }
   const query = params.toString();
   return query ? `?${query}` : "";
 }
 
-export function listTickets(filters: ListTicketsFilters = {}): Promise<TicketListItem[]> {
-  return apiFetch<TicketListItem[]>(`/tickets${toQueryString(filters)}`);
+/** Story S-8e — `GET /tickets` returns a page envelope, replacing the
+ * Story 105 500-row cap. Same `PaginatedResponse<T>` every other paginated
+ * list client already uses. */
+export function listTickets(
+  filters: ListTicketsFilters = {},
+): Promise<PaginatedResponse<TicketListItem>> {
+  return apiFetch<PaginatedResponse<TicketListItem>>(`/tickets${toQueryString(filters)}`);
 }
 
 export function getTicket(id: string): Promise<TicketSummary> {
@@ -253,8 +269,13 @@ export function updateTicket(id: string, input: UpdateTicketInput): Promise<{ id
   });
 }
 
-export function listCustomers(filters: ListCustomersFilters = {}): Promise<CustomerSummary[]> {
-  return apiFetch<CustomerSummary[]>(`/customers${toQueryString(filters)}`);
+/** Story S-8e — see `listTickets`; this replaces the Story 106 cap.
+ * `listCustomerOptions` below stays a bare array on purpose: a picker has
+ * to be able to offer every option. */
+export function listCustomers(
+  filters: ListCustomersFilters = {},
+): Promise<PaginatedResponse<CustomerSummary>> {
+  return apiFetch<PaginatedResponse<CustomerSummary>>(`/customers${toQueryString(filters)}`);
 }
 
 /**

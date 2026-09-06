@@ -75,23 +75,108 @@ describe("Customer Management (e2e)", () => {
   });
 
   it("lists customers in the caller's active branch, including the new one", async () => {
+    // Story S-8e — the default order is `createdAt` ascending, so this
+    // suite's freshly-created customer is on the LAST page, not the first.
+    // Asking for it by name is what this test was really checking.
     const response = await request(app.getHttpServer())
       .get("/api/v1/customers")
+      .query({ search: "Acme Corp" })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    const ids = response.body.map((customer: { id: string }) => customer.id);
+    const ids = response.body.items.map((customer: { id: string }) => customer.id);
     expect(ids).toContain(customerId);
   });
 
-  // Story 106 — Bounded Result Caps.
-  it("never returns more than 500 rows", async () => {
-    const response = await request(app.getHttpServer())
-      .get("/api/v1/customers")
-      .set("Authorization", `Bearer ${adminAccessToken}`)
-      .expect(200);
+  // Story S-8e — pagination replaces Story 106's 500-row cap.
+  describe("pagination (Story S-8e)", () => {
+    it("returns a page envelope rather than a bare array", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
 
-    expect(response.body.length).toBeLessThanOrEqual(500);
+      expect(Array.isArray(response.body)).toBe(false);
+      expect(response.body).toMatchObject({ page: 1, pageSize: 25 });
+      expect(Array.isArray(response.body.items)).toBe(true);
+      expect(response.body.items.length).toBeLessThanOrEqual(25);
+    });
+
+    it("reaches rows the old 500-row cap made unreachable", async () => {
+      const first = await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .query({ pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      // The whole point of the change: whatever the row count, the last
+      // page is reachable. Story 106 simply truncated at 500.
+      const last = await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .query({ pageSize: 5, page: first.body.totalPages })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(last.body.items.length).toBeGreaterThan(0);
+      expect(last.body.total).toBe(first.body.total);
+    });
+
+    it("returns a non-overlapping second page", async () => {
+      const first = await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .query({ page: 1, pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      if (first.body.totalPages < 2) return;
+
+      const second = await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .query({ page: 2, pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const firstIds = first.body.items.map((c: { id: string }) => c.id);
+      const secondIds = second.body.items.map((c: { id: string }) => c.id);
+      expect(secondIds.filter((id: string) => firstIds.includes(id))).toEqual([]);
+    });
+
+    it("keeps totalPages consistent with total and pageSize", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .query({ pageSize: 10 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.totalPages).toBe(Math.ceil(response.body.total / 10));
+    });
+
+    it("returns an empty page past the end, keeping the metadata accurate", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .query({ page: 100000, pageSize: 25 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items).toEqual([]);
+      expect(response.body.page).toBe(100000);
+      expect(response.body.total).toBeGreaterThan(0);
+    });
+
+    it("rejects a page size above the maximum rather than silently clamping it", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .query({ pageSize: 101 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(400);
+    });
+
+    it("rejects an invalid page with 400", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .query({ page: 0 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(400);
+    });
   });
 
   // Story S-8d — the customer-picker lookup, kept separate from the
@@ -312,15 +397,25 @@ describe("Customer Management (e2e)", () => {
         .expect(200);
     });
 
-    it("omitting every query param returns every customer in the branch, unaffected", async () => {
-      const response = await request(app.getHttpServer())
+    it("omitting every query param returns the branch's customers, unfiltered", async () => {
+      // Story S-8e — this used to assert both fixtures were present in one
+      // unfiltered response. That is no longer the contract: the response
+      // is one page, and these fixtures are the newest rows under an
+      // ascending default order. What the test is actually about - that
+      // omitting the filters narrows nothing - is now expressed through
+      // `total`, which counts the whole unfiltered set.
+      const unfiltered = await request(app.getHttpServer())
         .get("/api/v1/customers")
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
+      const filtered = await request(app.getHttpServer())
+        .get("/api/v1/customers")
+        .query({ search: searchMarker })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
 
-      const ids = response.body.map((customer: { id: string }) => customer.id);
-      expect(ids).toContain(activeCustomerId);
-      expect(ids).toContain(inactiveCustomerId);
+      expect(filtered.body.total).toBe(2);
+      expect(unfiltered.body.total).toBeGreaterThanOrEqual(filtered.body.total);
     });
 
     it("filters by search, case-insensitively, matching displayName", async () => {
@@ -330,19 +425,23 @@ describe("Customer Management (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      const ids = response.body.map((customer: { id: string }) => customer.id);
+      const ids = response.body.items.map((customer: { id: string }) => customer.id);
       expect(ids).toContain(activeCustomerId);
       expect(ids).toContain(inactiveCustomerId);
     });
 
-    it("returns [] for a search that matches nothing", async () => {
+    it("returns an empty page for a search that matches nothing", async () => {
       const response = await request(app.getHttpServer())
         .get("/api/v1/customers")
         .query({ search: `no-such-customer-${randomUUID()}` })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      expect(response.body).toEqual([]);
+      expect(response.body.items).toEqual([]);
+      expect(response.body.total).toBe(0);
+      // `totalPagesFor` clamps to a minimum of 1: there is always a page 1,
+      // even when it is empty, so a client never has to special-case 0.
+      expect(response.body.totalPages).toBe(1);
     });
 
     it("filters by isActive: true/false", async () => {
@@ -351,14 +450,16 @@ describe("Customer Management (e2e)", () => {
         .query({ search: searchMarker, isActive: "true" })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      expect(activeOnly.body.map((c: { id: string }) => c.id)).toEqual([activeCustomerId]);
+      expect(activeOnly.body.items.map((c: { id: string }) => c.id)).toEqual([activeCustomerId]);
 
       const inactiveOnly = await request(app.getHttpServer())
         .get("/api/v1/customers")
         .query({ search: searchMarker, isActive: "false" })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      expect(inactiveOnly.body.map((c: { id: string }) => c.id)).toEqual([inactiveCustomerId]);
+      expect(inactiveOnly.body.items.map((c: { id: string }) => c.id)).toEqual([
+        inactiveCustomerId,
+      ]);
     });
 
     it("rejects an invalid isActive value with 400", async () => {
@@ -375,7 +476,7 @@ describe("Customer Management (e2e)", () => {
         .query({ search: searchMarker, sortBy: "displayName", sortDir: "asc" })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      expect(ascending.body.map((c: { id: string }) => c.id)).toEqual([
+      expect(ascending.body.items.map((c: { id: string }) => c.id)).toEqual([
         activeCustomerId,
         inactiveCustomerId,
       ]);
@@ -385,7 +486,7 @@ describe("Customer Management (e2e)", () => {
         .query({ search: searchMarker, sortBy: "displayName", sortDir: "desc" })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      expect(descending.body.map((c: { id: string }) => c.id)).toEqual([
+      expect(descending.body.items.map((c: { id: string }) => c.id)).toEqual([
         inactiveCustomerId,
         activeCustomerId,
       ]);

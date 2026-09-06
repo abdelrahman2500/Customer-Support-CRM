@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, NotFoundException } from "@nest
 import { Prisma } from "@prisma/client";
 import type { EventEmitter2 } from "@nestjs/event-emitter";
 import { TicketsService } from "./tickets.service";
+import type { TicketListItem } from "./tickets.service";
 import {
   TICKET_CREATED_EVENT,
   TICKET_UPDATED_EVENT,
@@ -19,6 +20,9 @@ function buildPrismaMock() {
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
+      // Story S-8e — `paginate` issues this alongside `findMany`, so it
+      // needs a default; the pagination tests below override it.
+      count: vi.fn().mockResolvedValue(0),
     },
     ticketHistoryEntry: {
       findMany: vi.fn(),
@@ -295,31 +299,37 @@ describe("TicketsService", () => {
       await service.listTickets();
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
-      // Story 105 — the DB fetch always requests `desc` (see that
-      // story's own doc comment on `listTickets`); the default `asc`
-      // result order is restored by reversing the (here, empty) array.
+      // Story S-8e — the requested direction is the direction queried
+      // (Story 105 had to query `desc` and reverse), `id` breaks ties, and
+      // `take` is the page size rather than a fixed cap.
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         include: {
           slaTarget: true,
           category: { select: { name: true } },
           customer: { select: { displayName: true } },
         },
-        take: 500,
+        skip: 0,
+        take: 25,
       });
     });
 
-    // Story 105 — a Bounded Result Cap.
-    it("caps every query at 500 rows, unconditionally", async () => {
+    // Story S-8e — pagination replaces Story 105's Bounded Result Cap.
+    it("no longer caps the query at a fixed row count", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
 
       await service.listTickets({ status: "OPEN" });
 
-      expect(prisma.ticket.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 500 }));
+      // Story 105's unconditional `take: 500` put every older ticket out
+      // of reach entirely; `take` is now one page and `skip` reaches the
+      // rest.
+      const args = prisma.ticket.findMany.mock.calls[0]![0];
+      expect(args.take).toBe(25);
+      expect(args.skip).toBe(0);
     });
 
-    it("fetches desc and reverses in memory for the default (asc) direction, reproducing the exact pre-Story-105 order", async () => {
+    it("queries the requested direction directly instead of reversing in memory", async () => {
       const older = {
         ...baseTicketRow,
         id: "ticket-older",
@@ -330,12 +340,21 @@ describe("TicketsService", () => {
         id: "ticket-newer",
         createdAt: new Date("2024-01-05T00:00:00.000Z"),
       };
-      // Prisma, asked for `desc`, would itself return newest-first.
-      prisma.ticket.findMany.mockResolvedValue([newer, older]);
+      // Prisma, asked for `asc`, returns oldest-first - and that is now
+      // what is asked for, so the rows pass straight through. Story 105
+      // asked for `desc` and reversed, which only matched a direct `asc`
+      // query while the branch stayed under the cap.
+      prisma.ticket.findMany.mockResolvedValue([older, newer]);
 
       const result = await service.listTickets();
 
-      expect(result.map((t) => t.id)).toEqual(["ticket-older", "ticket-newer"]);
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ createdAt: "asc" }, { id: "asc" }] }),
+      );
+      expect(result.items.map((t: TicketListItem) => t.id)).toEqual([
+        "ticket-older",
+        "ticket-newer",
+      ]);
     });
 
     it("does not reverse when sortDir is explicitly desc", async () => {
@@ -353,7 +372,10 @@ describe("TicketsService", () => {
 
       const result = await service.listTickets({ sortDir: "desc" });
 
-      expect(result.map((t) => t.id)).toEqual(["ticket-newer", "ticket-older"]);
+      expect(result.items.map((t: TicketListItem) => t.id)).toEqual([
+        "ticket-newer",
+        "ticket-older",
+      ]);
     });
 
     it("applies status/priority/categoryId/assignedToUserId filters independently and in combination", async () => {
@@ -385,7 +407,7 @@ describe("TicketsService", () => {
       await service.listTickets({ sortBy: "updatedAt", sortDir: "desc" });
 
       expect(prisma.ticket.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { updatedAt: "desc" } }),
+        expect.objectContaining({ orderBy: [{ updatedAt: "desc" }, { id: "desc" }] }),
       );
     });
 
@@ -394,7 +416,7 @@ describe("TicketsService", () => {
 
       const result = await service.listTickets();
 
-      expect(result).toEqual([
+      expect(result.items).toEqual([
         {
           id: "ticket-1",
           subject: "Cannot log in",
@@ -425,7 +447,7 @@ describe("TicketsService", () => {
 
       const result = await service.listTickets();
 
-      expect(result[0]?.slaTarget).toEqual(slaTarget);
+      expect(result.items[0]?.slaTarget).toEqual(slaTarget);
     });
 
     // Story 70 — Ticket Search Foundation.
@@ -541,6 +563,88 @@ describe("TicketsService", () => {
 
   // Story S-8d — filters that let the dashboard and customer-detail screens
   // ask the server the question they used to answer client-side.
+  describe("listTickets pagination (Story S-8e)", () => {
+    it("translates a page number into the right offset", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ page: 4, pageSize: 10 });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 30, take: 10 }),
+      );
+    });
+
+    it("counts over exactly the same where clause it fetches with", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+      prisma.ticket.count.mockResolvedValue(0);
+
+      await service.listTickets({ status: "OPEN", customerId: "customer-7" });
+
+      // A `total` counted over a wider predicate than `items` would
+      // report rows the caller cannot reach - here, tickets outside the
+      // branch scope or the requested customer.
+      const where = { branchId: "branch-1", status: "OPEN", customerId: "customer-7" };
+      expect(prisma.ticket.count).toHaveBeenCalledWith({ where });
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(expect.objectContaining({ where }));
+    });
+
+    it("counts over the department-scoped predicate too, not just the branch", async () => {
+      tenantContext.roles = ["DeptOnly"];
+      tenantContext.departmentId = "dept-1";
+      prisma.role.findMany.mockResolvedValue([{ ticketVisibilityScope: "DEPARTMENT" }]);
+      prisma.ticket.findMany.mockResolvedValue([]);
+      prisma.ticket.count.mockResolvedValue(0);
+
+      await service.listTickets();
+
+      // The authorization arm is the one that matters most here: a total
+      // counted without it would tell a department-scoped agent how many
+      // tickets exist outside their department.
+      expect(prisma.ticket.count).toHaveBeenCalledWith({
+        where: {
+          branchId: "branch-1",
+          OR: [{ departmentId: "dept-1" }, { departmentId: null }],
+        },
+      });
+    });
+
+    it("reports the total and page count from the count query", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+      prisma.ticket.count.mockResolvedValue(101);
+
+      const result = await service.listTickets({ pageSize: 25 });
+
+      expect(result.total).toBe(101);
+      expect(result.totalPages).toBe(5);
+    });
+
+    it("returns an empty page past the end without losing the metadata", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+      prisma.ticket.count.mockResolvedValue(3);
+
+      const result = await service.listTickets({ page: 50 });
+
+      expect(result).toEqual({ items: [], total: 3, page: 50, pageSize: 25, totalPages: 1 });
+    });
+
+    it("still includes the sla/category/customer relations on a paged fetch", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.listTickets({ page: 2 });
+
+      // The delegate is wrapped to add this `include`, so a paging change
+      // is exactly where it could go missing.
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: {
+            slaTarget: true,
+            category: { select: { name: true } },
+            customer: { select: { displayName: true } },
+          },
+        }),
+      );
+    });
+  });
   describe("listTickets filters (Story S-8d)", () => {
     it("narrows to one customer's tickets when customerId is given", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
@@ -644,7 +748,7 @@ describe("TicketsService", () => {
 
       const result = await service.listTickets({});
 
-      expect(result[0]!.customerName).toBe("Acme Corp");
+      expect(result.items[0]!.customerName).toBe("Acme Corp");
     });
   });
 

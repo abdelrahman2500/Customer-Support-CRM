@@ -72,13 +72,33 @@ function idleMutation(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * Story S-8e — `GET /tickets` and `GET /customers` return a
+ * `Paginated<T>` envelope, so these queries' `data` is no longer a bare
+ * array. Builds one, defaulting to a single full page so the existing
+ * tests read exactly as they did before. Mirrors
+ * `audit-log-view.spec.tsx`'s own helper.
+ */
+function page(items: unknown[], overrides: Record<string, unknown> = {}) {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    pageSize: 25,
+    totalPages: 1,
+    ...overrides,
+  };
+}
+
 describe("CustomerDetailView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Every render path calls `useTicketsQuery({})` (Story 27); default to
     // an empty, successful result so pre-existing tests (which only assert
     // on the customer/contacts sections) are unaffected.
-    mockedUseTicketsQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
+    mockedUseTicketsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: page([]) }) as never,
+    );
     mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation() as never);
     mockedUseCreateContactMutation.mockReturnValue(idleMutation() as never);
     mockedUseUpdateContactMutation.mockReturnValue(idleMutation() as never);
@@ -193,7 +213,9 @@ describe("CustomerDetailView", () => {
     });
 
     it("shows an empty-state message when the customer has no tickets", () => {
-      mockedUseTicketsQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
 
       render(<CustomerDetailView customerId="customer-1" />);
 
@@ -204,7 +226,7 @@ describe("CustomerDetailView", () => {
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [
+          data: page([
             {
               id: "ticket-1",
               subject: "Cannot log in",
@@ -213,7 +235,7 @@ describe("CustomerDetailView", () => {
               customerId: "customer-1",
               createdAt: "2026-01-01T00:00:00.000Z",
             },
-          ],
+          ]),
         }) as never,
       );
 
@@ -226,7 +248,12 @@ describe("CustomerDetailView", () => {
        * filter is the server's job now, so what matters is that the request
        * carries it - and that the returned rows are rendered as given.
        */
-      expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith({ customerId: "customer-1" });
+      // Story S-8e — the card carries its own page state, so the request
+      // names the page it wants.
+      expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith({
+        customerId: "customer-1",
+        page: 1,
+      });
       expect(screen.getByText("Cannot log in")).toBeInTheDocument();
     });
 
@@ -235,7 +262,7 @@ describe("CustomerDetailView", () => {
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [
+          data: page([
             {
               id: "ticket-1",
               subject: "Open ticket",
@@ -252,7 +279,7 @@ describe("CustomerDetailView", () => {
               customerId: "customer-1",
               createdAt: "2026-01-02T00:00:00.000Z",
             },
-          ],
+          ]),
         }) as never,
       );
 
@@ -266,7 +293,7 @@ describe("CustomerDetailView", () => {
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [
+          data: page([
             {
               id: "ticket-1",
               subject: "Cannot log in",
@@ -275,7 +302,7 @@ describe("CustomerDetailView", () => {
               customerId: "customer-1",
               createdAt: "2026-01-01T00:00:00.000Z",
             },
-          ],
+          ]),
         }) as never,
       );
 
@@ -290,7 +317,9 @@ describe("CustomerDetailView", () => {
     });
 
     it("links 'New ticket' to tickets/new, carrying the current customerId", () => {
-      mockedUseTicketsQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
 
       render(<CustomerDetailView customerId="customer-1" />);
 

@@ -17,7 +17,7 @@ import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { ApiError } from "@/lib/api";
 import type { ContactSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Input, Pagination, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
@@ -372,6 +372,7 @@ export function CustomerDetailSkeleton() {
 
 export function CustomerDetailView({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
@@ -382,8 +383,14 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
    * returned the newest 500 tickets branch-wide, so a customer whose
    * tickets fell outside that window appeared to have none at all.
    */
-  const ticketsQuery = useTicketsQuery({ customerId });
-  const relatedTickets = ticketsQuery.data ?? [];
+  /** Story S-8e — this card renders the server's own `createdAt` order
+   * with no client-side re-sort, so paging it is exact: page 2 really is
+   * the next 25 tickets. Its own page state, independent of anything else
+   * on the screen. */
+  const [ticketsPage, setTicketsPage] = useState(1);
+  const ticketsQuery = useTicketsQuery({ customerId, page: ticketsPage });
+  const relatedTicketsPage = ticketsQuery.data;
+  const relatedTickets = relatedTicketsPage?.items ?? [];
   const updateCustomerMutation = useUpdateCustomerMutation(customerId);
   const [displayNameDraft, setDisplayNameDraft] = useState<string | null>(null);
 
@@ -509,6 +516,24 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               </li>
             ))}
           </ul>
+        )}
+
+        {/* Story S-8e — renders nothing until this customer actually has
+            more than one page of tickets, so the common case is unchanged. */}
+        {relatedTicketsPage !== undefined && (
+          <Pagination
+            page={relatedTicketsPage.page}
+            totalPages={relatedTicketsPage.totalPages}
+            onPageChange={setTicketsPage}
+            disabled={ticketsQuery.isPlaceholderData}
+            label={tCommon("pagination.label")}
+            previousLabel={tCommon("pagination.previous")}
+            nextLabel={tCommon("pagination.next")}
+            indicator={tCommon("pagination.indicator", {
+              page: relatedTicketsPage.page,
+              totalPages: relatedTicketsPage.totalPages,
+            })}
+          />
         )}
       </div>
 

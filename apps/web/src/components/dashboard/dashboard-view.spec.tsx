@@ -43,12 +43,35 @@ function queryResult(overrides: Record<string, unknown>) {
  * distinguish the two calls by argument so each section's tests can target
  * one section without the other interfering.
  */
+/**
+ * Story S-8e — `GET /tickets` returns a `Paginated<T>` envelope, so this
+ * screen's queries no longer hand back a bare array. Mirrors
+ * `audit-log-view.spec.tsx`'s own helper.
+ */
+function page(items: unknown[], overrides: Record<string, unknown> = {}) {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    pageSize: 25,
+    totalPages: 1,
+    ...overrides,
+  };
+}
+
 function mockTicketQueries(overrides: {
   mine?: Record<string, unknown>;
   all?: Record<string, unknown>;
 }) {
-  const mine = queryResult({ isSuccess: true, data: [], ...overrides.mine });
-  const all = queryResult({ isSuccess: true, data: [], ...overrides.all });
+  // Story S-8e — both panels now receive a page envelope. `overrides`
+  // still pass bare arrays, so they are wrapped here rather than at every
+  // call site.
+  // Only an array gets wrapped: a test that passes `data: undefined` is
+  // asserting the no-data-yet state and must keep it.
+  const wrap = (o: Record<string, unknown> = {}) =>
+    Array.isArray(o.data) ? { ...o, data: page(o.data) } : o;
+  const mine = queryResult({ isSuccess: true, data: page([]), ...wrap(overrides.mine) });
+  const all = queryResult({ isSuccess: true, data: page([]), ...wrap(overrides.all) });
   mockedUseTicketsQuery.mockImplementation((filters) => {
     if (filters && Object.prototype.hasOwnProperty.call(filters, "assignedToUserId")) {
       return mine as never;
@@ -147,7 +170,13 @@ describe("DashboardView", () => {
     it("queries GET /tickets scoped to the authenticated agent, not the branch-wide list", () => {
       renderWithLocale("agent-42");
 
-      expect(mockedUseTicketsQuery).toHaveBeenCalledWith({ assignedToUserId: "agent-42" });
+      // Story S-8e — `pageSize: 100` is the panel's explicit bounded
+      // window; see `DashboardView`'s own comment for why this panel takes
+      // a window rather than a pager.
+      expect(mockedUseTicketsQuery).toHaveBeenCalledWith({
+        assignedToUserId: "agent-42",
+        pageSize: 100,
+      });
     });
 
     it("excludes RESOLVED and CLOSED tickets from the populated list", () => {
@@ -312,7 +341,7 @@ describe("DashboardView", () => {
        * meant an unclaimed ticket older than the capped window could never
        * appear at all.
        */
-      expect(mockedUseTicketsQuery).toHaveBeenCalledWith({ unassigned: "true" });
+      expect(mockedUseTicketsQuery).toHaveBeenCalledWith({ unassigned: "true", pageSize: 100 });
       expect(screen.getByText("Unassigned open")).toBeInTheDocument();
       // The open-status rule stays client-side: `OPEN_STATUSES` is this
       // screen's own definition of "still needs work", not an API concept.

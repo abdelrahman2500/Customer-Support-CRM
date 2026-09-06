@@ -193,22 +193,30 @@ describe("Ticketing (e2e)", () => {
   });
 
   it("lists tickets in the caller's active branch, including the new one", async () => {
+    // Story S-8e — one page, ordered `createdAt` ascending by default, so
+    // this suite's freshly-created ticket is on the last page rather than
+    // the first. Narrowing to the suite's own customer keeps the test about
+    // what it was always about (the new ticket is listed, under branch
+    // scope) instead of about which page it landed on.
     const response = await request(app.getHttpServer())
       .get("/api/v1/tickets")
+      .query({ customerId })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    const ids = response.body.map((ticket: { id: string }) => ticket.id);
+    const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
     expect(ids).toContain(ticketId);
   });
 
   it("includes createdAt/updatedAt and a slaTarget field (Story 23) on each listed ticket", async () => {
+    // Story S-8e — see the note above on paging and the default order.
     const response = await request(app.getHttpServer())
       .get("/api/v1/tickets")
+      .query({ customerId })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    const ticket = response.body.find((entry: { id: string }) => entry.id === ticketId);
+    const ticket = response.body.items.find((entry: { id: string }) => entry.id === ticketId);
     expect(ticket).toBeDefined();
     expect(typeof ticket.createdAt).toBe("string");
     expect(typeof ticket.updatedAt).toBe("string");
@@ -225,10 +233,11 @@ describe("Ticketing (e2e)", () => {
     it("returns every listed ticket with its customer display name resolved", async () => {
       const response = await request(app.getHttpServer())
         .get("/api/v1/tickets")
+        .query({ customerId })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      const ticket = response.body.find((entry: { id: string }) => entry.id === ticketId);
+      const ticket = response.body.items.find((entry: { id: string }) => entry.id === ticketId);
       expect(ticket).toBeDefined();
       expect(typeof ticket.customerName).toBe("string");
       expect(ticket.customerName.length).toBeGreaterThan(0);
@@ -241,11 +250,11 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      expect(response.body.length).toBeGreaterThan(0);
-      for (const ticket of response.body) {
+      expect(response.body.items.length).toBeGreaterThan(0);
+      for (const ticket of response.body.items) {
         expect(ticket.customerId).toBe(customerId);
       }
-      expect(response.body.map((t: { id: string }) => t.id)).toContain(ticketId);
+      expect(response.body.items.map((t: { id: string }) => t.id)).toContain(ticketId);
     });
 
     it("returns an empty list for a customer with no tickets", async () => {
@@ -261,7 +270,7 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      expect(response.body).toEqual([]);
+      expect(response.body.items).toEqual([]);
     });
 
     it("returns only unclaimed tickets for unassigned=true", async () => {
@@ -271,7 +280,7 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      for (const ticket of response.body) {
+      for (const ticket of response.body.items) {
         expect(ticket.assignedToUserId).toBeNull();
       }
     });
@@ -283,7 +292,7 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      for (const ticket of response.body) {
+      for (const ticket of response.body.items) {
         expect(ticket.assignedToUserId).not.toBeNull();
       }
     });
@@ -304,9 +313,12 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      // Catches the filter being dropped (either side equalling the whole
-      // list) or inverted, without depending on absolute fixture counts.
-      expect(unclaimed.body.length + claimed.body.length).toBe(all.body.length);
+      // Story S-8e — compares totals, not page lengths: three pages of 25
+      // never sum to 25. `total` is counted over each request's own where
+      // clause, so this still catches the filter being dropped (either side
+      // equalling the whole list) or inverted, and still does not depend on
+      // absolute fixture counts.
+      expect(unclaimed.body.total + claimed.body.total).toBe(all.body.total);
     });
 
     it("rejects a non-boolean unassigned value with 400", async () => {
@@ -324,7 +336,7 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      for (const ticket of response.body) {
+      for (const ticket of response.body.items) {
         expect(ticket.customerId).toBe(customerId);
         expect(ticket.status).toBe("OPEN");
       }
@@ -336,14 +348,18 @@ describe("Ticketing (e2e)", () => {
       .query({ status: "OPEN" })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    expect(byStatus.body.every((entry: { status: string }) => entry.status === "OPEN")).toBe(true);
+    expect(byStatus.body.items.every((entry: { status: string }) => entry.status === "OPEN")).toBe(
+      true,
+    );
 
     const byUnrelatedStatus = await request(app.getHttpServer())
       .get("/api/v1/tickets")
       .query({ status: "CLOSED" })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    expect(byUnrelatedStatus.body.map((entry: { id: string }) => entry.id)).not.toContain(ticketId);
+    expect(byUnrelatedStatus.body.items.map((entry: { id: string }) => entry.id)).not.toContain(
+      ticketId,
+    );
   });
 
   it("rejects an invalid status filter value with a validation error", async () => {
@@ -361,21 +377,120 @@ describe("Ticketing (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    const updatedAts = response.body.map((entry: { updatedAt: string }) =>
+    const updatedAts = response.body.items.map((entry: { updatedAt: string }) =>
       new Date(entry.updatedAt).getTime(),
     );
     const sorted = [...updatedAts].sort((a, b) => b - a);
     expect(updatedAts).toEqual(sorted);
   });
 
-  // Story 105 — Ticketing: List a Bounded Result Cap.
-  it("never returns more than 500 rows", async () => {
-    const response = await request(app.getHttpServer())
-      .get("/api/v1/tickets")
-      .set("Authorization", `Bearer ${adminAccessToken}`)
-      .expect(200);
+  // Story S-8e — pagination replaces Story 105's Bounded Result Cap.
+  describe("pagination (Story S-8e)", () => {
+    it("returns a page envelope rather than a bare array", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
 
-    expect(response.body.length).toBeLessThanOrEqual(500);
+      expect(Array.isArray(response.body)).toBe(false);
+      expect(response.body).toMatchObject({ page: 1, pageSize: 25 });
+      expect(response.body.items.length).toBeLessThanOrEqual(25);
+    });
+
+    it("reaches rows the old 500-row cap made unreachable", async () => {
+      const first = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const last = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ pageSize: 5, page: first.body.totalPages })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(last.body.items.length).toBeGreaterThan(0);
+      expect(last.body.total).toBe(first.body.total);
+    });
+
+    it("returns a non-overlapping second page", async () => {
+      const first = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ page: 1, pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      if (first.body.totalPages < 2) return;
+
+      const second = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ page: 2, pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const firstIds = first.body.items.map((t: { id: string }) => t.id);
+      const secondIds = second.body.items.map((t: { id: string }) => t.id);
+      expect(secondIds.filter((id: string) => firstIds.includes(id))).toEqual([]);
+    });
+
+    it("counts the filtered set, not the whole branch", async () => {
+      const all = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const mine = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ customerId })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      // A `total` counted without the caller's filter would advertise
+      // pages that come back empty.
+      expect(mine.body.total).toBeLessThan(all.body.total);
+      expect(mine.body.total).toBeGreaterThan(0);
+    });
+
+    it("keeps each page's rows within the requested size", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ pageSize: 3 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items.length).toBeLessThanOrEqual(3);
+      expect(response.body.totalPages).toBe(Math.ceil(response.body.total / 3));
+    });
+
+    it("still resolves the customer name and slaTarget on a deeper page", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ page: 2, pageSize: 5 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      for (const ticket of response.body.items) {
+        // The include rides on a wrapped delegate, so paging is exactly
+        // where it could silently go missing.
+        expect(ticket).toHaveProperty("customerName");
+        expect(ticket).toHaveProperty("slaTarget");
+      }
+    });
+
+    it("rejects a page size above the maximum rather than silently clamping it", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ pageSize: 101 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(400);
+    });
+
+    it("rejects an invalid page with 400", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/tickets")
+        .query({ page: 0 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(400);
+    });
   });
 
   // Story 70 — Ticket Search Foundation. Dedicated, self-contained fixture
@@ -416,7 +531,7 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      const ids = response.body.map((ticket: { id: string }) => ticket.id);
+      const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
       expect(ids).toContain(searchSubjectTicketId);
       expect(ids).not.toContain(searchCategoryTicketId);
     });
@@ -428,7 +543,7 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      const ids = response.body.map((ticket: { id: string }) => ticket.id);
+      const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
       expect(ids).toContain(searchCategoryTicketId);
       expect(ids).not.toContain(searchSubjectTicketId);
     });
@@ -440,7 +555,7 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      expect(response.body).toEqual([]);
+      expect(response.body.items).toEqual([]);
     });
 
     it("composes with an existing equality filter (status)", async () => {
@@ -450,18 +565,22 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      const ids = response.body.map((ticket: { id: string }) => ticket.id);
+      const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
       expect(ids).toContain(searchSubjectTicketId);
-      expect(response.body.every((t: { status: string }) => t.status === "OPEN")).toBe(true);
+      expect(response.body.items.every((t: { status: string }) => t.status === "OPEN")).toBe(true);
     });
 
     it("omitted search behaves identically to today — the fixture tickets still appear unfiltered", async () => {
       const response = await request(app.getHttpServer())
         .get("/api/v1/tickets")
+        .query({ customerId })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      const ids = response.body.map((ticket: { id: string }) => ticket.id);
+      // Story S-8e — "unfiltered" now means "not narrowed by `search`",
+      // which is what this test is about; the customer filter only keeps
+      // both fixtures on one page. Omitting `search` must not drop them.
+      const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
       expect(ids).toContain(searchSubjectTicketId);
       expect(ids).toContain(searchCategoryTicketId);
     });

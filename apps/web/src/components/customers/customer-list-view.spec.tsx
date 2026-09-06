@@ -39,6 +39,24 @@ function queryResult(overrides: Record<string, unknown>) {
   };
 }
 
+/**
+ * Story S-8e — `GET /tickets` and `GET /customers` return a
+ * `Paginated<T>` envelope, so these queries' `data` is no longer a bare
+ * array. Builds one, defaulting to a single full page so the existing
+ * tests read exactly as they did before. Mirrors
+ * `audit-log-view.spec.tsx`'s own helper.
+ */
+function page(items: unknown[], overrides: Record<string, unknown> = {}) {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    pageSize: 25,
+    totalPages: 1,
+    ...overrides,
+  };
+}
+
 describe("CustomerListView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,7 +83,9 @@ describe("CustomerListView", () => {
   });
 
   it("shows the empty state when the query succeeds with zero customers", () => {
-    mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseCustomersQuery.mockReturnValue(
+      queryResult({ data: page([]), isSuccess: true }) as never,
+    );
 
     render(<CustomerListView />);
 
@@ -76,7 +96,7 @@ describe("CustomerListView", () => {
     mockedUseCustomersQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [
+        data: page([
           {
             id: "customer-1",
             displayName: "Acme Inc.",
@@ -89,7 +109,7 @@ describe("CustomerListView", () => {
             isActive: false,
             createdAt: "2026-01-02T00:00:00.000Z",
           },
-        ],
+        ]),
       }) as never,
     );
 
@@ -105,7 +125,7 @@ describe("CustomerListView", () => {
     mockedUseCustomersQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ id: "customer-1", displayName: "Acme Inc.", isActive: true }],
+        data: page([{ id: "customer-1", displayName: "Acme Inc.", isActive: true }]),
       }) as never,
     );
 
@@ -118,7 +138,9 @@ describe("CustomerListView", () => {
   });
 
   it("links the create button to the create-customer route", () => {
-    mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseCustomersQuery.mockReturnValue(
+      queryResult({ data: page([]), isSuccess: true }) as never,
+    );
 
     render(<CustomerListView />);
 
@@ -141,7 +163,7 @@ describe("CustomerListView", () => {
     mockedUseCustomersQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ id: "customer-1", displayName: "Acme Inc.", isActive: true }],
+        data: page([{ id: "customer-1", displayName: "Acme Inc.", isActive: true }]),
       }) as never,
     );
 
@@ -158,7 +180,9 @@ describe("CustomerListView", () => {
   // Story 101 — Customer Management: List Search/Filter.
   describe("filter bar (Story 101)", () => {
     it("defaults to sorting by createdAt ascending, and commits a search on blur", () => {
-      mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({ data: page([]), isSuccess: true }) as never,
+      );
 
       render(<CustomerListView />);
       expect(mockedUseCustomersQuery).toHaveBeenCalledWith({ sortBy: "createdAt", sortDir: "asc" });
@@ -175,7 +199,9 @@ describe("CustomerListView", () => {
     });
 
     it("clearing the search field on blur removes the filter rather than sending an empty string", () => {
-      mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({ data: page([]), isSuccess: true }) as never,
+      );
 
       render(<CustomerListView />);
       const input = screen.getByPlaceholderText("list.searchPlaceholder");
@@ -190,7 +216,9 @@ describe("CustomerListView", () => {
     });
 
     it("filters by isActive via the status select", async () => {
-      mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({ data: page([]), isSuccess: true }) as never,
+      );
 
       render(<CustomerListView />);
       const statusCombobox = screen.getByRole("combobox");
@@ -208,14 +236,14 @@ describe("CustomerListView", () => {
       mockedUseCustomersQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [
+          data: page([
             {
               id: "customer-1",
               displayName: "Acme Inc.",
               isActive: true,
               createdAt: "2026-01-01T00:00:00.000Z",
             },
-          ],
+          ]),
         }) as never,
       );
 
@@ -238,6 +266,62 @@ describe("CustomerListView", () => {
         sortBy: "displayName",
         sortDir: "desc",
       });
+    });
+  });
+  /** Story S-8e — `GET /customers` is paginated, replacing the Story 106
+   * 500-row cap. Mirrors `TicketListView`'s own pager tests. */
+  describe("pagination (Story S-8e)", () => {
+    const middlePage = { total: 60, page: 2, pageSize: 25, totalPages: 3 };
+    const row = { id: "customer-1", displayName: "Acme Inc.", isActive: true };
+
+    beforeEach(() => {
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([row], middlePage) }) as never,
+      );
+    });
+
+    it("renders no pager when everything fits on one page", () => {
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([row]) }) as never,
+      );
+
+      render(<CustomerListView />);
+
+      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    });
+
+    it("renders the pager and the current page indicator once there is more than one page", () => {
+      render(<CustomerListView />);
+
+      expect(screen.getByRole("navigation", { name: "pagination.label" })).toBeInTheDocument();
+      expect(
+        screen.getByText('pagination.indicator:{"page":2,"totalPages":3}'),
+      ).toBeInTheDocument();
+    });
+
+    it("requests the next page without touching the filters", () => {
+      render(<CustomerListView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
+
+      expect(mockedUseCustomersQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 3, sortBy: "createdAt", sortDir: "asc" }),
+      );
+    });
+
+    it("disables both controls while the previous page is still on screen", () => {
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: page([row], middlePage),
+        }) as never,
+      );
+
+      render(<CustomerListView />);
+
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
     });
   });
 });

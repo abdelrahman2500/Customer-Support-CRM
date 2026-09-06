@@ -11,6 +11,7 @@ import {
   Button,
   FetchingIndicator,
   Input,
+  Pagination,
   QueryStateCard,
   Skeleton,
   SortIndicator,
@@ -58,19 +59,27 @@ export function CustomerListView() {
   const customersQuery = useCustomersQuery(filters);
   /** Story S-7 — see `TicketListView`: the rows to render regardless of
    * which fetch they came from, `undefined` only when there is genuinely
-   * nothing yet. */
-  const customers = customersQuery.data;
+   * nothing yet.
+   *
+   * Story S-8e — a page envelope now, so the rows are one level in. */
+  const page = customersQuery.data;
+  const customers = page?.items;
 
+  /** Story S-8e — a filter change resets to page 1 in the SAME state
+   * update; see `TicketListView` / `AuditLogView` for why not an effect. */
   function updateFilter<K extends keyof ListCustomersFilters>(key: K, value: string) {
     setFilters((current) => ({
       ...current,
       [key]: value === ALL_VALUE ? undefined : (value as ListCustomersFilters[K]),
+      page: undefined,
     }));
   }
 
   function toggleSort(field: "displayName" | "createdAt") {
     setFilters((current) => ({
       ...current,
+      // Story S-8e — a re-sort reorders the whole result set.
+      page: undefined,
       sortBy: field,
       sortDir: current.sortBy === field && current.sortDir === "asc" ? "desc" : "asc",
     }));
@@ -209,6 +218,25 @@ export function CustomerListView() {
           </TableBody>
         </Table>
       </QueryStateCard>
+
+      {/* Story S-8e — renders nothing while there is only one page (see
+          `Pagination`). Disabled while the previous page is still on
+          screen, so a rapid double-click cannot queue a second jump. */}
+      {page !== undefined && (
+        <Pagination
+          page={page.page}
+          totalPages={page.totalPages}
+          onPageChange={(next) => setFilters((current) => ({ ...current, page: next }))}
+          disabled={customersQuery.isPlaceholderData}
+          label={tCommon("pagination.label")}
+          previousLabel={tCommon("pagination.previous")}
+          nextLabel={tCommon("pagination.next")}
+          indicator={tCommon("pagination.indicator", {
+            page: page.page,
+            totalPages: page.totalPages,
+          })}
+        />
+      )}
     </section>
   );
 }
