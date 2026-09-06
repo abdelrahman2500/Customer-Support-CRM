@@ -104,6 +104,8 @@ export class RealtimeGateway
 {
   private readonly logger = new Logger(RealtimeGateway.name);
   private readonly connectedSockets = new Map<string, string>(); // socketId -> userId
+  private readonly presenceRefreshIntervalMs = 15_000;
+  private readonly presenceRefreshTimer: NodeJS.Timeout;
 
   @WebSocketServer()
   server!: Server;
@@ -113,9 +115,14 @@ export class RealtimeGateway
     private readonly configService: ConfigService<EnvConfig, true>,
     private readonly prisma: PrismaService,
     private readonly presenceService: PresenceService,
-  ) {}
+  ) {
+    this.presenceRefreshTimer = setInterval(() => {
+      void this.refreshConnectedSockets();
+    }, this.presenceRefreshIntervalMs);
+  }
 
   async onModuleDestroy(): Promise<void> {
+    clearInterval(this.presenceRefreshTimer);
     const remaining = [...this.connectedSockets.entries()];
     this.connectedSockets.clear();
     await Promise.all(
@@ -178,6 +185,9 @@ export class RealtimeGateway
       return { ok: false };
     }
     await client.join(room);
+    if (claims.audience === "agent") {
+      await this.presenceService.refreshPresence(claims.userId, client.id);
+    }
     await this.sendCurrentPresenceIfApplicable(client, room);
     return { ok: true };
   }
@@ -269,6 +279,13 @@ export class RealtimeGateway
     }
 
     return false;
+  }
+
+  private async refreshConnectedSockets(): Promise<void> {
+    const sockets = [...this.connectedSockets.entries()];
+    await Promise.all(
+      sockets.map(([socketId, userId]) => this.presenceService.refreshPresence(userId, socketId)),
+    );
   }
 
   private async trackConnect(userId: string, socketId: string): Promise<void> {

@@ -38,6 +38,8 @@ import type { EnvConfig } from "../common/config/env.validation";
  * connection close and permanently leave a stale "online" entry behind —
  * caught during this Story's own e2e verification against real Redis.
  */
+const PRESENCE_SOCKET_TTL_SECONDS = 30;
+
 @Injectable()
 export class PresenceService implements OnApplicationShutdown {
   private readonly logger = new Logger(PresenceService.name);
@@ -60,11 +62,57 @@ export class PresenceService implements OnApplicationShutdown {
     return `presence:${userId}`;
   }
 
+  private socketKey(userId: string, socketId: string): string {
+    return `presence:${userId}:socket:${socketId}`;
+  }
+
+  private async pruneStaleSockets(userId: string): Promise<number> {
+    const members = ((await this.redis.smembers(this.key(userId))) ?? []) as string[];
+    if (members.length === 0) {
+      return (await this.redis.scard(this.key(userId))) ?? 0;
+    }
+
+    const staleSocketIds = (
+      await Promise.all(
+        members.map(async (socketId) => {
+          const stillLive = (await this.redis.exists(this.socketKey(userId, socketId))) === 1;
+          return stillLive ? null : socketId;
+        }),
+      )
+    ).filter((socketId): socketId is string => socketId !== null);
+
+    if (staleSocketIds.length > 0) {
+      await this.redis.srem(this.key(userId), ...staleSocketIds);
+    }
+
+    return (await this.redis.scard(this.key(userId))) ?? 0;
+  }
+
+  async refreshPresence(userId: string, socketId: string): Promise<boolean> {
+    const socketKey = this.socketKey(userId, socketId);
+    const alreadyExists = (await this.redis.exists(socketKey)) === 1;
+    if (alreadyExists) {
+      await this.redis.set(socketKey, "1", "EX", PRESENCE_SOCKET_TTL_SECONDS, "XX");
+      return true;
+    }
+
+    await this.redis.sadd(this.key(userId), socketId);
+    await this.redis.set(socketKey, "1", "EX", PRESENCE_SOCKET_TTL_SECONDS, "NX");
+    return false;
+  }
+
   /** Returns `true` only when this is the user's *first* live connection
    * (a real online transition, not just another tab/device). */
   async recordConnect(userId: string, socketId: string): Promise<boolean> {
-    const before = await this.redis.scard(this.key(userId));
+    const before = await this.pruneStaleSockets(userId);
+    const alreadyTracked = (await this.redis.sismember(this.key(userId), socketId)) === 1;
+    if (alreadyTracked) {
+      await this.refreshPresence(userId, socketId);
+      return false;
+    }
+
     await this.redis.sadd(this.key(userId), socketId);
+    await this.redis.set(this.socketKey(userId, socketId), "1", "EX", PRESENCE_SOCKET_TTL_SECONDS, "NX");
     return before === 0;
   }
 
@@ -72,11 +120,13 @@ export class PresenceService implements OnApplicationShutdown {
    * (a real offline transition). */
   async recordDisconnect(userId: string, socketId: string): Promise<boolean> {
     await this.redis.srem(this.key(userId), socketId);
-    const after = await this.redis.scard(this.key(userId));
+    await this.redis.del(this.socketKey(userId, socketId));
+    const after = (await this.redis.scard(this.key(userId))) ?? 0;
     return after === 0;
   }
 
   async isOnline(userId: string): Promise<boolean> {
-    return (await this.redis.scard(this.key(userId))) > 0;
+    const liveMembers = await this.pruneStaleSockets(userId);
+    return liveMembers > 0;
   }
 }

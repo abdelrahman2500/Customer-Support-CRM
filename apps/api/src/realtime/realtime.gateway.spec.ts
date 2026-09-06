@@ -30,6 +30,7 @@ function buildPresenceServiceMock() {
     recordConnect: vi.fn().mockResolvedValue(false),
     recordDisconnect: vi.fn().mockResolvedValue(false),
     isOnline: vi.fn().mockResolvedValue(false),
+    refreshPresence: vi.fn().mockResolvedValue(true),
   };
 }
 
