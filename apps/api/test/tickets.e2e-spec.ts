@@ -549,6 +549,18 @@ describe("Ticketing (e2e)", () => {
     });
 
     it("counts the filtered set, not the whole branch", async () => {
+      await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, subject: "Ticket inside the filter" })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId: otherCustomerId, subject: "Ticket outside the filter" })
+        .expect(201);
+
       const all = await request(app.getHttpServer())
         .get("/api/v1/tickets")
         .set("Authorization", `Bearer ${adminAccessToken}`)
