@@ -104,6 +104,20 @@ describe("ArticleDetailView", () => {
     expect(screen.getByText("list.publish")).toBeInTheDocument();
   });
 
+  // NAV-2 — this page had no heading landmark at all (the title is an
+  // editable Input, not static text a plain <h1> could reuse).
+  it("gives the page a level-1 heading landmark matching the article's title", () => {
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ data: baseArticle, isSuccess: true }) as never,
+    );
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "How to reset a password" }),
+    ).toBeInTheDocument();
+  });
+
   it("commits a title edit on blur when the value changed", () => {
     vi.mocked(useArticleQuery).mockReturnValue(
       queryResult({ data: baseArticle, isSuccess: true }) as never,

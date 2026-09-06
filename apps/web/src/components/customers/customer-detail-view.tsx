@@ -414,6 +414,13 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
     <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
+          {/* NAV-2 — no visible heading exists on this page (the name is
+              an editable Input, not static text), so a keyboard/screen-reader
+              user navigating by heading level got nothing. Visually
+              hidden: the Input's own aria-label is still the visible
+              control's accessible name; this only adds the missing
+              document-outline landmark. */}
+          <h1 className="sr-only">{customer.displayName}</h1>
           <Input
             className="w-56 text-lg font-semibold"
             defaultValue={customer.displayName}

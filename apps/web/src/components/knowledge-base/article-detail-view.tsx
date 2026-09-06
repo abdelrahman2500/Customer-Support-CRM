@@ -72,6 +72,13 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
+        {/* NAV-2 — no visible heading exists on this page (the title is
+            an editable Input, not static text), so a keyboard/screen-reader
+            user navigating by heading level got nothing. Visually hidden:
+            the Input's own aria-label is still the visible control's
+            accessible name; this only adds the missing document-outline
+            landmark. */}
+        <h1 className="sr-only">{article.title}</h1>
         <Input
           className="max-w-md text-lg font-semibold"
           defaultValue={article.title}

@@ -202,6 +202,13 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   return (
     <section className="flex flex-col gap-6">
       <div>
+        {/* NAV-2 — no visible heading exists on this page (the subject is
+            an editable Input, not static text), so a keyboard/screen-reader
+            user navigating by heading level got nothing. Visually hidden:
+            the Input's own aria-label is still the visible control's
+            accessible name; this only adds the missing document-outline
+            landmark. */}
+        <h1 className="sr-only">{ticket.subject}</h1>
         <Input
           className="w-full max-w-md text-lg font-semibold"
           defaultValue={ticket.subject}

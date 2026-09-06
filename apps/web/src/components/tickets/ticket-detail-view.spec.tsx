@@ -223,6 +223,18 @@ describe("TicketDetailView", () => {
     expect(screen.getByText(/Acme Inc\./)).toBeInTheDocument();
   });
 
+  // NAV-2 — this page had no heading landmark at all (the subject is an
+  // editable Input, not static text a plain <h1> could reuse).
+  it("gives the page a level-1 heading landmark matching the ticket subject", () => {
+    vi.mocked(useTicketQuery).mockReturnValue(
+      queryResult({ data: baseTicket, isSuccess: true }) as never,
+    );
+
+    render(<TicketDetailView ticketId="ticket-1" />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Cannot log in" })).toBeInTheDocument();
+  });
+
   it("renders a not-found message when the ticket lookup 404s", () => {
     vi.mocked(useTicketQuery).mockReturnValue(
       queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,

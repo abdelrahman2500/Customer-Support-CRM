@@ -170,6 +170,21 @@ describe("CustomerDetailView", () => {
     expect(within(screen.getByRole("list")).getByText("detail.primaryContact")).toBeInTheDocument();
   });
 
+  // NAV-2 — this page had no heading landmark at all (the name is an
+  // editable Input, not static text a plain <h1> could reuse).
+  it("gives the page a level-1 heading landmark matching the customer's name", () => {
+    mockedUseCustomerQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: { id: "customer-1", displayName: "Acme Inc.", isActive: true, contacts: [] },
+      }) as never,
+    );
+
+    render(<CustomerDetailView customerId="customer-1" />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Acme Inc." })).toBeInTheDocument();
+  });
+
   it("renders an empty-contacts message when the customer has no contacts", () => {
     mockedUseCustomerQuery.mockReturnValue(
       queryResult({
