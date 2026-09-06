@@ -225,6 +225,93 @@ describe("Ticketing (e2e)", () => {
     expect(ticket.slaTarget).toBeNull();
   });
 
+  // RM-01 — Formal Ticket Status Transition Rules. Recon (see
+  // .squad/plans/core-completion-roadmap/RM-01-ticket-status-transitions.md)
+  // found the repository's own existing tests already require free
+  // bidirectional movement between every status, including "skip a step"
+  // jumps — confirmed with the product owner rather than guessed. There is
+  // therefore no "legal transition succeeds, illegal transition is
+  // rejected with 400" pair to test here: every transition between two
+  // real `TicketStatus` values is legal, by explicit, confirmed product
+  // decision (`ticket-status-transitions.ts`). What this suite proves
+  // instead, end to end through the real HTTP endpoint: a full lifecycle
+  // walk (including both "skip a step" jumps) succeeds and is faithfully
+  // recorded in ticket history; a same-status no-op is likewise legal; and
+  // the one input that remains genuinely illegal — a string that is not a
+  // real `TicketStatus` value at all — is still rejected with 400 exactly
+  // as before, since `@IsEnum(TicketStatus)` on `UpdateTicketDto` is
+  // unchanged by this story.
+  describe("ticket status transitions (RM-01)", () => {
+    let lifecycleTicketId: string;
+
+    beforeAll(async () => {
+      const created = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, subject: "RM-01 lifecycle fixture" })
+        .expect(201);
+      lifecycleTicketId = created.body.id;
+    });
+
+    async function patchStatus(status: string): Promise<{ status: number; body: { id?: string } }> {
+      const response = await request(app.getHttpServer())
+        .patch(`/api/v1/tickets/${lifecycleTicketId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status });
+      return { status: response.status, body: response.body };
+    }
+
+    it("rejects a value that is not a real TicketStatus with 400 (unchanged DTO validation)", async () => {
+      await patchStatus("NOT_A_REAL_STATUS").then((response) => expect(response.status).toBe(400));
+    });
+
+    it("walks a full lifecycle — including both 'skip a step' jumps — with every transition succeeding", async () => {
+      // OPEN -> IN_PROGRESS (adjacent)
+      expect((await patchStatus("IN_PROGRESS")).status).toBe(200);
+      // IN_PROGRESS -> CLOSED (skips RESOLVED)
+      expect((await patchStatus("CLOSED")).status).toBe(200);
+      // CLOSED -> OPEN (reopen)
+      expect((await patchStatus("OPEN")).status).toBe(200);
+      // OPEN -> RESOLVED (adjacent)
+      expect((await patchStatus("RESOLVED")).status).toBe(200);
+      // RESOLVED -> OPEN (skips IN_PROGRESS)
+      expect((await patchStatus("OPEN")).status).toBe(200);
+      // OPEN -> OPEN (same-status no-op)
+      expect((await patchStatus("OPEN")).status).toBe(200);
+
+      const ticket = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${lifecycleTicketId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(ticket.body.status).toBe("OPEN");
+    });
+
+    it("records a history entry for every one of the transitions above, in order", async () => {
+      const history = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${lifecycleTicketId}/history`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      // 1 creation entry + 6 update entries from the lifecycle walk above
+      // (the rejected NOT_A_REAL_STATUS attempt produced none).
+      const statuses = history.body
+        .filter((entry: { eventType: string }) => entry.eventType === "ticket.updated")
+        .map((entry: { snapshot: { status: string } }) => entry.snapshot.status);
+      expect(statuses).toEqual(["IN_PROGRESS", "CLOSED", "OPEN", "RESOLVED", "OPEN", "OPEN"]);
+    });
+
+    it("cannot be used by another branch's caller (tenant isolation, unchanged)", async () => {
+      // Mirrors this file's own existing branch-scoping convention: a
+      // ticket outside the caller's branch 404s rather than ever reaching
+      // the transition check.
+      await request(app.getHttpServer())
+        .patch(`/api/v1/tickets/${randomUUID()}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status: "CLOSED" })
+        .expect(404);
+    });
+  });
+
   // Story S-8d — the two filters that let the dashboard and customer-detail
   // screens stop fetching the whole branch list and narrowing it in the
   // browser.

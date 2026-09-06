@@ -12,6 +12,20 @@ import {
 } from "./tickets.events";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
+import { assertValidTicketStatusTransition } from "./ticket-status-transitions";
+
+// RM-01 — spied, not stubbed: `vi.fn(actual...)` wraps the real
+// implementation as the default for every test in this file (so every
+// existing `updateTicket` call below still exercises the real, permissive
+// production policy, unchanged), while letting the one dedicated
+// "status transition policy" describe block below override it for a
+// single test to prove `updateTicket` correctly propagates a rejection —
+// which pairs are actually legal is `ticket-status-transitions.spec.ts`'s
+// own, separate concern, not re-derived here.
+vi.mock("./ticket-status-transitions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./ticket-status-transitions")>();
+  return { ...actual, assertValidTicketStatusTransition: vi.fn(actual.assertValidTicketStatusTransition) };
+});
 
 function buildPrismaMock() {
   return {
@@ -1121,7 +1135,11 @@ describe("TicketsService", () => {
     });
 
     it("only includes fields present in the DTO", async () => {
-      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      // RM-01 — `status` on the mocked existing ticket reflects a real
+      // ticket's own non-nullable column (every real Ticket row always
+      // has one); this fixture just never needed to state it before
+      // `assertValidTicketStatusTransition` started reading it.
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1", status: "OPEN" });
       prisma.ticket.update.mockResolvedValue({
         id: "ticket-1",
         subject: "Cannot log in",
@@ -1602,6 +1620,80 @@ describe("TicketsService", () => {
             customer: { select: { displayName: true } },
           },
         });
+      });
+    });
+
+    // RM-01 — proves `updateTicket` actually consults the centralized
+    // policy and honors its answer, both ways. *Which* transitions are
+    // legal is `ticket-status-transitions.spec.ts`'s own concern (today,
+    // every transition is legal by explicit product decision — see that
+    // file) — these tests only prove the wiring, using the real function
+    // for the "allowed" case and a forced rejection for the "denied" case.
+    describe("status transition policy (RM-01)", () => {
+      it("consults the policy with the ticket's current status and the requested one", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          categoryId: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "OPEN",
+        });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", status: "CLOSED" });
+
+        await service.updateTicket("ticket-1", { status: "CLOSED" as never });
+
+        expect(assertValidTicketStatusTransition).toHaveBeenCalledWith("OPEN", "CLOSED");
+      });
+
+      it("never consults the policy when status is absent from the DTO", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+        prisma.ticket.update.mockResolvedValue({ id: "ticket-1", subject: "New subject" });
+
+        await service.updateTicket("ticket-1", { subject: "New subject" });
+
+        expect(assertValidTicketStatusTransition).not.toHaveBeenCalled();
+      });
+
+      it("propagates the policy's rejection and never writes to the database", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          categoryId: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "OPEN",
+        });
+        vi.mocked(assertValidTicketStatusTransition).mockImplementationOnce(() => {
+          throw new BadRequestException("Cannot move ticket from OPEN to CLOSED");
+        });
+
+        await expect(
+          service.updateTicket("ticket-1", { status: "CLOSED" as never }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(prisma.ticket.update).not.toHaveBeenCalled();
+        expect(eventEmitter.emit).not.toHaveBeenCalled();
+      });
+
+      it("checks the transition before any other in-scope validation that could itself fail first, keeping the failure deterministic", async () => {
+        prisma.ticket.findFirst.mockResolvedValue({
+          id: "ticket-1",
+          categoryId: null,
+          priority: "MEDIUM",
+          departmentId: null,
+          status: "OPEN",
+        });
+        vi.mocked(assertValidTicketStatusTransition).mockImplementationOnce(() => {
+          throw new BadRequestException("Cannot move ticket from OPEN to CLOSED");
+        });
+
+        await expect(
+          service.updateTicket("ticket-1", {
+            status: "CLOSED" as never,
+            assignedToUserId: "user-from-elsewhere",
+          }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        // The assignee-in-scope check never even ran — the transition
+        // check, wired first, already rejected the call.
+        expect(prisma.userBranchRole.findFirst).not.toHaveBeenCalled();
       });
     });
   });

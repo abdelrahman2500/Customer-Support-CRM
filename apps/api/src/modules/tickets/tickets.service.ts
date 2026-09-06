@@ -23,6 +23,7 @@ import {
   TICKET_RECATEGORIZED_EVENT,
   TICKET_NOTE_ADDED_EVENT,
 } from "./tickets.events";
+import { assertValidTicketStatusTransition } from "./ticket-status-transitions";
 import type {
   TicketCreatedEvent,
   TicketUpdatedEvent,
@@ -343,6 +344,13 @@ export class TicketsService {
     const { branchId } = this.tenantContext.requireBranchScope();
     const existing = await this.findTicketInScope(id);
 
+    // RM-01 — checked first, and synchronously: a pure, no-I/O check
+    // should never run after (and be masked by) an async DB-bound
+    // validation that could itself fail for an unrelated reason. See
+    // `ticket-status-transitions.ts` for the policy itself.
+    if (dto.status !== undefined) {
+      assertValidTicketStatusTransition(existing.status, dto.status);
+    }
     if (dto.departmentId !== undefined) {
       await this.requireDepartmentInScope(dto.departmentId, branchId);
       await this.requireAllowedDepartmentReassignment(dto.departmentId);
