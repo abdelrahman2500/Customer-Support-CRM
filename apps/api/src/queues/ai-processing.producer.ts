@@ -26,7 +26,7 @@ export const AI_PROCESSING_QUEUE = "ai-processing";
 export interface AiProcessingJobPayload {
   aiPromptLogId: string;
   branchId: string;
-  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT";
+  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT" | "SUGGEST_SOLUTIONS";
   ticketId?: string;
   subject?: string;
   body: string;

@@ -16,6 +16,6 @@ export const AI_PROMPT_COMPLETED_EVENT = "ai.prompt_completed";
 export interface AiPromptCompletedEvent {
   aiPromptLogId: string;
   ticketId: string;
-  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE";
+  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "SUGGEST_SOLUTIONS";
   outcome: "SUCCESS" | "ERROR" | "DISABLED";
 }

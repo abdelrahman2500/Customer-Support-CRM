@@ -1,6 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AiProvider } from "./ai-provider.interface";
-import type { AiCallResult, AiChatMessageInput, AiTicketInput } from "./types";
+import type {
+  AiCallResult,
+  AiChatMessageInput,
+  AiTicketContextInput,
+  AiTicketInput,
+} from "./types";
 
 const MAX_TOKENS = 1024;
 
@@ -75,6 +80,25 @@ export class AnthropicAiProvider implements AiProvider {
         content: `Suggest a short (1-3 word) category for the following support ticket. Respond with only the category.\n\nSubject: ${ticket.subject}\n\n${ticket.body}`,
       },
     ]);
+  }
+
+  /**
+   * RM-00 — grounds the suggestion in `input.context` (published Knowledge
+   * Base excerpts the caller already searched/truncated) via a `system`
+   * prompt, exactly mirroring `chat()`'s own Story 117 grounding — see
+   * `buildSuggestSolutionsSystemPrompt`. An empty `context` sends no
+   * `system` param at all, same as `chat()` with no matching articles.
+   */
+  async suggestSolutions(input: AiTicketContextInput): Promise<AiCallResult> {
+    return this.complete(
+      [
+        {
+          role: "user",
+          content: `Suggest possible solutions for the following support ticket, drawing on the knowledge base excerpts provided if relevant.\n\nSubject: ${input.subject}\n\n${input.body}`,
+        },
+      ],
+      buildSuggestSolutionsSystemPrompt(input.context),
+    );
   }
 
   /**
@@ -155,6 +179,21 @@ function buildChatSystemPrompt(context: string[]): string | undefined {
   return [
     "Answer the customer's question primarily using the following knowledge base excerpts.",
     "If the excerpts do not cover the question, say you don't know and suggest the customer ask a human agent.",
+    "",
+    ...context.map((excerpt, index) => `Excerpt ${index + 1}: ${excerpt}`),
+  ].join("\n");
+}
+
+/** RM-00 — same "`undefined`, never an empty string, when there's no
+ * context" contract as `buildChatSystemPrompt`, phrased for an agent
+ * suggesting a solution rather than a customer-facing chat reply. */
+function buildSuggestSolutionsSystemPrompt(context: string[]): string | undefined {
+  if (context.length === 0) {
+    return undefined;
+  }
+  return [
+    "Ground your suggested solution in the following knowledge base excerpts where relevant.",
+    "If none of the excerpts are relevant, suggest a solution based on the ticket alone and say so.",
     "",
     ...context.map((excerpt, index) => `Excerpt ${index + 1}: ${excerpt}`),
   ].join("\n");

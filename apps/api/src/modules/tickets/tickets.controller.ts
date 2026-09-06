@@ -130,6 +130,17 @@ export class TicketsController {
     return this.ticketAiService.categorizeTicket(id);
   }
 
+  /** RM-00 — Suggested Solutions, the fifth AI capability. Same
+   * advisory-only, `ticket:read`-gated, asynchronous shape as
+   * `summarize`/`suggestReply`/`categorize` above — nothing here mutates
+   * the ticket; an agent reads the suggestion via the same result-polling
+   * route below. */
+  @Post(":id/ai/suggest-solutions")
+  @RequirePermissions("ticket:read")
+  suggestSolutions(@Param("id") id: string): Promise<AiJobSubmittedResponse> {
+    return this.ticketAiService.suggestSolutionsForTicket(id);
+  }
+
   /** Story 79 — retrieves the durable AiPromptLog row a prior
    * summarize/suggest-reply/categorize submission created, once
    * apps/worker has resolved it. ticket:read-gated, same as the three

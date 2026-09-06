@@ -33,10 +33,17 @@ export interface AiResultResponse {
   createdAt: Date;
 }
 
-/** The three ticket-scoped AI features this service submits — deliberately
+/** The four ticket-scoped AI features this service submits — deliberately
  * narrower than the full `AiFeature` Prisma enum (`CHAT` has no producer
- * here; chatbot is out of scope, see the plan's own Non-goals). */
-type TicketAiFeature = "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE";
+ * here; chatbot is out of scope, see the plan's own Non-goals).
+ *
+ * RM-00 — `SUGGEST_SOLUTIONS` added, the fifth AI capability this product
+ * defines. Submitted identically to the other three via `submit()`; its
+ * Knowledge Base grounding happens entirely in `apps/worker`
+ * (`AiProcessingProcessor.fetchKnowledgeBaseContext`), mirroring exactly
+ * how `CHAT`'s own grounding never touches this API-side submit path
+ * either. */
+type TicketAiFeature = "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "SUGGEST_SOLUTIONS";
 
 /**
  * Story 73 — the first real consumer of `AiGatewayService` (Story 72's own
@@ -98,6 +105,14 @@ export class TicketAiService {
 
   async categorizeTicket(id: string): Promise<AiJobSubmittedResponse> {
     return this.submit(id, "CATEGORIZE");
+  }
+
+  /** RM-00 — Suggested Solutions. Submitted identically to the other three
+   * ticket-scoped features; `apps/worker` additionally grounds the
+   * suggestion in published Knowledge Base articles before calling the
+   * provider (see `AiProcessingProcessor`'s own doc comment). */
+  async suggestSolutionsForTicket(id: string): Promise<AiJobSubmittedResponse> {
+    return this.submit(id, "SUGGEST_SOLUTIONS");
   }
 
   /**

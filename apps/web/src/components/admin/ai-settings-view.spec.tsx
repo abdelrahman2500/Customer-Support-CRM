@@ -44,6 +44,7 @@ const allEnabled = {
   suggestReplyEnabled: true,
   categorizeEnabled: true,
   chatEnabled: true,
+  suggestSolutionsEnabled: true,
 };
 
 describe("AiSettingsView", () => {
@@ -83,6 +84,7 @@ describe("AiSettingsView", () => {
 
     expect(screen.getByLabelText("summarizeLabel")).toBeChecked();
     expect(screen.getByLabelText("chatLabel")).not.toBeChecked();
+    expect(screen.getByLabelText("suggestSolutionsLabel")).toBeChecked();
   });
 
   it("saves immediately when a toggle is changed", async () => {

@@ -17,6 +17,7 @@ function buildProviderMock() {
     suggestReply: vi.fn(),
     categorize: vi.fn(),
     chat: vi.fn(),
+    suggestSolutions: vi.fn(),
   };
 }
 
@@ -212,6 +213,97 @@ describe("AiProcessingProcessor", () => {
         "ai-completion",
         expect.objectContaining({ feature: "CATEGORIZE" }),
       );
+    });
+
+    // RM-00 — Suggested Solutions.
+    describe("SUGGEST_SOLUTIONS feature", () => {
+      const SUGGEST_SOLUTIONS_PAYLOAD: AiProcessingJobPayload = {
+        aiPromptLogId: "log-1",
+        ticketId: "ticket-1",
+        branchId: "branch-1",
+        feature: "SUGGEST_SOLUTIONS",
+        subject: "Login issue",
+        body: "Checked logs.",
+      };
+
+      it("calls provider.suggestSolutions with { subject, body, context } and never the other ticket-scoped methods", async () => {
+        provider.suggestSolutions.mockResolvedValue(SUCCESS_RESULT);
+        const job = buildJob(SUGGEST_SOLUTIONS_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(provider.suggestSolutions).toHaveBeenCalledWith({
+          subject: "Login issue",
+          body: "Checked logs.",
+          context: [],
+        });
+        expect(provider.summarize).not.toHaveBeenCalled();
+        expect(provider.suggestReply).not.toHaveBeenCalled();
+        expect(provider.categorize).not.toHaveBeenCalled();
+        expect(handbackQueue.add).toHaveBeenCalledWith(
+          "ai-completion",
+          expect.objectContaining({ feature: "SUGGEST_SOLUTIONS", ticketId: "ticket-1" }),
+        );
+      });
+
+      it("queries the Knowledge Base scoped to the job's branchId, using the ticket's subject+body as the search query", async () => {
+        provider.suggestSolutions.mockResolvedValue(SUCCESS_RESULT);
+        const job = buildJob(SUGGEST_SOLUTIONS_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+        const [strings, ...values] = prisma.$queryRaw.mock.calls[0]!;
+        expect(strings.join("")).toContain("branch_id =");
+        expect(strings.join("")).toContain("status = 'PUBLISHED'");
+        expect(values).toContain("branch-1");
+        expect(values).toContain("Login issue\nChecked logs.");
+      });
+
+      it("passes matching articles as context to the provider", async () => {
+        provider.suggestSolutions.mockResolvedValue(SUCCESS_RESULT);
+        prisma.$queryRaw.mockResolvedValue([
+          { title: "Password reset", body: "Go to Settings and click Reset Password." },
+        ]);
+        const job = buildJob(SUGGEST_SOLUTIONS_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(provider.suggestSolutions).toHaveBeenCalledWith(
+          expect.objectContaining({
+            context: ["Password reset: Go to Settings and click Reset Password."],
+          }),
+        );
+      });
+
+      it("fails open (empty context) when the Knowledge Base query throws, without failing the job", async () => {
+        provider.suggestSolutions.mockResolvedValue(SUCCESS_RESULT);
+        prisma.$queryRaw.mockRejectedValue(new Error("connection reset"));
+        const job = buildJob(SUGGEST_SOLUTIONS_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(provider.suggestSolutions).toHaveBeenCalledWith(
+          expect.objectContaining({ context: [] }),
+        );
+        expect(prisma.aiPromptLog.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ outcome: "SUCCESS" }) }),
+        );
+      });
+
+      it("hands back ticketId, never chatSessionId", async () => {
+        provider.suggestSolutions.mockResolvedValue(SUCCESS_RESULT);
+        const job = buildJob(SUGGEST_SOLUTIONS_PAYLOAD);
+
+        await processor.process(job);
+
+        expect(handbackQueue.add).toHaveBeenCalledWith("ai-completion", {
+          aiPromptLogId: "log-1",
+          ticketId: "ticket-1",
+          feature: "SUGGEST_SOLUTIONS",
+          outcome: "SUCCESS",
+        });
+      });
     });
 
     it("persists a DISABLED outcome and hands it back without throwing (NullAiProvider path)", async () => {

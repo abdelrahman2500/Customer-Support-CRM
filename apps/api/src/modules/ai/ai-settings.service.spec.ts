@@ -66,6 +66,7 @@ describe("AiSettingsService", () => {
         suggestReplyEnabled: true,
         categorizeEnabled: true,
         chatEnabled: true,
+        suggestSolutionsEnabled: true,
       });
     });
 
@@ -75,6 +76,7 @@ describe("AiSettingsService", () => {
         suggestReplyEnabled: true,
         categorizeEnabled: false,
         chatEnabled: true,
+        suggestSolutionsEnabled: false,
       });
 
       const result = await service.getSettings();
@@ -84,6 +86,7 @@ describe("AiSettingsService", () => {
         suggestReplyEnabled: true,
         categorizeEnabled: false,
         chatEnabled: true,
+        suggestSolutionsEnabled: false,
       });
     });
 
@@ -102,6 +105,7 @@ describe("AiSettingsService", () => {
         suggestReplyEnabled: true,
         categorizeEnabled: true,
         chatEnabled: true,
+        suggestSolutionsEnabled: true,
       });
 
       await service.updateSettings({ summarizeEnabled: false });
@@ -114,11 +118,29 @@ describe("AiSettingsService", () => {
           suggestReplyEnabled: true,
           categorizeEnabled: true,
           chatEnabled: true,
+          suggestSolutionsEnabled: true,
         },
         update: {
           summarizeEnabled: false,
         },
       });
+    });
+
+    // RM-00 — Suggested Solutions.
+    it("updates only suggestSolutionsEnabled when that's the only field provided", async () => {
+      prisma.aiSettings.upsert.mockResolvedValue({
+        summarizeEnabled: true,
+        suggestReplyEnabled: true,
+        categorizeEnabled: true,
+        chatEnabled: true,
+        suggestSolutionsEnabled: false,
+      });
+
+      await service.updateSettings({ suggestSolutionsEnabled: false });
+
+      expect(prisma.aiSettings.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ update: { suggestSolutionsEnabled: false } }),
+      );
     });
 
     it("updates only the provided fields, leaving others untouched", async () => {
@@ -127,6 +149,7 @@ describe("AiSettingsService", () => {
         suggestReplyEnabled: true,
         categorizeEnabled: true,
         chatEnabled: false,
+        suggestSolutionsEnabled: true,
       });
 
       await service.updateSettings({ chatEnabled: false });
@@ -142,6 +165,7 @@ describe("AiSettingsService", () => {
         suggestReplyEnabled: true,
         categorizeEnabled: true,
         chatEnabled: false,
+        suggestSolutionsEnabled: true,
       });
 
       const result = await service.updateSettings({ chatEnabled: false });
@@ -151,6 +175,7 @@ describe("AiSettingsService", () => {
         suggestReplyEnabled: true,
         categorizeEnabled: true,
         chatEnabled: false,
+        suggestSolutionsEnabled: true,
       });
     });
   });
@@ -161,6 +186,7 @@ describe("AiSettingsService", () => {
 
       expect(await service.isFeatureEnabled("branch-1", "SUMMARIZE")).toBe(true);
       expect(await service.isFeatureEnabled("branch-1", "CHAT")).toBe(true);
+      expect(await service.isFeatureEnabled("branch-1", "SUGGEST_SOLUTIONS")).toBe(true);
     });
 
     it("reads the matching column for each feature", async () => {
@@ -169,12 +195,14 @@ describe("AiSettingsService", () => {
         suggestReplyEnabled: true,
         categorizeEnabled: false,
         chatEnabled: true,
+        suggestSolutionsEnabled: false,
       });
 
       expect(await service.isFeatureEnabled("branch-1", "SUMMARIZE")).toBe(false);
       expect(await service.isFeatureEnabled("branch-1", "SUGGEST_REPLY")).toBe(true);
       expect(await service.isFeatureEnabled("branch-1", "CATEGORIZE")).toBe(false);
       expect(await service.isFeatureEnabled("branch-1", "CHAT")).toBe(true);
+      expect(await service.isFeatureEnabled("branch-1", "SUGGEST_SOLUTIONS")).toBe(false);
     });
 
     it("scopes the lookup by the given branchId, never the ambient TenantContext", async () => {

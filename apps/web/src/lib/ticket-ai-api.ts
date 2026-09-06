@@ -9,7 +9,7 @@ import { apiFetch } from "./api";
  * because it mirrors the backend's `AiFeature` column verbatim, never
  * because this UI submits a CHAT operation.
  */
-export type TicketAiFeature = "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE";
+export type TicketAiFeature = "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "SUGGEST_SOLUTIONS";
 
 export interface AiResultSummary {
   id: string;
@@ -24,6 +24,7 @@ const FEATURE_PATH: Record<TicketAiFeature, string> = {
   SUMMARIZE: "summarize",
   SUGGEST_REPLY: "suggest-reply",
   CATEGORIZE: "categorize",
+  SUGGEST_SOLUTIONS: "suggest-solutions",
 };
 
 /** `POST /tickets/:id/ai/{summarize,suggest-reply,categorize}`

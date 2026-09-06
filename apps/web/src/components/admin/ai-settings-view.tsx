@@ -14,11 +14,13 @@ const TOGGLES: { key: ToggleKey; labelKey: string }[] = [
   { key: "suggestReplyEnabled", labelKey: "suggestReplyLabel" },
   { key: "categorizeEnabled", labelKey: "categorizeLabel" },
   { key: "chatEnabled", labelKey: "chatLabel" },
+  { key: "suggestSolutionsEnabled", labelKey: "suggestSolutionsLabel" },
 ];
 
 /**
  * Story 81 — AI Feature Flags per Branch. Mirrors `BrandingView`'s
- * loading/error/form shape exactly, with four toggle checkboxes instead
+ * loading/error/form shape exactly, with toggle checkboxes (a fifth,
+ * `suggestSolutionsEnabled`, added by RM-00) instead
  * of three text inputs — no `Switch` component exists yet in
  * `@/components/ui`, so a plain labeled checkbox mirrors the simplest
  * existing form-control precedent. Each toggle saves immediately on
@@ -37,7 +39,7 @@ export function AiSettingsView() {
 
       {settingsQuery.isLoading && (
         <div className="flex flex-col gap-2">
-          {[0, 1, 2, 3].map((row) => (
+          {[0, 1, 2, 3, 4].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
         </div>

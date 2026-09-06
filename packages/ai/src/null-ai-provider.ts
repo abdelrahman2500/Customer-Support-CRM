@@ -1,5 +1,10 @@
 import type { AiProvider } from "./ai-provider.interface";
-import type { AiCallResult, AiChatMessageInput, AiTicketInput } from "./types";
+import type {
+  AiCallResult,
+  AiChatMessageInput,
+  AiTicketContextInput,
+  AiTicketInput,
+} from "./types";
 
 const DISABLED_RESULT: AiCallResult = {
   outcome: "DISABLED",
@@ -34,6 +39,10 @@ export class NullAiProvider implements AiProvider {
   }
 
   async chat(_input: AiChatMessageInput): Promise<AiCallResult> {
+    return DISABLED_RESULT;
+  }
+
+  async suggestSolutions(_input: AiTicketContextInput): Promise<AiCallResult> {
     return DISABLED_RESULT;
   }
 }

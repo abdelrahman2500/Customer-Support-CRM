@@ -143,6 +143,7 @@
       "aiSummarize": "تلخيص",
       "aiSuggestReply": "اقتراح رد",
       "aiCategorize": "تصنيف",
+      "aiSuggestSolutions": "اقتراح حلول",
       "aiSubmitFailed": "تعذّر إرسال هذا الطلب. حاول مرة أخرى.",
       "aiPending": "جارٍ المعالجة...",
       "aiDisabled": "ميزات الذكاء الاصطناعي غير مفعّلة في هذه البيئة.",
@@ -860,6 +861,7 @@
     "suggestReplyLabel": "اقتراح الرد",
     "categorizeLabel": "التصنيف",
     "chatLabel": "روبوت المحادثة في البوابة",
+    "suggestSolutionsLabel": "اقتراح الحلول",
     "saveFailed": "تعذّر حفظ هذا الإعداد. حاول مرة أخرى."
   },
   "mySessions": {

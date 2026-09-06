@@ -10,7 +10,7 @@ export const AI_PROCESSING_EVENTS_QUEUE = "ai-processing-events";
  * are mutually exclusive by feature (both optional). */
 export interface AiCompletionJobPayload {
   aiPromptLogId: string;
-  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT";
+  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT" | "SUGGEST_SOLUTIONS";
   outcome: "SUCCESS" | "ERROR" | "DISABLED";
   ticketId?: string;
   chatSessionId?: string;

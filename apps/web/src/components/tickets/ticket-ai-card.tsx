@@ -7,17 +7,19 @@ import type { TicketAiFeature } from "@/lib/ticket-ai-api";
 import { ApiError } from "@/lib/api";
 import { Alert, Button, Skeleton } from "@crm/ui";
 
-const FEATURES: TicketAiFeature[] = ["SUMMARIZE", "SUGGEST_REPLY", "CATEGORIZE"];
+const FEATURES: TicketAiFeature[] = ["SUMMARIZE", "SUGGEST_REPLY", "CATEGORIZE", "SUGGEST_SOLUTIONS"];
 
 const FEATURE_LABEL_KEYS: Record<TicketAiFeature, string> = {
   SUMMARIZE: "detail.aiSummarize",
   SUGGEST_REPLY: "detail.aiSuggestReply",
   CATEGORIZE: "detail.aiCategorize",
+  SUGGEST_SOLUTIONS: "detail.aiSuggestSolutions",
 };
 
 /**
- * Story 79 — the agent-facing AI card: three actions (Summarize / Suggest
- * Reply / Categorize), each submitting via `POST /tickets/:id/ai/*` and
+ * Story 79 — the agent-facing AI card: four actions (Summarize / Suggest
+ * Reply / Categorize / Suggest Solutions — the last added by RM-00), each
+ * submitting via `POST /tickets/:id/ai/*` and
  * then tracking the returned `AiPromptLog.id` to poll the durable result
  * via `GET /tickets/:id/ai/:logId`. Only the most-recently-submitted
  * operation is shown at a time (mirrors this story's own non-goal of an

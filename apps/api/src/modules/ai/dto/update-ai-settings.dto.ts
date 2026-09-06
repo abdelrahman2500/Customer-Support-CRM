@@ -23,4 +23,9 @@ export class UpdateAiSettingsDto {
   @IsOptional()
   @IsBoolean()
   chatEnabled?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  suggestSolutionsEnabled?: boolean;
 }

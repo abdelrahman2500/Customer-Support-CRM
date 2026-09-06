@@ -143,6 +143,7 @@
       "aiSummarize": "Summarize",
       "aiSuggestReply": "Suggest Reply",
       "aiCategorize": "Categorize",
+      "aiSuggestSolutions": "Suggest Solutions",
       "aiSubmitFailed": "Couldn't submit this request. Please try again.",
       "aiPending": "Working on it...",
       "aiDisabled": "AI features are not enabled in this environment.",
@@ -860,6 +861,7 @@
     "suggestReplyLabel": "Suggest Reply",
     "categorizeLabel": "Categorize",
     "chatLabel": "Portal AI Chatbot",
+    "suggestSolutionsLabel": "Suggest Solutions",
     "saveFailed": "Couldn't save this setting. Please try again."
   },
   "mySessions": {

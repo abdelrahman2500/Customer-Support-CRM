@@ -13,6 +13,7 @@ export interface AiSettingsSummary {
   suggestReplyEnabled: boolean;
   categorizeEnabled: boolean;
   chatEnabled: boolean;
+  suggestSolutionsEnabled: boolean;
 }
 
 export interface UpdateAiSettingsInput {
@@ -20,6 +21,7 @@ export interface UpdateAiSettingsInput {
   suggestReplyEnabled?: boolean;
   categorizeEnabled?: boolean;
   chatEnabled?: boolean;
+  suggestSolutionsEnabled?: boolean;
 }
 
 export function getAiSettings(): Promise<AiSettingsSummary> {

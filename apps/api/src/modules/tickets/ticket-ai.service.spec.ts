@@ -207,6 +207,37 @@ describe("TicketAiService", () => {
     });
   });
 
+  // RM-00 — Suggested Solutions.
+  describe("suggestSolutionsForTicket", () => {
+    it("submits with feature SUGGEST_SOLUTIONS", async () => {
+      const result = await service.suggestSolutionsForTicket("ticket-1");
+
+      expect(aiGateway.createPendingLog).toHaveBeenCalledWith(
+        "SUGGEST_SOLUTIONS",
+        "branch-1",
+        "ticket-1",
+        null,
+        expect.any(String),
+      );
+      expect(producer.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ feature: "SUGGEST_SOLUTIONS" }),
+      );
+      expect(result).toEqual({ id: "log-1", outcome: "PENDING" });
+    });
+
+    it("creates a DISABLED log and never enqueues when SUGGEST_SOLUTIONS is disabled for the branch", async () => {
+      aiSettings.isFeatureEnabled.mockResolvedValue(false);
+      aiGateway.createDisabledLog.mockResolvedValue({ id: "log-disabled" });
+
+      const result = await service.suggestSolutionsForTicket("ticket-1");
+
+      expect(aiSettings.isFeatureEnabled).toHaveBeenCalledWith("branch-1", "SUGGEST_SOLUTIONS");
+      expect(aiGateway.createPendingLog).not.toHaveBeenCalled();
+      expect(producer.enqueue).not.toHaveBeenCalled();
+      expect(result).toEqual({ id: "log-disabled", outcome: "DISABLED" });
+    });
+  });
+
   describe("getAiResult", () => {
     it("returns the mapped result when the log exists and its ticketId matches", async () => {
       const createdAt = new Date("2026-01-01T00:00:00.000Z");

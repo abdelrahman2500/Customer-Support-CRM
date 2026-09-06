@@ -30,7 +30,7 @@ describe("TicketAiCard", () => {
     vi.mocked(useTicketAiResultQuery).mockReturnValue(queryResult({}) as never);
   });
 
-  it("renders the three actions with no operation submitted yet", () => {
+  it("renders the four actions with no operation submitted yet", () => {
     vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
       mutateAsync: vi.fn(),
       isPending: false,
@@ -41,7 +41,40 @@ describe("TicketAiCard", () => {
     expect(screen.getByText("detail.aiSummarize")).toBeInTheDocument();
     expect(screen.getByText("detail.aiSuggestReply")).toBeInTheDocument();
     expect(screen.getByText("detail.aiCategorize")).toBeInTheDocument();
+    expect(screen.getByText("detail.aiSuggestSolutions")).toBeInTheDocument();
     expect(screen.queryByText("detail.aiPending")).not.toBeInTheDocument();
+  });
+
+  // RM-00 — Suggested Solutions.
+  it("submits Suggest Solutions and renders its outputText like any other plain-text feature", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ id: "log-1", outcome: "PENDING" });
+    vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+      mutateAsync,
+      isPending: false,
+    } as never);
+    vi.mocked(useTicketAiResultQuery).mockReturnValue(
+      queryResult({
+        data: {
+          id: "log-1",
+          feature: "SUGGEST_SOLUTIONS",
+          outcome: "SUCCESS",
+          outputText: "Try resetting the password via Settings.",
+          errorMessage: null,
+          createdAt: "2024-01-01T00:00:00.000Z",
+        },
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+    fireEvent.click(screen.getByText("detail.aiSuggestSolutions"));
+
+    await vi.waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith("SUGGEST_SOLUTIONS");
+    });
+    expect(await screen.findByText("Try resetting the password via Settings.")).toBeInTheDocument();
+    // No "use as category" action for this feature.
+    expect(screen.queryByText("detail.aiUseAsCategory")).not.toBeInTheDocument();
   });
 
   it("submits Summarize and shows PENDING once tracked", async () => {

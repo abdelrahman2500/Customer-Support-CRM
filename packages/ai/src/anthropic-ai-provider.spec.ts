@@ -110,6 +110,13 @@ describe("AnthropicAiProvider", () => {
       expect(createMock).toHaveBeenCalledOnce();
     });
 
+    it("suggestSolutions calls the SDK and returns SUCCESS", async () => {
+      const provider = createProvider();
+      const result = await provider.suggestSolutions({ subject: "s", body: "b", context: [] });
+      expect(result.outcome).toBe("SUCCESS");
+      expect(createMock).toHaveBeenCalledOnce();
+    });
+
     it("chat sends the raw message as the prompt when there is no prior history or context", async () => {
       const provider = createProvider();
       const result = await provider.chat({
@@ -177,6 +184,74 @@ describe("AnthropicAiProvider", () => {
       const system = createMock.mock.calls[0][0].system as string;
       expect(system).toContain("Account lockout: After 5 failed attempts, wait 15 minutes.");
       expect(system).toContain("don't know");
+    });
+  });
+
+  // RM-00 — Suggested Solutions.
+  describe("suggestSolutions", () => {
+    it("sends the ticket subject/body as the prompt when there is no context", async () => {
+      createMock.mockResolvedValue({
+        content: [{ type: "text", text: "Try resetting the password." }],
+        model: "claude-test-model",
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+      const provider = createProvider();
+
+      const result = await provider.suggestSolutions({
+        subject: "Login issue",
+        body: "I can't log in.",
+        context: [],
+      });
+
+      expect(result.outcome).toBe("SUCCESS");
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messages: [
+            expect.objectContaining({ role: "user", content: expect.stringContaining("Login issue") }),
+          ],
+        }),
+      );
+      // No context means no `system` param at all, mirroring `chat()`'s
+      // own Story 117 contract exactly.
+      expect(createMock.mock.calls[0][0]).not.toHaveProperty("system");
+    });
+
+    it("sends a grounding system prompt including every context excerpt when context is non-empty", async () => {
+      createMock.mockResolvedValue({
+        content: [{ type: "text", text: "Try resetting the password." }],
+        model: "claude-test-model",
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+      const provider = createProvider();
+
+      await provider.suggestSolutions({
+        subject: "Login issue",
+        body: "I can't log in.",
+        context: [
+          "Password reset: Go to Settings > Security and click Reset Password.",
+          "Account lockout: After 5 failed attempts, wait 15 minutes.",
+        ],
+      });
+
+      const system = createMock.mock.calls[0][0].system as string;
+      expect(system).toContain("Password reset: Go to Settings > Security and click Reset Password.");
+      expect(system).toContain("Account lockout: After 5 failed attempts, wait 15 minutes.");
+    });
+
+    it("returns an ERROR result (never throws) when the SDK call rejects", async () => {
+      createMock.mockRejectedValue(new Error("rate limited"));
+      const provider = createProvider();
+
+      const result = await provider.suggestSolutions({ subject: "s", body: "b", context: [] });
+
+      expect(result).toEqual({
+        outcome: "ERROR",
+        text: null,
+        model: "claude-test-model",
+        inputTokens: null,
+        outputTokens: null,
+        errorMessage: "rate limited",
+      });
     });
   });
 

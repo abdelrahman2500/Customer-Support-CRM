@@ -8,6 +8,9 @@ export interface AiSettingsSummary {
   suggestReplyEnabled: boolean;
   categorizeEnabled: boolean;
   chatEnabled: boolean;
+  /** RM-00 — Suggested Solutions per-branch flag, mirroring the other
+   * three ticket-scoped flags exactly. */
+  suggestSolutionsEnabled: boolean;
 }
 
 /** The pre-Story-81 behavior for every branch: every feature enabled.
@@ -19,6 +22,7 @@ const DEFAULT_AI_SETTINGS: AiSettingsSummary = {
   suggestReplyEnabled: true,
   categorizeEnabled: true,
   chatEnabled: true,
+  suggestSolutionsEnabled: true,
 };
 
 /**
@@ -52,6 +56,7 @@ export class AiSettingsService {
         suggestReplyEnabled: dto.suggestReplyEnabled ?? true,
         categorizeEnabled: dto.categorizeEnabled ?? true,
         chatEnabled: dto.chatEnabled ?? true,
+        suggestSolutionsEnabled: dto.suggestSolutionsEnabled ?? true,
       },
       update: {
         ...(dto.summarizeEnabled !== undefined ? { summarizeEnabled: dto.summarizeEnabled } : {}),
@@ -60,6 +65,9 @@ export class AiSettingsService {
           : {}),
         ...(dto.categorizeEnabled !== undefined ? { categorizeEnabled: dto.categorizeEnabled } : {}),
         ...(dto.chatEnabled !== undefined ? { chatEnabled: dto.chatEnabled } : {}),
+        ...(dto.suggestSolutionsEnabled !== undefined
+          ? { suggestSolutionsEnabled: dto.suggestSolutionsEnabled }
+          : {}),
       },
     });
     return toSummary(settings);
@@ -72,7 +80,7 @@ export class AiSettingsService {
    * case) means every feature is enabled. */
   async isFeatureEnabled(
     branchId: string,
-    feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT",
+    feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT" | "SUGGEST_SOLUTIONS",
   ): Promise<boolean> {
     const settings = await this.prisma.aiSettings.findUnique({ where: { branchId } });
     if (!settings) {
@@ -87,6 +95,8 @@ export class AiSettingsService {
         return settings.categorizeEnabled;
       case "CHAT":
         return settings.chatEnabled;
+      case "SUGGEST_SOLUTIONS":
+        return settings.suggestSolutionsEnabled;
     }
   }
 }
@@ -96,11 +106,13 @@ function toSummary(settings: {
   suggestReplyEnabled: boolean;
   categorizeEnabled: boolean;
   chatEnabled: boolean;
+  suggestSolutionsEnabled: boolean;
 }): AiSettingsSummary {
   return {
     summarizeEnabled: settings.summarizeEnabled,
     suggestReplyEnabled: settings.suggestReplyEnabled,
     categorizeEnabled: settings.categorizeEnabled,
     chatEnabled: settings.chatEnabled,
+    suggestSolutionsEnabled: settings.suggestSolutionsEnabled,
   };
 }

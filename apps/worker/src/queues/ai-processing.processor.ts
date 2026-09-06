@@ -43,7 +43,7 @@ const KB_CONTEXT_SNIPPET_MAX_CHARS = 500;
 export interface AiProcessingJobPayload {
   aiPromptLogId: string;
   branchId: string;
-  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT";
+  feature: "SUMMARIZE" | "SUGGEST_REPLY" | "CATEGORIZE" | "CHAT" | "SUGGEST_SOLUTIONS";
   ticketId?: string;
   subject?: string;
   body: string;
@@ -201,6 +201,18 @@ export class AiProcessingProcessor extends WorkerHost {
           history,
           context,
         });
+      }
+      case "SUGGEST_SOLUTIONS": {
+        // RM-00 — grounded in published Knowledge Base articles the same
+        // way CHAT already is, searched on the ticket's own subject+body
+        // (richer signal for full-text search than body alone, since a
+        // ticket's issue is often summarized in its subject).
+        const subject = data.subject ?? "";
+        const context = await this.fetchKnowledgeBaseContext(
+          data.branchId,
+          `${subject}\n${data.body}`,
+        );
+        return this.provider.suggestSolutions({ subject, body: data.body, context });
       }
     }
   }

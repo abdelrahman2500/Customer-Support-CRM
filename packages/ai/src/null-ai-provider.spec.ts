@@ -29,4 +29,10 @@ describe("NullAiProvider", () => {
       provider.chat({ sessionId: "s", message: "m", history: [], context: [] }),
     ).resolves.toEqual(DISABLED);
   });
+
+  it("suggestSolutions returns a DISABLED result", async () => {
+    await expect(
+      provider.suggestSolutions({ subject: "s", body: "b", context: [] }),
+    ).resolves.toEqual(DISABLED);
+  });
 });

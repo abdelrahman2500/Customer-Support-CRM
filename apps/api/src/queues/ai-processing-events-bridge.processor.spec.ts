@@ -85,6 +85,27 @@ describe("AiProcessingEventsBridgeProcessor", () => {
       });
     });
 
+    // RM-00 — Suggested Solutions.
+    it("emits ai.prompt_completed for a SUGGEST_SOLUTIONS job exactly like the other ticket-scoped features", async () => {
+      const emitter = buildEventEmitterMock();
+      const processor = createProcessor(emitter);
+      const job = buildJob({
+        aiPromptLogId: "log-5",
+        ticketId: "ticket-5",
+        feature: "SUGGEST_SOLUTIONS",
+        outcome: "SUCCESS",
+      });
+
+      await processor.process(job);
+
+      expect(emitter.emit).toHaveBeenCalledWith(AI_PROMPT_COMPLETED_EVENT, {
+        aiPromptLogId: "log-5",
+        ticketId: "ticket-5",
+        feature: "SUGGEST_SOLUTIONS",
+        outcome: "SUCCESS",
+      });
+    });
+
     // Story 80 — a CHAT-feature job emits the separate, chat-scoped event
     // instead, never ai.prompt_completed.
     it("emits ai.chat_message_completed with chatSessionId for a CHAT-feature job", async () => {

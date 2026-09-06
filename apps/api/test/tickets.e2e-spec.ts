@@ -1420,6 +1420,44 @@ describe("Ticketing (e2e)", () => {
     });
   });
 
+  // RM-00 — Suggested Solutions, the fifth AI capability. Same shape as
+  // the categorization describe block above: advisory-only, never mutates
+  // the ticket, creates exactly one PENDING AiPromptLog row.
+  describe("ticket AI suggested solutions (RM-00)", () => {
+    it("rejects an unauthenticated request", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/suggest-solutions`)
+        .expect(401);
+    });
+
+    it("returns 404 for a ticket that doesn't exist", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${randomUUID()}/ai/suggest-solutions`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("returns { id, outcome: PENDING } immediately and creates exactly one PENDING AiPromptLog row", async () => {
+      const before = await prisma.aiPromptLog.count({ where: { feature: "SUGGEST_SOLUTIONS" } });
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/ai/suggest-solutions`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      expect(response.body).toEqual({
+        id: expect.any(String),
+        outcome: "PENDING",
+      });
+
+      const after = await prisma.aiPromptLog.count({ where: { feature: "SUGGEST_SOLUTIONS" } });
+      expect(after).toBe(before + 1);
+
+      const log = await prisma.aiPromptLog.findUnique({ where: { id: response.body.id } });
+      expect(log).toMatchObject({ feature: "SUGGEST_SOLUTIONS", outcome: "PENDING", model: "pending" });
+    });
+  });
+
   // Story 76 — proves apps/api actually enqueues a real, Redis-backed
   // ai-processing job for a submitted operation (not just that the HTTP
   // response looks right) — mirrors ai-processing-producer.e2e-spec.ts's

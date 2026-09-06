@@ -1105,6 +1105,11 @@ enum AiFeature {
   SUGGEST_REPLY
   CATEGORIZE
   CHAT
+  /// RM-00 — Suggested Solutions. Ticket-scoped, like SUMMARIZE/
+  /// SUGGEST_REPLY/CATEGORIZE, but additionally grounded in published
+  /// Knowledge Base articles the same way CHAT already is (see
+  /// AiProcessingProcessor.fetchKnowledgeBaseContext).
+  SUGGEST_SOLUTIONS
 
   @@schema("ai")
 }
@@ -1209,15 +1214,18 @@ enum ChatMessageRole {
 /// (the pre-Story-81 behavior, unchanged) — see AiSettingsService's own
 /// DEFAULT_AI_SETTINGS.
 model AiSettings {
-  id                  String   @id @default(uuid())
-  branchId            String   @unique @map("branch_id")
-  branch              Branch   @relation(fields: [branchId], references: [id])
-  summarizeEnabled    Boolean  @default(true) @map("summarize_enabled")
-  suggestReplyEnabled Boolean  @default(true) @map("suggest_reply_enabled")
-  categorizeEnabled   Boolean  @default(true) @map("categorize_enabled")
-  chatEnabled         Boolean  @default(true) @map("chat_enabled")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  id                       String   @id @default(uuid())
+  branchId                 String   @unique @map("branch_id")
+  branch                   Branch   @relation(fields: [branchId], references: [id])
+  summarizeEnabled         Boolean  @default(true) @map("summarize_enabled")
+  suggestReplyEnabled      Boolean  @default(true) @map("suggest_reply_enabled")
+  categorizeEnabled        Boolean  @default(true) @map("categorize_enabled")
+  chatEnabled              Boolean  @default(true) @map("chat_enabled")
+  /// RM-00 — Suggested Solutions per-branch feature flag, mirroring the
+  /// other three ticket-scoped flags exactly.
+  suggestSolutionsEnabled  Boolean  @default(true) @map("suggest_solutions_enabled")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
 
   @@map("ai_settings")
   @@schema("ai")

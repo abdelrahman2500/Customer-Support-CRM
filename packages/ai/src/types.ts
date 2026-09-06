@@ -35,6 +35,16 @@ export interface AiTicketInput {
   body: string;
 }
 
+/** RM-00 — Suggested Solutions. Same shape as `AiTicketInput`, plus
+ * pre-truncated Knowledge Base excerpt strings the caller already
+ * searched/scoped (`AiProcessingProcessor.fetchKnowledgeBaseContext`,
+ * the exact same retrieval already proven for `chat()`'s own grounding
+ * step). An empty array means "no matching published article found" —
+ * the suggestion proceeds without KB grounding, never a missing field. */
+export interface AiTicketContextInput extends AiTicketInput {
+  context: string[];
+}
+
 /** Story 116 — one prior turn in the same chat session, oldest-to-newest
  * order, excluding the current `AiChatMessageInput.message`. `"user"`/
  * `"assistant"` (not `ChatMessageRole`'s own `CUSTOMER`/`ASSISTANT`

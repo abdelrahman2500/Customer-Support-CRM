@@ -108,6 +108,7 @@ describe("AI Settings (e2e)", () => {
       suggestReplyEnabled: true,
       categorizeEnabled: true,
       chatEnabled: true,
+      suggestSolutionsEnabled: true,
     });
 
     await request(app.getHttpServer())
@@ -125,14 +126,15 @@ describe("AI Settings (e2e)", () => {
       suggestReplyEnabled: true,
       categorizeEnabled: true,
       chatEnabled: false,
+      suggestSolutionsEnabled: true,
     });
 
-    // A partial update (categorizeEnabled only) must leave the two
-    // already-set flags exactly as they were.
+    // A partial update (categorizeEnabled/suggestSolutionsEnabled only)
+    // must leave the two already-set flags exactly as they were.
     await request(app.getHttpServer())
       .patch("/api/v1/ai/settings")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ categorizeEnabled: false })
+      .send({ categorizeEnabled: false, suggestSolutionsEnabled: false })
       .expect(200);
 
     const afterPartialUpdate = await request(app.getHttpServer())
@@ -144,6 +146,7 @@ describe("AI Settings (e2e)", () => {
       suggestReplyEnabled: true,
       categorizeEnabled: false,
       chatEnabled: false,
+      suggestSolutionsEnabled: false,
     });
 
     // Restore the seeded, all-enabled default — this branch is shared
@@ -156,6 +159,7 @@ describe("AI Settings (e2e)", () => {
         suggestReplyEnabled: true,
         categorizeEnabled: true,
         chatEnabled: true,
+        suggestSolutionsEnabled: true,
       })
       .expect(200);
   });
