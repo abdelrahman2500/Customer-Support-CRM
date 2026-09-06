@@ -35,7 +35,20 @@ export default async function AgentWorkspaceLayout({
   return (
     <div className="flex min-h-screen flex-col bg-surface-sunk">
       <WorkspaceNav user={user} />
-      <main className="flex-1 p-6">{children}</main>
+      {/* NAV-2 — every route here used to stretch full-bleed with no width
+          ceiling, the one inconsistency left once auth/error pages'
+          existing `max-w-*`/`mx-auto` wrappers are accounted for. The
+          shared `Table` primitive already wraps every table in its own
+          `overflow-x-auto` box (`packages/ui/src/components/table.tsx`),
+          so a wide table scrolls inside that box rather than depending on
+          this `<main>` being edge-to-edge — capping the width here does
+          not newly clip anything. `max-w-screen-2xl` (96rem/1536px) is
+          generous enough for this app's widest tables while still reading
+          as an intentional page rather than raw viewport width on an
+          ultra-wide monitor. */}
+      <main className="flex-1 p-6">
+        <div className="mx-auto w-full max-w-screen-2xl">{children}</div>
+      </main>
       {/* Story 24 — one branch-wide notification consumer for the whole
           authenticated session, not per-page (see BranchNotifications). */}
       <BranchNotifications branchId={user.branchId} />
