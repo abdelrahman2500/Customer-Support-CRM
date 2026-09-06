@@ -4,6 +4,7 @@ import { TicketDetailView } from "./ticket-detail-view";
 import {
   useCreateTicketNoteMutation,
   useCurrentUserQuery,
+  useCustomerQuery,
   useCustomersQuery,
   useDepartmentsQuery,
   useTicketCsatQuery,
@@ -12,6 +13,7 @@ import {
   useTicketNotesQuery,
   useTicketQuery,
   useTicketSlaTargetQuery,
+  useTicketsQuery,
   useUpdateTicketMutation,
   useUsersQuery,
 } from "@/hooks/use-tickets";
@@ -63,6 +65,12 @@ vi.mock("@/hooks/use-tickets", () => ({
   useDepartmentsQuery: vi.fn(),
   useUpdateTicketMutation: vi.fn(),
   useCreateTicketNoteMutation: vi.fn(),
+  // RM-04 — `CustomerContextPanel`'s own two hooks; its behavior is
+  // covered by its own dedicated describe block below (mirrors this
+  // file's own precedent for TicketChatCard/TicketAiCard's hooks — see
+  // their mocks further down).
+  useCustomerQuery: vi.fn(),
+  useTicketsQuery: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-ticket-categories", () => ({
@@ -209,6 +217,18 @@ describe("TicketDetailView", () => {
       mutateAsync: vi.fn().mockResolvedValue({ id: "log-new", outcome: "PENDING" }),
       isPending: false,
     } as never);
+    // RM-04 — `CustomerContextPanel`'s own two queries; default to an
+    // empty, successful result so pre-existing tests (which only assert
+    // on their own card) are unaffected.
+    vi.mocked(useTicketsQuery).mockReturnValue(
+      queryResult({
+        data: { items: [], total: 0, page: 1, pageSize: 5, totalPages: 1 },
+        isSuccess: true,
+      }) as never,
+    );
+    vi.mocked(useCustomerQuery).mockReturnValue(
+      queryResult({ data: { id: "customer-1", contacts: [] }, isSuccess: true }) as never,
+    );
   });
 
   it("renders the ticket subject and resolved customer name", () => {

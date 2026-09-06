@@ -19,6 +19,7 @@ import {
 } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
+import { CustomerContextPanel } from "@/components/tickets/customer-context-panel";
 import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
@@ -112,16 +113,25 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * Story S-8d — the customer name arrives on the ticket itself instead of
  * being looked up in a map built from the whole customer list, so this
  * screen no longer fetches that list at all.
+ *
+ * RM-04 — a new `CustomerContextPanel`, mounted right after the header
+ * (highest-visibility spot, before any editable field): the customer's
+ * other still-open tickets and primary contacts, so an agent never has to
+ * leave this screen to answer "does this customer have other open
+ * issues?" or "who else can I call?". Pure frontend composition of two
+ * already-existing, already-scoped endpoints (`GET /tickets?customerId=`,
+ * `GET /customers/:id`) — no new endpoint, no new permission.
  */
 /**
  * Story 97 — Loading & Skeleton UX. Replaces the previous generic
  * two-block skeleton (a heading bar + one body block, unrelated to this
  * page's actual shape) with one shaped to match the real, loaded layout:
- * the editable-subject header, the 5-field status/priority/category/
- * assignee/department grid, the chat card, and the run of bordered
- * sections below it (SLA/Escalations/History/CSAT/Notes/Attachments).
- * Exported so `app/[locale]/(agent)/tickets/[id]/loading.tsx` can render
- * the identical shape during the route transition itself, before this
+ * the editable-subject header, the customer context panel (RM-04), the
+ * 5-field status/priority/category/assignee/department grid, the chat
+ * card, and the run of bordered sections below it (SLA/Escalations/
+ * History/CSAT/Notes/Attachments). Exported so
+ * `app/[locale]/(agent)/tickets/[id]/loading.tsx` can render the
+ * identical shape during the route transition itself, before this
  * component has even mounted — one skeleton definition, two call sites.
  */
 export function TicketDetailSkeleton() {
@@ -130,6 +140,12 @@ export function TicketDetailSkeleton() {
       <div className="flex flex-col gap-2">
         <Skeleton className="h-7 w-1/2" />
         <Skeleton className="h-4 w-40" />
+      </div>
+
+      {/* RM-04 — the customer context panel. */}
+      <div className="rounded-md border border-slate-200 bg-white p-4">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="mt-2 h-16 w-full" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 rounded-md border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -232,6 +248,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </Link>
         </p>
       </div>
+
+      <CustomerContextPanel ticketId={ticketId} customerId={ticket.customerId} />
 
       {mutation.isError && (
         <Alert variant="destructive">
