@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { FetchingIndicator, Input, Skeleton } from "@crm/ui";
+import { FetchingIndicator, Input, Pagination, Skeleton } from "@crm/ui";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 
@@ -31,7 +31,17 @@ export function ArticleListView() {
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const [search, setSearch] = useState("");
-  const articlesQuery = usePublishedArticlesQuery(search, locale.toUpperCase() as KbLocale);
+  /** Story S-8c — 1-based; `undefined` until the reader pages. */
+  const [page, setPage] = useState<number | undefined>(undefined);
+
+  /** Typing resets to page 1 in the same update as the search term, so no
+   * request is ever made for "page 7 of the new search". */
+  function updateSearch(value: string) {
+    setSearch(value);
+    setPage(undefined);
+  }
+
+  const articlesQuery = usePublishedArticlesQuery(search, locale.toUpperCase() as KbLocale, page);
   /**
    * Story S-7 — the articles to render whatever their provenance: a
    * completed fetch, the previous search kept as placeholder data, or the
@@ -46,7 +56,8 @@ export function ArticleListView() {
    * are all here regardless: pending-vs-placeholder, a fetch indicator, and
    * an error that no longer takes the rows down with it.
    */
-  const articles = articlesQuery.data;
+  const articlePage = articlesQuery.data;
+  const articles = articlePage?.items;
 
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4">
@@ -62,7 +73,7 @@ export function ArticleListView() {
         aria-label={t("list.searchLabel")}
         placeholder={t("list.searchPlaceholder")}
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onChange={(event) => updateSearch(event.target.value)}
         className="mt-3 max-w-sm"
       />
 
@@ -114,6 +125,27 @@ export function ArticleListView() {
             </li>
           ))}
         </ol>
+      )}
+
+      {articlePage !== undefined && (
+        <div className="mt-3">
+          {/* Story S-8c — the shared pager, same primitive the agent
+              workspace uses. Renders nothing for a single page, so a small
+              published library looks exactly as it did before. */}
+          <Pagination
+            page={articlePage.page}
+            totalPages={articlePage.totalPages}
+            onPageChange={setPage}
+            disabled={articlesQuery.isPlaceholderData}
+            label={tCommon("pagination.label")}
+            previousLabel={tCommon("pagination.previous")}
+            nextLabel={tCommon("pagination.next")}
+            indicator={tCommon("pagination.indicator", {
+              page: articlePage.page,
+              totalPages: articlePage.totalPages,
+            })}
+          />
+        </div>
       )}
     </section>
   );

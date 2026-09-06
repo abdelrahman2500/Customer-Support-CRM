@@ -1,6 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsEnum, IsOptional, IsString } from "class-validator";
 import { KbLocale } from "@prisma/client";
+import { PaginationQueryDto } from "../../../common/pagination/pagination-query.dto";
 
 /**
  * Story 64 — the first search-query-param precedent anywhere in this
@@ -16,8 +17,13 @@ import { KbLocale } from "@prisma/client";
  * Deliberately does not affect `search` (Story 102's full-text search
  * stays English-only against the base `search_vector` column — see this
  * story's own plan doc, "Non-goals").
+ *
+ * Story S-8c — `page`/`pageSize` arrive by extending `PaginationQueryDto`.
+ * This one DTO serves both the agent endpoint and the portal one
+ * (`PortalKnowledgeBaseController` imports it), so both gain paging from a
+ * single declaration and cannot drift apart on bounds or defaults.
  */
-export class ListArticlesQueryDto {
+export class ListArticlesQueryDto extends PaginationQueryDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()

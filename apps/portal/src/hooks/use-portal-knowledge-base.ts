@@ -11,16 +11,19 @@ import type { KbLocale } from "@/lib/knowledge-base-api";
  * Story 109 — both query keys also include `locale`, so switching the
  * portal's own active locale never serves a stale cached response fetched
  * under the other one. */
-export const publishedArticlesQueryKey = (search?: string, locale?: KbLocale) =>
-  ["portal-knowledge-base-articles", search ?? "", locale ?? ""] as const;
+/** Story S-8c — the requested page joins the key, so paging behaves like
+ * any other key change and inherits Story S-7's row preservation. */
+export const publishedArticlesQueryKey = (search?: string, locale?: KbLocale, page?: number) =>
+  ["portal-knowledge-base-articles", search ?? "", locale ?? "", page ?? 1] as const;
 export const publishedArticleQueryKey = (id: string, locale?: KbLocale) =>
   ["portal-knowledge-base-articles", id, locale ?? ""] as const;
 
-export function usePublishedArticlesQuery(search?: string, locale?: KbLocale) {
+export function usePublishedArticlesQuery(search?: string, locale?: KbLocale, page?: number) {
   return useQuery({
-    queryKey: publishedArticlesQueryKey(search, locale),
-    queryFn: () => listPublishedArticles(search, locale),
-    // Story S-7 — `search`/`locale` are the key, so both are new queries.
+    queryKey: publishedArticlesQueryKey(search, locale, page),
+    queryFn: () => listPublishedArticles(search, locale, { page }),
+    // Story S-7 — `search`/`locale` are the key, so both are new queries,
+    // and since Story S-8c so is the page.
     ...preservePreviousResults,
   });
 }

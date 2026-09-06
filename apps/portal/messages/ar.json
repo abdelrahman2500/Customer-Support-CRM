@@ -3,6 +3,12 @@
     "appName": "بوابة العملاء",
     "loading": "جارٍ التحميل...",
     "updating": "جارٍ التحديث…",
+    "pagination": {
+      "label": "ترقيم الصفحات",
+      "previous": "الصفحة السابقة",
+      "next": "الصفحة التالية",
+      "indicator": "الصفحة {page} من {totalPages}"
+    },
     "cancel": "إلغاء",
     "working": "جارٍ التنفيذ...",
     "dismiss": "إغلاق",

@@ -1,7 +1,18 @@
-import { Body, Controller, Get, Param, ParseEnumPipe, Patch, Post, Put, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseEnumPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { KbLocale } from "@prisma/client";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
+import type { Paginated } from "../../common/pagination/paginated";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { ListArticlesQueryDto } from "./dto/list-articles-query.dto";
@@ -28,16 +39,13 @@ export class KnowledgeBaseController {
 
   @Get()
   @RequirePermissions("kb:read")
-  list(@Query() query: ListArticlesQueryDto): Promise<ArticleSummary[]> {
-    return this.knowledgeBaseService.listArticles(query.search, query.locale);
+  list(@Query() query: ListArticlesQueryDto): Promise<Paginated<ArticleSummary>> {
+    return this.knowledgeBaseService.listArticles(query);
   }
 
   @Get(":id")
   @RequirePermissions("kb:read")
-  getOne(
-    @Param("id") id: string,
-    @Query() query: LocaleQueryDto,
-  ): Promise<ArticleSummary> {
+  getOne(@Param("id") id: string, @Query() query: LocaleQueryDto): Promise<ArticleSummary> {
     return this.knowledgeBaseService.getArticle(id, query.locale);
   }
 

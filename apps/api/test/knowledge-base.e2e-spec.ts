@@ -79,7 +79,11 @@ describe("Knowledge Base (e2e)", () => {
     const response = await request(app.getHttpServer())
       .post("/api/v1/knowledge-base/articles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ title: "How to reset a password", body: "Step-by-step instructions...", category: "account" })
+      .send({
+        title: "How to reset a password",
+        body: "Step-by-step instructions...",
+        category: "account",
+      })
       .expect(201);
 
     expect(response.body.status).toBe("DRAFT");
@@ -94,7 +98,8 @@ describe("Knowledge Base (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    const ids = response.body.map((article: { id: string }) => article.id);
+    // Story S-8c — the list returns a paginated envelope.
+    const ids = response.body.items.map((article: { id: string }) => article.id);
     expect(ids).toContain(articleId);
   });
 
@@ -105,7 +110,8 @@ describe("Knowledge Base (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
-    expect(response.body.length).toBeLessThanOrEqual(200);
+    expect(response.body.items.length).toBeLessThanOrEqual(response.body.pageSize);
+    expect(response.body.total).toBeGreaterThanOrEqual(response.body.items.length);
   });
 
   it("gets a single article", async () => {
@@ -277,21 +283,21 @@ describe("Knowledge Base (e2e)", () => {
       .query({ search: "RESET YOUR password" })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    expect(byTitle.body.map((article: { id: string }) => article.id)).toContain(articleId);
+    expect(byTitle.body.items.map((article: { id: string }) => article.id)).toContain(articleId);
 
     const byBody = await request(app.getHttpServer())
       .get("/api/v1/knowledge-base/articles")
       .query({ search: "step-by-step" })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    expect(byBody.body.map((article: { id: string }) => article.id)).toContain(articleId);
+    expect(byBody.body.items.map((article: { id: string }) => article.id)).toContain(articleId);
 
     const noMatch = await request(app.getHttpServer())
       .get("/api/v1/knowledge-base/articles")
       .query({ search: "no-such-article-content-xyz" })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
-    expect(noMatch.body).toEqual([]);
+    expect(noMatch.body.items).toEqual([]);
   });
 
   // Story 102 — Full-Text Search. Dedicated fixture articles (not the
@@ -359,7 +365,7 @@ describe("Knowledge Base (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      expect(response.body.map((a: { id: string }) => a.id)).toContain(stemFixtureId);
+      expect(response.body.items.map((a: { id: string }) => a.id)).toContain(stemFixtureId);
     });
 
     it("requires every word to match (AND semantics)", async () => {
@@ -368,14 +374,14 @@ describe("Knowledge Base (e2e)", () => {
         .query({ search: `${marker} alpha bravo` })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      expect(bothWords.body.map((a: { id: string }) => a.id)).toContain(multiWordFixtureId);
+      expect(bothWords.body.items.map((a: { id: string }) => a.id)).toContain(multiWordFixtureId);
 
       const oneMissingWord = await request(app.getHttpServer())
         .get("/api/v1/knowledge-base/articles")
         .query({ search: `${marker} alpha nonexistentwordxyz` })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
-      expect(oneMissingWord.body.map((a: { id: string }) => a.id)).not.toContain(
+      expect(oneMissingWord.body.items.map((a: { id: string }) => a.id)).not.toContain(
         multiWordFixtureId,
       );
     });
@@ -387,7 +393,7 @@ describe("Knowledge Base (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      const ids = response.body.map((a: { id: string }) => a.id);
+      const ids = response.body.items.map((a: { id: string }) => a.id);
       expect(ids).toEqual([highRelevanceId, lowRelevanceId]);
     });
   });
@@ -558,5 +564,129 @@ describe("Knowledge Base (e2e)", () => {
       .get(`/api/v1/knowledge-base/articles/${articleId}/versions`)
       .set("Authorization", `Bearer ${agentAccessToken}`)
       .expect(200);
+  });
+
+  /**
+   * Story S-8c — paging `GET /knowledge-base/articles`.
+   *
+   * The article library is shared across this suite's own fixtures and
+   * whatever has accumulated, so every assertion is relative to the
+   * endpoint's own reported `total` rather than a fixed row count.
+   */
+  describe("pagination (Story S-8c)", () => {
+    function get(query: Record<string, unknown> = {}) {
+      return request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query(query)
+        .set("Authorization", `Bearer ${adminAccessToken}`);
+    }
+
+    it("defaults to page 1 at a page size of 25", async () => {
+      const response = await get().expect(200);
+
+      expect(response.body.page).toBe(1);
+      expect(response.body.pageSize).toBe(25);
+      expect(response.body.items.length).toBeLessThanOrEqual(25);
+      expect(response.body.totalPages).toBe(Math.max(1, Math.ceil(response.body.total / 25)));
+    });
+
+    it("echoes back an explicit page and pageSize", async () => {
+      const response = await get({ page: 2, pageSize: 5 }).expect(200);
+
+      expect(response.body.page).toBe(2);
+      expect(response.body.pageSize).toBe(5);
+      expect(response.body.items.length).toBeLessThanOrEqual(5);
+    });
+
+    it("returns a non-overlapping second page", async () => {
+      const first = await get({ page: 1, pageSize: 1 }).expect(200);
+      if (first.body.total <= 1) {
+        expect(first.body.totalPages).toBe(1);
+        return;
+      }
+
+      const second = await get({ page: 2, pageSize: 1 }).expect(200);
+      const firstIds = first.body.items.map((a: { id: string }) => a.id);
+      const secondIds = second.body.items.map((a: { id: string }) => a.id);
+      for (const id of secondIds) {
+        expect(firstIds).not.toContain(id);
+      }
+    });
+
+    it("returns the last page with at least one row", async () => {
+      const first = await get({ pageSize: 2 }).expect(200);
+      const last = await get({ page: first.body.totalPages, pageSize: 2 }).expect(200);
+
+      expect(last.body.page).toBe(first.body.totalPages);
+      expect(last.body.items.length).toBeGreaterThan(0);
+    });
+
+    it("returns 200 with an empty page past the end, keeping the metadata accurate", async () => {
+      const first = await get({ pageSize: 5 }).expect(200);
+      const beyond = await get({ page: first.body.totalPages + 50, pageSize: 5 }).expect(200);
+
+      expect(beyond.body.items).toEqual([]);
+      expect(beyond.body.page).toBe(first.body.totalPages + 50);
+      expect(beyond.body.total).toBe(first.body.total);
+      expect(beyond.body.totalPages).toBe(first.body.totalPages);
+    });
+
+    it("does not repeat a row across pages", async () => {
+      const size = 3;
+      const pages = await Promise.all([
+        get({ page: 1, pageSize: size }).expect(200),
+        get({ page: 2, pageSize: size }).expect(200),
+      ]);
+
+      const ids = pages.flatMap((p) => p.body.items.map((a: { id: string }) => a.id));
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("pages a full-text search, counting only the matches", async () => {
+      const all = await get({ pageSize: 1 }).expect(200);
+      const searched = await get({ search: "password", pageSize: 1 }).expect(200);
+
+      expect(searched.body.total).toBeLessThanOrEqual(all.body.total);
+      expect(searched.body.items.length).toBeLessThanOrEqual(1);
+      expect(searched.body.totalPages).toBe(Math.max(1, Math.ceil(searched.body.total / 1)));
+    });
+
+    it("keeps the locale resolution working on a paged response", async () => {
+      const response = await get({ pageSize: 5, locale: "AR" }).expect(200);
+
+      expect(response.body.pageSize).toBe(5);
+      expect(Array.isArray(response.body.items)).toBe(true);
+    });
+
+    it("returns an accurate empty envelope for a search that matches nothing", async () => {
+      const response = await get({ search: `no-such-article-${randomUUID()}` }).expect(200);
+
+      expect(response.body.items).toEqual([]);
+      expect(response.body.total).toBe(0);
+      expect(response.body.totalPages).toBe(1);
+      expect(response.body.page).toBe(1);
+    });
+
+    it("accepts the maximum page size", async () => {
+      const response = await get({ pageSize: 100 }).expect(200);
+
+      expect(response.body.pageSize).toBe(100);
+    });
+
+    it("rejects an invalid page or pageSize with 400", async () => {
+      await get({ pageSize: 101 }).expect(400);
+      await get({ pageSize: 0 }).expect(400);
+      await get({ pageSize: "abc" }).expect(400);
+      await get({ page: 0 }).expect(400);
+      await get({ page: -1 }).expect(400);
+      await get({ page: "abc" }).expect(400);
+    });
+
+    it("still requires authentication on a paginated request", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ page: 2 })
+        .expect(401);
+    });
   });
 });

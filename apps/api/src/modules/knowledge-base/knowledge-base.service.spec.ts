@@ -7,6 +7,7 @@ import type { TenantContext } from "../../common/tenant/tenant-context";
 function buildPrismaMock() {
   const prisma: {
     knowledgeBaseArticle: {
+      count: ReturnType<typeof vi.fn>;
       create: ReturnType<typeof vi.fn>;
       findMany: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
@@ -25,6 +26,8 @@ function buildPrismaMock() {
     $transaction: ReturnType<typeof vi.fn>;
   } = {
     knowledgeBaseArticle: {
+      // Story S-8c — `paginate` issues this alongside `findMany`.
+      count: vi.fn().mockResolvedValue(0),
       create: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -148,8 +151,9 @@ describe("KnowledgeBaseService", () => {
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { updatedAt: "desc" },
-        take: 200,
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
       });
     });
 
@@ -158,17 +162,17 @@ describe("KnowledgeBaseService", () => {
 
       const result = await service.listArticles();
 
-      expect(result).toEqual([]);
+      expect(result.items).toEqual([]);
     });
 
     // Story 106 — Bounded Result Caps.
-    it("caps every plain-path query at 200 rows, unconditionally", async () => {
+    it("pages the plain-path query, defaulting to 25 rows from the first page", async () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
 
       await service.listArticles();
 
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 200 }),
+        expect.objectContaining({ skip: 0, take: 25 }),
       );
     });
 
@@ -176,15 +180,17 @@ describe("KnowledgeBaseService", () => {
     it("matches via $queryRaw full-text search when search is given, bypassing findMany", async () => {
       prisma.$queryRaw.mockResolvedValue([]);
 
-      await service.listArticles("password");
+      await service.listArticles({ search: "password" });
 
       expect(prisma.knowledgeBaseArticle.findMany).not.toHaveBeenCalled();
-      expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+      // Story S-8c — two now: the page of rows, then its count.
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
       const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [
         TemplateStringsArray,
         ...unknown[],
       ];
-      expect(values).toEqual(["branch-1", "password", "password", 200]);
+      // Story S-8c — LIMIT/OFFSET replace the old fixed cap.
+      expect(values).toEqual(["branch-1", "password", "password", 25, 0]);
       expect(strings.join("")).toContain("websearch_to_tsquery");
       expect(strings.join("")).not.toContain("'PUBLISHED'");
       expect(strings.join("")).toContain("LIMIT");
@@ -193,33 +199,35 @@ describe("KnowledgeBaseService", () => {
     it("maps raw $queryRaw rows through the same shape as the plain-list path", async () => {
       prisma.$queryRaw.mockResolvedValue([baseArticleRow]);
 
-      const result = await service.listArticles("password");
+      const result = await service.listArticles({ search: "password" });
 
-      expect(result).toEqual([baseArticleRow]);
+      expect(result.items).toEqual([baseArticleRow]);
     });
 
     it("treats a whitespace-only search as no search at all", async () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
 
-      await service.listArticles("   ");
+      await service.listArticles({ search: "   " });
 
       expect(prisma.$queryRaw).not.toHaveBeenCalled();
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { updatedAt: "desc" },
-        take: 200,
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
       });
     });
 
     it("behaves identically to the no-arg call when search is an empty string", async () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
 
-      await service.listArticles("");
+      await service.listArticles({ search: "" });
 
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
-        orderBy: { updatedAt: "desc" },
-        take: 200,
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
       });
     });
 
@@ -227,15 +235,21 @@ describe("KnowledgeBaseService", () => {
     it("resolves each article's AR title/body when a matching translation exists", async () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([baseArticleRow]);
       prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([
-        { id: "t1", articleId: "article-1", locale: "AR", title: "كيفية إعادة تعيين كلمة المرور", body: "تعليمات..." },
+        {
+          id: "t1",
+          articleId: "article-1",
+          locale: "AR",
+          title: "كيفية إعادة تعيين كلمة المرور",
+          body: "تعليمات...",
+        },
       ]);
 
-      const result = await service.listArticles(undefined, "AR" as never);
+      const result = await service.listArticles({ locale: "AR" as never });
 
       expect(prisma.knowledgeBaseArticleTranslation.findMany).toHaveBeenCalledWith({
         where: { articleId: { in: ["article-1"] }, locale: "AR" },
       });
-      expect(result).toEqual([
+      expect(result.items).toEqual([
         { ...baseArticleRow, title: "كيفية إعادة تعيين كلمة المرور", body: "تعليمات..." },
       ]);
     });
@@ -244,9 +258,9 @@ describe("KnowledgeBaseService", () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([baseArticleRow]);
       prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
 
-      const result = await service.listArticles(undefined, "AR" as never);
+      const result = await service.listArticles({ locale: "AR" as never });
 
-      expect(result).toEqual([baseArticleRow]);
+      expect(result.items).toEqual([baseArticleRow]);
     });
 
     it("never queries translations when locale is omitted", async () => {
@@ -255,7 +269,7 @@ describe("KnowledgeBaseService", () => {
       const result = await service.listArticles();
 
       expect(prisma.knowledgeBaseArticleTranslation.findMany).not.toHaveBeenCalled();
-      expect(result).toEqual([baseArticleRow]);
+      expect(result.items).toEqual([baseArticleRow]);
     });
   });
 
@@ -282,12 +296,22 @@ describe("KnowledgeBaseService", () => {
     it("resolves the AR title/body when a matching translation exists", async () => {
       prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
       prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([
-        { id: "t1", articleId: "article-1", locale: "AR", title: "العنوان بالعربية", body: "النص بالعربية" },
+        {
+          id: "t1",
+          articleId: "article-1",
+          locale: "AR",
+          title: "العنوان بالعربية",
+          body: "النص بالعربية",
+        },
       ]);
 
       const result = await service.getArticle("article-1", "AR" as never);
 
-      expect(result).toEqual({ ...baseArticleRow, title: "العنوان بالعربية", body: "النص بالعربية" });
+      expect(result).toEqual({
+        ...baseArticleRow,
+        title: "العنوان بالعربية",
+        body: "النص بالعربية",
+      });
     });
 
     it("falls back to the base title/body when no AR translation exists", async () => {
@@ -386,7 +410,11 @@ describe("KnowledgeBaseService", () => {
       });
       expect(prisma.knowledgeBaseArticle.update).toHaveBeenCalledWith({
         where: { id: "article-1" },
-        data: { title: "How to reset your password", status: "PUBLISHED", publishedAt: expect.any(Date) },
+        data: {
+          title: "How to reset your password",
+          status: "PUBLISHED",
+          publishedAt: expect.any(Date),
+        },
       });
     });
 
@@ -497,8 +525,9 @@ describe("KnowledgeBaseService", () => {
 
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", status: "PUBLISHED" },
-        orderBy: { publishedAt: "desc" },
-        take: 200,
+        orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
       });
     });
 
@@ -507,17 +536,17 @@ describe("KnowledgeBaseService", () => {
 
       const result = await service.listPublishedArticlesForBranch("branch-1");
 
-      expect(result).toEqual([]);
+      expect(result.items).toEqual([]);
     });
 
     // Story 106 — Bounded Result Caps.
-    it("caps every plain-path query at 200 rows, unconditionally", async () => {
+    it("pages the plain-path query, defaulting to 25 rows from the first page", async () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
 
       await service.listPublishedArticlesForBranch("branch-1");
 
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 200 }),
+        expect.objectContaining({ skip: 0, take: 25 }),
       );
     });
 
@@ -525,15 +554,17 @@ describe("KnowledgeBaseService", () => {
     it("matches via $queryRaw full-text search, restricted to PUBLISHED, when search is given", async () => {
       prisma.$queryRaw.mockResolvedValue([]);
 
-      await service.listPublishedArticlesForBranch("branch-1", "password");
+      await service.listPublishedArticlesForBranch("branch-1", { search: "password" });
 
       expect(prisma.knowledgeBaseArticle.findMany).not.toHaveBeenCalled();
-      expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+      // Story S-8c — two now: the page of rows, then its count.
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
       const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [
         TemplateStringsArray,
         ...unknown[],
       ];
-      expect(values).toEqual(["branch-1", "password", "password", 200]);
+      // Story S-8c — LIMIT/OFFSET replace the old fixed cap.
+      expect(values).toEqual(["branch-1", "password", "password", 25, 0]);
       expect(strings.join("")).toContain("websearch_to_tsquery");
       expect(strings.join("")).toContain("'PUBLISHED'");
       expect(strings.join("")).toContain("LIMIT");
@@ -542,25 +573,27 @@ describe("KnowledgeBaseService", () => {
     it("treats a whitespace-only search as no search at all", async () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
 
-      await service.listPublishedArticlesForBranch("branch-1", "   ");
+      await service.listPublishedArticlesForBranch("branch-1", { search: "   " });
 
       expect(prisma.$queryRaw).not.toHaveBeenCalled();
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", status: "PUBLISHED" },
-        orderBy: { publishedAt: "desc" },
-        take: 200,
+        orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
       });
     });
 
     it("behaves identically to the no-search call when search is an empty string", async () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
 
-      await service.listPublishedArticlesForBranch("branch-1", "");
+      await service.listPublishedArticlesForBranch("branch-1", { search: "" });
 
       expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1", status: "PUBLISHED" },
-        orderBy: { publishedAt: "desc" },
-        take: 200,
+        orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
       });
     });
 
@@ -571,18 +604,22 @@ describe("KnowledgeBaseService", () => {
         { id: "t1", articleId: publishedArticleRow.id, locale: "AR", title: "عنوان", body: "نص" },
       ]);
 
-      const result = await service.listPublishedArticlesForBranch("branch-1", undefined, "AR" as never);
+      const result = await service.listPublishedArticlesForBranch("branch-1", {
+        locale: "AR" as never,
+      });
 
-      expect(result).toEqual([{ ...publishedArticleRow, title: "عنوان", body: "نص" }]);
+      expect(result.items).toEqual([{ ...publishedArticleRow, title: "عنوان", body: "نص" }]);
     });
 
     it("falls back to the base title/body when no translation exists for the requested locale", async () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([publishedArticleRow]);
       prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
 
-      const result = await service.listPublishedArticlesForBranch("branch-1", undefined, "AR" as never);
+      const result = await service.listPublishedArticlesForBranch("branch-1", {
+        locale: "AR" as never,
+      });
 
-      expect(result).toEqual([publishedArticleRow]);
+      expect(result.items).toEqual([publishedArticleRow]);
     });
   });
 
@@ -728,6 +765,111 @@ describe("KnowledgeBaseService", () => {
       const result = await service.listArticleTranslations("article-1");
 
       expect(result).toEqual([]);
+    });
+  });
+
+  /**
+   * Story S-8c — the two list endpoints page, and both branches of each
+   * (plain listing and `ts_rank` full-text search) return the same
+   * envelope, so a caller cannot tell from the shape which path ran.
+   */
+  describe("pagination (Story S-8c)", () => {
+    it("translates a page number into the right offset on the plain path", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listArticles({ page: 3, pageSize: 10 });
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 10 }),
+      );
+    });
+
+    it("reports the total and page count from a single count query", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+      prisma.knowledgeBaseArticle.count.mockResolvedValue(57);
+
+      const result = await service.listArticles({ page: 2, pageSize: 25 });
+
+      expect(prisma.knowledgeBaseArticle.count).toHaveBeenCalledOnce();
+      expect(result).toMatchObject({ total: 57, page: 2, pageSize: 25, totalPages: 3 });
+    });
+
+    it("counts over exactly the same where clause it fetches with", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listArticles();
+
+      const countWhere = prisma.knowledgeBaseArticle.count.mock.calls[0]![0]!.where;
+      const findWhere = prisma.knowledgeBaseArticle.findMany.mock.calls[0]![0]!.where;
+      expect(countWhere).toEqual({ branchId: "branch-1" });
+      // Not merely equal by value - literally the same object.
+      expect(countWhere).toBe(findWhere);
+    });
+
+    it("keeps the PUBLISHED half of the portal scope in the count", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listPublishedArticlesForBranch("branch-1");
+
+      // A portal reader must not learn a draft exists, including through
+      // `total`.
+      expect(prisma.knowledgeBaseArticle.count).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", status: "PUBLISHED" },
+      });
+    });
+
+    it("returns an empty page past the end without losing the metadata", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+      prisma.knowledgeBaseArticle.count.mockResolvedValue(30);
+
+      const result = await service.listArticles({ page: 99, pageSize: 10 });
+
+      expect(result.items).toEqual([]);
+      expect(result).toMatchObject({ total: 30, page: 99, totalPages: 3 });
+    });
+
+    it("pages the full-text search path with LIMIT/OFFSET and its own count", async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 42 }]);
+
+      const result = await service.listArticles({ search: "password", page: 3, pageSize: 5 });
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+      const [, ...rowValues] = prisma.$queryRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...unknown[],
+      ];
+      expect(rowValues).toEqual(["branch-1", "password", "password", 5, 10]);
+      expect(result).toMatchObject({ total: 42, page: 3, pageSize: 5, totalPages: 9 });
+    });
+
+    it("tiebreaks the ts_rank ordering by id", async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+
+      await service.listArticles({ search: "password" });
+
+      // `ts_rank` ties constantly - two articles matching the same single
+      // term usually score identically - so without this a paged search
+      // would repeat and drop rows almost every time.
+      const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+      expect(strings.join("")).toContain("id DESC");
+      expect(strings.join("")).toContain("OFFSET");
+    });
+
+    it("counts the search over the same predicate it fetches with", async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ count: 0 }]);
+
+      await service.listPublishedArticlesForBranch("branch-1", { search: "password" });
+
+      const [rowStrings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+      const [countStrings, ...countValues] = prisma.$queryRaw.mock.calls[1] as [
+        TemplateStringsArray,
+        ...unknown[],
+      ];
+      // Both restricted to PUBLISHED, both against the same branch/term.
+      expect(rowStrings.join("")).toContain("'PUBLISHED'");
+      expect(countStrings.join("")).toContain("'PUBLISHED'");
+      expect(countStrings.join("")).toContain("COUNT(*)");
+      expect(countValues).toEqual(["branch-1", "password"]);
     });
   });
 });

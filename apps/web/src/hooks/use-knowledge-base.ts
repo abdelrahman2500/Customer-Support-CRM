@@ -20,16 +20,27 @@ import { preservePreviousResults } from "@/lib/list-query";
  * matches every search variant (same partial-match convention `use-tickets.ts`
  * relies on for `["tickets"]`).
  */
-export const articlesQueryKey = (search?: string) =>
-  ["knowledge-base-articles", search ?? ""] as const;
+/**
+ * Story S-8c — the key carries the page alongside the search term, so a
+ * page change is a new query exactly like a keystroke is, and inherits
+ * Story S-7's row preservation.
+ *
+ * `page` is appended rather than folded into the existing element so the
+ * key's shape stays greppable, and so mutations that invalidate the bare
+ * `["knowledge-base-articles"]` prefix keep matching every page - which is
+ * how publishing an article still refreshes the list.
+ */
+export const articlesQueryKey = (search?: string, page?: number) =>
+  ["knowledge-base-articles", search ?? "", page ?? 1] as const;
 export const articleQueryKey = (id: string) => ["knowledge-base-articles", id] as const;
 
-export function useArticlesQuery(search?: string) {
+export function useArticlesQuery(search?: string, page?: number) {
   return useQuery({
-    queryKey: articlesQueryKey(search),
-    queryFn: () => listArticles(search),
-    // Story S-7 — `search` is the key, so typing is a new query. Keep the
-    // previous results visible while the new ones load.
+    queryKey: articlesQueryKey(search, page),
+    queryFn: () => listArticles({ search, page }),
+    // Story S-7 — `search` is the key, so typing is a new query, and since
+    // Story S-8c so is a page change. Keep the previous results visible
+    // while the new ones load.
     ...preservePreviousResults,
   });
 }

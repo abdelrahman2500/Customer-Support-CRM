@@ -91,7 +91,11 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
     const publishedArticle = await request(app.getHttpServer())
       .post("/api/v1/knowledge-base/articles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ title: "How to reset your password", body: "Step-by-step instructions...", category: "account" })
+      .send({
+        title: "How to reset your password",
+        body: "Step-by-step instructions...",
+        category: "account",
+      })
       .expect(201);
     publishedArticleId = publishedArticle.body.id;
     await request(app.getHttpServer())
@@ -125,7 +129,8 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
       .set("Authorization", `Bearer ${portalAccessToken}`)
       .expect(200);
 
-    const ids = response.body.map((article: { id: string }) => article.id);
+    // Story S-8c — the list returns a paginated envelope.
+    const ids = response.body.items.map((article: { id: string }) => article.id);
     expect(ids).toContain(publishedArticleId);
     expect(ids).not.toContain(draftArticleId);
   });
@@ -165,7 +170,7 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
       .query({ search: "RESET YOUR password" })
       .set("Authorization", `Bearer ${portalAccessToken}`)
       .expect(200);
-    const byTitleIds = byTitle.body.map((article: { id: string }) => article.id);
+    const byTitleIds = byTitle.body.items.map((article: { id: string }) => article.id);
     expect(byTitleIds).toContain(publishedArticleId);
     expect(byTitleIds).not.toContain(draftArticleId);
 
@@ -174,14 +179,14 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
       .query({ search: "Draft-only" })
       .set("Authorization", `Bearer ${portalAccessToken}`)
       .expect(200);
-    expect(byDraftTitle.body).toEqual([]);
+    expect(byDraftTitle.body.items).toEqual([]);
 
     const noMatch = await request(app.getHttpServer())
       .get("/api/v1/portal/knowledge-base/articles")
       .query({ search: "no-such-article-content-xyz" })
       .set("Authorization", `Bearer ${portalAccessToken}`)
       .expect(200);
-    expect(noMatch.body).toEqual([]);
+    expect(noMatch.body.items).toEqual([]);
   });
 
   // Story 109 — Multi-locale content. A dedicated published article, not
@@ -204,7 +209,10 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
       await request(app.getHttpServer())
         .put(`/api/v1/knowledge-base/articles/${localizedArticleId}/translations/AR`)
         .set("Authorization", `Bearer ${adminAccessToken}`)
-        .send({ title: "كيفية التواصل مع الدعم", body: "اتصل بنا أو راسلنا عبر البريد الإلكتروني." })
+        .send({
+          title: "كيفية التواصل مع الدعم",
+          body: "اتصل بنا أو راسلنا عبر البريد الإلكتروني.",
+        })
         .expect(200);
     });
 
@@ -235,7 +243,7 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
         .set("Authorization", `Bearer ${portalAccessToken}`)
         .expect(200);
 
-      const found = response.body.find(
+      const found = response.body.items.find(
         (article: { id: string }) => article.id === localizedArticleId,
       );
       expect(found).toMatchObject({ title: "كيفية التواصل مع الدعم" });
@@ -268,7 +276,82 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
       .get("/api/v1/portal/knowledge-base/articles")
       .set("Authorization", `Bearer ${portalAccessToken}`)
       .expect(200);
-    const ids = response.body.map((article: { id: string }) => article.id);
+    // Story S-8c — the list returns a paginated envelope.
+    const ids = response.body.items.map((article: { id: string }) => article.id);
     expect(ids).not.toContain(publishedArticleId);
+  });
+
+  /**
+   * Story S-8c — paging `GET /portal/knowledge-base/articles`.
+   *
+   * The isolation that matters here is `status: PUBLISHED`: a portal reader
+   * must not learn a draft exists, and `total` is as capable of disclosing
+   * that as `items` is.
+   */
+  describe("pagination (Story S-8c)", () => {
+    function get(query: Record<string, unknown> = {}) {
+      return request(app.getHttpServer())
+        .get("/api/v1/portal/knowledge-base/articles")
+        .query(query)
+        .set("Authorization", `Bearer ${portalAccessToken}`);
+    }
+
+    it("defaults to page 1 at a page size of 25", async () => {
+      const response = await get().expect(200);
+
+      expect(response.body.page).toBe(1);
+      expect(response.body.pageSize).toBe(25);
+      expect(response.body.totalPages).toBe(Math.max(1, Math.ceil(response.body.total / 25)));
+    });
+
+    it("never counts a draft in the total", async () => {
+      const response = await get({ pageSize: 100 }).expect(200);
+
+      // Every returned row is published...
+      for (const article of response.body.items) {
+        expect(article.status).toBe("PUBLISHED");
+      }
+      // ...and the total agrees, rather than counting the drafts the
+      // fixtures created alongside them.
+      expect(response.body.total).toBe(response.body.items.length);
+    });
+
+    it("returns 200 with an empty page past the end", async () => {
+      const first = await get({ pageSize: 1 }).expect(200);
+      const beyond = await get({ page: first.body.totalPages + 20, pageSize: 1 }).expect(200);
+
+      expect(beyond.body.items).toEqual([]);
+      expect(beyond.body.total).toBe(first.body.total);
+    });
+
+    it("pages a search without surfacing a draft", async () => {
+      const response = await get({ search: "support", pageSize: 5 }).expect(200);
+
+      for (const article of response.body.items) {
+        expect(article.status).toBe("PUBLISHED");
+      }
+      expect(response.body.pageSize).toBe(5);
+    });
+
+    it("keeps locale resolution working on a paged response", async () => {
+      const response = await get({ locale: "AR", pageSize: 5 }).expect(200);
+
+      expect(response.body.pageSize).toBe(5);
+      expect(Array.isArray(response.body.items)).toBe(true);
+    });
+
+    it("rejects an invalid page or pageSize with 400", async () => {
+      await get({ pageSize: 101 }).expect(400);
+      await get({ pageSize: 0 }).expect(400);
+      await get({ page: 0 }).expect(400);
+      await get({ page: "abc" }).expect(400);
+    });
+
+    it("still requires a portal session on a paginated request", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/portal/knowledge-base/articles")
+        .query({ page: 2 })
+        .expect(401);
+    });
   });
 });

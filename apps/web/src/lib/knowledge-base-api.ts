@@ -1,4 +1,5 @@
 import { apiFetch } from "./api";
+import type { PaginatedResponse } from "./paginated";
 
 /**
  * Story 51 — Knowledge Base Foundation. A dedicated API client file (plan
@@ -40,17 +41,35 @@ export interface UpdateArticleInput {
 /** Story 64 — Article Search. Mirrors `tickets-api.ts`'s own
  * `toQueryString` convention: an omitted/empty `search` produces the exact
  * same request every existing caller already sends. */
-function toQueryString(search: string | undefined): string {
+/**
+ * Story S-8c — the article list's request parameters. `search` keeps its
+ * Story 64 semantics exactly; `page`/`pageSize` are new and optional, so
+ * omitting them reproduces the pre-S-8c request apart from the page bound
+ * the API now applies by default.
+ */
+export interface ArticleFilters {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+function toQueryString(filters: ArticleFilters): string {
   const params = new URLSearchParams();
-  if (search !== undefined && search !== "") {
-    params.set("search", search);
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") {
+      params.set(key, String(value));
+    }
   }
   const query = params.toString();
   return query ? `?${query}` : "";
 }
 
-export function listArticles(search?: string): Promise<ArticleSummary[]> {
-  return apiFetch<ArticleSummary[]>(`/knowledge-base/articles${toQueryString(search)}`);
+export function listArticles(
+  filters: ArticleFilters = {},
+): Promise<PaginatedResponse<ArticleSummary>> {
+  return apiFetch<PaginatedResponse<ArticleSummary>>(
+    `/knowledge-base/articles${toQueryString(filters)}`,
+  );
 }
 
 export function getArticle(id: string): Promise<ArticleSummary> {

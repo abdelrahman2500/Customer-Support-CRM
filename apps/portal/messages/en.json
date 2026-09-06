@@ -3,6 +3,12 @@
     "appName": "Customer Portal",
     "loading": "Loading...",
     "updating": "Updating…",
+    "pagination": {
+      "label": "Pagination",
+      "previous": "Previous page",
+      "next": "Next page",
+      "indicator": "Page {page} of {totalPages}"
+    },
     "cancel": "Cancel",
     "working": "Working...",
     "dismiss": "Dismiss",

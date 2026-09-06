@@ -5,6 +5,7 @@ import type { JwtAccessTokenClaims } from "@crm/shared";
 import { PortalRoute } from "../../common/auth/portal-route.decorator";
 import { ListArticlesQueryDto } from "../knowledge-base/dto/list-articles-query.dto";
 import { LocaleQueryDto } from "../knowledge-base/dto/locale-query.dto";
+import type { Paginated } from "../../common/pagination/paginated";
 import { KnowledgeBaseService } from "../knowledge-base/knowledge-base.service";
 import type { ArticleSummary } from "../knowledge-base/knowledge-base.service";
 
@@ -28,11 +29,10 @@ export class PortalKnowledgeBaseController {
   list(
     @Req() request: Request,
     @Query() query: ListArticlesQueryDto,
-  ): Promise<ArticleSummary[]> {
+  ): Promise<Paginated<ArticleSummary>> {
     return this.knowledgeBaseService.listPublishedArticlesForBranch(
       this.requireBranchId(request),
-      query.search,
-      query.locale,
+      query,
     );
   }
 

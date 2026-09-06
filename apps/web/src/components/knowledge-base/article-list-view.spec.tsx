@@ -52,6 +52,23 @@ function mutationResult(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * Story S-8c — `GET /knowledge-base/articles` returns a
+ * `Paginated<ArticleSummary>` envelope, so the query's `data` is no longer
+ * a bare array. Defaults to one full page so the existing tests read as
+ * they did before.
+ */
+function page(items: unknown[], overrides: Record<string, unknown> = {}) {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    pageSize: 25,
+    totalPages: 1,
+    ...overrides,
+  };
+}
+
 const baseArticle = {
   id: "article-1",
   branchId: "branch-1",
@@ -90,7 +107,9 @@ describe("ArticleListView", () => {
   });
 
   it("shows the empty state with a prominent create action when the query succeeds with zero articles", () => {
-    mockedUseArticlesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseArticlesQuery.mockReturnValue(
+      queryResult({ data: page([]), isSuccess: true }) as never,
+    );
 
     render(<ArticleListView />);
 
@@ -99,7 +118,9 @@ describe("ArticleListView", () => {
   });
 
   it("links every create affordance to the create route", () => {
-    mockedUseArticlesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseArticlesQuery.mockReturnValue(
+      queryResult({ data: page([]), isSuccess: true }) as never,
+    );
 
     render(<ArticleListView />);
 
@@ -114,7 +135,7 @@ describe("ArticleListView", () => {
 
   it("renders a row per article once the query succeeds", () => {
     mockedUseArticlesQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseArticle] }) as never,
+      queryResult({ isSuccess: true, data: page([baseArticle]) }) as never,
     );
 
     render(<ArticleListView />);
@@ -127,7 +148,7 @@ describe("ArticleListView", () => {
 
   it("navigates to the detail route when an article title is clicked", () => {
     mockedUseArticlesQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseArticle] }) as never,
+      queryResult({ isSuccess: true, data: page([baseArticle]) }) as never,
     );
 
     render(<ArticleListView />);
@@ -140,7 +161,7 @@ describe("ArticleListView", () => {
 
   it("falls back to the placeholder label for an unscoped category", () => {
     mockedUseArticlesQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [{ ...baseArticle, category: null }] }) as never,
+      queryResult({ isSuccess: true, data: page([{ ...baseArticle, category: null }]) }) as never,
     );
 
     render(<ArticleListView />);
@@ -151,7 +172,7 @@ describe("ArticleListView", () => {
   it("publishes a draft article via the publish button", () => {
     const mutate = vi.fn();
     mockedUseArticlesQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseArticle] }) as never,
+      queryResult({ isSuccess: true, data: page([baseArticle]) }) as never,
     );
     mockedUseUpdateArticleMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
@@ -166,7 +187,9 @@ describe("ArticleListView", () => {
     mockedUseArticlesQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ ...baseArticle, status: "PUBLISHED", publishedAt: "2026-01-02T00:00:00.000Z" }],
+        data: page([
+          { ...baseArticle, status: "PUBLISHED", publishedAt: "2026-01-02T00:00:00.000Z" },
+        ]),
       }) as never,
     );
     mockedUseUpdateArticleMutation.mockReturnValue(mutationResult({ mutate }) as never);
@@ -183,7 +206,9 @@ describe("ArticleListView", () => {
     mockedUseArticlesQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ ...baseArticle, status: "PUBLISHED", publishedAt: "2026-01-02T00:00:00.000Z" }],
+        data: page([
+          { ...baseArticle, status: "PUBLISHED", publishedAt: "2026-01-02T00:00:00.000Z" },
+        ]),
       }) as never,
     );
     mockedUseUpdateArticleMutation.mockReturnValue(mutationResult({ mutate }) as never);
@@ -201,7 +226,7 @@ describe("ArticleListView", () => {
 
   it("renders an inline permission error when a mutation is rejected with 403", () => {
     mockedUseArticlesQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseArticle] }) as never,
+      queryResult({ isSuccess: true, data: page([baseArticle]) }) as never,
     );
     mockedUseUpdateArticleMutation.mockReturnValue(
       mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
@@ -214,7 +239,7 @@ describe("ArticleListView", () => {
 
   it("renders a generic action-failed message for a non-403 mutation error", () => {
     mockedUseArticlesQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseArticle] }) as never,
+      queryResult({ isSuccess: true, data: page([baseArticle]) }) as never,
     );
     mockedUseUpdateArticleMutation.mockReturnValue(
       mutationResult({ isError: true, error: new ApiError("Server error", 500) }) as never,
@@ -228,7 +253,7 @@ describe("ArticleListView", () => {
   // Story 64 — Article Search.
   it("passes the typed search text through to useArticlesQuery", () => {
     mockedUseArticlesQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseArticle] }) as never,
+      queryResult({ isSuccess: true, data: page([baseArticle]) }) as never,
     );
 
     render(<ArticleListView />);
@@ -236,11 +261,14 @@ describe("ArticleListView", () => {
       target: { value: "password" },
     });
 
-    expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("password");
+    // Story S-8c — the hook takes `(search, page)`; typing resets the page.
+    expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("password", undefined);
   });
 
   it("shows a distinct no-results state (not the create-prompting empty state) when a search yields nothing", () => {
-    mockedUseArticlesQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
+    mockedUseArticlesQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: page([]) }) as never,
+    );
 
     render(<ArticleListView />);
     fireEvent.change(screen.getByPlaceholderText("list.searchPlaceholder"), {
@@ -249,5 +277,158 @@ describe("ArticleListView", () => {
 
     expect(screen.getByText("list.noResults")).toBeInTheDocument();
     expect(screen.queryByText("list.empty")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Story S-8c — paging the article library. `page` joins `search` in the
+   * query key, so a page change inherits Story S-7's row preservation.
+   */
+  describe("pagination (Story S-8c)", () => {
+    const middlePage = { total: 60, page: 2, pageSize: 25, totalPages: 3 };
+
+    beforeEach(() => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([baseArticle], middlePage) }) as never,
+      );
+    });
+
+    it("renders no pager when the library fits on one page", () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([baseArticle]) }) as never,
+      );
+
+      render(<ArticleListView />);
+
+      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    });
+
+    it("renders the pager and page indicator once there is more than one page", () => {
+      render(<ArticleListView />);
+
+      expect(screen.getByRole("navigation", { name: "pagination.label" })).toBeInTheDocument();
+      expect(
+        screen.getByText('pagination.indicator:{"page":2,"totalPages":3}'),
+      ).toBeInTheDocument();
+    });
+
+    it("requests the next page, keeping the current search term", () => {
+      render(<ArticleListView />);
+
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "password" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
+
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("password", 3);
+    });
+
+    it("requests the previous page", () => {
+      render(<ArticleListView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "pagination.previous" }));
+
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("", 1);
+    });
+
+    it("disables previous on the first page", () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([baseArticle], { ...middlePage, page: 1 }),
+        }) as never,
+      );
+
+      render(<ArticleListView />);
+
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeEnabled();
+    });
+
+    it("disables next on the last page", () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([baseArticle], { ...middlePage, page: 3 }),
+        }) as never,
+      );
+
+      render(<ArticleListView />);
+
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeEnabled();
+    });
+
+    it("keeps the previous page's rows on screen while the next one loads", () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: page([baseArticle], middlePage),
+        }) as never,
+      );
+
+      const { container } = render(<ArticleListView />);
+
+      expect(screen.getByRole("table")).toBeInTheDocument();
+      expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+    });
+
+    it("shows a polite fetch indicator while a page change is in flight", () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: page([baseArticle], middlePage),
+        }) as never,
+      );
+
+      render(<ArticleListView />);
+
+      const status = screen.getByRole("status");
+      expect(status).toHaveTextContent("updating");
+      expect(status).toHaveAttribute("aria-live", "polite");
+    });
+
+    it("blocks both controls while a page change is in flight", () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          isPlaceholderData: true,
+          data: page([baseArticle], middlePage),
+        }) as never,
+      );
+
+      render(<ArticleListView />);
+
+      expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
+    });
+
+    it("resets to page 1 when the search term changes, in the same update", () => {
+      render(<ArticleListView />);
+
+      // Move off page 1 first, so the reset is observable.
+      fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("", 3);
+
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "reset" },
+      });
+
+      // `undefined` rather than 1: the same request, and it keeps the query
+      // key identical to a first visit.
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("reset", undefined);
+    });
+
+    it("still shows the empty state for a genuinely empty page", () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([], { total: 0, totalPages: 1 }) }) as never,
+      );
+
+      render(<ArticleListView />);
+
+      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    });
   });
 });

@@ -2,19 +2,14 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import type { KbLocale, KnowledgeBaseArticleStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
+import { paginate } from "../../common/pagination/paginate";
+import { DEFAULT_PAGE_SIZE } from "../../common/pagination/pagination-query.dto";
+import type { Paginated } from "../../common/pagination/paginated";
+import { totalPagesFor } from "../../common/pagination/paginated";
+import type { ListArticlesQueryDto } from "./dto/list-articles-query.dto";
 import type { CreateArticleDto } from "./dto/create-article.dto";
 import type { UpdateArticleDto } from "./dto/update-article.dto";
 import type { SetArticleTranslationDto } from "./dto/set-article-translation.dto";
-
-/** Story 106 — mirrors `AuditLogsService`'s own `MAX_AUDIT_LOG_ROWS`
- * precedent (Story 104): a KB article library is a "generous page for a
- * human reader" concern, not a per-interaction record like `Ticket`/
- * `Customer` — 200 mirrors that same rationale. `listArticles`/
- * `listPublishedArticlesForBranch` already order by a fixed, already-
- * `desc` timestamp with no user-configurable direction, so a plain
- * `take`/`LIMIT` is sufficient here — no fetch-desc-then-reverse fix
- * needed (unlike `Ticket`/`Customer`'s configurable `sortDir`). */
-const MAX_ARTICLE_ROWS = 200;
 
 export interface ArticleSummary {
   id: string;
@@ -116,18 +111,37 @@ export class KnowledgeBaseService {
     return toArticleSummary(article);
   }
 
-  async listArticles(search?: string, locale?: KbLocale): Promise<ArticleSummary[]> {
+  /**
+   * Story S-8c — `take: MAX_ARTICLE_ROWS` (200) replaced by real paging.
+   *
+   * Both branches return the same envelope, which is the point: a caller
+   * cannot tell from the response shape whether its `search` sent the
+   * request down the full-text path or the plain listing one, and a UI
+   * pager works identically either way.
+   */
+  async listArticles(query: ListArticlesQueryDto = {}): Promise<Paginated<ArticleSummary>> {
     const { branchId } = this.tenantContext.requireBranchScope();
-    if (search?.trim()) {
-      const results = await this.searchArticles(branchId, search.trim());
-      return this.applyLocale(results, locale);
+    const search = query.search?.trim();
+    if (search) {
+      return this.applyLocaleToPage(
+        await this.searchArticles(branchId, search, query),
+        query.locale,
+      );
     }
-    const articles = await this.prisma.knowledgeBaseArticle.findMany({
+    // `id` tiebreaks `updatedAt`, which is not unique: a bulk import or a
+    // batched publish writes several rows in the same millisecond, and
+    // paging on a non-unique key lets a row straddling a page boundary
+    // appear twice or vanish.
+    const page = await paginate(this.prisma.knowledgeBaseArticle, {
       where: { branchId },
-      orderBy: { updatedAt: "desc" },
-      take: MAX_ARTICLE_ROWS,
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      page: query.page,
+      pageSize: query.pageSize,
     });
-    return this.applyLocale(articles.map(toArticleSummary), locale);
+    return this.applyLocaleToPage(
+      { ...page, items: page.items.map(toArticleSummary) },
+      query.locale,
+    );
   }
 
   async getArticle(id: string, locale?: KbLocale): Promise<ArticleSummary> {
@@ -257,19 +271,29 @@ export class KnowledgeBaseService {
    * `status: PUBLISHED`, so `publishedAt` is never null here. */
   async listPublishedArticlesForBranch(
     branchId: string,
-    search?: string,
-    locale?: KbLocale,
-  ): Promise<ArticleSummary[]> {
-    if (search?.trim()) {
-      const results = await this.searchArticles(branchId, search.trim(), { publishedOnly: true });
-      return this.applyLocale(results, locale);
+    query: ListArticlesQueryDto = {},
+  ): Promise<Paginated<ArticleSummary>> {
+    const search = query.search?.trim();
+    if (search) {
+      return this.applyLocaleToPage(
+        await this.searchArticles(branchId, search, query, { publishedOnly: true }),
+        query.locale,
+      );
     }
-    const articles = await this.prisma.knowledgeBaseArticle.findMany({
+    // Story S-8c — the `status: PUBLISHED` half of the scope is as much a
+    // visibility rule as the branch is: a portal reader must never learn a
+    // draft exists, including through `total`. Passing one `where` to
+    // `paginate` is what guarantees the count and the page agree on it.
+    const page = await paginate(this.prisma.knowledgeBaseArticle, {
       where: { branchId, status: "PUBLISHED" },
-      orderBy: { publishedAt: "desc" },
-      take: MAX_ARTICLE_ROWS,
+      orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+      page: query.page,
+      pageSize: query.pageSize,
     });
-    return this.applyLocale(articles.map(toArticleSummary), locale);
+    return this.applyLocaleToPage(
+      { ...page, items: page.items.map(toArticleSummary) },
+      query.locale,
+    );
   }
 
   /** 404s identically for a draft article, one in a different branch, or an
@@ -332,10 +356,14 @@ export class KnowledgeBaseService {
     const translations = await this.prisma.knowledgeBaseArticleTranslation.findMany({
       where: { articleId: { in: articles.map((article) => article.id) }, locale },
     });
-    const byArticleId = new Map(translations.map((translation) => [translation.articleId, translation]));
+    const byArticleId = new Map(
+      translations.map((translation) => [translation.articleId, translation]),
+    );
     return articles.map((article) => {
       const translation = byArticleId.get(article.id);
-      return translation ? { ...article, title: translation.title, body: translation.body } : article;
+      return translation
+        ? { ...article, title: translation.title, body: translation.body }
+        : article;
     });
   }
 
@@ -377,34 +405,96 @@ export class KnowledgeBaseService {
    * Prisma `findMany({ where: { id: { in: [...] } } })` re-fetch would
    * not honor the original rank order).
    */
+  /**
+   * Story S-8c — the full-text path pages too, which `paginate` cannot do
+   * for it: that helper drives a Prisma model delegate, and this is raw
+   * SQL precisely because `ts_rank` ordering cannot be expressed through
+   * the query builder (see this method's own doc comment above).
+   *
+   * So the two guarantees `paginate` provides are reproduced here by hand:
+   *
+   * - **One predicate.** The count and the page are issued from the same
+   *   `publishedOnly` branch with the same interpolated `branchId`/
+   *   `search`, so `total` can never be counted over a wider scope than
+   *   `items` — which for the portal means never disclosing that drafts
+   *   exist.
+   * - **Deterministic order.** `ts_rank` ties constantly, far more than a
+   *   timestamp does: any two articles matching the same single term
+   *   usually score identically. Without `, id` a paged search would repeat
+   *   and drop rows almost every time, so the tiebreaker matters more on
+   *   this path than on either listing one.
+   *
+   * `COUNT(*)::int` rather than a bare `COUNT(*)`, which Postgres returns
+   * as `bigint` and the driver hands back as a `BigInt` that `JSON.stringify`
+   * refuses to serialise.
+   */
   private async searchArticles(
     branchId: string,
     search: string,
+    pagination: { page?: number; pageSize?: number } = {},
     options: { publishedOnly?: boolean } = {},
-  ): Promise<ArticleSummary[]> {
-    const rows = options.publishedOnly
-      ? await this.prisma.$queryRaw<RawArticleRow[]>`
-          SELECT id, branch_id AS "branchId", title, body, category, status,
-                 published_at AS "publishedAt", created_at AS "createdAt",
-                 updated_at AS "updatedAt"
-          FROM knowledge_base.knowledge_base_articles
-          WHERE branch_id = ${branchId}
-            AND status = 'PUBLISHED'
-            AND search_vector @@ websearch_to_tsquery('english', ${search})
-          ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC
-          LIMIT ${MAX_ARTICLE_ROWS}
-        `
-      : await this.prisma.$queryRaw<RawArticleRow[]>`
-          SELECT id, branch_id AS "branchId", title, body, category, status,
-                 published_at AS "publishedAt", created_at AS "createdAt",
-                 updated_at AS "updatedAt"
-          FROM knowledge_base.knowledge_base_articles
-          WHERE branch_id = ${branchId}
-            AND search_vector @@ websearch_to_tsquery('english', ${search})
-          ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC
-          LIMIT ${MAX_ARTICLE_ROWS}
-        `;
-    return rows.map(toArticleSummary);
+  ): Promise<Paginated<ArticleSummary>> {
+    const page = pagination.page ?? 1;
+    const pageSize = pagination.pageSize ?? DEFAULT_PAGE_SIZE;
+    const offset = (page - 1) * pageSize;
+
+    const [rows, countRows] = await Promise.all([
+      options.publishedOnly
+        ? this.prisma.$queryRaw<RawArticleRow[]>`
+            SELECT id, branch_id AS "branchId", title, body, category, status,
+                   published_at AS "publishedAt", created_at AS "createdAt",
+                   updated_at AS "updatedAt"
+            FROM knowledge_base.knowledge_base_articles
+            WHERE branch_id = ${branchId}
+              AND status = 'PUBLISHED'
+              AND search_vector @@ websearch_to_tsquery('english', ${search})
+            ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC, id DESC
+            LIMIT ${pageSize} OFFSET ${offset}
+          `
+        : this.prisma.$queryRaw<RawArticleRow[]>`
+            SELECT id, branch_id AS "branchId", title, body, category, status,
+                   published_at AS "publishedAt", created_at AS "createdAt",
+                   updated_at AS "updatedAt"
+            FROM knowledge_base.knowledge_base_articles
+            WHERE branch_id = ${branchId}
+              AND search_vector @@ websearch_to_tsquery('english', ${search})
+            ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC, id DESC
+            LIMIT ${pageSize} OFFSET ${offset}
+          `,
+      options.publishedOnly
+        ? this.prisma.$queryRaw<{ count: number }[]>`
+            SELECT COUNT(*)::int AS count
+            FROM knowledge_base.knowledge_base_articles
+            WHERE branch_id = ${branchId}
+              AND status = 'PUBLISHED'
+              AND search_vector @@ websearch_to_tsquery('english', ${search})
+          `
+        : this.prisma.$queryRaw<{ count: number }[]>`
+            SELECT COUNT(*)::int AS count
+            FROM knowledge_base.knowledge_base_articles
+            WHERE branch_id = ${branchId}
+              AND search_vector @@ websearch_to_tsquery('english', ${search})
+          `,
+    ]);
+
+    const total = countRows[0]?.count ?? 0;
+    return {
+      items: rows.map(toArticleSummary),
+      total,
+      page,
+      pageSize,
+      totalPages: totalPagesFor(total, pageSize),
+    };
+  }
+
+  /** Story S-8c — `applyLocale` over a page's `items`, leaving the
+   * pagination metadata untouched. Translation resolution is per-row and
+   * never changes how many rows matched. */
+  private async applyLocaleToPage(
+    page: Paginated<ArticleSummary>,
+    locale: KbLocale | undefined,
+  ): Promise<Paginated<ArticleSummary>> {
+    return { ...page, items: await this.applyLocale(page.items, locale) };
   }
 }
 

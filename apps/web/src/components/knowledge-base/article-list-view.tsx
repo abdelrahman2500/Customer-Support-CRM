@@ -7,7 +7,15 @@ import { useTranslations } from "next-intl";
 import { useArticlesQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
 import type { ArticleSummary } from "@/lib/knowledge-base-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Badge, Button, FetchingIndicator, Input, QueryStateCard, Skeleton } from "@crm/ui";
+import {
+  Badge,
+  Button,
+  FetchingIndicator,
+  Input,
+  Pagination,
+  QueryStateCard,
+  Skeleton,
+} from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -25,9 +33,24 @@ export function ArticleListView() {
   const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
   const [search, setSearch] = useState("");
+  /** Story S-8c — 1-based; `undefined` until the reader actually pages, so
+   * the first request is identical to the pre-S-8c one. */
+  const [page, setPage] = useState<number | undefined>(undefined);
 
-  const articlesQuery = useArticlesQuery(search);
-  const articles = articlesQuery.data;
+  /**
+   * Typing resets to page 1 in the SAME state update as the search term.
+   * Doing it in a separate effect would first fire a request for "page 7 of
+   * the new search" and only then correct itself - a wasted round trip that
+   * also flashes the wrong rows.
+   */
+  function updateSearch(value: string) {
+    setSearch(value);
+    setPage(undefined);
+  }
+
+  const articlesQuery = useArticlesQuery(search, page);
+  const articlePage = articlesQuery.data;
+  const articles = articlePage?.items;
 
   return (
     <section className="flex flex-col gap-4">
@@ -48,7 +71,7 @@ export function ArticleListView() {
         aria-label={t("list.searchLabel")}
         placeholder={t("list.searchPlaceholder")}
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onChange={(event) => updateSearch(event.target.value)}
         className="max-w-sm"
       />
 
@@ -108,6 +131,26 @@ export function ArticleListView() {
           </TableBody>
         </Table>
       </QueryStateCard>
+
+      {/* Renders nothing while there is only one page (see `Pagination`),
+          so a small library looks exactly as it did before S-8c. Disabled
+          while the previous page is still showing, so a rapid double-click
+          cannot queue a second jump. */}
+      {articlePage !== undefined && (
+        <Pagination
+          page={articlePage.page}
+          totalPages={articlePage.totalPages}
+          onPageChange={setPage}
+          disabled={articlesQuery.isPlaceholderData}
+          label={tCommon("pagination.label")}
+          previousLabel={tCommon("pagination.previous")}
+          nextLabel={tCommon("pagination.next")}
+          indicator={tCommon("pagination.indicator", {
+            page: articlePage.page,
+            totalPages: articlePage.totalPages,
+          })}
+        />
+      )}
     </section>
   );
 }
