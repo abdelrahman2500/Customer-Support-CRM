@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { fetchCurrentContact } from "@/lib/auth-server";
 import { PortalHeader } from "@/components/portal/portal-header";
 import { PortalNotifications } from "@/components/portal/portal-notifications";
@@ -27,12 +28,20 @@ export default async function CustomerLayout({
   if (!contact) {
     redirect(`/${locale}/login`);
   }
+  const t = await getTranslations("common");
 
   return (
     <div className="flex min-h-screen flex-col bg-surface-sunk">
+      {/* A11Y-3 — first focusable element on every route here, so Tab from
+          the top of the page reaches it before the header/nav below. */}
+      <a href="#main-content" className="skip-link">
+        {t("skipToMainContent")}
+      </a>
       <PortalHeader contact={contact} />
       <PortalNotifications customerId={contact.customerId} />
-      <main className="flex-1 p-6">{children}</main>
+      <main id="main-content" className="flex-1 p-6">
+        {children}
+      </main>
       {/* Story 94 — one generic success-feedback renderer for the whole
           authenticated session; deliberately separate from
           PortalNotifications' real-time domain-event stack. */}

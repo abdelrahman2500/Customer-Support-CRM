@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "نظام إدارة خدمة العملاء",
+    "skipToMainContent": "تخطَّ إلى المحتوى الرئيسي",
     "loading": "جارٍ التحميل...",
     "updating": "جارٍ التحديث…",
     "pagination": {

@@ -26,6 +26,10 @@ test("an agent signs in, opens a ticket, and resolves it", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/tickets$/);
 
+  // A11Y-3 — confirms the skip link renders on every authenticated
+  // agent-workspace page (added to `(agent)/layout.tsx`'s shared shell).
+  await expect(page.locator('a[href="#main-content"]')).toHaveText("Skip to main content");
+
   // Story S-9 — the list is paginated and ordered oldest-first by default,
   // so a freshly-created ticket is on the LAST page, not the first. Finding
   // it by search is also how an agent would actually reach it in a branch

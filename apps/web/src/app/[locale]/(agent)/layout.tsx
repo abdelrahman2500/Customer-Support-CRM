@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { fetchCurrentUser } from "@/lib/auth-server";
 import { WorkspaceNav } from "@/components/workspace/workspace-nav";
 import { BranchNotifications } from "@/components/notifications/branch-notifications";
@@ -31,9 +32,15 @@ export default async function AgentWorkspaceLayout({
   if (!user) {
     redirect(`/${locale}/login`);
   }
+  const t = await getTranslations("common");
 
   return (
     <div className="flex min-h-screen flex-col bg-surface-sunk">
+      {/* A11Y-3 — first focusable element on every route here, so Tab from
+          the top of the page reaches it before the nav below. */}
+      <a href="#main-content" className="skip-link">
+        {t("skipToMainContent")}
+      </a>
       <WorkspaceNav user={user} />
       {/* NAV-2 — every route here used to stretch full-bleed with no width
           ceiling, the one inconsistency left once auth/error pages'
@@ -46,7 +53,7 @@ export default async function AgentWorkspaceLayout({
           generous enough for this app's widest tables while still reading
           as an intentional page rather than raw viewport width on an
           ultra-wide monitor. */}
-      <main className="flex-1 p-6">
+      <main id="main-content" className="flex-1 p-6">
         <div className="mx-auto w-full max-w-screen-2xl">{children}</div>
       </main>
       {/* Story 24 — one branch-wide notification consumer for the whole

@@ -28,6 +28,10 @@ test("a customer signs in to the portal and submits a new ticket", async ({ page
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/home$/);
 
+  // A11Y-3 — confirms the skip link renders on every authenticated
+  // portal page (added to `(customer)/layout.tsx`'s shared shell).
+  await expect(page.locator('a[href="#main-content"]')).toHaveText("Skip to main content");
+
   await page.goto("/en/tickets");
   await page.getByLabel("Subject").fill(subject);
   await page.getByRole("button", { name: "Submit ticket" }).click();

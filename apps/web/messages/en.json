@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "Customer Support CRM",
+    "skipToMainContent": "Skip to main content",
     "loading": "Loading...",
     "updating": "Updating…",
     "pagination": {

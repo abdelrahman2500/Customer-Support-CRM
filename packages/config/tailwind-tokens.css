@@ -212,4 +212,22 @@
   .focus-ring-always {
     @apply focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-surface;
   }
+
+  /**
+   * A11Y-3 — "Skip to main content". The standard WCAG 2.4.1 (Bypass
+   * Blocks) pattern: invisible until it receives keyboard focus, then
+   * pinned above everything else at the top-left corner, so a keyboard
+   * user tabbing from the top of the page can jump straight to
+   * `#main-content` instead of tabbing through the entire nav first.
+   *
+   * `sr-only`/`not-sr-only` are Tailwind's own built-in utilities (not a
+   * `--token`-driven addition — there is no colour here that needs to
+   * track the palette), so this composes them with the same `--focus`
+   * ring already used everywhere else rather than inventing a new
+   * treatment.
+   */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface;
+  }
 }

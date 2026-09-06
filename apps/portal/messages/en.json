@@ -1,6 +1,7 @@
 {
   "common": {
     "appName": "Customer Portal",
+    "skipToMainContent": "Skip to main content",
     "loading": "Loading...",
     "updating": "Updating…",
     "pagination": {
