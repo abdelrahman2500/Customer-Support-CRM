@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedUser } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge, Button } from "@crm/ui";
 import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
@@ -128,6 +129,8 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
   const unreadCount = unreadCountQuery.data?.unreadCount ?? 0;
   const membershipsQuery = useMyBranchMembershipsQuery();
   const memberships = membershipsQuery.data ?? [];
+  const errorMessage = useErrorMessage();
+  const [branchSwitchError, setBranchSwitchError] = useState<string | null>(null);
 
   /**
    * Story 41 — calls the real `POST /auth/logout` (revoking the refresh
@@ -152,16 +155,41 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
     router.push(`/${locale}/login`);
   }
 
-  /** Story 118 — `value` encodes both `branchId`/`departmentId` (a
+  /**
+   * Story 118 — `value` encodes both `branchId`/`departmentId` (a
    * membership is unique on the pair, not `branchId` alone) as
    * `"branchId::departmentId-or-empty"` — plain `<select>` values are
-   * always single strings. */
+   * always single strings.
+   *
+   * Unlike `handleSignOut`/`handleSwitchLocale` below, `switchBranch(...)`
+   * is not a secondary side effect of some other action that should
+   * proceed regardless — it *is* the action the user asked for. A
+   * rejection here (a stale membership, a network blip) must not
+   * silently clear the cache/refresh as if it had succeeded: that would
+   * leave the session on the branch it was already on while looking like
+   * nothing happened. On failure this sets a visible message instead and
+   * returns without touching the cache/route; the `<select>` itself
+   * already reverts to the still-active membership on the next render,
+   * since its `value` is derived from `memberships`, not from whatever
+   * the browser's native dropdown shows mid-interaction.
+   */
   async function handleSwitchBranch(value: string) {
     const [branchId, departmentId] = value.split("::");
     if (!branchId) {
       return;
     }
-    await switchBranch(branchId, departmentId || undefined);
+    setBranchSwitchError(null);
+    try {
+      await switchBranch(branchId, departmentId || undefined);
+    } catch (error) {
+      setBranchSwitchError(
+        errorMessage(error, {
+          forbidden: t("branchSwitcher.actionForbidden"),
+          generic: t("branchSwitcher.actionFailed"),
+        }),
+      );
+      return;
+    }
     clearQueryCache();
     router.refresh();
   }
@@ -224,6 +252,11 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
                 </option>
               ))}
             </select>
+          )}
+          {branchSwitchError && (
+            <span role="alert" className="text-danger-solid">
+              {branchSwitchError}
+            </span>
           )}
           <select
             aria-label={t("languageSwitcher.label")}

@@ -47,7 +47,9 @@
     "signOut": "تسجيل الخروج",
     "branchSwitcher": {
       "label": "تبديل الفرع",
-      "branchAndDepartment": "{branch} — {department}"
+      "branchAndDepartment": "{branch} — {department}",
+      "actionForbidden": "لا تملك صلاحية التبديل إلى هذا الفرع.",
+      "actionFailed": "تعذّر تبديل الفرع. حاول مرة أخرى."
     },
     "languageSwitcher": {
       "label": "اللغة",

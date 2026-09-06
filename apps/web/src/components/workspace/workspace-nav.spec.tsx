@@ -4,7 +4,7 @@ import { WorkspaceNav } from "./workspace-nav";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
-import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
+import { ApiError, clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
 const push = vi.fn();
@@ -25,7 +25,13 @@ vi.mock("next-intl", () => ({
     vars ? `${key}:${JSON.stringify(vars)}` : key,
 }));
 
-vi.mock("@/lib/api", () => ({
+// A11Y/NAV-1 — spreads the real module (keeping the real `ApiError` class,
+// needed for `classifyError`'s `instanceof` check in the branch-switch
+// rejection tests below) and overrides only the four functions this
+// component calls, mirroring this codebase's established partial-mock
+// convention for exactly this situation.
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
   logout: vi.fn(),
   clearAccessToken: vi.fn(),
   switchBranch: vi.fn(),
@@ -431,6 +437,51 @@ describe("WorkspaceNav", () => {
       });
 
       await waitFor(() => expect(mockedSwitchBranch).toHaveBeenCalledWith("branch-2", "dept-2"));
+    });
+
+    // NAV-1 — unlike handleSignOut/handleSwitchLocale, a rejected
+    // switchBranch must not silently clear the cache/refresh as if it had
+    // succeeded.
+    it("shows a forbidden-specific message and does not clear the cache or refresh when rejected with 403", async () => {
+      mockedUseMyBranchMembershipsQuery.mockReturnValue({ data: twoMemberships } as never);
+      mockedSwitchBranch.mockRejectedValue(new ApiError("Forbidden", 403));
+
+      render(<WorkspaceNav user={user} />);
+      fireEvent.change(screen.getByLabelText("branchSwitcher.label"), {
+        target: { value: "branch-2::" },
+      });
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("branchSwitcher.actionForbidden");
+      expect(mockedClearQueryCache).not.toHaveBeenCalled();
+      expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("shows a generic message when rejected with a non-403 error", async () => {
+      mockedUseMyBranchMembershipsQuery.mockReturnValue({ data: twoMemberships } as never);
+      mockedSwitchBranch.mockRejectedValue(new ApiError("Server error", 500));
+
+      render(<WorkspaceNav user={user} />);
+      fireEvent.change(screen.getByLabelText("branchSwitcher.label"), {
+        target: { value: "branch-2::" },
+      });
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("branchSwitcher.actionFailed");
+    });
+
+    it("clears a previous error and succeeds on a subsequent, successful switch", async () => {
+      mockedUseMyBranchMembershipsQuery.mockReturnValue({ data: twoMemberships } as never);
+      mockedSwitchBranch.mockRejectedValueOnce(new ApiError("Server error", 500));
+
+      render(<WorkspaceNav user={user} />);
+      const select = screen.getByLabelText("branchSwitcher.label");
+      fireEvent.change(select, { target: { value: "branch-2::" } });
+      await screen.findByRole("alert");
+
+      mockedSwitchBranch.mockResolvedValue("new-access-token");
+      fireEvent.change(select, { target: { value: "branch-2::" } });
+
+      await waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
   });
 

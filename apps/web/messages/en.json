@@ -47,7 +47,9 @@
     "signOut": "Sign out",
     "branchSwitcher": {
       "label": "Switch branch",
-      "branchAndDepartment": "{branch} — {department}"
+      "branchAndDepartment": "{branch} — {department}",
+      "actionForbidden": "You don't have permission to switch to that branch.",
+      "actionFailed": "Couldn't switch branches. Please try again."
     },
     "languageSwitcher": {
       "label": "Language",
