@@ -310,6 +310,39 @@ describe("CustomerListView", () => {
       expect(screen.getByRole("combobox", { name: "list.filterStatus" })).toBeInTheDocument();
     });
   });
+  // RM-10 — Mobile-Responsive Data Tables. jsdom applies no real
+  // stylesheet, so this can't assert which layout is visually on screen;
+  // it asserts the one thing both layouts depend on — the mobile card
+  // label text is real, always-in-the-DOM content next to each value.
+  describe("mobile card labels (RM-10)", () => {
+    it("renders each column's own label text next to its cell value", () => {
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([
+            {
+              id: "customer-1",
+              displayName: "Acme Inc.",
+              isActive: true,
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+          ]),
+        }) as never,
+      );
+
+      render(<CustomerListView />);
+
+      const nameCell = screen.getByText("Acme Inc.").closest("td");
+      expect(nameCell).toHaveTextContent("list.columns.name");
+      const statusCell = screen.getByText("list.active").closest("td");
+      expect(statusCell).toHaveTextContent("list.columns.status");
+      const createdAtCell = screen
+        .getByText(new Date("2026-01-01T00:00:00.000Z").toLocaleString("en"))
+        .closest("td");
+      expect(createdAtCell).toHaveTextContent("list.columns.createdAt");
+    });
+  });
+
   /** Story S-8e — `GET /customers` is paginated, replacing the Story 106
    * 500-row cap. Mirrors `TicketListView`'s own pager tests. */
   describe("pagination (Story S-8e)", () => {

@@ -960,6 +960,30 @@ describe("UserListView", () => {
     });
   });
 
+  // RM-10 — Mobile-Responsive Data Tables. jsdom applies no real
+  // stylesheet, so this can't assert which layout is visually on screen;
+  // it asserts the one thing both layouts depend on — the mobile card
+  // label text is real, always-in-the-DOM content in each of this
+  // screen's own 5 cells (this screen has no filter bar, so only the
+  // `label`-prop half of RM-10's pattern applies here).
+  describe("mobile card labels (RM-10)", () => {
+    it("renders each column's own label text inside its cell", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      );
+
+      renderView();
+
+      const [emailCell, fullNameCell, rolesCell, statusCell, presenceCell] =
+        screen.getAllByRole("cell");
+      expect(within(emailCell!).getByText("Email")).toBeInTheDocument();
+      expect(within(fullNameCell!).getByText("Name")).toBeInTheDocument();
+      expect(within(rolesCell!).getByText("Roles")).toBeInTheDocument();
+      expect(within(statusCell!).getByText("Status")).toBeInTheDocument();
+      expect(within(presenceCell!).getByText("Presence")).toBeInTheDocument();
+    });
+  });
+
   // Story 122 — Account Lockout.
   describe("account lockout", () => {
     it("does not render a Locked badge or Unlock button for an unlocked user", () => {

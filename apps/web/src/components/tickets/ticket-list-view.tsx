@@ -86,6 +86,11 @@ function SlaCell({ ticket }: { ticket: TicketListItem }) {
  * rather than a client-side id -> name map, so the list no longer depends
  * on a second, whole-table customer fetch. Rows outside that fetch's cap
  * used to fall back to a raw UUID.
+ *
+ * RM-10 — every `TableCell` below now carries a `label` matching its
+ * column's own `TableHead` text, and the filter bar stacks one control
+ * per row below `sm` — `@crm/ui`'s `Table` primitive does the rest (see
+ * that file's own doc comment): no bespoke card markup lives here.
  */
 export function TicketListView() {
   const t = useTranslations("tickets");
@@ -167,7 +172,11 @@ export function TicketListView() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      {/* RM-10 — one filter per row below `sm` (tappable full-width
+          controls) instead of wrapping fixed-`min-w` selects onto
+          however many lines happen to fit; unchanged, wrapped inline row
+          at `sm` and up. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <FilterSelect
           label={t("list.filterStatus")}
           value={filters.status ?? ALL_VALUE}
@@ -197,7 +206,7 @@ export function TicketListView() {
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("list.searchLabel")}
           <Input
-            className="min-w-[10rem]"
+            className="w-full sm:w-auto sm:min-w-[10rem]"
             defaultValue={filters.search ?? ""}
             placeholder={t("list.searchPlaceholder")}
             onBlur={(event) => updateFilter("search", event.target.value.trim() || ALL_VALUE)}
@@ -282,10 +291,10 @@ export function TicketListView() {
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
               >
-                <TableCell className="font-mono text-xs text-slate-500">
+                <TableCell label={t("list.columns.id")} className="font-mono text-xs text-slate-500">
                   {ticket.id.slice(0, 8)}
                 </TableCell>
-                <TableCell className="font-medium text-slate-900">
+                <TableCell label={t("list.columns.subject")} className="font-medium text-slate-900">
                   <Link
                     href={`/${locale}/tickets/${ticket.id}`}
                     className="focus-ring rounded-sm hover:underline"
@@ -294,7 +303,7 @@ export function TicketListView() {
                     {ticket.subject}
                   </Link>
                 </TableCell>
-                <TableCell>
+                <TableCell label={t("list.columns.customer")}>
                   <Link
                     href={`/${locale}/customers/${ticket.customerId}`}
                     className="focus-ring rounded-sm hover:underline"
@@ -307,27 +316,29 @@ export function TicketListView() {
                     {ticket.customerName ?? ticket.customerId}
                   </Link>
                 </TableCell>
-                <TableCell>
+                <TableCell label={t("list.columns.status")}>
                   <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
                 </TableCell>
-                <TableCell>
+                <TableCell label={t("list.columns.priority")}>
                   <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
                     {ticket.priority}
                   </Badge>
                 </TableCell>
-                <TableCell>{ticket.categoryName ?? t("list.noCategory")}</TableCell>
-                <TableCell>
+                <TableCell label={t("list.columns.category")}>
+                  {ticket.categoryName ?? t("list.noCategory")}
+                </TableCell>
+                <TableCell label={t("list.columns.assignedAgent")}>
                   {ticket.assignedToUserId
                     ? (userNameById.get(ticket.assignedToUserId) ?? ticket.assignedToUserId)
                     : t("list.unassigned")}
                 </TableCell>
-                <TableCell>
+                <TableCell label={t("list.columns.sla")}>
                   <SlaCell ticket={ticket} />
                 </TableCell>
-                <TableCell className="text-slate-500">
+                <TableCell label={t("list.columns.createdAt")} className="text-slate-500">
                   {new Date(ticket.createdAt).toLocaleString(locale)}
                 </TableCell>
-                <TableCell className="text-slate-500">
+                <TableCell label={t("list.columns.updatedAt")} className="text-slate-500">
                   {new Date(ticket.updatedAt).toLocaleString(locale)}
                 </TableCell>
               </TableRow>
@@ -377,7 +388,7 @@ function FilterSelect({
     <label className="flex flex-col gap-1 text-xs text-slate-600">
       {label}
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="min-w-[10rem]" aria-label={label}>
+        <SelectTrigger className="w-full sm:w-auto sm:min-w-[10rem]" aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

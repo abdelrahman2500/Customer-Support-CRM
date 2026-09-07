@@ -92,6 +92,11 @@ const UNSET_DEPARTMENT = "__unset__";
  * "activate" button's own no-confirm precedent, the inverse of
  * "deactivate"'s confirm-gated one), wired to the new
  * `useUnlockUserMutation(user.id)`.
+ *
+ * RM-10 — every `TableCell` below now carries a `label` matching its
+ * column's own `TableHead` text, mirroring `TicketListView`'s/
+ * `CustomerListView`'s identical change. This screen has no filter/search
+ * bar to stack, so that half of the pattern doesn't apply here.
  */
 export function UserListView() {
   const t = useTranslations("users");
@@ -225,7 +230,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
 
   return (
     <TableRow>
-      <TableCell>
+      <TableCell label={t("list.columns.email")}>
         <div className="flex flex-col gap-2">
           <Input
             className="min-w-[10rem]"
@@ -294,7 +299,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
           </div>
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell label={t("list.columns.fullName")}>
         <Input
           className="min-w-[10rem]"
           value={fullNameDraft}
@@ -310,7 +315,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
           </p>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell label={t("list.columns.roles")}>
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-1">
             <span className="text-xs text-slate-500">{t("list.roleLabel")}</span>
@@ -379,7 +384,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
           )}
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell label={t("list.columns.status")}>
         <div className="flex flex-col items-start gap-2">
           <div className="flex items-center gap-2">
             <Badge variant={user.isActive ? "success" : "secondary"}>
@@ -426,7 +431,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
           )}
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell label={t("list.columns.presence")}>
         <Badge variant={presence === "online" ? "success" : "secondary"}>
           {presence === "online" ? t("list.online") : t("list.offline")}
         </Badge>

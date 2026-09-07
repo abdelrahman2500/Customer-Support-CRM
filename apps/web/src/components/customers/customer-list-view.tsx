@@ -60,6 +60,10 @@ function sortAriaValue(
  * param — every other existing caller (the ticket-creation picker,
  * `TicketListView`'s own customer-name lookup) keeps calling it with no
  * arguments, reproducing today's exact all-customers request.
+ *
+ * RM-10 — every `TableCell` below now carries a `label` matching its
+ * column's own `TableHead` text, and the filter bar stacks one control
+ * per row below `sm`, mirroring `TicketListView`'s own identical change.
  */
 export function CustomerListView() {
   const t = useTranslations("customers");
@@ -116,11 +120,14 @@ export function CustomerListView() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      {/* RM-10 — one filter per row below `sm`, mirrors `TicketListView`'s
+          own exact class change; unchanged, wrapped inline row at `sm`
+          and up. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("list.searchLabel")}
           <Input
-            className="min-w-[10rem]"
+            className="w-full sm:w-auto sm:min-w-[10rem]"
             defaultValue={filters.search ?? ""}
             placeholder={t("list.searchPlaceholder")}
             onBlur={(event) => updateFilter("search", event.target.value.trim() || ALL_VALUE)}
@@ -132,7 +139,10 @@ export function CustomerListView() {
             value={filters.isActive ?? ALL_VALUE}
             onValueChange={(value) => updateFilter("isActive", value)}
           >
-            <SelectTrigger className="min-w-[10rem]" aria-label={t("list.filterStatus")}>
+            <SelectTrigger
+              className="w-full sm:w-auto sm:min-w-[10rem]"
+              aria-label={t("list.filterStatus")}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -212,7 +222,7 @@ export function CustomerListView() {
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/customers/${customer.id}`)}
               >
-                <TableCell className="font-medium text-slate-900">
+                <TableCell label={t("list.columns.name")} className="font-medium text-slate-900">
                   <Link
                     href={`/${locale}/customers/${customer.id}`}
                     className="focus-ring rounded-sm hover:underline"
@@ -221,12 +231,12 @@ export function CustomerListView() {
                     {customer.displayName}
                   </Link>
                 </TableCell>
-                <TableCell>
+                <TableCell label={t("list.columns.status")}>
                   <Badge variant={customer.isActive ? "success" : "secondary"}>
                     {customer.isActive ? t("list.active") : t("list.inactive")}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-slate-500">
+                <TableCell label={t("list.columns.createdAt")} className="text-slate-500">
                   {new Date(customer.createdAt).toLocaleString(locale)}
                 </TableCell>
               </TableRow>

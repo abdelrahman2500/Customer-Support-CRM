@@ -417,6 +417,52 @@ describe("TicketListView", () => {
       expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
     });
   });
+
+  // RM-10 — Mobile-Responsive Data Tables. jsdom applies no real
+  // stylesheet, so this can't assert which layout is visually on screen;
+  // it asserts the one thing both layouts depend on — the mobile card
+  // label text is real, always-in-the-DOM content next to each value.
+  describe("mobile card labels (RM-10)", () => {
+    it("renders each column's own label text next to its cell value", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([
+            {
+              id: "ticket-1",
+              subject: "Cannot log in",
+              categoryId: "category-1",
+              categoryName: "billing",
+              priority: "HIGH",
+              status: "OPEN",
+              customerId: "customer-1",
+              customerName: "Acme Inc.",
+              contactId: null,
+              departmentId: null,
+              assignedToUserId: null,
+              createdAt: "2024-01-01T00:00:00.000Z",
+              updatedAt: "2024-01-02T00:00:00.000Z",
+              slaTarget: null,
+            },
+          ]),
+        }) as never,
+      );
+
+      render(<TicketListView />);
+
+      const subjectCell = screen.getByText("Cannot log in").closest("td");
+      expect(subjectCell).toHaveTextContent("list.columns.subject");
+      const customerCell = screen.getByText("Acme Inc.").closest("td");
+      expect(customerCell).toHaveTextContent("list.columns.customer");
+      const statusCell = screen.getByText("OPEN").closest("td");
+      expect(statusCell).toHaveTextContent("list.columns.status");
+      const priorityCell = screen.getByText("HIGH").closest("td");
+      expect(priorityCell).toHaveTextContent("list.columns.priority");
+      const categoryCell = screen.getByText("billing").closest("td");
+      expect(categoryCell).toHaveTextContent("list.columns.category");
+    });
+  });
+
   /**
    * Story S-8e — `GET /tickets` is paginated, replacing the Story 105
    * 500-row cap. `page` lives inside the same filters object as every
