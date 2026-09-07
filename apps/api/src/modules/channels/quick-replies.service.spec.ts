@@ -84,7 +84,18 @@ describe("QuickRepliesService", () => {
       expect(prisma.quickReply.findMany).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
         orderBy: { createdAt: "asc" },
+        take: 200,
       });
+    });
+
+    // RM-23 — closes the remainder of the unbounded-list tech debt Story
+    // 106 deliberately left untouched.
+    it("caps the query at 200 rows, unconditionally", async () => {
+      prisma.quickReply.findMany.mockResolvedValue([]);
+
+      await service.listQuickReplies();
+
+      expect(prisma.quickReply.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 200 }));
     });
 
     it("maps rows to QuickReplySummary", async () => {

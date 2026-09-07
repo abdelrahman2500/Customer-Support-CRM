@@ -14,6 +14,10 @@ export interface SlaPolicySummary {
   isActive: boolean;
 }
 
+/** RM-23 — see `AutomationRulesService`'s `MAX_AUTOMATION_RULE_ROWS` doc
+ * comment for the shared reasoning across RM-23's five capped lists. */
+const MAX_SLA_POLICY_ROWS = 200;
+
 /**
  * Owns the `sla` schema — see docs/architecture/03-domain-boundaries.md
  * ("SLA & Automation"). `SlaPolicy` is a branch-scoped aggregate root, the
@@ -58,6 +62,7 @@ export class SlaPoliciesService {
     const policies = await this.prisma.slaPolicy.findMany({
       where: { branchId },
       orderBy: { createdAt: "asc" },
+      take: MAX_SLA_POLICY_ROWS,
     });
     return policies.map(toSlaPolicySummary);
   }

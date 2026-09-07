@@ -82,6 +82,7 @@
       "ticketCategories": "فئات التذاكر",
       "webhookSubscriptions": "اشتراكات Webhook",
       "apiKeys": "مفاتيح API",
+      "settings": "الإعدادات",
       "mySessions": "جلساتي",
       "unreadNotificationsLabel": "{count} إشعارات غير مقروءة"
     }
@@ -918,6 +919,15 @@
     "keyRevealedDescription": "يُعرض هذا مرة واحدة فقط — انسخه الآن. استخدمه كـ Bearer token: Authorization: Bearer <key>.",
     "revokeConfirmTitle": "هل تريد إلغاء مفتاح API هذا؟",
     "revokeConfirmDescription": "سيتوقف \"{label}\" فورًا عن العمل مع كل طلب يستخدمه. لا يمكن التراجع عن هذا الإجراء."
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "description": "الهوية البصرية، ميزات الذكاء الاصطناعي، وساعات العمل — كلها في مكان واحد.",
+    "tabs": {
+      "branding": "الهوية البصرية",
+      "ai": "ميزات الذكاء الاصطناعي",
+      "businessHours": "ساعات العمل"
+    }
   },
   "quickReplies": {
     "title": "الردود السريعة",

@@ -4,6 +4,15 @@ import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateAutomationRuleDto } from "./dto/create-automation-rule.dto";
 import type { UpdateAutomationRuleDto } from "./dto/update-automation-rule.dto";
 
+/** RM-23 — closes the remainder of the unbounded-list tech debt Story 106
+ * deliberately left untouched. A fixed `take` cap, not real `paginate()`
+ * pagination: this is admin-authored configuration (bounded by how many
+ * distinct workflows a branch actually defines), not high-volume
+ * operational data — see `identity.service.ts`'s own `MAX_USERS_ROWS` doc
+ * comment for the full reasoning, shared verbatim across RM-23's five
+ * capped lists. `200` mirrors the KB/Notifications precedent's own value. */
+const MAX_AUTOMATION_RULE_ROWS = 200;
+
 export interface AutomationRuleSummary {
   id: string;
   name: string;
@@ -62,6 +71,7 @@ export class AutomationRulesService {
     const rules = await this.prisma.automationRule.findMany({
       where: { branchId },
       orderBy: { createdAt: "asc" },
+      take: MAX_AUTOMATION_RULE_ROWS,
     });
     return rules.map(toAutomationRuleSummary);
   }

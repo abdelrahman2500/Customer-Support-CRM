@@ -11,6 +11,10 @@ export interface QuickReplySummary {
   isActive: boolean;
 }
 
+/** RM-23 — see `AutomationRulesService`'s `MAX_AUTOMATION_RULE_ROWS` doc
+ * comment for the shared reasoning across RM-23's five capped lists. */
+const MAX_QUICK_REPLY_ROWS = 200;
+
 /**
  * Story 91 — grows `ChannelsModule` with its first controller-facing
  * resource. Owns `channels.quick_replies` — see docs/architecture/03-
@@ -40,6 +44,7 @@ export class QuickRepliesService {
     const quickReplies = await this.prisma.quickReply.findMany({
       where: { branchId },
       orderBy: { createdAt: "asc" },
+      take: MAX_QUICK_REPLY_ROWS,
     });
     return quickReplies.map(toSummary);
   }

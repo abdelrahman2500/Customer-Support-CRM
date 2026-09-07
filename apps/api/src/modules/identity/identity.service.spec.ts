@@ -1388,6 +1388,16 @@ describe("IdentityService", () => {
       ]);
     });
 
+    // RM-23 — closes the remainder of the unbounded-list tech debt Story
+    // 106 deliberately left untouched.
+    it("caps the query at 500 rows, unconditionally", async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+
+      await service.listUsers();
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 500 }));
+    });
+
     // Story 122 — Account Lockout.
     it("computes isLocked true for a user with a still-future lockedUntil, false once it has passed", async () => {
       const future = new Date(Date.now() + 10 * 60 * 1000);
@@ -2771,6 +2781,16 @@ describe("IdentityService", () => {
       expect(result).toEqual([
         { id: "role-1", name: "SuperAdmin", permissions: ["user:create", "user:read"] },
       ]);
+    });
+
+    // RM-23 — closes the remainder of the unbounded-list tech debt Story
+    // 106 deliberately left untouched.
+    it("caps the query at 200 rows, unconditionally", async () => {
+      prisma.role.findMany.mockResolvedValue([]);
+
+      await service.listRoles();
+
+      expect(prisma.role.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 200 }));
     });
 
     // Story 68 — Ticket Department-Scoped Visibility.

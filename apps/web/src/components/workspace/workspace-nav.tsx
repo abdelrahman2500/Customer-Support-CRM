@@ -124,6 +124,10 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * `my-sessions`, same convention.
  *
  * RM-22 — `api-keys` appended the same way.
+ *
+ * RM-23 — `settings` appended the same way — a consolidated view over the
+ * three settings screens already in this list (`branding`, `aiSettings`,
+ * `businessHours`), not a replacement for any of them.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -146,6 +150,7 @@ const NAV_ITEMS = [
   { href: "ticket-categories", labelKey: "nav.ticketCategories" },
   { href: "webhook-subscriptions", labelKey: "nav.webhookSubscriptions" },
   { href: "api-keys", labelKey: "nav.apiKeys" },
+  { href: "settings", labelKey: "nav.settings" },
   { href: "my-sessions", labelKey: "nav.mySessions" },
 ] as const;
 

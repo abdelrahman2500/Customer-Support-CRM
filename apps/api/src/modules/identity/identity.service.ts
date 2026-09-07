@@ -32,6 +32,28 @@ import type { GrantBranchAssignmentDto } from "./dto/grant-branch-assignment.dto
 const BCRYPT_ROUNDS = 12;
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
 
+/** RM-23 — closes the remainder of the unbounded-list tech debt Story 106
+ * deliberately left untouched (Users/Roles were explicitly excluded from
+ * that story's own scope). A fixed `take` cap, not the real `paginate()`
+ * pagination `listTickets`/`listCustomers`/`listAuditLogs`/
+ * `listNotifications`/`listArticles` since migrated to (Stories S-8a–e):
+ * those are high-volume, ever-growing operational data; a branch's own
+ * staff roster is fundamentally low-cardinality, bounded by how many
+ * people actually work there — proportionate here is the same lightweight
+ * defensive ceiling Story 105/106 used for every list before that
+ * migration, not a second pagination UI this list will realistically
+ * never need. `500` mirrors Story 105's own original `MAX_TICKET_ROWS`
+ * value exactly (the largest of RM-23's five capped lists, since a
+ * branch plausibly has more staff than roles/rules/replies/policies). No
+ * `sortDir` is caller-configurable here (unlike `listTickets`), so no
+ * fetch-desc-then-reverse correctness fix is needed — a plain `take` is
+ * sufficient, mirroring the KB/Notifications (no-reversal) precedent. */
+const MAX_USERS_ROWS = 500;
+/** RM-23 — same reasoning as `MAX_USERS_ROWS`, above; roles are
+ * admin-authored configuration, smaller in practice than the staff
+ * roster, mirroring the KB/Notifications precedent's own `200` value. */
+const MAX_ROLES_ROWS = 200;
+
 /** Story 122 — Account Lockout. Closes Story 100's own explicit non-goal
  * ("No account lockout... throttling only"). 5 sits well below
  * `AUTH_THROTTLE`'s 80-requests/60s per-IP budget (`identity.controller.ts`)
@@ -798,6 +820,7 @@ export class IdentityService {
         },
       },
       orderBy: { createdAt: "asc" },
+      take: MAX_USERS_ROWS,
     });
 
     // Story 47 — `roleId`/`departmentId` are derived from `branchRoles[0]`,
@@ -1120,6 +1143,7 @@ export class IdentityService {
       where: { ...(includeInactive ? {} : { isActive: true }) },
       include: { permissions: { include: { permission: true } } },
       orderBy: { name: "asc" },
+      take: MAX_ROLES_ROWS,
     });
 
     return roles.map((role) => ({

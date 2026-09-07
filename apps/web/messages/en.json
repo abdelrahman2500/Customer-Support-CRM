@@ -82,6 +82,7 @@
       "ticketCategories": "Ticket Categories",
       "webhookSubscriptions": "Webhook Subscriptions",
       "apiKeys": "API Keys",
+      "settings": "Settings",
       "mySessions": "My Sessions",
       "unreadNotificationsLabel": "{count} unread notifications"
     }
@@ -918,6 +919,15 @@
     "keyRevealedDescription": "This is shown only once — copy it now. Use it as a Bearer token: Authorization: Bearer <key>.",
     "revokeConfirmTitle": "Revoke this API key?",
     "revokeConfirmDescription": "\"{label}\" will immediately stop working for every request that uses it. This cannot be undone."
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Branding, AI features, and business hours — all in one place.",
+    "tabs": {
+      "branding": "Branding",
+      "ai": "AI Features",
+      "businessHours": "Business Hours"
+    }
   },
   "quickReplies": {
     "title": "Quick Replies",
