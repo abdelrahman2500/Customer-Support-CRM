@@ -7,6 +7,8 @@ import type { UpdateNotificationTemplateDto } from "./dto/update-notification-te
 export interface NotificationTemplateSummary {
   id: string;
   eventType: string;
+  /** RM-30 — `null` means "shown to every viewer regardless of locale". */
+  locale: string | null;
   template: string;
 }
 
@@ -17,11 +19,18 @@ export interface NotificationTemplateSummary {
  * mirrors `SlaPoliciesService`'s exact `TenantContext.requireBranchScope()`/
  * `findXInScope` 404-masking CRUD shape.
  *
- * `@@unique([branchId, eventType])` on the model means "create" is really
- * create-or-update (`upsert`) — a second `POST` for the same event type
- * updates the existing row rather than erroring, since there is nothing
- * meaningfully different about "creating" vs. "replacing" a branch's one
- * template for a given event type.
+ * RM-30 — "create" is still really create-or-update, now keyed on
+ * `(branchId, eventType, locale)` rather than just `(branchId,
+ * eventType)` — a second `POST` for the same event type AND locale
+ * updates that existing row rather than erroring; the same event type
+ * with a *different* locale is a distinct row (an admin's
+ * locale-specific override, layered on top of the default). No longer a
+ * typed Prisma `upsert`: the model's own real uniqueness invariant is an
+ * expression index Prisma's schema DSL can't represent (see
+ * `NotificationTemplate`'s own doc comment), so this looks the existing
+ * row up with a plain `findFirst` first, mirroring this codebase's more
+ * common "findXInScope, then branch on found/not-found" convention
+ * instead.
  */
 @Injectable()
 export class NotificationTemplatesService {
@@ -34,11 +43,18 @@ export class NotificationTemplatesService {
     dto: CreateNotificationTemplateDto,
   ): Promise<NotificationTemplateSummary> {
     const { branchId } = this.tenantContext.requireBranchScope();
-    const template = await this.prisma.notificationTemplate.upsert({
-      where: { branchId_eventType: { branchId, eventType: dto.eventType } },
-      create: { branchId, eventType: dto.eventType, template: dto.template },
-      update: { template: dto.template },
+    const locale = dto.locale ?? null;
+    const existing = await this.prisma.notificationTemplate.findFirst({
+      where: { branchId, eventType: dto.eventType, locale },
     });
+    const template = existing
+      ? await this.prisma.notificationTemplate.update({
+          where: { id: existing.id },
+          data: { template: dto.template },
+        })
+      : await this.prisma.notificationTemplate.create({
+          data: { branchId, eventType: dto.eventType, locale, template: dto.template },
+        });
     return toSummary(template);
   }
 
@@ -71,7 +87,13 @@ export class NotificationTemplatesService {
 function toSummary(template: {
   id: string;
   eventType: string;
+  locale: string | null;
   template: string;
 }): NotificationTemplateSummary {
-  return { id: template.id, eventType: template.eventType, template: template.template };
+  return {
+    id: template.id,
+    eventType: template.eventType,
+    locale: template.locale,
+    template: template.template,
+  };
 }

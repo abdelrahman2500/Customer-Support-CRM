@@ -131,4 +131,88 @@ describe("NotificationTemplatesView", () => {
 
     expect(await screen.findByText("Server error")).toBeInTheDocument();
   });
+
+  // RM-30 — Notification Templates: locale-aware content.
+  describe("locale (RM-30)", () => {
+    it("pre-fills the default (all-locales) text when the locale picker is left unset", () => {
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [
+            { id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" },
+            { id: "t-2", eventType: "sla.at_risk", locale: "ar", template: "نص عربي" },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+
+      expect(screen.getByDisplayValue("Default text")).toBeInTheDocument();
+    });
+
+    it("switches to a locale's own saved text when that locale is selected", async () => {
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [
+            { id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" },
+            { id: "t-2", eventType: "sla.at_risk", locale: "ar", template: "نص عربي" },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+
+      const localeSelects = screen.getAllByLabelText("localeLabel");
+      fireEvent.click(localeSelects[0]!);
+      fireEvent.click(await screen.findByRole("option", { name: "localeArabic" }));
+
+      expect(screen.getByDisplayValue("نص عربي")).toBeInTheDocument();
+      expect(screen.queryByDisplayValue("Default text")).not.toBeInTheDocument();
+    });
+
+    it("shows a blank textarea when switching to a locale with no saved text yet", async () => {
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+
+      const localeSelects = screen.getAllByLabelText("localeLabel");
+      fireEvent.click(localeSelects[0]!);
+      fireEvent.click(await screen.findByRole("option", { name: "localeEnglish" }));
+
+      const textareas = screen.getAllByLabelText("templateLabel");
+      expect(textareas[0]).toHaveValue("");
+    });
+
+    it("submits the selected locale alongside the template text", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({});
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      mockedUseCreateNotificationTemplateMutation.mockReturnValue(
+        mutationResult({ mutateAsync }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+
+      const localeSelects = screen.getAllByLabelText("localeLabel");
+      fireEvent.click(localeSelects[0]!);
+      fireEvent.click(await screen.findByRole("option", { name: "localeArabic" }));
+
+      const textareas = screen.getAllByLabelText("templateLabel");
+      fireEvent.change(textareas[0]!, { target: { value: "نص جديد" } });
+      fireEvent.click(screen.getAllByText("save")[0]!);
+
+      expect(mutateAsync).toHaveBeenCalledWith({
+        eventType: "sla.at_risk",
+        locale: "ar",
+        template: "نص جديد",
+      });
+    });
+  });
 });

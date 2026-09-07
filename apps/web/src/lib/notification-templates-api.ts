@@ -8,15 +8,21 @@ import { apiFetch } from "./api";
  * Mirrors the backend's own `NotificationTemplateSummary`
  * (`apps/api/src/modules/notifications/notification-templates.service.ts`)
  * exactly.
+ *
+ * RM-30 — `locale` added: `null` means "shown to every viewer regardless
+ * of locale" (this field's own default, and the original, unchanged
+ * behavior for every template that predates this story).
  */
 export interface NotificationTemplateSummary {
   id: string;
   eventType: string;
+  locale: string | null;
   template: string;
 }
 
 export interface CreateNotificationTemplateInput {
   eventType: string;
+  locale?: "en" | "ar";
   template: string;
 }
 

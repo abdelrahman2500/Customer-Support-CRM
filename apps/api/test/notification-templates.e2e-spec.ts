@@ -203,4 +203,76 @@ describe("Notification Templates (e2e)", () => {
     const row = listResponse.body.find((item: { id: string }) => item.id === templateId);
     expect(row.template).toBe(updatedText);
   });
+
+  // RM-30 — Notification Templates: locale-aware content.
+  describe("locale (RM-30)", () => {
+    it("rejects an unrecognized locale with a validation error", async () => {
+      await request(app.getHttpServer())
+        .post("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ eventType: "sla.at_risk", locale: "fr", template: "x" })
+        .expect(400);
+    });
+
+    it("creates a locale-specific override alongside the default template, never replacing it", async () => {
+      const marker = randomUUID();
+      const defaultText = `Default text (${marker})`;
+      const arabicText = `نص عربي (${marker})`;
+
+      await request(app.getHttpServer())
+        .post("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ eventType: "ticket.escalated", template: defaultText })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ eventType: "ticket.escalated", locale: "ar", template: arabicText })
+        .expect(201);
+
+      const listResponse = await request(app.getHttpServer())
+        .get("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const defaultRow = listResponse.body.find(
+        (item: { eventType: string; locale: string | null }) =>
+          item.eventType === "ticket.escalated" && item.locale === null,
+      );
+      const arabicRow = listResponse.body.find(
+        (item: { eventType: string; locale: string | null }) =>
+          item.eventType === "ticket.escalated" && item.locale === "ar",
+      );
+      expect(defaultRow.template).toBe(defaultText);
+      expect(arabicRow.template).toBe(arabicText);
+    });
+
+    it("upserts on a second create for the same (eventType, locale), never duplicating that locale's row", async () => {
+      const first = `First AR text (${randomUUID()})`;
+      const second = `Second AR text (${randomUUID()})`;
+
+      await request(app.getHttpServer())
+        .post("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ eventType: "sla.at_risk", locale: "ar", template: first })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ eventType: "sla.at_risk", locale: "ar", template: second })
+        .expect(201);
+
+      const listResponse = await request(app.getHttpServer())
+        .get("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const arabicRows = listResponse.body.filter(
+        (item: { eventType: string; locale: string | null }) =>
+          item.eventType === "sla.at_risk" && item.locale === "ar",
+      );
+      expect(arabicRows).toHaveLength(1);
+      expect(arabicRows[0].template).toBe(second);
+    });
+  });
 });

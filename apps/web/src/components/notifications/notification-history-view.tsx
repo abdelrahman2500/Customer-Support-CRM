@@ -51,6 +51,10 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * for this row's `eventType`, when one exists; falls back to the exact
  * existing `EVENT_LABEL_KEYS`-driven label otherwise (zero behavior change
  * for any branch that has never created one).
+ *
+ * RM-30 — `template` now arrives already resolved for the *viewer's own*
+ * locale (see `NotificationHistoryView`'s own `resolveTemplate` doc
+ * comment) — this component itself stays locale-agnostic, same as before.
  */
 function NotificationRow({
   notification,
@@ -147,6 +151,14 @@ function NotificationRow({
  * ticket/customer name resolution above) — every row simply falls back to
  * its default label until templates are available.
  *
+ * RM-30 — `resolveTemplate` prefers a template scoped to the viewer's own
+ * locale (`useParams().locale`) over the branch's default (`locale:
+ * null`) one for the same event type, falling back to that default when
+ * no locale-specific override exists — mirrors `NotificationRow`'s own
+ * date-formatting locale, and requires no change to this screen's own
+ * loading/error handling: an admin who has never created any template
+ * (the common case, unchanged) still gets `undefined` either way.
+ *
  * Story 92 — marks the caller's notifications read exactly once per
  * successful mount of this view (never on loading/error/403 — gated on
  * `notificationsQuery.isSuccess`), via `useMarkNotificationsReadMutation()`.
@@ -163,6 +175,7 @@ function NotificationRow({
 export function NotificationHistoryView() {
   const t = useTranslations("notificationHistory");
   const tCommon = useTranslations("common");
+  const { locale } = useParams<{ locale: string }>();
 
   /**
    * Story S-8b — the requested page. There is no filter or search state on
@@ -189,13 +202,21 @@ export function NotificationHistoryView() {
     }
   }, [notificationsQuery.isSuccess, markReadMutation]);
 
-  const templateByEventType = useMemo(() => {
+  // RM-30 — keyed by `eventType:locale` (`""` standing in for the
+  // default, `locale: null` row) rather than a flat `eventType` map, so a
+  // locale-specific override and the branch's own default can coexist
+  // without one clobbering the other.
+  const templateByKey = useMemo(() => {
     const map = new Map<string, string>();
     for (const template of templatesQuery.data ?? []) {
-      map.set(template.eventType, template.template);
+      map.set(`${template.eventType}:${template.locale ?? ""}`, template.template);
     }
     return map;
   }, [templatesQuery.data]);
+
+  function resolveTemplate(eventType: string): string | undefined {
+    return templateByKey.get(`${eventType}:${locale}`) ?? templateByKey.get(`${eventType}:`);
+  }
 
   const forbidden =
     notificationsQuery.isError &&
@@ -273,7 +294,7 @@ export function NotificationHistoryView() {
                   notification={notification}
                   ticketSubject={notification.ticketSubject ?? undefined}
                   customerName={notification.customerName ?? undefined}
-                  template={templateByEventType.get(notification.eventType)}
+                  template={resolveTemplate(notification.eventType)}
                 />
               ))}
             </TableBody>

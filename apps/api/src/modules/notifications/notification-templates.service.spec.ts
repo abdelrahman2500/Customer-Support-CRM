@@ -7,7 +7,7 @@ import type { TenantContext } from "../../common/tenant/tenant-context";
 function buildPrismaMock() {
   return {
     notificationTemplate: {
-      upsert: vi.fn(),
+      create: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
@@ -49,10 +49,12 @@ describe("NotificationTemplatesService", () => {
   });
 
   describe("createOrUpdateTemplate", () => {
-    it("upserts on the (branchId, eventType) compound key", async () => {
-      prisma.notificationTemplate.upsert.mockResolvedValue({
+    it("creates a new default (locale: null) row when none exists yet for this (branchId, eventType, locale)", async () => {
+      prisma.notificationTemplate.findFirst.mockResolvedValue(null);
+      prisma.notificationTemplate.create.mockResolvedValue({
         id: "template-1",
         eventType: "sla.at_risk",
+        locale: null,
         template: "Ticket {ticketId} is at risk",
       });
 
@@ -61,21 +63,47 @@ describe("NotificationTemplatesService", () => {
         template: "Ticket {ticketId} is at risk",
       });
 
-      expect(prisma.notificationTemplate.upsert).toHaveBeenCalledWith({
-        where: { branchId_eventType: { branchId: "branch-1", eventType: "sla.at_risk" } },
-        create: {
+      expect(prisma.notificationTemplate.findFirst).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", eventType: "sla.at_risk", locale: null },
+      });
+      expect(prisma.notificationTemplate.create).toHaveBeenCalledWith({
+        data: {
           branchId: "branch-1",
           eventType: "sla.at_risk",
+          locale: null,
           template: "Ticket {ticketId} is at risk",
         },
-        update: { template: "Ticket {ticketId} is at risk" },
       });
     });
 
-    it("returns the resulting template summary", async () => {
-      prisma.notificationTemplate.upsert.mockResolvedValue({
+    it("updates the existing row's text when one already exists for this (branchId, eventType, locale)", async () => {
+      prisma.notificationTemplate.findFirst.mockResolvedValue({
         id: "template-1",
         eventType: "sla.at_risk",
+        locale: null,
+      });
+      prisma.notificationTemplate.update.mockResolvedValue({
+        id: "template-1",
+        eventType: "sla.at_risk",
+        locale: null,
+        template: "Updated text",
+      });
+
+      await service.createOrUpdateTemplate({ eventType: "sla.at_risk", template: "Updated text" });
+
+      expect(prisma.notificationTemplate.update).toHaveBeenCalledWith({
+        where: { id: "template-1" },
+        data: { template: "Updated text" },
+      });
+      expect(prisma.notificationTemplate.create).not.toHaveBeenCalled();
+    });
+
+    it("returns the resulting template summary", async () => {
+      prisma.notificationTemplate.findFirst.mockResolvedValue(null);
+      prisma.notificationTemplate.create.mockResolvedValue({
+        id: "template-1",
+        eventType: "sla.at_risk",
+        locale: null,
         template: "Ticket {ticketId} is at risk",
       });
 
@@ -87,7 +115,65 @@ describe("NotificationTemplatesService", () => {
       expect(result).toEqual({
         id: "template-1",
         eventType: "sla.at_risk",
+        locale: null,
         template: "Ticket {ticketId} is at risk",
+      });
+    });
+
+    // RM-30 — Notification Templates: locale-aware content.
+    describe("locale (RM-30)", () => {
+      it("scopes the lookup/create by the given locale, distinct from the default row", async () => {
+        prisma.notificationTemplate.findFirst.mockResolvedValue(null);
+        prisma.notificationTemplate.create.mockResolvedValue({
+          id: "template-2",
+          eventType: "sla.at_risk",
+          locale: "ar",
+          template: "تذكرتك في خطر",
+        });
+
+        await service.createOrUpdateTemplate({
+          eventType: "sla.at_risk",
+          locale: "ar",
+          template: "تذكرتك في خطر",
+        });
+
+        expect(prisma.notificationTemplate.findFirst).toHaveBeenCalledWith({
+          where: { branchId: "branch-1", eventType: "sla.at_risk", locale: "ar" },
+        });
+        expect(prisma.notificationTemplate.create).toHaveBeenCalledWith({
+          data: {
+            branchId: "branch-1",
+            eventType: "sla.at_risk",
+            locale: "ar",
+            template: "تذكرتك في خطر",
+          },
+        });
+      });
+
+      it("updates the existing locale-specific row rather than the default row", async () => {
+        prisma.notificationTemplate.findFirst.mockResolvedValue({
+          id: "template-2",
+          eventType: "sla.at_risk",
+          locale: "ar",
+        });
+        prisma.notificationTemplate.update.mockResolvedValue({
+          id: "template-2",
+          eventType: "sla.at_risk",
+          locale: "ar",
+          template: "نص محدّث",
+        });
+
+        await service.createOrUpdateTemplate({
+          eventType: "sla.at_risk",
+          locale: "ar",
+          template: "نص محدّث",
+        });
+
+        expect(prisma.notificationTemplate.update).toHaveBeenCalledWith({
+          where: { id: "template-2" },
+          data: { template: "نص محدّث" },
+        });
+        expect(prisma.notificationTemplate.create).not.toHaveBeenCalled();
       });
     });
   });

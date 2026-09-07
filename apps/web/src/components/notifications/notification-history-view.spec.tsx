@@ -303,6 +303,64 @@ describe("NotificationHistoryView", () => {
     expect(screen.queryByText("eventLabel.slaAtRisk")).not.toBeInTheDocument();
   });
 
+  // RM-30 — Notification Templates: locale-aware content. `useParams` is
+  // mocked to `locale: "en"` for this whole file (see the top-of-file
+  // `next/navigation` mock).
+  describe("locale (RM-30)", () => {
+    it("prefers a template scoped to the viewer's own locale over the branch default", () => {
+      mockedUseNotificationsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
+      );
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [
+            { id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" },
+            { id: "t-2", eventType: "sla.at_risk", locale: "en", template: "English override" },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByText("English override")).toBeInTheDocument();
+      expect(screen.queryByText("Default text")).not.toBeInTheDocument();
+    });
+
+    it("falls back to the branch default when no template exists for the viewer's own locale", () => {
+      mockedUseNotificationsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
+      );
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByText("Default text")).toBeInTheDocument();
+    });
+
+    it("ignores a template scoped to a different locale, falling back to the default label", () => {
+      mockedUseNotificationsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
+      );
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "t-1", eventType: "sla.at_risk", locale: "ar", template: "نص عربي" }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByText("eventLabel.slaAtRisk")).toBeInTheDocument();
+      expect(screen.queryByText("نص عربي")).not.toBeInTheDocument();
+    });
+  });
+
   it("keeps the exact existing default label when no template exists for that eventType", () => {
     mockedUseNotificationsQuery.mockReturnValue(
       queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
