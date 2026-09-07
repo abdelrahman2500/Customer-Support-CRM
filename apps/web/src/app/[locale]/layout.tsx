@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
+import { localeDirection } from "@/i18n/direction";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { fontVariables } from "@/lib/fonts";
 import "../globals.css";
@@ -27,7 +28,8 @@ export default async function LocaleLayout({
     notFound();
   }
 
-  const dir = locale === "ar" ? "rtl" : "ltr";
+  // RM-12 — extracted to `@/i18n/direction` so it can be tested directly.
+  const dir = localeDirection(locale);
 
   return (
     // Story S-1 — the font variables go on <html> so they are in scope for
