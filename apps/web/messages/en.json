@@ -749,7 +749,8 @@
     "agentPerformance": {
       "heading": "Agent Performance",
       "empty": "No tickets assigned yet.",
-      "detail": "{open} open · {resolved} resolved"
+      "openLabel": "Open",
+      "resolvedLabel": "Resolved"
     },
     "ticketAging": {
       "heading": "Ticket Aging"

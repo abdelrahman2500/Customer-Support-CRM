@@ -274,9 +274,69 @@ describe("ReportsView", () => {
     render(<ReportsView />);
 
     expect(screen.getByText("Jane Agent")).toBeInTheDocument();
+    // RM-08 — a chart replaces the old plain-text detail line; its
+    // accessible name (the chart is `role="img"`, so its bars themselves
+    // carry no independently-readable text) is asserted instead.
     expect(
-      screen.getByText(`agentPerformance.detail:${JSON.stringify({ open: 2, resolved: 5 })}`),
+      screen.getByRole("img", {
+        name: "Jane Agent: agentPerformance.openLabel 2, agentPerformance.resolvedLabel 5",
+      }),
     ).toBeInTheDocument();
+  });
+
+  // RM-08 — Reporting Charts.
+  describe("charts (RM-08)", () => {
+    it("renders the ticket-volume widget as a chart (role=img), not a plain list", () => {
+      mockedUseTicketVolumeQuery.mockReturnValue(
+        queryResult({ data: [{ status: "OPEN", count: 3 }], isSuccess: true }) as never,
+      );
+
+      render(<ReportsView />);
+
+      expect(screen.getByRole("img", { name: "OPEN: 3" })).toBeInTheDocument();
+    });
+
+    it("renders the sla-compliance widget as a chart (role=img), alongside its own existing detail text", () => {
+      mockedUseSlaComplianceQuery.mockReturnValue(
+        queryResult({
+          data: { totalWithTarget: 10, breachedCount: 2, compliantCount: 8, complianceRate: 0.8 },
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ReportsView />);
+
+      expect(screen.getByRole("img", { name: "80%" })).toBeInTheDocument();
+      expect(
+        screen.getByText(`slaCompliance.detail:${JSON.stringify({ compliant: 8, total: 10 })}`),
+      ).toBeInTheDocument();
+    });
+
+    it("renders the csat widget as a chart (role=img), alongside its own existing detail text", () => {
+      mockedUseCsatSummaryQuery.mockReturnValue(
+        queryResult({ data: { responseCount: 4, averageRating: 4.5 }, isSuccess: true }) as never,
+      );
+
+      render(<ReportsView />);
+
+      expect(screen.getByRole("img", { name: "4.5/5" })).toBeInTheDocument();
+      expect(screen.getByText(`csat.detail:${JSON.stringify({ count: 4 })}`)).toBeInTheDocument();
+    });
+
+    it("leaves the remaining four widgets (ticket-aging, resolution-time, ai-usage, ticket-volume-by-category) as plain lists/stats, unchanged", () => {
+      mockedUseTicketAgingQuery.mockReturnValue(
+        queryResult({ data: [{ bucket: "0-1d", count: 2 }], isSuccess: true }) as never,
+      );
+
+      render(<ReportsView />);
+
+      // The ticket-aging card renders its bucket rows as plain text, never
+      // wrapped in a `role="img"` element — this story's own explicit
+      // non-goal for the other four widgets.
+      const heading = screen.getByText("ticketAging.heading");
+      const card = heading.closest("div")!;
+      expect(within(card).queryByRole("img")).not.toBeInTheDocument();
+    });
   });
 
   it("shows a forbidden message on a card whose query 403s, independent of the others", () => {

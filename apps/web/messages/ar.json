@@ -749,7 +749,8 @@
     "agentPerformance": {
       "heading": "أداء الوكلاء",
       "empty": "لا توجد تذاكر مسندة حتى الآن.",
-      "detail": "{open} مفتوحة · {resolved} محلولة"
+      "openLabel": "مفتوحة",
+      "resolvedLabel": "محلولة"
     },
     "ticketAging": {
       "heading": "قِدَم التذاكر"

@@ -20,6 +20,7 @@ import { downloadReportCsv } from "@/lib/reporting-api";
 import type { ReportDateRange, ReportExportPath, ReportWidgetType } from "@/lib/reporting-api";
 import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
+import { BarChart, DonutGauge, RatingBar, ticketStatusBarColor } from "./report-charts";
 import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
 import { Alert, Button, Input, Skeleton } from "@crm/ui";
@@ -126,6 +127,22 @@ function formatUsd(amount: number): string {
  * instead sees each card's own pre-existing `forbidden` state once
  * selected, exactly as reaching any other permission-gated screen without
  * the right grant already renders.
+ *
+ * RM-08 — the four highest-value widgets (Ticket Volume, SLA Compliance,
+ * CSAT, Agent Performance) now render as real charts (`report-charts.tsx`
+ * — plain, dependency-free inline SVG/CSS; recon reconfirmed no charting
+ * library exists anywhere in this monorepo, and the plan's own guidance
+ * was to evaluate a no-dependency approach first) instead of a plain stat
+ * number or `<ul>` list, reading the exact same `ReportingService`
+ * response each already used — no backend change. The remaining four
+ * widgets (Ticket Aging, Resolution Time, AI Usage, Ticket Volume by
+ * Category) are unchanged, per the plan's own explicit scope. Every
+ * existing textual detail line (`slaCompliance.detail`/`csat.detail`) is
+ * kept alongside its new chart, not replaced by it — the chart adds a
+ * visual, it doesn't remove the precise number. `ReportCard`'s own
+ * loading/forbidden/error states are untouched: a chart is just a new
+ * shape of `children`, the one thing that shell was already designed to
+ * vary per widget.
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
@@ -212,14 +229,15 @@ export function ReportsView() {
               <p className="text-sm text-slate-500">{t("ticketVolume.empty")}</p>
             )}
             {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length > 0 && (
-              <ul className="flex flex-col gap-1 text-sm">
-                {ticketVolumeQuery.data.map((row) => (
-                  <li key={row.status} className="flex items-center justify-between">
-                    <span className="text-slate-600">{row.status}</span>
-                    <span className="font-medium text-slate-900">{row.count}</span>
-                  </li>
-                ))}
-              </ul>
+              <BarChart
+                ariaLabel={ticketVolumeQuery.data
+                  .map((row) => `${row.status}: ${row.count}`)
+                  .join(", ")}
+                rows={ticketVolumeQuery.data.map((row) => ({
+                  label: row.status,
+                  segments: [{ label: "", value: row.count, color: ticketStatusBarColor(row.status) }],
+                }))}
+              />
             )}
           </ReportCard>
         );
@@ -238,10 +256,12 @@ export function ReportsView() {
               <p className="text-sm text-slate-500">{t("slaCompliance.empty")}</p>
             )}
             {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget > 0 && (
-              <div className="flex flex-col gap-1 text-sm">
-                <span className="text-2xl font-semibold text-slate-900">
-                  {Math.round((slaComplianceQuery.data.complianceRate ?? 0) * 100)}%
-                </span>
+              <div className="flex flex-col items-center gap-1 text-sm">
+                <DonutGauge
+                  percent={(slaComplianceQuery.data.complianceRate ?? 0) * 100}
+                  color="rgb(var(--success-solid))"
+                  ariaLabel={`${Math.round((slaComplianceQuery.data.complianceRate ?? 0) * 100)}%`}
+                />
                 <span className="text-slate-500">
                   {t("slaCompliance.detail", {
                     compliant: slaComplianceQuery.data.compliantCount,
@@ -267,10 +287,11 @@ export function ReportsView() {
               <p className="text-sm text-slate-500">{t("csat.empty")}</p>
             )}
             {csatQuery.isSuccess && csatQuery.data.responseCount > 0 && (
-              <div className="flex flex-col gap-1 text-sm">
-                <span className="text-2xl font-semibold text-slate-900">
-                  {csatQuery.data.averageRating?.toFixed(1)}/5
-                </span>
+              <div className="flex flex-col gap-2 text-sm">
+                <RatingBar
+                  rating={csatQuery.data.averageRating ?? 0}
+                  ariaLabel={`${(csatQuery.data.averageRating ?? 0).toFixed(1)}/5`}
+                />
                 <span className="text-slate-500">
                   {t("csat.detail", { count: csatQuery.data.responseCount })}
                 </span>
@@ -293,19 +314,29 @@ export function ReportsView() {
               <p className="text-sm text-slate-500">{t("agentPerformance.empty")}</p>
             )}
             {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length > 0 && (
-              <ul className="flex flex-col gap-2 text-sm">
-                {agentPerformanceQuery.data.map((row) => (
-                  <li key={row.userId} className="flex flex-col">
-                    <span className="font-medium text-slate-900">{row.fullName}</span>
-                    <span className="text-slate-500">
-                      {t("agentPerformance.detail", {
-                        open: row.openCount,
-                        resolved: row.resolvedCount,
-                      })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <BarChart
+                ariaLabel={agentPerformanceQuery.data
+                  .map(
+                    (row) =>
+                      `${row.fullName}: ${t("agentPerformance.openLabel")} ${row.openCount}, ${t("agentPerformance.resolvedLabel")} ${row.resolvedCount}`,
+                  )
+                  .join("; ")}
+                rows={agentPerformanceQuery.data.map((row) => ({
+                  label: row.fullName,
+                  segments: [
+                    {
+                      label: t("agentPerformance.openLabel"),
+                      value: row.openCount,
+                      color: "rgb(var(--warning-solid))",
+                    },
+                    {
+                      label: t("agentPerformance.resolvedLabel"),
+                      value: row.resolvedCount,
+                      color: "rgb(var(--success-solid))",
+                    },
+                  ],
+                }))}
+              />
             )}
           </ReportCard>
         );
