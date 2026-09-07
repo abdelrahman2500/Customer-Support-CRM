@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsOptional, IsString, IsUUID, MinLength } from "class-validator";
+import { AutomationActionAssignmentMode } from "@prisma/client";
+import { ArrayUnique, IsArray, IsEnum, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
 
 export class CreateAutomationRuleDto {
   @ApiProperty()
@@ -25,4 +26,20 @@ export class CreateAutomationRuleDto {
   @IsOptional()
   @IsUUID()
   actionSetDepartmentId?: string;
+
+  /** RM-24 — omitted defaults to `FIXED` (Prisma's own column default). */
+  @ApiProperty({ required: false, enum: AutomationActionAssignmentMode })
+  @IsOptional()
+  @IsEnum(AutomationActionAssignmentMode)
+  actionAssignmentMode?: AutomationActionAssignmentMode;
+
+  /** RM-24 — only meaningful when `actionAssignmentMode` is
+   * `LEAST_LOADED`; omitted defaults to `[]` (`actionAssignToUserId` is
+   * then this rule's only possible assignee, mirroring `FIXED`). */
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID("4", { each: true })
+  eligibleAgentPool?: string[];
 }

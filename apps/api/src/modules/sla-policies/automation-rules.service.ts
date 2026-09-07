@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import type { AutomationActionAssignmentMode } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { CreateAutomationRuleDto } from "./dto/create-automation-rule.dto";
@@ -21,6 +22,9 @@ export interface AutomationRuleSummary {
   actionAssignToUserId: string;
   actionSetCategoryId: string | null;
   actionSetDepartmentId: string | null;
+  /** RM-24 */
+  actionAssignmentMode: AutomationActionAssignmentMode;
+  eligibleAgentPool: string[];
 }
 
 /**
@@ -52,6 +56,14 @@ export class AutomationRulesService {
     if (dto.actionSetCategoryId !== undefined) {
       await this.requireCategoryInScope(dto.actionSetCategoryId, branchId);
     }
+    // RM-24 — every pool member is validated exactly like
+    // `actionAssignToUserId` already is; a rule's pool can never name a
+    // user outside this branch.
+    if (dto.eligibleAgentPool !== undefined) {
+      await Promise.all(
+        dto.eligibleAgentPool.map((userId) => this.requireUserInScope(userId, branchId)),
+      );
+    }
 
     const rule = await this.prisma.automationRule.create({
       data: {
@@ -61,6 +73,10 @@ export class AutomationRulesService {
         actionAssignToUserId: dto.actionAssignToUserId,
         actionSetCategoryId: dto.actionSetCategoryId ?? null,
         actionSetDepartmentId: dto.actionSetDepartmentId ?? null,
+        ...(dto.actionAssignmentMode !== undefined
+          ? { actionAssignmentMode: dto.actionAssignmentMode }
+          : {}),
+        ...(dto.eligibleAgentPool !== undefined ? { eligibleAgentPool: dto.eligibleAgentPool } : {}),
       },
     });
     return toAutomationRuleSummary(rule);
@@ -97,6 +113,11 @@ export class AutomationRulesService {
     if (dto.actionSetCategoryId !== undefined && dto.actionSetCategoryId !== null) {
       await this.requireCategoryInScope(dto.actionSetCategoryId, branchId);
     }
+    if (dto.eligibleAgentPool !== undefined) {
+      await Promise.all(
+        dto.eligibleAgentPool.map((userId) => this.requireUserInScope(userId, branchId)),
+      );
+    }
 
     await this.prisma.automationRule.update({
       where: { id },
@@ -115,6 +136,10 @@ export class AutomationRulesService {
         ...(dto.actionSetDepartmentId !== undefined
           ? { actionSetDepartmentId: dto.actionSetDepartmentId }
           : {}),
+        ...(dto.actionAssignmentMode !== undefined
+          ? { actionAssignmentMode: dto.actionAssignmentMode }
+          : {}),
+        ...(dto.eligibleAgentPool !== undefined ? { eligibleAgentPool: dto.eligibleAgentPool } : {}),
       },
     });
     return { id };
@@ -132,6 +157,8 @@ export class AutomationRulesService {
     actionAssignToUserId: string;
     actionSetCategoryId: string | null;
     actionSetDepartmentId: string | null;
+    actionAssignmentMode: AutomationActionAssignmentMode;
+    eligibleAgentPool: string[];
   }> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const rule = await this.prisma.automationRule.findFirst({ where: { id, branchId } });
@@ -183,6 +210,8 @@ function toAutomationRuleSummary(rule: {
   actionAssignToUserId: string;
   actionSetCategoryId: string | null;
   actionSetDepartmentId: string | null;
+  actionAssignmentMode: AutomationActionAssignmentMode;
+  eligibleAgentPool: string[];
 }): AutomationRuleSummary {
   return {
     id: rule.id,
@@ -192,5 +221,7 @@ function toAutomationRuleSummary(rule: {
     actionAssignToUserId: rule.actionAssignToUserId,
     actionSetCategoryId: rule.actionSetCategoryId,
     actionSetDepartmentId: rule.actionSetDepartmentId,
+    actionAssignmentMode: rule.actionAssignmentMode,
+    eligibleAgentPool: rule.eligibleAgentPool,
   };
 }

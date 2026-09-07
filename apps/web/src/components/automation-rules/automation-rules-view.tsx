@@ -9,13 +9,16 @@ import {
 } from "@/hooks/use-automation-rules";
 import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
-import type { AutomationRuleSummary } from "@/lib/automation-rules-api";
+import { AUTOMATION_ACTION_ASSIGNMENT_MODES } from "@/lib/automation-rules-api";
+import type { AutomationActionAssignmentMode, AutomationRuleSummary } from "@/lib/automation-rules-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
   Alert,
   Badge,
   Button,
+  Checkbox,
   Input,
+  Label,
   Skeleton,
   Table,
   TableBody,
@@ -47,6 +50,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
  * became `conditionCategoryId`/`actionSetCategoryId` `Select`s sourced
  * from `useTicketCategoriesQuery()`, resolved to a display name the same
  * way `actionSetDepartmentId` already is.
+ *
+ * RM-24 — `actionAssignmentMode` (`FIXED`/`LEAST_LOADED`) and
+ * `eligibleAgentPool` added. `actionAssignToUserId`'s own `Select` stays
+ * visible and required for both modes — it's `LEAST_LOADED`'s own
+ * fallback assignee when `eligibleAgentPool` is empty, not a field that
+ * stops mattering once that mode is chosen. The pool picker is a
+ * `Checkbox` list, mirroring `AddApiKeyForm`'s own scopes picker (RM-22):
+ * this codebase has no multi-select `Select` variant anywhere.
  */
 export function AutomationRulesView() {
   const t = useTranslations("automationRules");
@@ -177,7 +188,15 @@ function AutomationRuleRow({
           : t("anyCategory")}
       </TableCell>
       <TableCell className="text-slate-500">
-        {userNameById.get(rule.actionAssignToUserId) ?? rule.actionAssignToUserId}
+        {rule.actionAssignmentMode === "LEAST_LOADED" ? (
+          <span>
+            {t("leastLoaded")}
+            {" — "}
+            {t("eligibleAgentCount", { count: rule.eligibleAgentPool.length })}
+          </span>
+        ) : (
+          userNameById.get(rule.actionAssignToUserId) ?? rule.actionAssignToUserId
+        )}
       </TableCell>
       <TableCell className="text-slate-500">
         {rule.actionSetCategoryId
@@ -228,7 +247,9 @@ function AutomationRuleRow({
 /** The smallest UI surface for a create form — an inline form below
  * the table, mirroring `AddDepartmentForm`'s exact submit/error pattern.
  * Story 83 — gains two new optional fields, `actionSetCategory`/
- * `actionSetDepartmentId`, alongside the original three. */
+ * `actionSetDepartmentId`, alongside the original three.
+ * RM-24 — gains the assignment-mode `Select` and, only when
+ * `LEAST_LOADED` is chosen, the eligible-agent-pool `Checkbox` list. */
 function AddAutomationRuleForm() {
   const t = useTranslations("automationRules");
   const errorMessage = useErrorMessage();
@@ -240,8 +261,17 @@ function AddAutomationRuleForm() {
   const [actionAssignToUserId, setActionAssignToUserId] = useState("");
   const [actionSetCategoryId, setActionSetCategoryId] = useState("");
   const [actionSetDepartmentId, setActionSetDepartmentId] = useState("");
+  const [actionAssignmentMode, setActionAssignmentMode] =
+    useState<AutomationActionAssignmentMode>("FIXED");
+  const [eligibleAgentPool, setEligibleAgentPool] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const mutation = useCreateAutomationRuleMutation();
+
+  function toggleEligibleAgent(userId: string, checked: boolean) {
+    setEligibleAgentPool((current) =>
+      checked ? [...current, userId] : current.filter((id) => id !== userId),
+    );
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -250,15 +280,19 @@ function AddAutomationRuleForm() {
       await mutation.mutateAsync({
         name: name.trim(),
         actionAssignToUserId,
+        actionAssignmentMode,
         ...(conditionCategoryId ? { conditionCategoryId } : {}),
         ...(actionSetCategoryId ? { actionSetCategoryId } : {}),
         ...(actionSetDepartmentId ? { actionSetDepartmentId } : {}),
+        ...(actionAssignmentMode === "LEAST_LOADED" ? { eligibleAgentPool } : {}),
       });
       setName("");
       setConditionCategoryId("");
       setActionAssignToUserId("");
       setActionSetCategoryId("");
       setActionSetDepartmentId("");
+      setActionAssignmentMode("FIXED");
+      setEligibleAgentPool([]);
     } catch (submitError) {
       setError(
         errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }),
@@ -269,84 +303,132 @@ function AddAutomationRuleForm() {
   return (
     <div className="rounded-md border border-slate-200 bg-white p-4">
       <h2 className="text-sm font-semibold text-slate-900">{t("createHeading")}</h2>
-      <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
-          {t("nameLabel")}
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-            minLength={1}
-            className="w-56"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
-          {t("conditionCategoryLabel")}
-          <Select value={conditionCategoryId} onValueChange={setConditionCategoryId}>
-            <SelectTrigger className="w-40" aria-label={t("conditionCategoryLabel")}>
-              <SelectValue placeholder={t("anyCategory")} />
-            </SelectTrigger>
-            <SelectContent>
-              {(categoriesQuery.data ?? []).map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
-          {t("actionAssignToLabel")}
-          <Select value={actionAssignToUserId} onValueChange={setActionAssignToUserId}>
-            <SelectTrigger className="w-56" aria-label={t("actionAssignToLabel")}>
-              <SelectValue placeholder={t("actionAssignToPlaceholder")} />
-            </SelectTrigger>
-            <SelectContent>
+      <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
+            {t("nameLabel")}
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+              minLength={1}
+              className="w-56"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
+            {t("conditionCategoryLabel")}
+            <Select value={conditionCategoryId} onValueChange={setConditionCategoryId}>
+              <SelectTrigger className="w-40" aria-label={t("conditionCategoryLabel")}>
+                <SelectValue placeholder={t("anyCategory")} />
+              </SelectTrigger>
+              <SelectContent>
+                {(categoriesQuery.data ?? []).map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
+            {t("assignmentModeLabel")}
+            <Select
+              value={actionAssignmentMode}
+              onValueChange={(value) => setActionAssignmentMode(value as AutomationActionAssignmentMode)}
+            >
+              <SelectTrigger className="w-40" aria-label={t("assignmentModeLabel")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AUTOMATION_ACTION_ASSIGNMENT_MODES.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {mode === "LEAST_LOADED" ? t("leastLoaded") : t("fixed")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
+            {actionAssignmentMode === "LEAST_LOADED" ? t("fallbackAssignToLabel") : t("actionAssignToLabel")}
+            <Select value={actionAssignToUserId} onValueChange={setActionAssignToUserId}>
+              <SelectTrigger
+                className="w-56"
+                aria-label={
+                  actionAssignmentMode === "LEAST_LOADED"
+                    ? t("fallbackAssignToLabel")
+                    : t("actionAssignToLabel")
+                }
+              >
+                <SelectValue placeholder={t("actionAssignToPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                {(usersQuery.data ?? []).map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
+            {t("actionSetCategoryLabel")}
+            <Select value={actionSetCategoryId} onValueChange={setActionSetCategoryId}>
+              <SelectTrigger className="w-40" aria-label={t("actionSetCategoryLabel")}>
+                <SelectValue placeholder={t("noAction")} />
+              </SelectTrigger>
+              <SelectContent>
+                {(categoriesQuery.data ?? []).map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
+            {t("actionSetDepartmentLabel")}
+            <Select value={actionSetDepartmentId} onValueChange={setActionSetDepartmentId}>
+              <SelectTrigger className="w-56" aria-label={t("actionSetDepartmentLabel")}>
+                <SelectValue placeholder={t("noAction")} />
+              </SelectTrigger>
+              <SelectContent>
+                {(departmentsQuery.data ?? []).map((department) => (
+                  <SelectItem key={department.id} value={department.id}>
+                    {department.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={mutation.isPending || !name.trim() || !actionAssignToUserId}
+          >
+            {mutation.isPending ? t("createSubmitting") : t("createSubmit")}
+          </Button>
+        </div>
+
+        {actionAssignmentMode === "LEAST_LOADED" && (
+          <fieldset className="flex flex-col gap-1">
+            <legend className="text-xs text-slate-600">{t("eligibleAgentPoolLabel")}</legend>
+            <div className="flex flex-wrap gap-3">
               {(usersQuery.data ?? []).map((user) => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.fullName}
-                </SelectItem>
+                <div key={user.id} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`eligible-agent-${user.id}`}
+                    checked={eligibleAgentPool.includes(user.id)}
+                    onCheckedChange={(checked) => toggleEligibleAgent(user.id, checked === true)}
+                  />
+                  <Label htmlFor={`eligible-agent-${user.id}`} className="text-xs font-normal">
+                    {user.fullName}
+                  </Label>
+                </div>
               ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
-          {t("actionSetCategoryLabel")}
-          <Select value={actionSetCategoryId} onValueChange={setActionSetCategoryId}>
-            <SelectTrigger className="w-40" aria-label={t("actionSetCategoryLabel")}>
-              <SelectValue placeholder={t("noAction")} />
-            </SelectTrigger>
-            <SelectContent>
-              {(categoriesQuery.data ?? []).map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
-          {t("actionSetDepartmentLabel")}
-          <Select value={actionSetDepartmentId} onValueChange={setActionSetDepartmentId}>
-            <SelectTrigger className="w-56" aria-label={t("actionSetDepartmentLabel")}>
-              <SelectValue placeholder={t("noAction")} />
-            </SelectTrigger>
-            <SelectContent>
-              {(departmentsQuery.data ?? []).map((department) => (
-                <SelectItem key={department.id} value={department.id}>
-                  {department.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <Button
-          type="submit"
-          size="sm"
-          disabled={mutation.isPending || !name.trim() || !actionAssignToUserId}
-        >
-          {mutation.isPending ? t("createSubmitting") : t("createSubmit")}
-        </Button>
+            </div>
+          </fieldset>
+        )}
+
         {error && (
           <Alert variant="destructive" className="w-full">
             {error}

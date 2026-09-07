@@ -840,7 +840,13 @@
     "createSubmitting": "Creating...",
     "createFailed": "Couldn't create the rule. Please try again.",
     "deactivateConfirmTitle": "Deactivate this automation rule?",
-    "deactivateConfirmDescription": "\"{name}\" will stop running against new tickets."
+    "deactivateConfirmDescription": "\"{name}\" will stop running against new tickets.",
+    "assignmentModeLabel": "Assignment mode",
+    "fixed": "Fixed agent",
+    "leastLoaded": "Least loaded",
+    "fallbackAssignToLabel": "Fallback assignee",
+    "eligibleAgentPoolLabel": "Eligible agents",
+    "eligibleAgentCount": "{count} eligible agents"
   },
   "webhookSubscriptions": {
     "title": "Webhook Subscriptions",

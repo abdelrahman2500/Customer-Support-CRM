@@ -415,4 +415,75 @@ describe("Automation Rules (e2e)", () => {
         .send({ isActive: false });
     }
   });
+
+  // RM-24 — Automation Load-Balanced Assignment.
+  it("auto-assigns a LEAST_LOADED rule's matching ticket to the eligible pool member with fewer open tickets", async () => {
+    const me = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const roles = await request(app.getHttpServer())
+      .get("/api/v1/identity/roles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+
+    async function createAgent(label: string): Promise<string> {
+      const agent = await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: `agent-least-loaded-${label}-${randomUUID()}@example.com`,
+          password: "agent-test-password-123",
+          fullName: `Test Agent Least Loaded ${label}`,
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+      return agent.body.id;
+    }
+
+    // Two fresh agents — freshly created, so each starts with zero open
+    // tickets of their own. Busying up `busyAgentId` with a pre-existing
+    // OPEN ticket (via explicit assignment, which never triggers automation
+    // — see "never overrides an explicit assignedToUserId" above) makes
+    // `idleAgentId` the deterministically least-loaded pool member.
+    const busyAgentId = await createAgent("busy");
+    const idleAgentId = await createAgent("idle");
+
+    const busyCustomer = await request(app.getHttpServer())
+      .post("/api/v1/customers")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ displayName: `Automation rules e2e least-loaded pre-load ${randomUUID()}` })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post("/api/v1/tickets")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        customerId: busyCustomer.body.id,
+        subject: "Pre-existing open ticket for the busy agent",
+        assignedToUserId: busyAgentId,
+      })
+      .expect(201);
+
+    const matchingCategoryId = await createTicketCategory("automation-rules-e2e-least-loaded");
+    await request(app.getHttpServer())
+      .post("/api/v1/automation-rules")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        name: "Auto-assign least-loaded",
+        conditionCategoryId: matchingCategoryId,
+        actionAssignToUserId: busyAgentId,
+        actionAssignmentMode: "LEAST_LOADED",
+        eligibleAgentPool: [busyAgentId, idleAgentId],
+      })
+      .expect(201);
+
+    const ticket = await createTicket(matchingCategoryId);
+    expect(ticket.assignedToUserId).toBeNull();
+
+    const response = await waitForAssignment(ticket.id);
+    expect(response.body.assignedToUserId).toBe(idleAgentId);
+  });
 });

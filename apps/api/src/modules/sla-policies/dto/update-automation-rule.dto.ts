@@ -1,5 +1,15 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsBoolean, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
+import { AutomationActionAssignmentMode } from "@prisma/client";
+import {
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MinLength,
+} from "class-validator";
 
 export class UpdateAutomationRuleDto {
   @ApiProperty({ required: false })
@@ -32,4 +42,17 @@ export class UpdateAutomationRuleDto {
   @IsOptional()
   @IsUUID()
   actionSetDepartmentId?: string;
+
+  /** RM-24 */
+  @ApiProperty({ required: false, enum: AutomationActionAssignmentMode })
+  @IsOptional()
+  @IsEnum(AutomationActionAssignmentMode)
+  actionAssignmentMode?: AutomationActionAssignmentMode;
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID("4", { each: true })
+  eligibleAgentPool?: string[];
 }

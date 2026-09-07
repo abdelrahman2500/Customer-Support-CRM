@@ -760,6 +760,25 @@ model SlaPolicy {
   @@schema("sla")
 }
 
+/// RM-24 — Round-Robin / Load-Based Automatic Assignment. `FIXED` is the
+/// original (and still default) behavior — always
+/// `actionAssignToUserId`. `LEAST_LOADED` assigns to whichever member of
+/// `eligibleAgentPool` currently has the fewest `OPEN`/`IN_PROGRESS`
+/// tickets, ties broken by pool order (the first member at the minimum
+/// count wins) — deterministic and, unlike a raw id comparison, actually
+/// controllable by whoever ordered the pool. `actionAssignToUserId`
+/// remains required for every rule, including `LEAST_LOADED` ones: it is
+/// this mode's own fallback when `eligibleAgentPool` is empty (a rule
+/// half-configured, or every pool member later removed from the branch),
+/// keeping every rule's assignment action total rather than adding a
+/// second, separate "what if nobody's eligible" failure mode.
+enum AutomationActionAssignmentMode {
+  FIXED
+  LEAST_LOADED
+
+  @@schema("sla")
+}
+
 /// Story 57 — a simple trigger-condition-action automation rule
 /// (docs/architecture/07-sla-automation-and-ai.md — "AutomationRule"). v1:
 /// the trigger is implicitly `ticket.created` (not persisted — every rule
@@ -770,6 +789,12 @@ model SlaPolicy {
 /// `SlaPolicy`'s own matching dimensions; an automation-driven change to
 /// any of them would risk desyncing a ticket's SLA target with no existing
 /// reconciliation mechanism, unlike a real agent's `ticket.recategorized`).
+///
+/// RM-24 — the assignment action itself now has two modes; see
+/// `AutomationActionAssignmentMode`'s own doc comment. Every rule that
+/// existed before this story has `actionAssignmentMode: FIXED` (the
+/// column's own default) and `eligibleAgentPool: []` — zero behavior
+/// change for any of them.
 model AutomationRule {
   id                    String          @id @default(uuid())
   branchId              String          @map("branch_id")
@@ -785,6 +810,16 @@ model AutomationRule {
   conditionCategory     TicketCategory? @relation("AutomationRuleCondition", fields: [conditionCategoryId], references: [id])
   actionAssignToUserId  String          @map("action_assign_to_user_id")
   actionAssignToUser    User            @relation(fields: [actionAssignToUserId], references: [id])
+  actionAssignmentMode  AutomationActionAssignmentMode @default(FIXED) @map("action_assignment_mode")
+  /// Plain `String[]`, validated at the DTO layer, mirroring
+  /// `WebhookSubscription.subscribedEventTypes`/`ApiKey.scopes`'s own
+  /// established "no DB-level FK enforcement" convention for an
+  /// admin-configured id list — each element is instead validated against
+  /// `UserBranchRole` the same way `actionAssignToUserId` already is
+  /// (`AutomationRulesService.requireUserInScope`). Only meaningful when
+  /// `actionAssignmentMode` is `LEAST_LOADED`; ignored (but still stored,
+  /// so re-toggling the mode doesn't lose it) when `FIXED`.
+  eligibleAgentPool     String[]        @map("eligible_agent_pool")
   /// Story 83 — both nullable/independent: a rule may set neither, one,
   /// or both, alongside its always-required assignment action. Applied
   /// only when the matched ticket's own current value is still `null`

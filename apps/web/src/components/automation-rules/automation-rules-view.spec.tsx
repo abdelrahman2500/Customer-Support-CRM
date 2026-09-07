@@ -328,4 +328,123 @@ describe("AutomationRulesView", () => {
       ).toBeInTheDocument();
     });
   });
+
+  // RM-24 — Round-Robin / Load-Based Automatic Assignment.
+  describe("assignment mode (RM-24)", () => {
+    it("shows the least-loaded label and eligible-agent count for a LEAST_LOADED rule", () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({
+          data: [{ ...baseRule, actionAssignmentMode: "LEAST_LOADED", eligibleAgentPool: ["user-1", "user-2"] }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      // "leastLoaded" also appears as a hidden native <option> Radix's own
+      // Select renders for accessibility — at least one visible occurrence
+      // (the row's own text) is what this asserts, mirroring this file's
+      // own "billing"/"Jane Agent" precedent elsewhere. The row cell
+      // renders its label/count as sibling JSX expressions (separate text
+      // nodes), so this checks the row's own combined text content rather
+      // than a single exact text node.
+      expect(screen.getAllByText(/leastLoaded/).length).toBeGreaterThan(0);
+      const row = screen.getByText("Auto-assign billing").closest("tr");
+      expect(row?.textContent).toContain('eligibleAgentCount:{"count":2}');
+    });
+
+    it("still shows the resolved assignee name for a FIXED rule (unchanged default behavior)", () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({
+          data: [{ ...baseRule, actionAssignmentMode: "FIXED", eligibleAgentPool: [] }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      expect(screen.getAllByText("Jane Agent").length).toBeGreaterThan(0);
+    });
+
+    it("does not show the eligible-agent-pool picker until LEAST_LOADED is chosen", async () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      expect(screen.queryByText("eligibleAgentPoolLabel")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("combobox", { name: "assignmentModeLabel" }));
+      fireEvent.click(await screen.findByRole("option", { name: "leastLoaded" }));
+
+      expect(screen.getByText("eligibleAgentPoolLabel")).toBeInTheDocument();
+      expect(screen.getByLabelText("Jane Agent")).toBeInTheDocument();
+    });
+
+    it("submits actionAssignmentMode and the selected eligibleAgentPool", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({});
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      mockedUseCreateAutomationRuleMutation.mockReturnValue(
+        mutationResult({ mutateAsync }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      fireEvent.change(screen.getByLabelText("nameLabel"), {
+        target: { value: "Load-balanced rule" },
+      });
+      fireEvent.click(
+        within(screen.getByText("actionAssignToLabel").closest("label")!).getByRole("combobox"),
+      );
+      fireEvent.click(await screen.findByRole("option", { name: "Jane Agent" }));
+
+      fireEvent.click(screen.getByRole("combobox", { name: "assignmentModeLabel" }));
+      fireEvent.click(await screen.findByRole("option", { name: "leastLoaded" }));
+      fireEvent.click(screen.getByLabelText("Jane Agent"));
+
+      const form = screen.getByText("createSubmit").closest("form") as HTMLFormElement;
+      fireEvent.submit(form);
+
+      await vi.waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "Load-balanced rule",
+            actionAssignmentMode: "LEAST_LOADED",
+            eligibleAgentPool: ["user-1"],
+          }),
+        );
+      });
+    });
+
+    it("does not submit eligibleAgentPool for a FIXED rule", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({});
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      mockedUseCreateAutomationRuleMutation.mockReturnValue(
+        mutationResult({ mutateAsync }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      fireEvent.change(screen.getByLabelText("nameLabel"), { target: { value: "Fixed rule" } });
+      fireEvent.click(
+        within(screen.getByText("actionAssignToLabel").closest("label")!).getByRole("combobox"),
+      );
+      fireEvent.click(await screen.findByRole("option", { name: "Jane Agent" }));
+
+      const form = screen.getByText("createSubmit").closest("form") as HTMLFormElement;
+      fireEvent.submit(form);
+
+      await vi.waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "Fixed rule", actionAssignmentMode: "FIXED" }),
+        );
+      });
+      expect(mutateAsync.mock.calls[0]?.[0]).not.toHaveProperty("eligibleAgentPool");
+    });
+  });
 });

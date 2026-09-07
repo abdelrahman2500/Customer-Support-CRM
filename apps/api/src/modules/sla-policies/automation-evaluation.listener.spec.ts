@@ -9,6 +9,8 @@ function buildPrismaMock() {
   return {
     ticket: {
       findUnique: vi.fn(),
+      // RM-24 — LEAST_LOADED's own open-ticket-count query.
+      groupBy: vi.fn(),
     },
     automationRule: {
       findFirst: vi.fn(),
@@ -113,6 +115,8 @@ describe("AutomationEvaluationListener", () => {
       select: {
         id: true,
         actionAssignToUserId: true,
+        actionAssignmentMode: true,
+        eligibleAgentPool: true,
         actionSetCategoryId: true,
         actionSetDepartmentId: true,
       },
@@ -183,6 +187,159 @@ describe("AutomationEvaluationListener", () => {
       AUTOMATION_RULE_MATCHED_EVENT,
       expect.objectContaining({ setCategoryId: "category-1", setDepartmentId: "dept-1" }),
     );
+  });
+
+  // RM-24 — Round-Robin / Load-Based Automatic Assignment.
+  describe("LEAST_LOADED resolution (RM-24)", () => {
+    function mockTicket() {
+      prisma.ticket.findUnique.mockResolvedValue({
+        branchId: "branch-1",
+        categoryId: "category-1",
+        assignedToUserId: null,
+      });
+    }
+
+    it("assigns to the eligible-pool member with the fewest open tickets", async () => {
+      mockTicket();
+      prisma.automationRule.findFirst.mockResolvedValue({
+        id: "rule-1",
+        actionAssignToUserId: "user-fallback",
+        actionAssignmentMode: "LEAST_LOADED",
+        eligibleAgentPool: ["user-a", "user-b", "user-c"],
+        actionSetCategoryId: null,
+        actionSetDepartmentId: null,
+      });
+      prisma.ticket.groupBy.mockResolvedValue([
+        { assignedToUserId: "user-a", status: "OPEN", _count: { _all: 3 } },
+        { assignedToUserId: "user-b", status: "IN_PROGRESS", _count: { _all: 1 } },
+        { assignedToUserId: "user-c", status: "OPEN", _count: { _all: 5 } },
+      ]);
+
+      await listener.onTicketCreated({ ticket, actorUserId: null });
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["assignedToUserId", "status"],
+        where: {
+          assignedToUserId: { in: ["user-a", "user-b", "user-c"] },
+          status: { in: ["OPEN", "IN_PROGRESS"] },
+        },
+        _count: { _all: true },
+      });
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTOMATION_RULE_MATCHED_EVENT,
+        expect.objectContaining({ assignToUserId: "user-b" }),
+      );
+    });
+
+    it("sums OPEN and IN_PROGRESS counts together for the same agent", async () => {
+      mockTicket();
+      prisma.automationRule.findFirst.mockResolvedValue({
+        id: "rule-1",
+        actionAssignToUserId: "user-fallback",
+        actionAssignmentMode: "LEAST_LOADED",
+        eligibleAgentPool: ["user-a", "user-b"],
+        actionSetCategoryId: null,
+        actionSetDepartmentId: null,
+      });
+      prisma.ticket.groupBy.mockResolvedValue([
+        { assignedToUserId: "user-a", status: "OPEN", _count: { _all: 1 } },
+        { assignedToUserId: "user-a", status: "IN_PROGRESS", _count: { _all: 1 } },
+        { assignedToUserId: "user-b", status: "OPEN", _count: { _all: 1 } },
+      ]);
+
+      await listener.onTicketCreated({ ticket, actorUserId: null });
+
+      // user-a: 1 + 1 = 2, user-b: 1 — user-b wins.
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTOMATION_RULE_MATCHED_EVENT,
+        expect.objectContaining({ assignToUserId: "user-b" }),
+      );
+    });
+
+    it("treats a pool member with zero open tickets (no groupBy row at all) as a real, winning candidate", async () => {
+      mockTicket();
+      prisma.automationRule.findFirst.mockResolvedValue({
+        id: "rule-1",
+        actionAssignToUserId: "user-fallback",
+        actionAssignmentMode: "LEAST_LOADED",
+        eligibleAgentPool: ["user-a", "user-never-assigned"],
+        actionSetCategoryId: null,
+        actionSetDepartmentId: null,
+      });
+      prisma.ticket.groupBy.mockResolvedValue([
+        { assignedToUserId: "user-a", status: "OPEN", _count: { _all: 2 } },
+      ]);
+
+      await listener.onTicketCreated({ ticket, actorUserId: null });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTOMATION_RULE_MATCHED_EVENT,
+        expect.objectContaining({ assignToUserId: "user-never-assigned" }),
+      );
+    });
+
+    it("breaks a tie by the pool's own configured order — the first member at the minimum count wins", async () => {
+      mockTicket();
+      prisma.automationRule.findFirst.mockResolvedValue({
+        id: "rule-1",
+        actionAssignToUserId: "user-fallback",
+        actionAssignmentMode: "LEAST_LOADED",
+        eligibleAgentPool: ["user-b", "user-a"], // note: user-b listed first
+        actionSetCategoryId: null,
+        actionSetDepartmentId: null,
+      });
+      prisma.ticket.groupBy.mockResolvedValue([
+        { assignedToUserId: "user-a", status: "OPEN", _count: { _all: 2 } },
+        { assignedToUserId: "user-b", status: "OPEN", _count: { _all: 2 } },
+      ]);
+
+      await listener.onTicketCreated({ ticket, actorUserId: null });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTOMATION_RULE_MATCHED_EVENT,
+        expect.objectContaining({ assignToUserId: "user-b" }),
+      );
+    });
+
+    it("falls back to actionAssignToUserId when eligibleAgentPool is empty, without querying groupBy", async () => {
+      mockTicket();
+      prisma.automationRule.findFirst.mockResolvedValue({
+        id: "rule-1",
+        actionAssignToUserId: "user-fallback",
+        actionAssignmentMode: "LEAST_LOADED",
+        eligibleAgentPool: [],
+        actionSetCategoryId: null,
+        actionSetDepartmentId: null,
+      });
+
+      await listener.onTicketCreated({ ticket, actorUserId: null });
+
+      expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTOMATION_RULE_MATCHED_EVENT,
+        expect.objectContaining({ assignToUserId: "user-fallback" }),
+      );
+    });
+
+    it("a FIXED rule never queries groupBy, even if eligibleAgentPool happens to be non-empty", async () => {
+      mockTicket();
+      prisma.automationRule.findFirst.mockResolvedValue({
+        id: "rule-1",
+        actionAssignToUserId: "user-fixed",
+        actionAssignmentMode: "FIXED",
+        eligibleAgentPool: ["user-a", "user-b"],
+        actionSetCategoryId: null,
+        actionSetDepartmentId: null,
+      });
+
+      await listener.onTicketCreated({ ticket, actorUserId: null });
+
+      expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTOMATION_RULE_MATCHED_EVENT,
+        expect.objectContaining({ assignToUserId: "user-fixed" }),
+      );
+    });
   });
 
   it("catches and logs a Prisma failure without rethrowing", async () => {

@@ -11,7 +11,13 @@ import { apiFetch } from "./api";
  * Story 120 — `conditionCategory`/`actionSetCategory` (free text) renamed
  * `conditionCategoryId`/`actionSetCategoryId`, mirroring the backend's own
  * schema change.
+ *
+ * RM-24 — `actionAssignmentMode`/`eligibleAgentPool` added, mirroring the
+ * backend's own two new fields exactly.
  */
+export const AUTOMATION_ACTION_ASSIGNMENT_MODES = ["FIXED", "LEAST_LOADED"] as const;
+export type AutomationActionAssignmentMode = (typeof AUTOMATION_ACTION_ASSIGNMENT_MODES)[number];
+
 export interface AutomationRuleSummary {
   id: string;
   name: string;
@@ -20,6 +26,8 @@ export interface AutomationRuleSummary {
   actionAssignToUserId: string;
   actionSetCategoryId: string | null;
   actionSetDepartmentId: string | null;
+  actionAssignmentMode: AutomationActionAssignmentMode;
+  eligibleAgentPool: string[];
 }
 
 /** Mirrors the existing `CreateAutomationRuleDto` exactly. */
@@ -29,6 +37,8 @@ export interface CreateAutomationRuleInput {
   actionAssignToUserId: string;
   actionSetCategoryId?: string;
   actionSetDepartmentId?: string;
+  actionAssignmentMode?: AutomationActionAssignmentMode;
+  eligibleAgentPool?: string[];
 }
 
 /** Mirrors the existing `UpdateAutomationRuleDto` exactly. */
@@ -39,6 +49,8 @@ export interface UpdateAutomationRuleInput {
   isActive?: boolean;
   actionSetCategoryId?: string;
   actionSetDepartmentId?: string;
+  actionAssignmentMode?: AutomationActionAssignmentMode;
+  eligibleAgentPool?: string[];
 }
 
 export function listAutomationRules(): Promise<AutomationRuleSummary[]> {

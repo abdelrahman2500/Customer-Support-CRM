@@ -840,7 +840,13 @@
     "createSubmitting": "جارٍ الإنشاء...",
     "createFailed": "تعذّر إنشاء القاعدة. حاول مرة أخرى.",
     "deactivateConfirmTitle": "هل تريد إلغاء تفعيل قاعدة الأتمتة هذه؟",
-    "deactivateConfirmDescription": "سيتوقف \"{name}\" عن العمل على التذاكر الجديدة."
+    "deactivateConfirmDescription": "سيتوقف \"{name}\" عن العمل على التذاكر الجديدة.",
+    "assignmentModeLabel": "وضع التعيين",
+    "fixed": "وكيل ثابت",
+    "leastLoaded": "الأقل عبئًا",
+    "fallbackAssignToLabel": "المعيّن الاحتياطي",
+    "eligibleAgentPoolLabel": "الوكلاء المؤهلون",
+    "eligibleAgentCount": "{count} وكلاء مؤهلين"
   },
   "webhookSubscriptions": {
     "title": "اشتراكات Webhook",
