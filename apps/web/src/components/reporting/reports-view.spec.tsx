@@ -15,6 +15,8 @@ import {
   useTicketVolumeQuery,
   useUpdateDashboardMutation,
 } from "@/hooks/use-reporting";
+import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { ApiError } from "@/lib/api";
 import { downloadReportCsv } from "@/lib/reporting-api";
 
@@ -48,6 +50,20 @@ vi.mock("@/hooks/use-reporting", () => ({
   useUpdateDashboardMutation: vi.fn(),
   useDeleteDashboardMutation: vi.fn(),
 }));
+
+// RM-07 — Cross-Dimension Filters + Manager Cross-Branch Rollup.
+vi.mock("@/hooks/use-tickets", () => ({
+  useDepartmentsQuery: vi.fn(),
+  useUsersQuery: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-ticket-categories", () => ({
+  useTicketCategoriesQuery: vi.fn(),
+}));
+
+const mockedUseDepartmentsQuery = vi.mocked(useDepartmentsQuery);
+const mockedUseUsersQuery = vi.mocked(useUsersQuery);
+const mockedUseTicketCategoriesQuery = vi.mocked(useTicketCategoriesQuery);
 
 const mockedUseTicketVolumeQuery = vi.mocked(useTicketVolumeQuery);
 const mockedUseSlaComplianceQuery = vi.mocked(useSlaComplianceQuery);
@@ -137,6 +153,13 @@ describe("ReportsView", () => {
       blob: new Blob(["Status,Count\r\n"], { type: "text/csv" }),
       filename: "ticket-volume-all.csv",
     });
+    // RM-07 — default to an empty, successful result so pre-existing tests
+    // are unaffected; the dedicated describe block below overrides these.
+    mockedUseDepartmentsQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseUsersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseTicketCategoriesQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
   });
 
   it("renders each card's empty state when there is no data yet", () => {
@@ -344,6 +367,117 @@ describe("ReportsView", () => {
       render(<ReportsView />);
 
       expect(screen.getByText("dateRange.clear")).toBeDisabled();
+    });
+  });
+
+  // RM-07 — Cross-Dimension Filters + Manager Cross-Branch Rollup.
+  describe("cross-dimension filters and cross-branch rollup (RM-07)", () => {
+    beforeEach(() => {
+      mockedUseDepartmentsQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "department-1", name: "Billing" }],
+          isSuccess: true,
+        }) as never,
+      );
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "user-1", fullName: "Jane Agent" }],
+          isSuccess: true,
+        }) as never,
+      );
+      mockedUseTicketCategoriesQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "category-1", branchId: "branch-1", name: "Refunds", isActive: true }],
+          isSuccess: true,
+        }) as never,
+      );
+    });
+
+    it("re-invokes every hook with departmentId once a department is picked", async () => {
+      render(<ReportsView />);
+
+      fireEvent.click(screen.getByRole("combobox", { name: "filters.department" }));
+      fireEvent.click(await screen.findByRole("option", { name: "Billing" }));
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({ departmentId: "department-1" });
+      expect(mockedUseAgentPerformanceQuery).toHaveBeenLastCalledWith({
+        departmentId: "department-1",
+      });
+    });
+
+    it("re-invokes every hook with assignedToUserId once an agent is picked", async () => {
+      render(<ReportsView />);
+
+      fireEvent.click(screen.getByRole("combobox", { name: "filters.agent" }));
+      fireEvent.click(await screen.findByRole("option", { name: "Jane Agent" }));
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({ assignedToUserId: "user-1" });
+    });
+
+    it("re-invokes every hook with categoryId once a category is picked", async () => {
+      render(<ReportsView />);
+
+      fireEvent.click(screen.getByRole("combobox", { name: "filters.category" }));
+      fireEvent.click(await screen.findByRole("option", { name: "Refunds" }));
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({ categoryId: "category-1" });
+    });
+
+    it("clears a filter back to unset when 'All' is picked again", async () => {
+      render(<ReportsView />);
+
+      fireEvent.click(screen.getByRole("combobox", { name: "filters.department" }));
+      fireEvent.click(await screen.findByRole("option", { name: "Billing" }));
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({ departmentId: "department-1" });
+
+      fireEvent.click(screen.getByRole("combobox", { name: "filters.department" }));
+      fireEvent.click(await screen.findByRole("option", { name: "filters.all" }));
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({});
+    });
+
+    it("re-invokes every hook with crossBranch: true once the checkbox is checked", () => {
+      render(<ReportsView />);
+
+      fireEvent.click(screen.getByLabelText("filters.crossBranch"));
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({ crossBranch: true });
+      expect(mockedUseAiUsageQuery).toHaveBeenLastCalledWith({ crossBranch: true });
+    });
+
+    it("unchecking crossBranch reverts to the unset range, not crossBranch: false", () => {
+      render(<ReportsView />);
+
+      const checkbox = screen.getByLabelText("filters.crossBranch");
+      fireEvent.click(checkbox);
+      fireEvent.click(checkbox);
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({ crossBranch: false });
+    });
+
+    it("combines a filter with the date range in the same request", () => {
+      render(<ReportsView />);
+
+      fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
+        target: { value: "2026-01-01" },
+      });
+      fireEvent.click(screen.getByLabelText("filters.crossBranch"));
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({
+        from: "2026-01-01",
+        crossBranch: true,
+      });
+    });
+
+    it("a forbidden (403) card renders its existing forbidden state when crossBranch is on — no new error UI invented", () => {
+      mockedUseTicketVolumeQuery.mockReturnValue(
+        queryResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
+      );
+
+      render(<ReportsView />);
+      fireEvent.click(screen.getByLabelText("filters.crossBranch"));
+
+      expect(screen.getByText("forbidden")).toBeInTheDocument();
     });
   });
 

@@ -1187,4 +1187,183 @@ describe("Reporting & Analytics (e2e)", () => {
       expect(explicitlyUnfiltered).toEqual(allTime);
     });
   });
+
+  // RM-07 — Cross-Dimension Filters + Manager Cross-Branch Rollup.
+  describe("cross-dimension filters and cross-branch rollup (RM-07)", () => {
+    it("filters ticket-volume by a freshly-created categoryId (no pre-existing collision possible)", async () => {
+      const categoryId = await createTicketCategory();
+      await createTicket(categoryId);
+      await createTicket(categoryId);
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/reports/ticket-volume")
+        .query({ categoryId })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const total = (response.body as { status: string; count: number }[]).reduce(
+        (sum, row) => sum + row.count,
+        0,
+      );
+      expect(total).toBe(2);
+    });
+
+    it("filters ticket-volume by a freshly-created departmentId", async () => {
+      const department = await request(app.getHttpServer())
+        .post("/api/v1/identity/departments")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ name: `reporting-e2e-department-${randomUUID()}` })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          customerId: await createCustomer(),
+          subject: "Reporting e2e department-filtered ticket",
+          departmentId: department.body.id,
+        })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/reports/ticket-volume")
+        .query({ departmentId: department.body.id })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const total = (response.body as { status: string; count: number }[]).reduce(
+        (sum, row) => sum + row.count,
+        0,
+      );
+      expect(total).toBe(1);
+    });
+
+    it("filters agent-performance by a freshly-created agent's assignedToUserId", async () => {
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentEmail = `reporting-e2e-agent-${randomUUID()}@example.com`;
+      const agent = await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: "agent-test-password-123",
+          fullName: "Reporting E2E Agent",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          customerId: await createCustomer(),
+          subject: "Reporting e2e agent-filtered ticket",
+          assignedToUserId: agent.body.id,
+        })
+        .expect(201);
+
+      // A dedicated per-filter request rather than reusing `getAgentPerformance`
+      // (its own helper signature only carries a date range) — narrowed to
+      // this one freshly-created agent, so the response is exactly one row
+      // regardless of how many other agents/tickets already exist in this
+      // shared dev database.
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/reports/agent-performance")
+        .query({ assignedToUserId: agent.body.id })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toEqual([
+        { userId: agent.body.id, fullName: "Reporting E2E Agent", openCount: 1, resolvedCount: 0 },
+      ]);
+    });
+
+    it("rejects crossBranch=true with 403 for a caller holding report:read but not report:read-cross-branch", async () => {
+      const role = await request(app.getHttpServer())
+        .post("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ name: `Report Reader Only ${randomUUID()}` })
+        .expect(201);
+      await request(app.getHttpServer())
+        .patch(`/api/v1/identity/roles/${role.body.id}/permissions`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ permissionKeys: ["report:read"] })
+        .expect(200);
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const email = `reporting-e2e-reader-${randomUUID()}@example.com`;
+      const password = "reader-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email,
+          password,
+          fullName: "Report Reader Only",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: role.body.id,
+        })
+        .expect(201);
+      const login = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email, password })
+        .expect(200);
+      const readerAccessToken = login.body.accessToken as string;
+
+      // The same caller succeeds on an ordinary, single-branch request —
+      // proves the 403 below is genuinely about crossBranch specifically,
+      // not a broader report:read gap.
+      await request(app.getHttpServer())
+        .get("/api/v1/reports/ticket-volume")
+        .set("Authorization", `Bearer ${readerAccessToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get("/api/v1/reports/ticket-volume")
+        .query({ crossBranch: "true" })
+        .set("Authorization", `Bearer ${readerAccessToken}`)
+        .expect(403);
+    });
+
+    it("allows crossBranch=true for the seeded SuperAdmin (report:read-cross-branch granted by default)", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/reports/ticket-volume")
+        .query({ crossBranch: "true" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      // This dev database seeds exactly one Branch (the same known scope
+      // limit `tickets.e2e-spec.ts`'s own doc comment discloses), so a
+      // cross-branch result is necessarily identical to the single-branch
+      // one here — this asserts the org-wide resolution genuinely ran
+      // (200, not 403) and still includes the caller's own branch, not
+      // that a second branch's data was aggregated in (unverifiable in
+      // this single-branch fixture).
+      const singleBranch = await getTicketVolume();
+      expect(response.body).toEqual(singleBranch);
+    });
+
+    it("omitting crossBranch entirely reproduces the exact single-branch response (backward compatibility)", async () => {
+      const withoutFlag = await getTicketVolume();
+      const explicitlyFalse = await request(app.getHttpServer())
+        .get("/api/v1/reports/ticket-volume")
+        .query({ crossBranch: "false" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(explicitlyFalse.body).toEqual(withoutFlag);
+    });
+  });
 });

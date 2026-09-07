@@ -18,10 +18,19 @@ import {
 } from "@/hooks/use-reporting";
 import { downloadReportCsv } from "@/lib/reporting-api";
 import type { ReportDateRange, ReportExportPath, ReportWidgetType } from "@/lib/reporting-api";
+import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
+import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
 import { Alert, Button, Input, Skeleton } from "@crm/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+
+/** RM-07 — mirrors `ticket-list-view.tsx`'s own `ALL_VALUE` sentinel
+ * exactly: Radix's `Select` cannot represent an empty-string option value,
+ * so "no filter" needs a real, distinct value translated back to
+ * `undefined` on change. */
+const ALL_VALUE = "__all__";
 
 /** Every existing report, in the same order this screen has always shown
  * them — also the "All reports" default and the widget set a brand-new
@@ -103,6 +112,20 @@ function formatUsd(amount: number): string {
  * cohort — "no category assigned" — not a value with nothing to display)
  * renders with this screen's own localized `ticketVolumeByCategory.
  * uncategorized` label rather than the raw `null`.
+ *
+ * RM-07 — three more filter controls (department/agent/category, mirroring
+ * `ticket-list-view.tsx`'s own `FilterSelect` pattern) plus a "aggregate
+ * across every branch" checkbox, all folded into the same shared `range`
+ * state every card already reads from (`ReportDateRange` widened, not a
+ * second piece of state) — one dashboard-wide filter set, the same
+ * Story-93 "one shared control, not per-card ones" decision this screen
+ * already made for the date range. The cross-branch checkbox is always
+ * rendered, never conditionally hidden behind a client-side permission
+ * check — `workspace-nav.tsx`'s own doc comment discloses this codebase
+ * has no such pattern anywhere; a caller lacking `report:read-cross-branch`
+ * instead sees each card's own pre-existing `forbidden` state once
+ * selected, exactly as reaching any other permission-gated screen without
+ * the right grant already renders.
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
@@ -129,6 +152,11 @@ export function ReportsView() {
   const createDashboardMutation = useCreateDashboardMutation();
   const updateDashboardMutation = useUpdateDashboardMutation(selectedDashboardId ?? "");
   const deleteDashboardMutation = useDeleteDashboardMutation();
+
+  // RM-07 — Cross-Dimension Filters + Manager Cross-Branch Rollup.
+  const departmentsQuery = useDepartmentsQuery();
+  const usersQuery = useUsersQuery();
+  const categoriesQuery = useTicketCategoriesQuery();
 
   const dashboards = dashboardsQuery.data ?? [];
   const selectedDashboard = dashboards.find((dashboard) => dashboard.id === selectedDashboardId);
@@ -468,6 +496,49 @@ export function ReportsView() {
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
+        <FilterSelect
+          label={t("filters.department")}
+          value={range.departmentId ?? ALL_VALUE}
+          onChange={(value) =>
+            setRange((prev) => ({ ...prev, departmentId: value === ALL_VALUE ? undefined : value }))
+          }
+          options={(departmentsQuery.data ?? []).map((department) => department.id)}
+          renderLabel={(id) => departmentsQuery.data?.find((d) => d.id === id)?.name ?? id}
+        />
+        <FilterSelect
+          label={t("filters.agent")}
+          value={range.assignedToUserId ?? ALL_VALUE}
+          onChange={(value) =>
+            setRange((prev) => ({
+              ...prev,
+              assignedToUserId: value === ALL_VALUE ? undefined : value,
+            }))
+          }
+          options={(usersQuery.data ?? []).map((user) => user.id)}
+          renderLabel={(id) => usersQuery.data?.find((u) => u.id === id)?.fullName ?? id}
+        />
+        <FilterSelect
+          label={t("filters.category")}
+          value={range.categoryId ?? ALL_VALUE}
+          onChange={(value) =>
+            setRange((prev) => ({ ...prev, categoryId: value === ALL_VALUE ? undefined : value }))
+          }
+          options={(categoriesQuery.data ?? []).map((category) => category.id)}
+          renderLabel={(id) => categoriesQuery.data?.find((c) => c.id === id)?.name ?? id}
+        />
+        <label className="flex items-center gap-2 text-xs text-slate-600">
+          <input
+            type="checkbox"
+            checked={range.crossBranch ?? false}
+            onChange={(event) =>
+              setRange((prev) => ({ ...prev, crossBranch: event.target.checked }))
+            }
+          />
+          {t("filters.crossBranch")}
+        </label>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("dashboards.pickerLabel")}
           <select
@@ -549,6 +620,44 @@ export function ReportsView() {
         ))}
       </div>
     </section>
+  );
+}
+
+/** RM-07 — mirrors `ticket-list-view.tsx`'s own private `FilterSelect`
+ * shape exactly, under this screen's own `"reporting"` namespace (that
+ * one is unexported and scoped to the `"tickets"` namespace, so it isn't
+ * reused directly). */
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  renderLabel,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly string[];
+  renderLabel?: (value: string) => string;
+}) {
+  const t = useTranslations("reporting");
+  return (
+    <label className="flex flex-col gap-1 text-xs text-slate-600">
+      {label}
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="min-w-[10rem]" aria-label={label}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_VALUE}>{t("filters.all")}</SelectItem>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {renderLabel ? renderLabel(option) : option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </label>
   );
 }
 

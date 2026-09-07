@@ -13,18 +13,31 @@ import { ApiError, apiFetch, getAccessToken, getApiBaseUrl } from "./api";
  * (mirrors `tickets-api.ts`'s own identical helper — `URLSearchParams`,
  * skips `undefined`/`""`). Omitting `range` entirely reproduces each
  * function's exact pre-Story-93 call.
+ *
+ * RM-07 — widened with `departmentId`/`assignedToUserId`/`categoryId`
+ * (additive narrowing filters) and `crossBranch` (the manager rollup
+ * flag) — every function above already forwards this whole object
+ * straight through, so no other change was needed to thread the four new
+ * fields to all eight reports.
  */
 export interface ReportDateRange {
   from?: string;
   to?: string;
+  departmentId?: string;
+  assignedToUserId?: string;
+  categoryId?: string;
+  crossBranch?: boolean;
 }
 
 function toQueryString(range: ReportDateRange): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(range)) {
-    if (value !== undefined && value !== "") {
-      params.set(key, value);
+    // `crossBranch: false` (the default) is omitted entirely, same as not
+    // supplying it at all — the backend treats both identically.
+    if (value === undefined || value === "" || value === false) {
+      continue;
     }
+    params.set(key, String(value));
   }
   const query = params.toString();
   return query ? `?${query}` : "";

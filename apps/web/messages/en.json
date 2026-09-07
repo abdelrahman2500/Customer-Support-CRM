@@ -725,6 +725,13 @@
       "clear": "Clear",
       "invalidRange": "The selected date range is invalid — \"From\" must not be after \"To\"."
     },
+    "filters": {
+      "all": "All",
+      "department": "Department",
+      "agent": "Agent",
+      "category": "Category",
+      "crossBranch": "Aggregate across every branch"
+    },
     "ticketVolume": {
       "heading": "Ticket Volume by Status",
       "empty": "No tickets yet."

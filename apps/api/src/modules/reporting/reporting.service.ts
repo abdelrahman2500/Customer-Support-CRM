@@ -1,8 +1,37 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import type { AiFeature, TicketStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { hasDateRange, resolveReportDateRange } from "./report-date-range.util";
+
+/** RM-07 — the new permission a cross-branch caller must hold; not part of
+ * the seeded `Agent`/`SuperAdmin` grant lists except `SuperAdmin`'s own
+ * "entire catalog" grant — an admin creates and assigns it to whatever
+ * manager-shaped role they need, the same fully-general RBAC flow every
+ * other permission already uses (no code change beyond the seed catalog
+ * row is required to make a new role work with it). */
+const CROSS_BRANCH_PERMISSION = "report:read-cross-branch";
+
+/**
+ * RM-07 — every `ReportingService` method now takes this instead of two
+ * bare `from`/`to` strings. `departmentId`/`assignedToUserId`/`categoryId`
+ * are additive `AND` conditions layered onto each method's existing
+ * `where`, applied uniformly across all eight reports rather than
+ * special-cased per report (e.g. `categoryId` is still accepted, if
+ * redundantly, by `getTicketVolumeByCategory` — the report already groups
+ * by that dimension) — one predictable contract instead of eight
+ * different ones. `crossBranch` replaces the caller's own single
+ * `TenantContext`-resolved `branchId` with every branch in the caller's
+ * organization — see `resolveBranchFilter` below for the permission gate.
+ */
+export interface ReportFilters {
+  from?: string;
+  to?: string;
+  departmentId?: string;
+  assignedToUserId?: string;
+  categoryId?: string;
+  crossBranch?: boolean;
+}
 
 /** One row per `TicketStatus` value with at least one ticket in the caller's
  * branch — no zero-padding, same "only what exists" convention as every
@@ -151,6 +180,20 @@ function bucketForAgeDays(ageDays: number): AgeBucketLabel {
  * Story 99 — a sixth method, `getResolutionTime`, over a sixth new column
  * (`Ticket.resolvedAt`, added by this story) — still a direct Prisma read,
  * no schema beyond that one nullable column, no materialized view.
+ *
+ * RM-07 — every method's `(from?, to?)` pair widened to one `ReportFilters`
+ * object (`departmentId`/`assignedToUserId`/`categoryId`/`crossBranch`
+ * added). `crossBranch` is deliberately a uniform aggregation across every
+ * branch in the caller's organization, not a per-branch breakdown: a
+ * per-branch shape would mean eight different bespoke response envelopes
+ * (list-shaped reports gaining a `branchId` dimension, scalar ones staying
+ * aggregated) for a capability no story has yet disclosed a concrete need
+ * for beyond "an aggregated multi-branch view" (this story's own
+ * acceptance criteria, verbatim) — a true per-branch breakdown is a
+ * straightforward, additive follow-up once a real need is disclosed, not
+ * invented speculatively here. No org-wide branch listing existed before
+ * this story (`IdentityService.listBranches` is deliberately single-branch,
+ * per its own doc comment) — `resolveBranchFilter` below is the first.
  */
 @Injectable()
 export class ReportingService {
@@ -159,15 +202,68 @@ export class ReportingService {
     private readonly tenantContext: TenantContext,
   ) {}
 
+  /**
+   * RM-07 — always resolves (and validates) the caller's own single active
+   * branch first via `requireBranchScope()`, exactly as every method did
+   * before this story — a `crossBranch` request from a caller with no
+   * active branch still fails the same way it always has, before the
+   * permission check even runs. `crossBranch: false`/`undefined` returns
+   * unchanged, single-branch behavior byte-for-byte (`{ branchId }`,
+   * spreads identically into every existing `where`). Only when
+   * `crossBranch` is truthy does this check `report:read-cross-branch`
+   * (the same raw `permission.findMany`-shaped query `PermissionsGuard`
+   * itself runs — no shared "has permission" service exists yet to reuse)
+   * and, if granted, resolve every `Branch` sharing the caller's own
+   * `organizationId` — `TenantContext` carries no `organizationId` of its
+   * own (confirmed absent during recon), so it's resolved via one extra
+   * lookup on the caller's own branch rather than widening `TenantClaims`/
+   * the JWT for this one story.
+   */
+  private async resolveBranchFilter(
+    crossBranch: boolean | undefined,
+  ): Promise<{ branchId: string } | { branchId: { in: string[] } }> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    if (!crossBranch) {
+      return { branchId };
+    }
+
+    const granted = await this.prisma.permission.findFirst({
+      where: {
+        key: CROSS_BRANCH_PERMISSION,
+        roles: { some: { role: { name: { in: this.tenantContext.roles } } } },
+      },
+      select: { id: true },
+    });
+    if (!granted) {
+      throw new ForbiddenException(`Missing required permission: ${CROSS_BRANCH_PERMISSION}`);
+    }
+
+    const branch = await this.prisma.branch.findUniqueOrThrow({
+      where: { id: branchId },
+      select: { organizationId: true },
+    });
+    const orgBranches = await this.prisma.branch.findMany({
+      where: { organizationId: branch.organizationId },
+      select: { id: true },
+    });
+    return { branchId: { in: orgBranches.map((orgBranch) => orgBranch.id) } };
+  }
+
   /** Filters on `Ticket.createdAt` — "how many tickets, by status, were
    * created in this window." The same field/table `getTicketAging` already
    * uses. */
-  async getTicketVolumeByStatus(from?: string, to?: string): Promise<TicketVolumeByStatus[]> {
-    const { branchId } = this.tenantContext.requireBranchScope();
-    const range = resolveReportDateRange(from, to);
+  async getTicketVolumeByStatus(filters: ReportFilters = {}): Promise<TicketVolumeByStatus[]> {
+    const branchFilter = await this.resolveBranchFilter(filters.crossBranch);
+    const range = resolveReportDateRange(filters.from, filters.to);
     const grouped = await this.prisma.ticket.groupBy({
       by: ["status"],
-      where: { branchId, ...(hasDateRange(range) ? { createdAt: range } : {}) },
+      where: {
+        ...branchFilter,
+        ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+        ...(filters.assignedToUserId ? { assignedToUserId: filters.assignedToUserId } : {}),
+        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+        ...(hasDateRange(range) ? { createdAt: range } : {}),
+      },
       _count: { _all: true },
     });
     return grouped.map((row) => ({ status: row.status, count: row._count._all }));
@@ -203,12 +299,20 @@ export class ReportingService {
    * more than one `resolution`-type row across different target windows —
    * counting distinct tickets avoids double-counting a single ticket twice.
    */
-  async getSlaCompliance(from?: string, to?: string): Promise<SlaComplianceSummary> {
-    const { branchId } = this.tenantContext.requireBranchScope();
-    const range = resolveReportDateRange(from, to);
+  async getSlaCompliance(filters: ReportFilters = {}): Promise<SlaComplianceSummary> {
+    const branchFilter = await this.resolveBranchFilter(filters.crossBranch);
+    const range = resolveReportDateRange(filters.from, filters.to);
 
     const targets = await this.prisma.slaTicketTarget.findMany({
-      where: { ticket: { branchId }, ...(hasDateRange(range) ? { createdAt: range } : {}) },
+      where: {
+        ticket: {
+          ...branchFilter,
+          ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+          ...(filters.assignedToUserId ? { assignedToUserId: filters.assignedToUserId } : {}),
+          ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+        },
+        ...(hasDateRange(range) ? { createdAt: range } : {}),
+      },
       select: { ticketId: true },
     });
     const totalWithTarget = targets.length;
@@ -216,7 +320,7 @@ export class ReportingService {
 
     const breachedTickets = ticketIds.length
       ? await this.prisma.slaEscalation.findMany({
-          where: { branchId, targetType: "resolution", ticketId: { in: ticketIds } },
+          where: { ...branchFilter, targetType: "resolution", ticketId: { in: ticketIds } },
           select: { ticketId: true },
           distinct: ["ticketId"],
         })
@@ -237,11 +341,19 @@ export class ReportingService {
    * not `Ticket.createdAt`: this report means "feedback submitted in this
    * window," not "feedback on tickets created in this window" — the only
    * sensible anchor for a CSAT trend report. */
-  async getCsatSummary(from?: string, to?: string): Promise<CsatSummary> {
-    const { branchId } = this.tenantContext.requireBranchScope();
-    const range = resolveReportDateRange(from, to);
+  async getCsatSummary(filters: ReportFilters = {}): Promise<CsatSummary> {
+    const branchFilter = await this.resolveBranchFilter(filters.crossBranch);
+    const range = resolveReportDateRange(filters.from, filters.to);
     const result = await this.prisma.ticketCsatResponse.aggregate({
-      where: { ticket: { branchId }, ...(hasDateRange(range) ? { createdAt: range } : {}) },
+      where: {
+        ticket: {
+          ...branchFilter,
+          ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+          ...(filters.assignedToUserId ? { assignedToUserId: filters.assignedToUserId } : {}),
+          ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+        },
+        ...(hasDateRange(range) ? { createdAt: range } : {}),
+      },
       _avg: { rating: true },
       _count: { _all: true },
     });
@@ -267,14 +379,19 @@ export class ReportingService {
    * disclosed limitation this method's own "no `resolvedAt`, count only"
    * comment already carries.
    */
-  async getAgentPerformance(from?: string, to?: string): Promise<AgentPerformanceSummary[]> {
-    const { branchId } = this.tenantContext.requireBranchScope();
-    const range = resolveReportDateRange(from, to);
+  async getAgentPerformance(filters: ReportFilters = {}): Promise<AgentPerformanceSummary[]> {
+    const branchFilter = await this.resolveBranchFilter(filters.crossBranch);
+    const range = resolveReportDateRange(filters.from, filters.to);
     const grouped = await this.prisma.ticket.groupBy({
       by: ["assignedToUserId", "status"],
       where: {
-        branchId,
-        assignedToUserId: { not: null },
+        ...branchFilter,
+        // A specific `assignedToUserId` filter already implies "not null"
+        // — only falls back to the original unassigned-exclusion guard
+        // when no specific agent was requested.
+        assignedToUserId: filters.assignedToUserId ?? { not: null },
+        ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
         ...(hasDateRange(range) ? { createdAt: range } : {}),
       },
       _count: { _all: true },
@@ -330,15 +447,18 @@ export class ReportingService {
    * position for the one row with no name to sort by, rather than an
    * arbitrary spot wherever `null` happens to collate.
    */
-  async getTicketVolumeByCategory(
-    from?: string,
-    to?: string,
-  ): Promise<TicketVolumeByCategory[]> {
-    const { branchId } = this.tenantContext.requireBranchScope();
-    const range = resolveReportDateRange(from, to);
+  async getTicketVolumeByCategory(filters: ReportFilters = {}): Promise<TicketVolumeByCategory[]> {
+    const branchFilter = await this.resolveBranchFilter(filters.crossBranch);
+    const range = resolveReportDateRange(filters.from, filters.to);
     const grouped = await this.prisma.ticket.groupBy({
       by: ["categoryId"],
-      where: { branchId, ...(hasDateRange(range) ? { createdAt: range } : {}) },
+      where: {
+        ...branchFilter,
+        ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+        ...(filters.assignedToUserId ? { assignedToUserId: filters.assignedToUserId } : {}),
+        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+        ...(hasDateRange(range) ? { createdAt: range } : {}),
+      },
       _count: { _all: true },
     });
 
@@ -387,13 +507,16 @@ export class ReportingService {
    * a range applied, this reads as "of tickets created in this window that
    * are *still* open today, how old are they now."
    */
-  async getTicketAging(from?: string, to?: string): Promise<TicketAgingBucket[]> {
-    const { branchId } = this.tenantContext.requireBranchScope();
-    const range = resolveReportDateRange(from, to);
+  async getTicketAging(filters: ReportFilters = {}): Promise<TicketAgingBucket[]> {
+    const branchFilter = await this.resolveBranchFilter(filters.crossBranch);
+    const range = resolveReportDateRange(filters.from, filters.to);
     const tickets = await this.prisma.ticket.findMany({
       where: {
-        branchId,
+        ...branchFilter,
         status: { in: ["OPEN", "IN_PROGRESS"] },
+        ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+        ...(filters.assignedToUserId ? { assignedToUserId: filters.assignedToUserId } : {}),
+        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
         ...(hasDateRange(range) ? { createdAt: range } : {}),
       },
       select: { createdAt: true },
@@ -433,13 +556,16 @@ export class ReportingService {
    * story's plan) and are excluded here by the same `not: null` guard
    * that excludes every ticket that has simply never resolved.
    */
-  async getResolutionTime(from?: string, to?: string): Promise<ResolutionTimeSummary> {
-    const { branchId } = this.tenantContext.requireBranchScope();
-    const range = resolveReportDateRange(from, to);
+  async getResolutionTime(filters: ReportFilters = {}): Promise<ResolutionTimeSummary> {
+    const branchFilter = await this.resolveBranchFilter(filters.crossBranch);
+    const range = resolveReportDateRange(filters.from, filters.to);
     const tickets = await this.prisma.ticket.findMany({
       where: {
-        branchId,
+        ...branchFilter,
         resolvedAt: { not: null, ...(hasDateRange(range) ? range : {}) },
+        ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+        ...(filters.assignedToUserId ? { assignedToUserId: filters.assignedToUserId } : {}),
+        ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
       },
       select: { createdAt: true, resolvedAt: true },
     });
@@ -472,20 +598,39 @@ export class ReportingService {
    * add, the same SQL `SUM()` behavior this codebase already relies on
    * nowhere else needing special-casing.
    */
-  async getAiUsage(from?: string, to?: string): Promise<AiUsageSummary> {
-    const { branchId } = this.tenantContext.requireBranchScope();
-    const range = resolveReportDateRange(from, to);
+  /**
+   * RM-07 — `AiPromptLog` carries no `departmentId`/`assignedToUserId`/
+   * `categoryId` of its own (only `branchId` and an optional `ticketId` —
+   * `CHAT`-feature rows have none). A department/agent/category filter is
+   * therefore applied via the `ticket` relation, and — unlike every other
+   * report above — necessarily excludes every `CHAT` operation when one is
+   * given: a chat session has no department/agent/category to filter by.
+   * Omitting all three filters (the common case) is completely unaffected.
+   */
+  async getAiUsage(filters: ReportFilters = {}): Promise<AiUsageSummary> {
+    const branchFilter = await this.resolveBranchFilter(filters.crossBranch);
+    const range = resolveReportDateRange(filters.from, filters.to);
     const dateFilter = hasDateRange(range) ? { createdAt: range } : {};
+    const ticketFilter =
+      filters.departmentId || filters.assignedToUserId || filters.categoryId
+        ? {
+            ticket: {
+              ...(filters.departmentId ? { departmentId: filters.departmentId } : {}),
+              ...(filters.assignedToUserId ? { assignedToUserId: filters.assignedToUserId } : {}),
+              ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+            },
+          }
+        : {};
 
     const grouped = await this.prisma.aiPromptLog.groupBy({
       by: ["feature", "outcome"],
-      where: { branchId, ...dateFilter },
+      where: { ...branchFilter, ...dateFilter, ...ticketFilter },
       _count: { _all: true },
       _sum: { inputTokens: true, outputTokens: true, costMicroUsd: true },
     });
 
     const unpricedCallCount = await this.prisma.aiPromptLog.count({
-      where: { branchId, outcome: "SUCCESS", costMicroUsd: null, ...dateFilter },
+      where: { ...branchFilter, outcome: "SUCCESS", costMicroUsd: null, ...dateFilter, ...ticketFilter },
     });
 
     const byFeatureMap = new Map<AiFeature, AiUsageByFeature>();

@@ -28,11 +28,22 @@ function buildPrismaMock() {
     ticketCategory: {
       findMany: vi.fn(),
     },
+    // RM-07 — only ever touched by `resolveBranchFilter`'s cross-branch
+    // path; every pre-RM-07 test (never passing `crossBranch: true`)
+    // leaves these untouched.
+    permission: {
+      findFirst: vi.fn(),
+    },
+    branch: {
+      findUniqueOrThrow: vi.fn(),
+      findMany: vi.fn(),
+    },
   };
 }
 
-function buildTenantContextMock(branchId: string | null = "branch-1") {
+function buildTenantContextMock(branchId: string | null = "branch-1", roles: string[] = []) {
   return {
+    roles,
     requireBranchScope: vi.fn(() => {
       if (!branchId) {
         throw new Error("TenantContext: no active branch on this request");
@@ -122,7 +133,7 @@ describe("ReportingService", () => {
     it("filters by Ticket.createdAt when a range is supplied", async () => {
       prisma.ticket.groupBy.mockResolvedValue([]);
 
-      await service.getTicketVolumeByStatus("2026-01-01", "2026-01-31");
+      await service.getTicketVolumeByStatus({ from: "2026-01-01", to: "2026-01-31" });
 
       expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
         by: ["status"],
@@ -136,9 +147,43 @@ describe("ReportingService", () => {
 
     it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
       await expect(
-        service.getTicketVolumeByStatus("2026-02-01", "2026-01-01"),
+        service.getTicketVolumeByStatus({ from: "2026-02-01", to: "2026-01-01" }),
       ).rejects.toThrow(/from must not be after to/);
       expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
+    });
+
+    // RM-07 — cross-dimension filters.
+    it("adds departmentId/assignedToUserId/categoryId as additional AND conditions when given", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByStatus({
+        departmentId: "department-1",
+        assignedToUserId: "user-1",
+        categoryId: "category-1",
+      });
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["status"],
+        where: {
+          branchId: "branch-1",
+          departmentId: "department-1",
+          assignedToUserId: "user-1",
+          categoryId: "category-1",
+        },
+        _count: { _all: true },
+      });
+    });
+
+    it("omits every filter field entirely when none are given (byte-for-byte pre-RM-07 query)", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByStatus({});
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["status"],
+        where: { branchId: "branch-1" },
+        _count: { _all: true },
+      });
     });
   });
 
@@ -259,7 +304,7 @@ describe("ReportingService", () => {
       prisma.slaTicketTarget.findMany.mockResolvedValue([{ ticketId: "ticket-1" }]);
       prisma.slaEscalation.findMany.mockResolvedValue([]);
 
-      await service.getSlaCompliance("2026-01-01", "2026-01-31");
+      await service.getSlaCompliance({ from: "2026-01-01", to: "2026-01-31" });
 
       expect(prisma.slaTicketTarget.findMany).toHaveBeenCalledWith({
         where: {
@@ -279,10 +324,41 @@ describe("ReportingService", () => {
     });
 
     it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
-      await expect(service.getSlaCompliance("2026-02-01", "2026-01-01")).rejects.toThrow(
+      await expect(service.getSlaCompliance({ from: "2026-02-01", to: "2026-01-01" })).rejects.toThrow(
         /from must not be after to/,
       );
       expect(prisma.slaTicketTarget.findMany).not.toHaveBeenCalled();
+    });
+
+    // RM-07 — cross-dimension filters, applied via the `ticket` relation
+    // (SlaTicketTarget carries no departmentId/assignedToUserId/categoryId
+    // column of its own).
+    it("applies departmentId/assignedToUserId/categoryId via the ticket relation on the target lookup only, never on the escalation lookup", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([{ ticketId: "ticket-1" }]);
+      prisma.slaEscalation.findMany.mockResolvedValue([]);
+
+      await service.getSlaCompliance({
+        departmentId: "department-1",
+        assignedToUserId: "user-1",
+        categoryId: "category-1",
+      });
+
+      expect(prisma.slaTicketTarget.findMany).toHaveBeenCalledWith({
+        where: {
+          ticket: {
+            branchId: "branch-1",
+            departmentId: "department-1",
+            assignedToUserId: "user-1",
+            categoryId: "category-1",
+          },
+        },
+        select: { ticketId: true },
+      });
+      expect(prisma.slaEscalation.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", targetType: "resolution", ticketId: { in: ["ticket-1"] } },
+        select: { ticketId: true },
+        distinct: ["ticketId"],
+      });
     });
   });
 
@@ -331,7 +407,7 @@ describe("ReportingService", () => {
         _count: { _all: 0 },
       });
 
-      await service.getCsatSummary("2026-01-01", "2026-01-31");
+      await service.getCsatSummary({ from: "2026-01-01", to: "2026-01-31" });
 
       expect(prisma.ticketCsatResponse.aggregate).toHaveBeenCalledWith({
         where: {
@@ -344,10 +420,37 @@ describe("ReportingService", () => {
     });
 
     it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
-      await expect(service.getCsatSummary("2026-02-01", "2026-01-01")).rejects.toThrow(
+      await expect(service.getCsatSummary({ from: "2026-02-01", to: "2026-01-01" })).rejects.toThrow(
         /from must not be after to/,
       );
       expect(prisma.ticketCsatResponse.aggregate).not.toHaveBeenCalled();
+    });
+
+    // RM-07 — cross-dimension filters, via the ticket relation.
+    it("applies departmentId/assignedToUserId/categoryId via the ticket relation", async () => {
+      prisma.ticketCsatResponse.aggregate.mockResolvedValue({
+        _avg: { rating: null },
+        _count: { _all: 0 },
+      });
+
+      await service.getCsatSummary({
+        departmentId: "department-1",
+        assignedToUserId: "user-1",
+        categoryId: "category-1",
+      });
+
+      expect(prisma.ticketCsatResponse.aggregate).toHaveBeenCalledWith({
+        where: {
+          ticket: {
+            branchId: "branch-1",
+            departmentId: "department-1",
+            assignedToUserId: "user-1",
+            categoryId: "category-1",
+          },
+        },
+        _avg: { rating: true },
+        _count: { _all: true },
+      });
     });
   });
 
@@ -425,7 +528,7 @@ describe("ReportingService", () => {
     it("filters by Ticket.createdAt when a range is supplied (a cohort-outcome view, not a live-workload view)", async () => {
       prisma.ticket.groupBy.mockResolvedValue([]);
 
-      await service.getAgentPerformance("2026-01-01", "2026-01-31");
+      await service.getAgentPerformance({ from: "2026-01-01", to: "2026-01-31" });
 
       expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
         by: ["assignedToUserId", "status"],
@@ -439,10 +542,40 @@ describe("ReportingService", () => {
     });
 
     it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
-      await expect(service.getAgentPerformance("2026-02-01", "2026-01-01")).rejects.toThrow(
+      await expect(service.getAgentPerformance({ from: "2026-02-01", to: "2026-01-01" })).rejects.toThrow(
         /from must not be after to/,
       );
       expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
+    });
+
+    // RM-07 — cross-dimension filters.
+    it("applies departmentId/categoryId as additional AND conditions", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getAgentPerformance({ departmentId: "department-1", categoryId: "category-1" });
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["assignedToUserId", "status"],
+        where: {
+          branchId: "branch-1",
+          assignedToUserId: { not: null },
+          departmentId: "department-1",
+          categoryId: "category-1",
+        },
+        _count: { _all: true },
+      });
+    });
+
+    it("a specific assignedToUserId filter replaces the unassigned-exclusion guard with that exact id", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getAgentPerformance({ assignedToUserId: "user-1" });
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["assignedToUserId", "status"],
+        where: { branchId: "branch-1", assignedToUserId: "user-1" },
+        _count: { _all: true },
+      });
     });
   });
 
@@ -522,7 +655,7 @@ describe("ReportingService", () => {
     it("filters by Ticket.createdAt when a range is supplied", async () => {
       prisma.ticket.groupBy.mockResolvedValue([]);
 
-      await service.getTicketVolumeByCategory("2026-01-01", "2026-01-31");
+      await service.getTicketVolumeByCategory({ from: "2026-01-01", to: "2026-01-31" });
 
       expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
         by: ["categoryId"],
@@ -536,7 +669,7 @@ describe("ReportingService", () => {
 
     it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
       await expect(
-        service.getTicketVolumeByCategory("2026-02-01", "2026-01-01"),
+        service.getTicketVolumeByCategory({ from: "2026-02-01", to: "2026-01-01" }),
       ).rejects.toThrow(/from must not be after to/);
       expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
     });
@@ -546,6 +679,30 @@ describe("ReportingService", () => {
       service = createService(prisma, tenantContext);
 
       await expect(service.getTicketVolumeByCategory()).rejects.toThrow(/no active branch/);
+    });
+
+    // RM-07 — cross-dimension filters (accepted here too, even though a
+    // `categoryId` filter is redundant with this report's own group-by
+    // dimension — applied uniformly rather than special-cased per report).
+    it("applies departmentId/assignedToUserId/categoryId as additional AND conditions", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByCategory({
+        departmentId: "department-1",
+        assignedToUserId: "user-1",
+        categoryId: "category-1",
+      });
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
+        by: ["categoryId"],
+        where: {
+          branchId: "branch-1",
+          departmentId: "department-1",
+          assignedToUserId: "user-1",
+          categoryId: "category-1",
+        },
+        _count: { _all: true },
+      });
     });
   });
 
@@ -614,7 +771,7 @@ describe("ReportingService", () => {
     it("filters which tickets are included by Ticket.createdAt, but buckets age relative to the real current time, unchanged", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
 
-      await service.getTicketAging("2026-01-01", "2026-01-05");
+      await service.getTicketAging({ from: "2026-01-01", to: "2026-01-05" });
 
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: {
@@ -627,10 +784,32 @@ describe("ReportingService", () => {
     });
 
     it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
-      await expect(service.getTicketAging("2026-02-01", "2026-01-01")).rejects.toThrow(
+      await expect(service.getTicketAging({ from: "2026-02-01", to: "2026-01-01" })).rejects.toThrow(
         /from must not be after to/,
       );
       expect(prisma.ticket.findMany).not.toHaveBeenCalled();
+    });
+
+    // RM-07 — cross-dimension filters.
+    it("applies departmentId/assignedToUserId/categoryId as additional AND conditions", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.getTicketAging({
+        departmentId: "department-1",
+        assignedToUserId: "user-1",
+        categoryId: "category-1",
+      });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith({
+        where: {
+          branchId: "branch-1",
+          status: { in: ["OPEN", "IN_PROGRESS"] },
+          departmentId: "department-1",
+          assignedToUserId: "user-1",
+          categoryId: "category-1",
+        },
+        select: { createdAt: true },
+      });
     });
   });
 
@@ -669,7 +848,7 @@ describe("ReportingService", () => {
     it("filters by Ticket.resolvedAt (not createdAt) when a range is supplied", async () => {
       prisma.ticket.findMany.mockResolvedValue([]);
 
-      await service.getResolutionTime("2026-01-01", "2026-01-31");
+      await service.getResolutionTime({ from: "2026-01-01", to: "2026-01-31" });
 
       expect(prisma.ticket.findMany).toHaveBeenCalledWith({
         where: {
@@ -685,7 +864,7 @@ describe("ReportingService", () => {
     });
 
     it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
-      await expect(service.getResolutionTime("2026-02-01", "2026-01-01")).rejects.toThrow(
+      await expect(service.getResolutionTime({ from: "2026-02-01", to: "2026-01-01" })).rejects.toThrow(
         /from must not be after to/,
       );
       expect(prisma.ticket.findMany).not.toHaveBeenCalled();
@@ -696,6 +875,28 @@ describe("ReportingService", () => {
       service = createService(prisma, tenantContext);
 
       await expect(service.getResolutionTime()).rejects.toThrow(/no active branch/);
+    });
+
+    // RM-07 — cross-dimension filters.
+    it("applies departmentId/assignedToUserId/categoryId as additional AND conditions", async () => {
+      prisma.ticket.findMany.mockResolvedValue([]);
+
+      await service.getResolutionTime({
+        departmentId: "department-1",
+        assignedToUserId: "user-1",
+        categoryId: "category-1",
+      });
+
+      expect(prisma.ticket.findMany).toHaveBeenCalledWith({
+        where: {
+          branchId: "branch-1",
+          resolvedAt: { not: null },
+          departmentId: "department-1",
+          assignedToUserId: "user-1",
+          categoryId: "category-1",
+        },
+        select: { createdAt: true, resolvedAt: true },
+      });
     });
   });
 
@@ -850,7 +1051,7 @@ describe("ReportingService", () => {
       prisma.aiPromptLog.groupBy.mockResolvedValue([]);
       prisma.aiPromptLog.count.mockResolvedValue(0);
 
-      await service.getAiUsage("2026-01-01", "2026-01-31");
+      await service.getAiUsage({ from: "2026-01-01", to: "2026-01-31" });
 
       const expectedRange = {
         gte: new Date("2026-01-01T00:00:00.000Z"),
@@ -870,7 +1071,7 @@ describe("ReportingService", () => {
     });
 
     it("propagates a BadRequestException for an invalid range without ever querying Prisma", async () => {
-      await expect(service.getAiUsage("2026-02-01", "2026-01-01")).rejects.toThrow(
+      await expect(service.getAiUsage({ from: "2026-02-01", to: "2026-01-01" })).rejects.toThrow(
         /from must not be after to/,
       );
       expect(prisma.aiPromptLog.groupBy).not.toHaveBeenCalled();
@@ -881,6 +1082,143 @@ describe("ReportingService", () => {
       service = createService(prisma, tenantContext);
 
       await expect(service.getAiUsage()).rejects.toThrow(/no active branch/);
+    });
+
+    // RM-07 — cross-dimension filters. Unlike every other report,
+    // AiPromptLog carries none of these columns itself — applied via the
+    // `ticket` relation, so a CHAT-feature row (no `ticketId`) is
+    // necessarily excluded whenever one is given.
+    describe("cross-dimension filters (RM-07)", () => {
+      it("applies departmentId/assignedToUserId/categoryId via the ticket relation on both queries", async () => {
+        prisma.aiPromptLog.groupBy.mockResolvedValue([]);
+        prisma.aiPromptLog.count.mockResolvedValue(0);
+
+        await service.getAiUsage({
+          departmentId: "department-1",
+          assignedToUserId: "user-1",
+          categoryId: "category-1",
+        });
+
+        const ticketFilter = {
+          ticket: {
+            departmentId: "department-1",
+            assignedToUserId: "user-1",
+            categoryId: "category-1",
+          },
+        };
+        expect(prisma.aiPromptLog.groupBy).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { branchId: "branch-1", ...ticketFilter } }),
+        );
+        expect(prisma.aiPromptLog.count).toHaveBeenCalledWith({
+          where: { branchId: "branch-1", outcome: "SUCCESS", costMicroUsd: null, ...ticketFilter },
+        });
+      });
+
+      it("omits the ticket relation entirely when no department/agent/category filter is given (byte-for-byte pre-RM-07 query, CHAT rows included)", async () => {
+        prisma.aiPromptLog.groupBy.mockResolvedValue([]);
+        prisma.aiPromptLog.count.mockResolvedValue(0);
+
+        await service.getAiUsage({});
+
+        expect(prisma.aiPromptLog.groupBy).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { branchId: "branch-1" } }),
+        );
+      });
+    });
+  });
+
+  // RM-07 — Cross-Dimension Filters + Manager Cross-Branch Rollup. Tested
+  // once, via `getTicketVolumeByStatus` as a representative method — every
+  // other method routes through the exact same, shared
+  // `resolveBranchFilter` private helper, so this is not duplicated eight
+  // times over (each method's own describe block above already asserts
+  // its `crossBranch: false`/omitted behavior is unchanged, since none of
+  // those tests ever pass it).
+  describe("cross-branch rollup (RM-07)", () => {
+    it("resolves the caller's own single branch, unchanged, when crossBranch is omitted or false", async () => {
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByStatus({ crossBranch: false });
+
+      expect(prisma.permission.findFirst).not.toHaveBeenCalled();
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: "branch-1" } }),
+      );
+    });
+
+    it("still validates the caller has an active branch before ever checking the cross-branch permission", async () => {
+      tenantContext = buildTenantContextMock(null, ["Manager"]);
+      service = createService(prisma, tenantContext);
+
+      await expect(
+        service.getTicketVolumeByStatus({ crossBranch: true }),
+      ).rejects.toThrow(/no active branch/);
+      expect(prisma.permission.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("rejects crossBranch: true with ForbiddenException when the caller lacks report:read-cross-branch", async () => {
+      tenantContext = buildTenantContextMock("branch-1", ["Agent"]);
+      service = createService(prisma, tenantContext);
+      prisma.permission.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getTicketVolumeByStatus({ crossBranch: true }),
+      ).rejects.toThrow(/report:read-cross-branch/);
+      expect(prisma.permission.findFirst).toHaveBeenCalledWith({
+        where: {
+          key: "report:read-cross-branch",
+          roles: { some: { role: { name: { in: ["Agent"] } } } },
+        },
+        select: { id: true },
+      });
+      expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
+      expect(prisma.branch.findUniqueOrThrow).not.toHaveBeenCalled();
+    });
+
+    it("resolves every branch in the caller's organization when granted", async () => {
+      tenantContext = buildTenantContextMock("branch-1", ["Manager"]);
+      service = createService(prisma, tenantContext);
+      prisma.permission.findFirst.mockResolvedValue({ id: "perm-1" });
+      prisma.branch.findUniqueOrThrow.mockResolvedValue({ organizationId: "org-1" });
+      prisma.branch.findMany.mockResolvedValue([
+        { id: "branch-1" },
+        { id: "branch-2" },
+        { id: "branch-3" },
+      ]);
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByStatus({ crossBranch: true });
+
+      expect(prisma.branch.findUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: "branch-1" },
+        select: { organizationId: true },
+      });
+      expect(prisma.branch.findMany).toHaveBeenCalledWith({
+        where: { organizationId: "org-1" },
+        select: { id: true },
+      });
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { branchId: { in: ["branch-1", "branch-2", "branch-3"] } },
+        }),
+      );
+    });
+
+    it("combines crossBranch with the other filter dimensions", async () => {
+      tenantContext = buildTenantContextMock("branch-1", ["Manager"]);
+      service = createService(prisma, tenantContext);
+      prisma.permission.findFirst.mockResolvedValue({ id: "perm-1" });
+      prisma.branch.findUniqueOrThrow.mockResolvedValue({ organizationId: "org-1" });
+      prisma.branch.findMany.mockResolvedValue([{ id: "branch-1" }, { id: "branch-2" }]);
+      prisma.ticket.groupBy.mockResolvedValue([]);
+
+      await service.getTicketVolumeByStatus({ crossBranch: true, categoryId: "category-1" });
+
+      expect(prisma.ticket.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { branchId: { in: ["branch-1", "branch-2"] }, categoryId: "category-1" },
+        }),
+      );
     });
   });
 });

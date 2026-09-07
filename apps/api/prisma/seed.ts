@@ -50,6 +50,15 @@ const PERMISSION_CATALOG = [
   "kb:read",
   "kb:update",
   "report:read",
+  // RM-07 — a superset capability, not a replacement for `report:read`:
+  // gates `ReportingService`'s cross-branch aggregation path
+  // (`?crossBranch=true`). Granted to `SuperAdmin` only by default (via
+  // `SuperAdmin`'s own "entire catalog" grant below); an admin creates and
+  // assigns it to whatever manager-shaped role they need — no seeded
+  // "Manager" role exists, since RBAC already supports creating one with
+  // zero code changes (`POST /identity/roles` + `PATCH
+  // /identity/roles/:id/permissions`).
+  "report:read-cross-branch",
   "automation:create",
   "automation:read",
   "automation:update",

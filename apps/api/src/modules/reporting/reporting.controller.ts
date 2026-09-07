@@ -10,6 +10,7 @@ import type {
   AiUsageByFeature,
   AiUsageSummary,
   CsatSummary,
+  ReportFilters,
   ResolutionTimeSummary,
   SlaComplianceSummary,
   TicketAgingBucket,
@@ -17,6 +18,23 @@ import type {
   TicketVolumeByStatus,
 } from "./reporting.service";
 import { ReportingService } from "./reporting.service";
+
+/** RM-07 — the one place `crossBranch`'s `"true"`/`"false"` string
+ * arrives and becomes a real boolean, mirroring
+ * `IdentityController.listBranches`'s own `includeInactive === "true"`
+ * precedent — every one of the 16 routes below builds its `ReportFilters`
+ * through this, so the conversion happens exactly once per request, not
+ * duplicated at each call site. */
+function toFilters(dto: ReportDateRangeQueryDto): ReportFilters {
+  return {
+    from: dto.from,
+    to: dto.to,
+    departmentId: dto.departmentId,
+    assignedToUserId: dto.assignedToUserId,
+    categoryId: dto.categoryId,
+    crossBranch: dto.crossBranch === "true",
+  };
+}
 
 const TICKET_VOLUME_COLUMNS: Array<CsvColumn<TicketVolumeByStatus>> = [
   { key: "status", header: "Status" },
@@ -116,6 +134,14 @@ const AI_USAGE_COLUMNS: Array<CsvColumn<AiUsageByFeature>> = [
  * the report's actual tabular data (mirrors the frontend's own rendering:
  * `ReportsView` already renders `byFeature` as a per-row table under the
  * summary totals), not the outer summary object.
+ *
+ * RM-07 — every route's destructured `{ from, to }` widened to the whole
+ * `ReportDateRangeQueryDto` (`query`), converted once via the module-level
+ * `toFilters()` into the `ReportFilters` object every `ReportingService`
+ * method now takes. Still `report:read` only — `report:read-cross-branch`
+ * is checked inside `ReportingService.resolveBranchFilter`, not via a
+ * second `@RequirePermissions` here, since whether it's required depends
+ * on the request's own `crossBranch` query value, not the static route.
  */
 @ApiTags("reporting")
 @ApiBearerAuth()
@@ -125,142 +151,142 @@ export class ReportingController {
 
   @Get("ticket-volume")
   @RequirePermissions("report:read")
-  getTicketVolume(@Query() { from, to }: ReportDateRangeQueryDto): Promise<TicketVolumeByStatus[]> {
-    return this.reportingService.getTicketVolumeByStatus(from, to);
+  getTicketVolume(@Query() query: ReportDateRangeQueryDto): Promise<TicketVolumeByStatus[]> {
+    return this.reportingService.getTicketVolumeByStatus(toFilters(query));
   }
 
   @Get("ticket-volume/export")
   @RequirePermissions("report:read")
   async exportTicketVolume(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
     @Res() response: Response,
   ): Promise<void> {
-    const rows = await this.reportingService.getTicketVolumeByStatus(from, to);
-    sendCsv(response, "ticket-volume", from, to, toCsv(rows, TICKET_VOLUME_COLUMNS));
+    const rows = await this.reportingService.getTicketVolumeByStatus(toFilters(query));
+    sendCsv(response, "ticket-volume", query.from, query.to, toCsv(rows, TICKET_VOLUME_COLUMNS));
   }
 
   @Get("sla-compliance")
   @RequirePermissions("report:read")
-  getSlaCompliance(@Query() { from, to }: ReportDateRangeQueryDto): Promise<SlaComplianceSummary> {
-    return this.reportingService.getSlaCompliance(from, to);
+  getSlaCompliance(@Query() query: ReportDateRangeQueryDto): Promise<SlaComplianceSummary> {
+    return this.reportingService.getSlaCompliance(toFilters(query));
   }
 
   @Get("sla-compliance/export")
   @RequirePermissions("report:read")
   async exportSlaCompliance(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
     @Res() response: Response,
   ): Promise<void> {
-    const summary = await this.reportingService.getSlaCompliance(from, to);
-    sendCsv(response, "sla-compliance", from, to, toCsv([summary], SLA_COMPLIANCE_COLUMNS));
+    const summary = await this.reportingService.getSlaCompliance(toFilters(query));
+    sendCsv(response, "sla-compliance", query.from, query.to, toCsv([summary], SLA_COMPLIANCE_COLUMNS));
   }
 
   @Get("csat")
   @RequirePermissions("report:read")
-  getCsat(@Query() { from, to }: ReportDateRangeQueryDto): Promise<CsatSummary> {
-    return this.reportingService.getCsatSummary(from, to);
+  getCsat(@Query() query: ReportDateRangeQueryDto): Promise<CsatSummary> {
+    return this.reportingService.getCsatSummary(toFilters(query));
   }
 
   @Get("csat/export")
   @RequirePermissions("report:read")
   async exportCsat(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
     @Res() response: Response,
   ): Promise<void> {
-    const summary = await this.reportingService.getCsatSummary(from, to);
-    sendCsv(response, "csat", from, to, toCsv([summary], CSAT_COLUMNS));
+    const summary = await this.reportingService.getCsatSummary(toFilters(query));
+    sendCsv(response, "csat", query.from, query.to, toCsv([summary], CSAT_COLUMNS));
   }
 
   @Get("agent-performance")
   @RequirePermissions("report:read")
   getAgentPerformance(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
   ): Promise<AgentPerformanceSummary[]> {
-    return this.reportingService.getAgentPerformance(from, to);
+    return this.reportingService.getAgentPerformance(toFilters(query));
   }
 
   @Get("agent-performance/export")
   @RequirePermissions("report:read")
   async exportAgentPerformance(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
     @Res() response: Response,
   ): Promise<void> {
-    const rows = await this.reportingService.getAgentPerformance(from, to);
-    sendCsv(response, "agent-performance", from, to, toCsv(rows, AGENT_PERFORMANCE_COLUMNS));
+    const rows = await this.reportingService.getAgentPerformance(toFilters(query));
+    sendCsv(response, "agent-performance", query.from, query.to, toCsv(rows, AGENT_PERFORMANCE_COLUMNS));
   }
 
   @Get("ticket-aging")
   @RequirePermissions("report:read")
-  getTicketAging(@Query() { from, to }: ReportDateRangeQueryDto): Promise<TicketAgingBucket[]> {
-    return this.reportingService.getTicketAging(from, to);
+  getTicketAging(@Query() query: ReportDateRangeQueryDto): Promise<TicketAgingBucket[]> {
+    return this.reportingService.getTicketAging(toFilters(query));
   }
 
   @Get("ticket-aging/export")
   @RequirePermissions("report:read")
   async exportTicketAging(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
     @Res() response: Response,
   ): Promise<void> {
-    const rows = await this.reportingService.getTicketAging(from, to);
-    sendCsv(response, "ticket-aging", from, to, toCsv(rows, TICKET_AGING_COLUMNS));
+    const rows = await this.reportingService.getTicketAging(toFilters(query));
+    sendCsv(response, "ticket-aging", query.from, query.to, toCsv(rows, TICKET_AGING_COLUMNS));
   }
 
   @Get("resolution-time")
   @RequirePermissions("report:read")
   getResolutionTime(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
   ): Promise<ResolutionTimeSummary> {
-    return this.reportingService.getResolutionTime(from, to);
+    return this.reportingService.getResolutionTime(toFilters(query));
   }
 
   @Get("resolution-time/export")
   @RequirePermissions("report:read")
   async exportResolutionTime(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
     @Res() response: Response,
   ): Promise<void> {
-    const summary = await this.reportingService.getResolutionTime(from, to);
-    sendCsv(response, "resolution-time", from, to, toCsv([summary], RESOLUTION_TIME_COLUMNS));
+    const summary = await this.reportingService.getResolutionTime(toFilters(query));
+    sendCsv(response, "resolution-time", query.from, query.to, toCsv([summary], RESOLUTION_TIME_COLUMNS));
   }
 
   @Get("ticket-volume-by-category")
   @RequirePermissions("report:read")
   getTicketVolumeByCategory(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
   ): Promise<TicketVolumeByCategory[]> {
-    return this.reportingService.getTicketVolumeByCategory(from, to);
+    return this.reportingService.getTicketVolumeByCategory(toFilters(query));
   }
 
   @Get("ticket-volume-by-category/export")
   @RequirePermissions("report:read")
   async exportTicketVolumeByCategory(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
     @Res() response: Response,
   ): Promise<void> {
-    const rows = await this.reportingService.getTicketVolumeByCategory(from, to);
+    const rows = await this.reportingService.getTicketVolumeByCategory(toFilters(query));
     sendCsv(
       response,
       "ticket-volume-by-category",
-      from,
-      to,
+      query.from,
+      query.to,
       toCsv(rows, TICKET_VOLUME_BY_CATEGORY_COLUMNS),
     );
   }
 
   @Get("ai-usage")
   @RequirePermissions("report:read")
-  getAiUsage(@Query() { from, to }: ReportDateRangeQueryDto): Promise<AiUsageSummary> {
-    return this.reportingService.getAiUsage(from, to);
+  getAiUsage(@Query() query: ReportDateRangeQueryDto): Promise<AiUsageSummary> {
+    return this.reportingService.getAiUsage(toFilters(query));
   }
 
   @Get("ai-usage/export")
   @RequirePermissions("report:read")
   async exportAiUsage(
-    @Query() { from, to }: ReportDateRangeQueryDto,
+    @Query() query: ReportDateRangeQueryDto,
     @Res() response: Response,
   ): Promise<void> {
-    const summary = await this.reportingService.getAiUsage(from, to);
-    sendCsv(response, "ai-usage", from, to, toCsv(summary.byFeature, AI_USAGE_COLUMNS));
+    const summary = await this.reportingService.getAiUsage(toFilters(query));
+    sendCsv(response, "ai-usage", query.from, query.to, toCsv(summary.byFeature, AI_USAGE_COLUMNS));
   }
 }
 
