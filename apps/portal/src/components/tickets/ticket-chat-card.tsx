@@ -25,6 +25,12 @@ import { Button, Skeleton } from "@crm/ui";
  * `OUTBOUND` one is always "an agent's" — a Portal contact has no access to
  * the agent user list (`identity` module is agent-only), so agents are
  * labeled generically rather than by name.
+ *
+ * RM-13 — mirrors `apps/web`'s own identical delivery-status indicator:
+ * an `OUTBOUND` (agent's) message whose `deliveryStatus` isn't `DELIVERED`
+ * renders a small status label after its timestamp. Invisible today (no
+ * adapter exists yet), and stays live via the same `mergeChannelMessage`
+ * upsert-by-id change — see that file's own doc comment.
  */
 export function TicketChatCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -78,6 +84,16 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
+                  {message.direction === "OUTBOUND" && message.deliveryStatus !== "DELIVERED" && (
+                    <>
+                      {" · "}
+                      <span
+                        className={message.deliveryStatus === "FAILED" ? "text-red-700" : undefined}
+                      >
+                        {t(`detail.chatDeliveryStatus.${message.deliveryStatus}`)}
+                      </span>
+                    </>
+                  )}
                 </span>
               </li>
             );

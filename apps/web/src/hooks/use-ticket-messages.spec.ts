@@ -12,6 +12,10 @@ function buildMessage(overrides: Partial<ChannelMessageSummary>): ChannelMessage
     senderUserId: null,
     body: "hello",
     createdAt: "2024-01-01T00:00:00.000Z",
+    deliveryStatus: "DELIVERED",
+    externalMessageId: null,
+    failureReason: null,
+    retryCount: 0,
     ...overrides,
   };
 }
@@ -37,10 +41,27 @@ describe("mergeChannelMessage", () => {
     expect(mergeChannelMessage([first], second)).toEqual([first, second]);
   });
 
-  it("does not duplicate a message whose id is already present", () => {
+  it("keeps a single copy when the sender's own broadcast echoes back identical content", () => {
     const message = buildMessage({ id: "message-1" });
-    const duplicate = buildMessage({ id: "message-1", body: "hello (echoed back)" });
-    expect(mergeChannelMessage([message], duplicate)).toEqual([message]);
+    const echo = buildMessage({ id: "message-1" });
+    expect(mergeChannelMessage([message], echo)).toEqual([message]);
+  });
+
+  // RM-13 — a status-update re-emission for an already-present id must
+  // replace it, not be ignored as if it were the old no-op-on-duplicate
+  // behavior — see this function's own doc comment for why.
+  it("replaces an existing message's content when the same id arrives again with a different deliveryStatus", () => {
+    const pending = buildMessage({ id: "message-1", deliveryStatus: "PENDING" });
+    const sent = buildMessage({
+      id: "message-1",
+      deliveryStatus: "SENT",
+      externalMessageId: "provider-msg-1",
+    });
+
+    const result = mergeChannelMessage([pending], sent);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(sent);
   });
 
   it("keeps the list chronological even if delivery order is out of order", () => {

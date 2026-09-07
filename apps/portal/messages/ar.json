@@ -88,6 +88,11 @@
       "chatSend": "إرسال",
       "chatSending": "جارٍ الإرسال...",
       "chatSendFailed": "تعذّر إرسال الرسالة. حاول مرة أخرى.",
+      "chatDeliveryStatus": {
+        "PENDING": "جارٍ الإرسال…",
+        "SENT": "تم الإرسال",
+        "FAILED": "فشل التسليم"
+      },
       "historyHeading": "السجل",
       "historyError": "تعذّر تحميل سجل هذه التذكرة.",
       "historyEmpty": "لا توجد إدخالات في السجل حتى الآن.",

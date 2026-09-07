@@ -144,6 +144,13 @@ export interface ChannelMessageSummary {
   senderUserId: string | null;
   body: string;
   createdAt: string;
+  /** RM-13 — meaningful only for an `OUTBOUND` message on a future
+   * externally-delivered channel (Email/WhatsApp/SMS); every Live
+   * Chat/Web Form/AI_CHAT message is always `"DELIVERED"`. */
+  deliveryStatus: "PENDING" | "SENT" | "DELIVERED" | "FAILED";
+  externalMessageId: string | null;
+  failureReason: string | null;
+  retryCount: number;
 }
 
 /** Mirrors the existing `CreateChannelMessageDto` exactly

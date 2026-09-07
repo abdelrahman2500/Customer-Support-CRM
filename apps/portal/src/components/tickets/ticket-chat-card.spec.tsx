@@ -31,6 +31,9 @@ function queryResult(overrides: Record<string, unknown>) {
   };
 }
 
+// RM-13 — every fixture below now carries `deliveryStatus: "DELIVERED"`,
+// matching what the real API always returns for Live Chat — see
+// `apps/web`'s own identical spec comment for why.
 const agentMessage = {
   id: "message-1",
   ticketId: "ticket-1",
@@ -40,6 +43,10 @@ const agentMessage = {
   senderUserId: "agent-1",
   body: "How can I help?",
   createdAt: "2024-01-01T09:00:00.000Z",
+  deliveryStatus: "DELIVERED" as const,
+  externalMessageId: null,
+  failureReason: null,
+  retryCount: 0,
 };
 
 const myMessage = {
@@ -51,6 +58,10 @@ const myMessage = {
   senderUserId: null,
   body: "I still can't log in.",
   createdAt: "2024-01-01T09:01:00.000Z",
+  deliveryStatus: "DELIVERED" as const,
+  externalMessageId: null,
+  failureReason: null,
+  retryCount: 0,
 };
 
 describe("TicketChatCard (portal)", () => {
@@ -177,6 +188,71 @@ describe("TicketChatCard (portal)", () => {
     fireEvent.click(screen.getByText("detail.chatSend"));
 
     await screen.findByText("Ticket not found");
+  });
+
+  // RM-13 — Channel Message Delivery Status & Retry Model.
+  describe("delivery-status indicator (RM-13)", () => {
+    it("shows no indicator at all for an INBOUND (the contact's own) message, regardless of its own deliveryStatus", () => {
+      vi.mocked(useMyTicketMessagesQuery).mockReturnValue(
+        queryResult({
+          data: [{ ...myMessage, deliveryStatus: "PENDING" as const }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(screen.queryByText("detail.chatDeliveryStatus.PENDING")).not.toBeInTheDocument();
+    });
+
+    it("shows no indicator for an agent's OUTBOUND message that is already DELIVERED (every message today)", () => {
+      vi.mocked(useMyTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [agentMessage], isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(screen.queryByText(/detail.chatDeliveryStatus/)).not.toBeInTheDocument();
+    });
+
+    it("shows the SENT label on an agent's OUTBOUND message once the provider has accepted it", () => {
+      vi.mocked(useMyTicketMessagesQuery).mockReturnValue(
+        queryResult({
+          data: [
+            {
+              ...agentMessage,
+              deliveryStatus: "SENT" as const,
+              externalMessageId: "provider-msg-1",
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.chatDeliveryStatus.SENT")).toBeInTheDocument();
+    });
+
+    it("shows the FAILED label, styled destructively, once every retry is exhausted", () => {
+      vi.mocked(useMyTicketMessagesQuery).mockReturnValue(
+        queryResult({
+          data: [
+            {
+              ...agentMessage,
+              deliveryStatus: "FAILED" as const,
+              failureReason: "Provider rejected: invalid recipient",
+              retryCount: 3,
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.chatDeliveryStatus.FAILED")).toHaveClass("text-red-700");
+    });
   });
 
   // Story 94 — a non-ApiError rejection (e.g. a dropped connection) is now

@@ -26,6 +26,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
  * can ever message a given ticket, Story 53's ownership scoping), several
  * different agents can send `OUTBOUND` messages on the same ticket, so
  * `direction` alone isn't enough to mean "mine."
+ *
+ * RM-13 — an `OUTBOUND` message whose `deliveryStatus` is anything other
+ * than `DELIVERED` (the implicit state every Live Chat/Web Form/AI_CHAT
+ * message has always been in) renders a small status label after its
+ * timestamp. Invisible today — no adapter exists yet that ever produces
+ * `PENDING`/`SENT`/`FAILED` — and stays live the same way the rest of this
+ * card already does: a status transition re-emits `channel.message.created`
+ * for the same message id, and `useTicketRealtime`'s handler now upserts
+ * by id (RM-13's own `mergeChannelMessage` change) instead of ignoring a
+ * repeat id, so this label updates in place with no extra wiring here.
  */
 export function TicketChatCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -113,6 +123,18 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
+                  {message.direction === "OUTBOUND" && message.deliveryStatus !== "DELIVERED" && (
+                    <>
+                      {" · "}
+                      <span
+                        className={
+                          message.deliveryStatus === "FAILED" ? "text-danger-solid" : undefined
+                        }
+                      >
+                        {t(`detail.chatDeliveryStatus.${message.deliveryStatus}`)}
+                      </span>
+                    </>
+                  )}
                 </span>
               </li>
             );

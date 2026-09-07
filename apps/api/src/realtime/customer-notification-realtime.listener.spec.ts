@@ -54,6 +54,10 @@ const agentMessageEvent = {
     senderUserId: "user-1",
     body: "We're looking into this now.",
     createdAt: new Date("2024-01-01T00:00:00.000Z"),
+    deliveryStatus: "DELIVERED" as const,
+    externalMessageId: null,
+    failureReason: null,
+    retryCount: 0,
   },
 };
 
@@ -68,6 +72,10 @@ const customerMessageEvent = {
     senderUserId: null,
     body: "Any update?",
     createdAt: new Date("2024-01-01T00:00:00.000Z"),
+    deliveryStatus: "DELIVERED" as const,
+    externalMessageId: null,
+    failureReason: null,
+    retryCount: 0,
   },
 };
 

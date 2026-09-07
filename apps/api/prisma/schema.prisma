@@ -1406,6 +1406,35 @@ enum ChannelMessageDirection {
   @@schema("channels")
 }
 
+/// RM-13 — a delivery lifecycle for any `ChannelMessage` that travels over
+/// a real external transport (Phase 5's future Email/WhatsApp/SMS
+/// adapters). Mirrors `AiOutcome`'s own "one-way state machine set once
+/// at creation, updated at most once more" shape. `INBOUND` messages and
+/// every first-party channel (`LIVE_CHAT`/`WEB_FORM`/`AI_CHAT`) never
+/// leave this app, so they are created straight at `DELIVERED` (the
+/// model's own default) and never transition — this enum's other three
+/// values are only ever reachable via `ChannelMessagesService`'s new
+/// `enqueueOutboundDelivery`/`markSent`/`markFailed` methods, which have
+/// no production caller yet (Phase 5's first real adapter will be the
+/// first one) but are fully implemented and tested now so the seam is
+/// proven before any real provider exists.
+enum ChannelMessageDeliveryStatus {
+  /// Created, not yet handed to an external transport.
+  PENDING
+  /// Handed to the external transport (e.g. accepted by an SMTP relay);
+  /// not yet confirmed received by the recipient.
+  SENT
+  /// The channel's own always-succeeds state for INBOUND/first-party
+  /// messages, and a real adapter's confirmed-received state for OUTBOUND
+  /// externally-delivered ones.
+  DELIVERED
+  /// Every retry attempt was exhausted; `failureReason`/`retryCount` on
+  /// the row explain what happened and how many attempts were made.
+  FAILED
+
+  @@schema("channels")
+}
+
 /// Story 77 — Customer Portal Live Chat, the first real `ChannelMessage`
 /// consumer (docs/architecture/06-*: "Live chat is a first-class Socket.IO
 /// flow between portal/widget and `apps/api`, normalized to
@@ -1435,6 +1464,15 @@ model ChannelMessage {
   senderUser       User?                   @relation(fields: [senderUserId], references: [id])
   body             String
   createdAt        DateTime                @default(now()) @map("created_at")
+  /// RM-13 — every existing row (and every row created via the three
+  /// pre-existing factory methods) gets this default, unchanged: Live
+  /// Chat/Web Form/AI_CHAT are always instantly "delivered" — first-party,
+  /// no external transport.
+  deliveryStatus    ChannelMessageDeliveryStatus @default(DELIVERED) @map("delivery_status")
+  /// The external provider's own message id, once a provider exists.
+  externalMessageId String?                      @map("external_message_id")
+  failureReason      String?                     @map("failure_reason")
+  retryCount         Int                         @default(0) @map("retry_count")
 
   @@index([ticketId])
   @@map("channel_messages")

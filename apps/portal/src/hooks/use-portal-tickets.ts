@@ -91,16 +91,19 @@ export function useSubmitMyTicketCsatMutation(id: string) {
  * contact's own sent message arrives back over the socket a moment after
  * the POST response already put it in the cache (Story 77 broadcasts to the
  * whole `ticket:{id}` room, sender included), so this is what keeps it from
- * appearing twice. */
+ * appearing twice.
+ *
+ * RM-13 — now an upsert: mirrors `apps/web`'s own identical RM-13 change
+ * exactly, including why (a status-update re-emission for a known id is a
+ * real update to apply, not an echo to ignore — see that file's own doc
+ * comment). */
 export function mergeChannelMessage(
   existing: ChannelMessageSummary[] | undefined,
   incoming: ChannelMessageSummary,
 ): ChannelMessageSummary[] {
   const current = existing ?? [];
-  if (current.some((message) => message.id === incoming.id)) {
-    return current;
-  }
-  return [...current, incoming].sort(
+  const withoutIncoming = current.filter((message) => message.id !== incoming.id);
+  return [...withoutIncoming, incoming].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
 }

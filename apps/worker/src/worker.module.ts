@@ -9,6 +9,11 @@ import { AiProcessingProcessor, AI_PROCESSING_QUEUE } from "./queues/ai-processi
 import { AI_PROCESSING_EVENTS_QUEUE } from "./queues/ai-processing-events.types";
 import { TaskReminderProcessor, TASK_REMINDERS_QUEUE } from "./queues/task-reminder.processor";
 import { TASK_REMINDER_EVENTS_QUEUE } from "./queues/task-reminder-events.types";
+import {
+  ChannelMessageDeliveryProcessor,
+  CHANNEL_MESSAGE_DELIVERY_QUEUE,
+} from "./queues/channel-message-delivery.processor";
+import { CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE } from "./queues/channel-message-delivery-events.types";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AiProviderModule } from "./ai/ai-provider.module";
 import { PinoLoggerService } from "./common/logging/pino-logger.service";
@@ -30,6 +35,8 @@ import { PinoLoggerService } from "./common/logging/pino-logger.service";
     BullModule.registerQueue({ name: AI_PROCESSING_EVENTS_QUEUE }),
     BullModule.registerQueue({ name: TASK_REMINDERS_QUEUE }),
     BullModule.registerQueue({ name: TASK_REMINDER_EVENTS_QUEUE }),
+    BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_QUEUE }),
+    BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE }),
     PrismaModule,
     AiProviderModule,
   ],
@@ -38,6 +45,7 @@ import { PinoLoggerService } from "./common/logging/pino-logger.service";
     SlaTimerProcessor,
     AiProcessingProcessor,
     TaskReminderProcessor,
+    ChannelMessageDeliveryProcessor,
     // Story 111 — resolved via `app.get(PinoLoggerService)` in `main.ts`.
     PinoLoggerService,
   ],

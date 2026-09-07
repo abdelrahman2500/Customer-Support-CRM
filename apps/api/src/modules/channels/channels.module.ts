@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
+import { QueuesModule } from "../../queues/queues.module";
 import { ChannelMessagesService } from "./channel-messages.service";
 import { QuickRepliesController } from "./quick-replies.controller";
 import { QuickRepliesService } from "./quick-replies.service";
@@ -19,8 +20,13 @@ import { QuickRepliesService } from "./quick-replies.service";
  * (`SlaPoliciesModule`/`NotificationsModule`'s own doc-comment precedent).
  * `QuickRepliesService` is not exported — no other module consumes it,
  * mirroring `NotificationTemplatesService`'s own "not exported" precedent.
+ *
+ * RM-13 — imports `QueuesModule` (already exports `ChannelMessageDeliveryProducer`)
+ * so `ChannelMessagesService` can inject it directly, mirroring exactly how
+ * `AiModule`/`TicketsModule` import `QueuesModule` for `AiProcessingProducer`.
  */
 @Module({
+  imports: [QueuesModule],
   controllers: [QuickRepliesController],
   providers: [ChannelMessagesService, QuickRepliesService, TenantContext],
   exports: [ChannelMessagesService],

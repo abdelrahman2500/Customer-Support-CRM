@@ -150,6 +150,11 @@
       "chatSend": "إرسال",
       "chatSending": "جارٍ الإرسال...",
       "chatSendFailed": "تعذّر إرسال الرسالة. حاول مرة أخرى.",
+      "chatDeliveryStatus": {
+        "PENDING": "جارٍ الإرسال…",
+        "SENT": "تم الإرسال",
+        "FAILED": "فشل التسليم"
+      },
       "aiHeading": "مساعد الذكاء الاصطناعي",
       "aiSummarize": "تلخيص",
       "aiSuggestReply": "اقتراح رد",

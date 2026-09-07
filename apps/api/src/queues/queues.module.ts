@@ -9,6 +9,11 @@ import { AiProcessingProducer, AI_PROCESSING_QUEUE } from "./ai-processing.produ
 import { AiProcessingEventsBridgeProcessor, AI_PROCESSING_EVENTS_QUEUE } from "./ai-processing-events-bridge.processor";
 import { TaskRemindersProducer, TASK_REMINDERS_QUEUE } from "./task-reminders.producer";
 import { TaskReminderEventsBridgeProcessor, TASK_REMINDER_EVENTS_QUEUE } from "./task-reminder-events-bridge.processor";
+import { ChannelMessageDeliveryProducer, CHANNEL_MESSAGE_DELIVERY_QUEUE } from "./channel-message-delivery.producer";
+import {
+  ChannelMessageDeliveryEventsBridgeProcessor,
+  CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE,
+} from "./channel-message-delivery-events-bridge.processor";
 
 /**
  * Owns `apps/api`'s BullMQ producer connection — one place all of
@@ -24,6 +29,13 @@ import { TaskReminderEventsBridgeProcessor, TASK_REMINDER_EVENTS_QUEUE } from ".
  * RM-03 — `task-reminders` (produced here, consumed by `apps/worker`) and
  * `task-reminder-events` (consumed here, produced by `apps/worker`) are
  * the identically-shaped task-reminder hand-back bridge.
+ *
+ * RM-13 — `channel-message-delivery` (produced here, consumed by
+ * `apps/worker`) and `channel-message-delivery-events` (consumed here,
+ * produced by `apps/worker`) are the identically-shaped channel-delivery
+ * hand-back bridge — see `ChannelMessageDeliveryProducer`'s own doc
+ * comment for why this is also the queue that introduces this
+ * repository's first configured `attempts`/`backoff` retry policy.
  */
 @Module({
   imports: [
@@ -41,6 +53,8 @@ import { TaskReminderEventsBridgeProcessor, TASK_REMINDER_EVENTS_QUEUE } from ".
     BullModule.registerQueue({ name: AI_PROCESSING_EVENTS_QUEUE }),
     BullModule.registerQueue({ name: TASK_REMINDERS_QUEUE }),
     BullModule.registerQueue({ name: TASK_REMINDER_EVENTS_QUEUE }),
+    BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_QUEUE }),
+    BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE }),
   ],
   providers: [
     HealthCheckProducer,
@@ -50,7 +64,15 @@ import { TaskReminderEventsBridgeProcessor, TASK_REMINDER_EVENTS_QUEUE } from ".
     AiProcessingEventsBridgeProcessor,
     TaskRemindersProducer,
     TaskReminderEventsBridgeProcessor,
+    ChannelMessageDeliveryProducer,
+    ChannelMessageDeliveryEventsBridgeProcessor,
   ],
-  exports: [HealthCheckProducer, SlaTimersProducer, AiProcessingProducer, TaskRemindersProducer],
+  exports: [
+    HealthCheckProducer,
+    SlaTimersProducer,
+    AiProcessingProducer,
+    TaskRemindersProducer,
+    ChannelMessageDeliveryProducer,
+  ],
 })
 export class QueuesModule {}

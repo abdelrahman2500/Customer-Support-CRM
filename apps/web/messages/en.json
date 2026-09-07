@@ -150,6 +150,11 @@
       "chatSend": "Send",
       "chatSending": "Sending...",
       "chatSendFailed": "Couldn't send the message. Please try again.",
+      "chatDeliveryStatus": {
+        "PENDING": "Sending…",
+        "SENT": "Sent",
+        "FAILED": "Delivery failed"
+      },
       "aiHeading": "AI Assist",
       "aiSummarize": "Summarize",
       "aiSuggestReply": "Suggest Reply",

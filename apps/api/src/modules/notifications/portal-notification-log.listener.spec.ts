@@ -101,6 +101,10 @@ describe("PortalNotificationLogListener", () => {
         senderUserId: "agent-1",
         body: "We're looking into this.",
         createdAt: new Date("2024-01-02T00:00:00.000Z"),
+        deliveryStatus: "DELIVERED" as const,
+        externalMessageId: null,
+        failureReason: null,
+        retryCount: 0,
       },
     };
 

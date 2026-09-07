@@ -13,16 +13,24 @@ export const ticketMessagesQueryKey = (id: string) => ["ticket", id, "messages"]
  * the *whole* `ticket:{id}` room, sender included, so the sender's own sent
  * message arrives back over the socket a moment after the POST response
  * already put it in the cache — this is what keeps it from appearing twice.
+ *
+ * RM-13 — now an upsert: an existing `id` is *replaced* rather than
+ * ignored. `ChannelMessagesService.markSent`/`markDelivered`/`markFailed`
+ * re-emit `channel.message.created` for an already-created message once
+ * its delivery status changes (deliberately reusing the same event rather
+ * than adding a new one — see that service's own doc comment), so a
+ * second arrival for a known id is a real, meaningful update, not an echo
+ * to ignore. Every pre-existing call site only ever re-sends identical
+ * content for an id it already had (the sender's own broadcast echo), so
+ * this changes nothing observable for any flow that predates this story.
  */
 export function mergeChannelMessage(
   existing: ChannelMessageSummary[] | undefined,
   incoming: ChannelMessageSummary,
 ): ChannelMessageSummary[] {
   const current = existing ?? [];
-  if (current.some((message) => message.id === incoming.id)) {
-    return current;
-  }
-  return [...current, incoming].sort(
+  const withoutIncoming = current.filter((message) => message.id !== incoming.id);
+  return [...withoutIncoming, incoming].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
 }
