@@ -56,3 +56,22 @@ export interface TicketNoteAddedEvent {
   ticketId: string;
   note: TicketNoteSummary;
 }
+
+export const TICKET_MENTIONED_EVENT = "ticket.mentioned";
+
+/**
+ * RM-06 — emitted once per resolved `@mention` found in a
+ * `TicketsService.createTicketNote` body (never for the note's own
+ * author, mentioning yourself notifies no one) — a single note mentioning
+ * three agents emits three of these, one per recipient, mirroring
+ * `TicketNoteAddedEvent`'s own "carries the specific thing, not the whole
+ * ticket" shape. `TicketMentionNotificationListener` persists a
+ * `NotificationLog` row from this; `TicketMentionRealtimeListener` relays
+ * it into `agent:{recipientUserId}:notifications`.
+ */
+export interface TicketMentionedEvent {
+  ticketId: string;
+  noteId: string;
+  recipientUserId: string;
+  actorUserId: string;
+}

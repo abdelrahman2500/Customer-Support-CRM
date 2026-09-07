@@ -95,6 +95,8 @@ model User {
   customerNotes               CustomerNote[]
   /// RM-05 — this agent's own Knowledge Base article references on tickets.
   ticketKbReferences          TicketKnowledgeBaseReference[]
+  /// RM-06 — @mention notifications addressed to this agent.
+  mentionNotifications        NotificationLog[]
   automationRules             AutomationRule[]
   notificationPreferences     NotificationPreference[]
   uploadedAttachments         TicketAttachment[]
@@ -989,6 +991,19 @@ model NotificationLog {
   /// directly without a `ticket` relation join.
   customerId String?   @map("customer_id")
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  /// RM-06 — set only by `TicketMentionNotificationListener`, for an
+  /// `@mention` notification addressed to one specific agent; every
+  /// pre-existing writer leaves this `null`. This is the first
+  /// single-agent-recipient row this table has ever had — the `customerId`
+  /// precedent above (Story 88) is customer-scoped, not agent-scoped, and
+  /// every other row is branch-wide by construction (visible to every
+  /// agent in `ticket.branchId`, per `NotificationsService`'s own doc
+  /// comment). `NotificationsService.listNotifications`/`getUnreadCount`
+  /// now read this column: a `null` row stays branch-wide as before: a
+  /// non-null one is visible only to that one recipient.
+  recipientUserId String? @map("recipient_user_id")
+  recipientUser   User?   @relation(fields: [recipientUserId], references: [id])
 
   @@unique([eventType, ticketId, targetType, targetAt])
   @@unique([eventType, dedupeKey])

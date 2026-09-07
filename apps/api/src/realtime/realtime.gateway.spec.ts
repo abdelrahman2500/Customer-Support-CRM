@@ -549,6 +549,36 @@ describe("RealtimeGateway", () => {
       expect(result).toEqual({ ok: false });
     });
 
+    // RM-06 — @Mentions. Same own-id-only shape as agent:{id}:tasks: a
+    // mention notification is addressed to one specific agent.
+    it("always allows joining the caller's own agent:{id}:notifications room", async () => {
+      const client = connectedClient();
+
+      const result = await gateway.onJoin(client as never, { room: "agent:user-1:notifications" });
+
+      expect(result).toEqual({ ok: true });
+      expect(prisma.userBranchRole.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("denies joining another agent's notifications room even when they share the caller's branch", async () => {
+      const client = connectedClient();
+
+      const result = await gateway.onJoin(client as never, { room: "agent:user-2:notifications" });
+
+      expect(result).toEqual({ ok: false });
+      expect(prisma.userBranchRole.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("denies a customer joining agent:{id}:notifications — agent-only", async () => {
+      const client = connectedCustomerClient();
+
+      const result = await gateway.onJoin(client as never, {
+        room: "agent:contact-1:notifications",
+      });
+
+      expect(result).toEqual({ ok: false });
+    });
+
     it("denies an unrecognized room shape by default", async () => {
       const client = connectedClient();
 

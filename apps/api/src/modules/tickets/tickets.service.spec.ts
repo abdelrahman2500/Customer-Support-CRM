@@ -9,10 +9,12 @@ import {
   TICKET_UPDATED_EVENT,
   TICKET_RECATEGORIZED_EVENT,
   TICKET_NOTE_ADDED_EVENT,
+  TICKET_MENTIONED_EVENT,
 } from "./tickets.events";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
 import type { KnowledgeBaseService } from "../knowledge-base/knowledge-base.service";
+import type { IdentityService } from "../identity/identity.service";
 import { assertValidTicketStatusTransition } from "./ticket-status-transitions";
 
 // RM-01 — spied, not stubbed: `vi.fn(actual...)` wraps the real
@@ -128,17 +130,27 @@ function buildKnowledgeBaseServiceMock() {
   };
 }
 
+/** RM-06 — `listUsers` defaults to `[]` so every pre-existing test (whose
+ * note bodies were never written with @mentions in mind) resolves zero
+ * mentions and emits no `TICKET_MENTIONED_EVENT`; the dedicated describe
+ * block below overrides it per test. */
+function buildIdentityServiceMock() {
+  return { listUsers: vi.fn().mockResolvedValue([]) };
+}
+
 function createService(
   prismaMock: ReturnType<typeof buildPrismaMock>,
   tenantMock: ReturnType<typeof buildTenantContextMock>,
   eventEmitterMock: ReturnType<typeof buildEventEmitterMock>,
   knowledgeBaseServiceMock: ReturnType<typeof buildKnowledgeBaseServiceMock> = buildKnowledgeBaseServiceMock(),
+  identityServiceMock: ReturnType<typeof buildIdentityServiceMock> = buildIdentityServiceMock(),
 ): TicketsService {
   return new TicketsService(
     prismaMock as unknown as PrismaService,
     tenantMock as unknown as TenantContext,
     eventEmitterMock as unknown as EventEmitter2,
     knowledgeBaseServiceMock as unknown as KnowledgeBaseService,
+    identityServiceMock as unknown as IdentityService,
   );
 }
 
@@ -147,6 +159,7 @@ describe("TicketsService", () => {
   let tenantContext: ReturnType<typeof buildTenantContextMock>;
   let eventEmitter: ReturnType<typeof buildEventEmitterMock>;
   let knowledgeBaseService: ReturnType<typeof buildKnowledgeBaseServiceMock>;
+  let identityService: ReturnType<typeof buildIdentityServiceMock>;
   let service: TicketsService;
 
   const baseDto = { customerId: "customer-1", subject: "Cannot log in" };
@@ -157,7 +170,8 @@ describe("TicketsService", () => {
     tenantContext = buildTenantContextMock();
     eventEmitter = buildEventEmitterMock();
     knowledgeBaseService = buildKnowledgeBaseServiceMock();
-    service = createService(prisma, tenantContext, eventEmitter, knowledgeBaseService);
+    identityService = buildIdentityServiceMock();
+    service = createService(prisma, tenantContext, eventEmitter, knowledgeBaseService, identityService);
   });
 
   describe("createTicket", () => {
@@ -1901,6 +1915,118 @@ describe("TicketsService", () => {
           body: "Called the customer back.",
           createdAt: new Date("2026-01-01T00:00:00.000Z"),
         },
+      });
+    });
+
+    // RM-06 — @Mentions.
+    describe("@mention resolution", () => {
+      const branchUsers = [
+        { id: "user-1", fullName: "Author Agent" },
+        { id: "user-2", fullName: "Jane Doe" },
+        { id: "user-3", fullName: "John Smith" },
+      ];
+
+      it("emits ticket.mentioned for each resolved recipient, in addition to ticket.note-added", async () => {
+        identityService.listUsers.mockResolvedValue(branchUsers);
+        prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+        prisma.ticketNote.create.mockResolvedValue({
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-1",
+          body: "@Jane Doe can you take this?",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        });
+
+        await service.createTicketNote("ticket-1", { body: "@Jane Doe can you take this?" });
+
+        expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_MENTIONED_EVENT, {
+          ticketId: "ticket-1",
+          noteId: "note-1",
+          recipientUserId: "user-2",
+          actorUserId: "user-1",
+        });
+        expect(eventEmitter.emit).toHaveBeenCalledTimes(2); // note-added + one mention.
+      });
+
+      it("emits one ticket.mentioned event per distinct resolved recipient", async () => {
+        identityService.listUsers.mockResolvedValue(branchUsers);
+        prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+        prisma.ticketNote.create.mockResolvedValue({
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-1",
+          body: "@Jane Doe @John Smith please review",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        });
+
+        await service.createTicketNote("ticket-1", {
+          body: "@Jane Doe @John Smith please review",
+        });
+
+        const mentionCalls = eventEmitter.emit.mock.calls.filter(
+          ([eventName]) => eventName === TICKET_MENTIONED_EVENT,
+        );
+        expect(mentionCalls).toHaveLength(2);
+        expect(mentionCalls.map(([, payload]) => payload.recipientUserId).sort()).toEqual([
+          "user-2",
+          "user-3",
+        ]);
+      });
+
+      it("never notifies the note's own author, even if their own name appears in it", async () => {
+        identityService.listUsers.mockResolvedValue(branchUsers);
+        prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+        prisma.ticketNote.create.mockResolvedValue({
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-1",
+          body: "@Author Agent will handle this myself.",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        });
+
+        await service.createTicketNote("ticket-1", {
+          body: "@Author Agent will handle this myself.",
+        });
+
+        expect(eventEmitter.emit).toHaveBeenCalledTimes(1); // note-added only.
+        expect(eventEmitter.emit).not.toHaveBeenCalledWith(
+          TICKET_MENTIONED_EVENT,
+          expect.anything(),
+        );
+      });
+
+      it("emits no ticket.mentioned event and never throws for an unresolvable mention", async () => {
+        identityService.listUsers.mockResolvedValue(branchUsers);
+        prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+        prisma.ticketNote.create.mockResolvedValue({
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-1",
+          body: "@Someone Unknown, please help",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        });
+
+        await expect(
+          service.createTicketNote("ticket-1", { body: "@Someone Unknown, please help" }),
+        ).resolves.toEqual({ id: "note-1" });
+        expect(eventEmitter.emit).toHaveBeenCalledTimes(1); // note-added only.
+      });
+
+      it("emits no ticket.mentioned event for a plain note with no @ at all", async () => {
+        identityService.listUsers.mockResolvedValue(branchUsers);
+        prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+        prisma.ticketNote.create.mockResolvedValue({
+          id: "note-1",
+          ticketId: "ticket-1",
+          authorUserId: "user-1",
+          body: "Called the customer back.",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        });
+
+        await service.createTicketNote("ticket-1", { body: "Called the customer back." });
+
+        expect(eventEmitter.emit).toHaveBeenCalledTimes(1); // note-added only.
+        expect(identityService.listUsers).toHaveBeenCalledOnce();
       });
     });
   });

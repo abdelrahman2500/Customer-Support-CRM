@@ -76,8 +76,50 @@ describe("NotificationsService", () => {
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
       expect(prisma.notificationLog.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { ticket: { branchId: "branch-1" }, customerId: null },
+          where: {
+            ticket: { branchId: "branch-1" },
+            customerId: null,
+            OR: [{ recipientUserId: null }, { recipientUserId: "user-1" }],
+          },
         }),
+      );
+    });
+
+    // RM-06 — @Mentions. `recipientUserId` narrows a branch-wide query to
+    // "branch-wide rows OR rows addressed to me specifically".
+    it("includes both branch-wide (recipientUserId: null) and my own mention rows", async () => {
+      prisma.notificationLog.findMany.mockResolvedValue([]);
+
+      await service.listNotifications();
+
+      const { where } = prisma.notificationLog.findMany.mock.calls[0]![0] as {
+        where: { OR: Array<{ recipientUserId: string | null }> };
+      };
+      expect(where.OR).toEqual([{ recipientUserId: null }, { recipientUserId: "user-1" }]);
+    });
+
+    it("scopes to the caller's own id, not another agent's", async () => {
+      tenantContext = buildTenantContextMock("branch-1", "user-2");
+      service = createService(prisma, tenantContext);
+      prisma.notificationLog.findMany.mockResolvedValue([]);
+
+      await service.listNotifications();
+
+      expect(prisma.notificationLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [{ recipientUserId: null }, { recipientUserId: "user-2" }],
+          }),
+        }),
+      );
+    });
+
+    it("throws when TenantContext has no authenticated user", async () => {
+      tenantContext = buildTenantContextMock("branch-1", null);
+      service = createService(prisma, tenantContext);
+
+      await expect(service.listNotifications()).rejects.toThrow(
+        "TenantContext: no active user on this request",
       );
     });
 
@@ -314,7 +356,11 @@ describe("NotificationsService", () => {
 
         const countWhere = prisma.notificationLog.count.mock.calls[0]![0]!.where;
         const findWhere = prisma.notificationLog.findMany.mock.calls[0]![0]!.where;
-        expect(countWhere).toEqual({ ticket: { branchId: "branch-1" }, customerId: null });
+        expect(countWhere).toEqual({
+          ticket: { branchId: "branch-1" },
+          customerId: null,
+          OR: [{ recipientUserId: null }, { recipientUserId: "user-1" }],
+        });
         // Not merely equal by value - literally the same object.
         expect(countWhere).toBe(findWhere);
       });
@@ -439,7 +485,11 @@ describe("NotificationsService", () => {
         select: { notificationsReadAt: true },
       });
       expect(prisma.notificationLog.count).toHaveBeenCalledWith({
-        where: { ticket: { branchId: "branch-1" }, customerId: null },
+        where: {
+          ticket: { branchId: "branch-1" },
+          customerId: null,
+          OR: [{ recipientUserId: null }, { recipientUserId: "user-1" }],
+        },
       });
       expect(result).toEqual({ unreadCount: 3 });
     });
@@ -452,8 +502,31 @@ describe("NotificationsService", () => {
       await service.getUnreadCount();
 
       expect(prisma.notificationLog.count).toHaveBeenCalledWith({
-        where: { ticket: { branchId: "branch-1" }, customerId: null, loggedAt: { gt: readAt } },
+        where: {
+          ticket: { branchId: "branch-1" },
+          customerId: null,
+          OR: [{ recipientUserId: null }, { recipientUserId: "user-1" }],
+          loggedAt: { gt: readAt },
+        },
       });
+    });
+
+    // RM-06 — @Mentions.
+    it("scopes the recipientUserId OR-clause to the caller's own id", async () => {
+      tenantContext = buildTenantContextMock("branch-1", "user-2");
+      service = createService(prisma, tenantContext);
+      prisma.user.findUniqueOrThrow.mockResolvedValue({ notificationsReadAt: null });
+      prisma.notificationLog.count.mockResolvedValue(0);
+
+      await service.getUnreadCount();
+
+      expect(prisma.notificationLog.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [{ recipientUserId: null }, { recipientUserId: "user-2" }],
+          }),
+        }),
+      );
     });
   });
 

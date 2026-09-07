@@ -12,6 +12,7 @@ import { paginate } from "../../common/pagination/paginate";
 import type { Paginated } from "../../common/pagination/paginated";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { KnowledgeBaseService } from "../knowledge-base/knowledge-base.service";
+import { IdentityService } from "../identity/identity.service";
 import type { CreateTicketDto } from "./dto/create-ticket.dto";
 import type { UpdateTicketDto } from "./dto/update-ticket.dto";
 import type { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
@@ -19,11 +20,13 @@ import type { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
 import type { CreateTicketKbReferenceDto } from "./dto/create-ticket-kb-reference.dto";
 import type { PortalCreateTicketDto } from "../portal/dto/portal-create-ticket.dto";
 import type { SubmitCsatDto } from "../portal/dto/submit-csat.dto";
+import { parseMentions } from "./ticket-mentions";
 import {
   TICKET_CREATED_EVENT,
   TICKET_UPDATED_EVENT,
   TICKET_RECATEGORIZED_EVENT,
   TICKET_NOTE_ADDED_EVENT,
+  TICKET_MENTIONED_EVENT,
 } from "./tickets.events";
 import { assertValidTicketStatusTransition } from "./ticket-status-transitions";
 import type {
@@ -31,6 +34,7 @@ import type {
   TicketUpdatedEvent,
   TicketRecategorizedEvent,
   TicketNoteAddedEvent,
+  TicketMentionedEvent,
 } from "./tickets.events";
 
 /**
@@ -164,6 +168,7 @@ export class TicketsService {
     private readonly tenantContext: TenantContext,
     private readonly eventEmitter: EventEmitter2,
     private readonly knowledgeBaseService: KnowledgeBaseService,
+    private readonly identityService: IdentityService,
   ) {}
 
   async createTicket(dto: CreateTicketDto): Promise<TicketSummary> {
@@ -474,6 +479,25 @@ export class TicketsService {
       ticketId: id,
       note: summary,
     } satisfies TicketNoteAddedEvent);
+
+    // RM-06 — @Mentions. `listUsers()` is the same branch-scoped agent
+    // list the assignee `Select`/mention composer both already render
+    // client-side (`useUsersQuery`) — reused here for resolution rather
+    // than a second, duplicated Prisma query. The author never notifies
+    // themself even if their own name appears in their own note.
+    const branchUsers = await this.identityService.listUsers();
+    const mentionedUserIds = parseMentions(dto.body, branchUsers).filter(
+      (userId) => userId !== authorUserId,
+    );
+    for (const recipientUserId of mentionedUserIds) {
+      this.eventEmitter.emit(TICKET_MENTIONED_EVENT, {
+        ticketId: id,
+        noteId: note.id,
+        recipientUserId,
+        actorUserId: authorUserId,
+      } satisfies TicketMentionedEvent);
+    }
+
     return { id: note.id };
   }
 

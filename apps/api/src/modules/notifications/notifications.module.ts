@@ -9,6 +9,7 @@ import { NotificationTemplatesController } from "./notification-templates.contro
 import { NotificationTemplatesService } from "./notification-templates.service";
 import { SlaAtRiskNotificationListener } from "./sla-at-risk-notification.listener";
 import { TicketEscalatedNotificationListener } from "./ticket-escalated-notification.listener";
+import { TicketMentionNotificationListener } from "./ticket-mention-notification.listener";
 import { PortalNotificationLogListener } from "./portal-notification-log.listener";
 
 /**
@@ -58,6 +59,15 @@ import { PortalNotificationLogListener } from "./portal-notification-log.listene
  * methods add a per-recipient read cursor on `User`/`Contact` themselves
  * (not a new table, not a column on `NotificationLog` — see
  * `NotificationsService.getUnreadCount`'s own doc comment for why).
+ *
+ * RM-06 — `TicketMentionNotificationListener` added the same way
+ * `TicketEscalatedNotificationListener` was: reacts to `tickets.events.ts`'s
+ * `ticket.mentioned`, no import of `TicketsModule` (same plain-event-
+ * contract pattern this module's own doc comment already describes for
+ * its siblings). `NotificationLog.recipientUserId` (this story's own new
+ * column) is what finally lets `NotificationsService.listNotifications`/
+ * `getUnreadCount` scope a row to one specific agent instead of the whole
+ * branch.
  */
 @Module({
   controllers: [
@@ -73,6 +83,7 @@ import { PortalNotificationLogListener } from "./portal-notification-log.listene
     TenantContext,
     SlaAtRiskNotificationListener,
     TicketEscalatedNotificationListener,
+    TicketMentionNotificationListener,
     PortalNotificationLogListener,
   ],
   exports: [NotificationsService, PortalNotificationPreferencesService],

@@ -4,6 +4,7 @@ import { WorkspaceNav } from "./workspace-nav";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
+import { useMentionNotifications } from "@/hooks/use-mention-notifications";
 import { ApiError, clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
@@ -56,6 +57,14 @@ vi.mock("@/hooks/use-notifications", () => ({
 // Story 118 — Branch switcher.
 vi.mock("@/hooks/use-branch-memberships", () => ({
   useMyBranchMembershipsQuery: vi.fn(),
+}));
+
+// RM-06 — mounted here unconditionally; its own behavior is covered by its
+// own dedicated spec, so this file only needs it to be a real no-op (it
+// calls the real `useQueryClient()` otherwise, which throws without a
+// `QueryClientProvider` this file never sets up).
+vi.mock("@/hooks/use-mention-notifications", () => ({
+  useMentionNotifications: vi.fn(),
 }));
 
 const mockedLogout = vi.mocked(logout);
@@ -113,6 +122,15 @@ describe("WorkspaceNav", () => {
     expect(
       screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`),
     ).toBeInTheDocument();
+  });
+
+  // RM-06 — mounted here so a mention notifies the agent regardless of
+  // which page is open, not just while a specific dashboard panel is
+  // mounted (mirrors this component's own always-on unread-count badge).
+  it("joins the signed-in user's own mention-notifications room", () => {
+    render(<WorkspaceNav user={user} />);
+
+    expect(useMentionNotifications).toHaveBeenCalledWith(user.id);
   });
 
   it("calls the real logout, then clears the local token and query cache, and redirects to login, on sign-out", async () => {

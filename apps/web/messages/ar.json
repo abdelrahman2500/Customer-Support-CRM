@@ -132,6 +132,8 @@
       "aiCategoryNoMatch": "لا توجد فئة مطابقة لـ \"{category}\".",
       "aiCategoryNoMatchLink": "أنشئها في فئات التذاكر",
       "assignedAgent": "الوكيل المكلّف",
+      "presenceOnline": "متصل",
+      "presenceOffline": "غير متصل",
       "department": "القسم",
       "noDepartment": "بدون قسم",
       "departmentLoadError": "تعذّر تحميل الأقسام.",
@@ -682,7 +684,8 @@
     "eventLabel": {
       "slaAtRisk": "اتفاقية الخدمة في خطر",
       "slaBreached": "تم خرق اتفاقية الخدمة",
-      "ticketEscalated": "تم تصعيد التذكرة"
+      "ticketEscalated": "تم تصعيد التذكرة",
+      "ticketMentioned": "تمت الإشارة إليك"
     },
     "targetType": {
       "response": "الاستجابة",

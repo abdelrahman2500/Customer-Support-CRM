@@ -132,6 +132,8 @@
       "aiCategoryNoMatch": "No existing category matches \"{category}\".",
       "aiCategoryNoMatchLink": "Create it in Ticket Categories",
       "assignedAgent": "Assigned agent",
+      "presenceOnline": "Online",
+      "presenceOffline": "Offline",
       "department": "Department",
       "noDepartment": "No department",
       "departmentLoadError": "Couldn't load departments.",
@@ -682,7 +684,8 @@
     "eventLabel": {
       "slaAtRisk": "SLA at risk",
       "slaBreached": "SLA breached",
-      "ticketEscalated": "Ticket escalated"
+      "ticketEscalated": "Ticket escalated",
+      "ticketMentioned": "You were mentioned"
     },
     "targetType": {
       "response": "Response",

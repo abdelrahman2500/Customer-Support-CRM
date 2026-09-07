@@ -286,6 +286,14 @@ export class RealtimeGateway
       return taskMatch[1] === claims.userId;
     }
 
+    // RM-06 — @Mentions. Same own-id-only shape as `agent:(.+):tasks`: a
+    // mention notification is addressed to one specific agent, never
+    // observable by a branch-mate the way presence is.
+    const mentionMatch = /^agent:(.+):notifications$/.exec(room);
+    if (mentionMatch) {
+      return mentionMatch[1] === claims.userId;
+    }
+
     return false;
   }
 

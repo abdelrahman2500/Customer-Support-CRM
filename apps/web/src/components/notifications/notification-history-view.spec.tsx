@@ -113,6 +113,17 @@ const escalatedNotification = {
   loggedAt: "2024-01-01T09:00:00.000Z",
 };
 
+// RM-06 — @Mentions.
+const mentionedNotification = {
+  id: "notif-3",
+  eventType: "ticket.mentioned",
+  ticketId: "ticket-3",
+  branchId: "branch-1",
+  targetType: null,
+  targetAt: null,
+  loggedAt: "2024-01-01T09:30:00.000Z",
+};
+
 describe("NotificationHistoryView", () => {
   let markRead: ReturnType<typeof vi.fn>;
 
@@ -259,6 +270,17 @@ describe("NotificationHistoryView", () => {
 
     expect(screen.getByText("eventLabel.ticketEscalated")).toBeInTheDocument();
     expect(screen.getByText("noTarget")).toBeInTheDocument();
+  });
+
+  // RM-06 — @Mentions.
+  it("renders a distinct label for a ticket.mentioned notification", () => {
+    mockedUseNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: page([mentionedNotification]) }) as never,
+    );
+
+    render(<NotificationHistoryView />);
+
+    expect(screen.getByText("eventLabel.ticketMentioned")).toBeInTheDocument();
   });
 
   // Story 61 — custom notification templates.

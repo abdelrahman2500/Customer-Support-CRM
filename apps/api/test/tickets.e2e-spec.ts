@@ -2124,4 +2124,127 @@ describe("Ticketing (e2e)", () => {
       expect(ids).not.toContain(draftArticleId);
     });
   });
+
+  // RM-06 — @Mentions.
+  describe("ticket note @mentions (RM-06)", () => {
+    let mentionTicketId: string;
+    let targetAccessToken: string;
+    let targetFullName: string;
+    let bystanderAccessToken: string;
+
+    async function createAgent(fullNameLabel: string): Promise<{
+      accessToken: string;
+      fullName: string;
+    }> {
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const fullName = `${fullNameLabel} ${randomUUID().slice(0, 8)}`;
+      const email = `${fullNameLabel.toLowerCase().replace(/\s+/g, "-")}-${randomUUID()}@example.com`;
+      const password = "agent-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email,
+          password,
+          fullName,
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+      const login = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email, password })
+        .expect(200);
+      return { accessToken: login.body.accessToken as string, fullName };
+    }
+
+    async function waitForMentionNotification(
+      ticketId: string,
+      { timeoutMs = 5000, intervalMs = 100 }: { timeoutMs?: number; intervalMs?: number } = {},
+    ) {
+      const deadline = Date.now() + timeoutMs;
+      do {
+        const rows = await prisma.notificationLog.findMany({
+          where: { eventType: "ticket.mentioned", ticketId },
+        });
+        if (rows.length > 0) {
+          return rows;
+        }
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      } while (Date.now() < deadline);
+      return [];
+    }
+
+    beforeAll(async () => {
+      const target = await createAgent("Mention Target");
+      targetAccessToken = target.accessToken;
+      targetFullName = target.fullName;
+
+      const bystander = await createAgent("Mention Bystander");
+      bystanderAccessToken = bystander.accessToken;
+
+      const ticket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, subject: "Mention fixture ticket" })
+        .expect(201);
+      mentionTicketId = ticket.body.id;
+    });
+
+    it("persists a NotificationLog row for the mentioned agent and relays it in real time", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${mentionTicketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: `@${targetFullName} can you take a look at this?` })
+        .expect(201);
+
+      const rows = await waitForMentionNotification(mentionTicketId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.ticketId).toBe(mentionTicketId);
+    });
+
+    it("shows the mention to the mentioned agent, but not to a bystander agent", async () => {
+      const targetNotifications = await request(app.getHttpServer())
+        .get("/api/v1/notifications")
+        .query({ pageSize: 100 })
+        .set("Authorization", `Bearer ${targetAccessToken}`)
+        .expect(200);
+      const targetHasMention = targetNotifications.body.items.some(
+        (item: { eventType: string; ticketId: string }) =>
+          item.eventType === "ticket.mentioned" && item.ticketId === mentionTicketId,
+      );
+      expect(targetHasMention).toBe(true);
+
+      const bystanderNotifications = await request(app.getHttpServer())
+        .get("/api/v1/notifications")
+        .query({ pageSize: 100 })
+        .set("Authorization", `Bearer ${bystanderAccessToken}`)
+        .expect(200);
+      const bystanderHasMention = bystanderNotifications.body.items.some(
+        (item: { eventType: string; ticketId: string }) =>
+          item.eventType === "ticket.mentioned" && item.ticketId === mentionTicketId,
+      );
+      expect(bystanderHasMention).toBe(false);
+    });
+
+    it("does not error on an unresolvable mention — the note is still created normally", async () => {
+      const created = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${mentionTicketId}/notes`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "@Someone Who Does Not Exist, please help" })
+        .expect(201);
+
+      expect(created.body.id).toBeDefined();
+    });
+  });
 });

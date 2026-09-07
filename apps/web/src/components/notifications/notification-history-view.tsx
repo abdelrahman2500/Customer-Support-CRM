@@ -16,13 +16,18 @@ import { NotificationPreferencesSection } from "./notification-preferences-secti
 /** The real, backend-defined event-type strings this history can ever show
  * (`SLA_AT_RISK_EVENT`/`SLA_BREACHED_EVENT`/`TICKET_ESCALATED_EVENT` —
  * confirmed against `sla-detection.events.ts`/`tickets.events.ts` and the
- * two `NotificationLog`-writing listeners during implementation). An
- * unrecognized value (a future event type) falls back to the raw string
- * rather than a missing-translation crash. */
+ * `NotificationLog`-writing listeners during implementation; RM-06 adds
+ * `TICKET_MENTIONED_EVENT`, whose row is only ever visible here to the
+ * one mentioned recipient — see `NotificationsService.listNotifications`'s
+ * own `recipientUserId` filter). An unrecognized value (a future event
+ * type) falls back to the raw string rather than a missing-translation
+ * crash. */
 const EVENT_LABEL_KEYS: Record<string, string> = {
   "sla.at_risk": "eventLabel.slaAtRisk",
   "sla.breached": "eventLabel.slaBreached",
   "ticket.escalated": "eventLabel.ticketEscalated",
+  // RM-06 — @Mentions.
+  "ticket.mentioned": "eventLabel.ticketMentioned",
 };
 
 /** The only two real `targetType` values the backend ever emits (`response`/

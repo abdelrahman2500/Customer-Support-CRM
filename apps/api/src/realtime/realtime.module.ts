@@ -6,6 +6,7 @@ import { ChatRealtimeListener } from "./chat-realtime.listener";
 import { BranchNotificationRealtimeListener } from "./branch-notification-realtime.listener";
 import { CustomerNotificationRealtimeListener } from "./customer-notification-realtime.listener";
 import { TaskRealtimeListener } from "./task-realtime.listener";
+import { TicketMentionRealtimeListener } from "./ticket-mention-realtime.listener";
 import { PresenceService } from "./presence.service";
 
 /**
@@ -41,6 +42,12 @@ import { PresenceService } from "./presence.service";
  * `task.reminder_due` and relaying into `agent:{ownerUserId}:tasks`
  * (`RealtimeGateway.authorizeRoom`'s own new `agent:(.+):tasks` branch) —
  * fully independent of every other listener here.
+ *
+ * RM-06 — `TicketMentionRealtimeListener` registered the same way,
+ * reacting to `ticket.mentioned` and relaying into
+ * `agent:{recipientUserId}:notifications` (`RealtimeGateway.authorizeRoom`'s
+ * own new `agent:(.+):notifications` branch) — fully independent of every
+ * other listener here.
  */
 @Module({
   imports: [AuthModule],
@@ -51,6 +58,7 @@ import { PresenceService } from "./presence.service";
     BranchNotificationRealtimeListener,
     CustomerNotificationRealtimeListener,
     TaskRealtimeListener,
+    TicketMentionRealtimeListener,
     PresenceService,
   ],
 })

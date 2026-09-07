@@ -8,6 +8,7 @@ import type { AuthenticatedUser } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
+import { useMentionNotifications } from "@/hooks/use-mention-notifications";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Badge, Button } from "@crm/ui";
 import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
@@ -127,6 +128,11 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
   const brandingQuery = useBrandingQuery();
   const unreadCountQuery = useUnreadNotificationCountQuery();
   const unreadCount = unreadCountQuery.data?.unreadCount ?? 0;
+  // RM-06 — mounted here (rather than a single page) since this component
+  // is rendered on every agent-workspace page, mirroring how its own
+  // unread-count badge already needs to stay live regardless of which
+  // screen is open.
+  useMentionNotifications(user.id);
   const membershipsQuery = useMyBranchMembershipsQuery();
   const memberships = membershipsQuery.data ?? [];
   const errorMessage = useErrorMessage();

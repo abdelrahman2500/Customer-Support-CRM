@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { TicketDetailView } from "./ticket-detail-view";
 import {
   useCreateTicketNoteMutation,
@@ -31,6 +31,7 @@ import {
   useTicketKbReferencesQuery,
 } from "@/hooks/use-ticket-kb-references";
 import { usePublishedArticleSearchQuery } from "@/hooks/use-knowledge-base";
+import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { ApiError } from "@/lib/api";
 import { showSuccessToast } from "@crm/ui";
@@ -126,6 +127,11 @@ vi.mock("@/hooks/use-ticket-kb-references", () => ({
 
 vi.mock("@/hooks/use-knowledge-base", () => ({
   usePublishedArticleSearchQuery: vi.fn(),
+}));
+
+// RM-06 — Workspace Presence.
+vi.mock("@/hooks/use-agent-presence", () => ({
+  useAgentPresence: vi.fn(),
 }));
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -268,6 +274,9 @@ describe("TicketDetailView", () => {
       error: null,
     } as never);
     vi.mocked(usePublishedArticleSearchQuery).mockReturnValue(queryResult({}) as never);
+    // RM-06 — default to an empty presence map so pre-existing tests are
+    // unaffected; the dedicated describe block below overrides it.
+    vi.mocked(useAgentPresence).mockReturnValue({});
   });
 
   it("renders the ticket subject and resolved customer name", () => {
@@ -551,6 +560,51 @@ describe("TicketDetailView", () => {
       render(<TicketDetailView ticketId="ticket-1" />);
 
       expect(screen.getByText("detail.departmentLoadError")).toBeInTheDocument();
+    });
+  });
+
+  // RM-06 — Workspace Presence. Extends Story 108's presence foundation
+  // into the assignee picker.
+  describe("assignee presence (RM-06)", () => {
+    beforeEach(() => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useUsersQuery).mockReturnValue(
+        queryResult({
+          data: [
+            { id: "user-1", fullName: "Jane Online" },
+            { id: "user-2", fullName: "John Offline" },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+    });
+
+    it("passes every listed agent's id to useAgentPresence", () => {
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(useAgentPresence).toHaveBeenCalledWith(["user-1", "user-2"]);
+    });
+
+    it("shows an online badge for an agent useAgentPresence reports online", async () => {
+      vi.mocked(useAgentPresence).mockReturnValue({ "user-1": "online" });
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByRole("combobox", { name: "detail.assignedAgent" }));
+
+      const option = await screen.findByRole("option", { name: /Jane Online/ });
+      expect(within(option).getByText("detail.presenceOnline")).toBeInTheDocument();
+    });
+
+    it("shows an offline badge for an agent useAgentPresence reports offline (or doesn't mention at all)", async () => {
+      vi.mocked(useAgentPresence).mockReturnValue({ "user-1": "online" });
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByRole("combobox", { name: "detail.assignedAgent" }));
+
+      const option = await screen.findByRole("option", { name: /John Offline/ });
+      expect(within(option).getByText("detail.presenceOffline")).toBeInTheDocument();
     });
   });
 
@@ -888,6 +942,114 @@ describe("TicketDetailView", () => {
 
       expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
       expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
+    });
+
+    // RM-06 — @Mentions. The note composer's own basic mention affordance.
+    describe("@mention composer (RM-06)", () => {
+      beforeEach(() => {
+        vi.mocked(useTicketNotesQuery).mockReturnValue(
+          queryResult({ data: [], isSuccess: true }) as never,
+        );
+        vi.mocked(useUsersQuery).mockReturnValue(
+          queryResult({
+            data: [
+              { id: "user-1", fullName: "Jane Doe" },
+              { id: "user-2", fullName: "John Smith" },
+            ],
+            isSuccess: true,
+          }) as never,
+        );
+      });
+
+      it("shows no suggestions until an @ is typed", () => {
+        render(<TicketDetailView ticketId="ticket-1" />);
+
+        expect(screen.queryByText("Jane Doe")).not.toBeInTheDocument();
+      });
+
+      it("shows matching agents once @ is typed, filtered as the query narrows", () => {
+        render(<TicketDetailView ticketId="ticket-1" />);
+        const textarea = screen.getByPlaceholderText("detail.notesPlaceholder");
+
+        fireEvent.change(textarea, { target: { value: "@J" } });
+        expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+        expect(screen.getByText("John Smith")).toBeInTheDocument();
+
+        fireEvent.change(textarea, { target: { value: "@Jane" } });
+        expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+        expect(screen.queryByText("John Smith")).not.toBeInTheDocument();
+      });
+
+      it("does not show suggestions for an @ that isn't at a word boundary (mid-word, e.g. an email address)", () => {
+        render(<TicketDetailView ticketId="ticket-1" />);
+        const textarea = screen.getByPlaceholderText("detail.notesPlaceholder");
+
+        fireEvent.change(textarea, { target: { value: "user@J" } });
+
+        expect(screen.queryByText("Jane Doe")).not.toBeInTheDocument();
+      });
+
+      it("closes the suggestions once the query no longer matches anyone", () => {
+        render(<TicketDetailView ticketId="ticket-1" />);
+        const textarea = screen.getByPlaceholderText("detail.notesPlaceholder");
+
+        fireEvent.change(textarea, { target: { value: "@Nobody Like This" } });
+
+        expect(screen.queryByText("Jane Doe")).not.toBeInTheDocument();
+        expect(screen.queryByText("John Smith")).not.toBeInTheDocument();
+      });
+
+      it("inserts the full name and closes the dropdown when a suggestion is picked", () => {
+        render(<TicketDetailView ticketId="ticket-1" />);
+        const textarea = screen.getByPlaceholderText(
+          "detail.notesPlaceholder",
+        ) as HTMLTextAreaElement;
+
+        fireEvent.change(textarea, { target: { value: "Please review @Ja" } });
+        fireEvent.click(screen.getByText("Jane Doe"));
+
+        expect(textarea.value).toBe("Please review @Jane Doe ");
+        expect(screen.queryByText("Jane Doe")).not.toBeInTheDocument();
+      });
+
+      it("closes the dropdown on Escape without changing the note body", () => {
+        render(<TicketDetailView ticketId="ticket-1" />);
+        const textarea = screen.getByPlaceholderText(
+          "detail.notesPlaceholder",
+        ) as HTMLTextAreaElement;
+
+        fireEvent.change(textarea, { target: { value: "@Ja" } });
+        expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+
+        fireEvent.keyDown(textarea, { key: "Escape" });
+
+        expect(screen.queryByText("Jane Doe")).not.toBeInTheDocument();
+        expect(textarea.value).toBe("@Ja");
+      });
+
+      it("submits the mention text verbatim as part of the note body", async () => {
+        const mutateAsync = vi.fn().mockResolvedValue({ id: "note-new" });
+        vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync,
+          isPending: false,
+          isError: false,
+          error: null,
+        } as never);
+
+        render(<TicketDetailView ticketId="ticket-1" />);
+        const textarea = screen.getByPlaceholderText(
+          "detail.notesPlaceholder",
+        ) as HTMLTextAreaElement;
+        fireEvent.change(textarea, { target: { value: "@Ja" } });
+        fireEvent.click(screen.getByText("Jane Doe"));
+        fireEvent.click(screen.getByText("detail.notesSubmit"));
+
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(mutateAsync).toHaveBeenCalledWith({ body: "@Jane Doe" });
+      });
     });
   });
 

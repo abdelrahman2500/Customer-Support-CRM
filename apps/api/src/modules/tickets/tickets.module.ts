@@ -3,6 +3,7 @@ import { TenantContext } from "../../common/tenant/tenant-context";
 import { AiModule } from "../ai/ai.module";
 import { ChannelsModule } from "../channels/channels.module";
 import { CustomersModule } from "../customers/customers.module";
+import { IdentityModule } from "../identity/identity.module";
 import { KnowledgeBaseModule } from "../knowledge-base/knowledge-base.module";
 import { QueuesModule } from "../../queues/queues.module";
 import { AutomationActionListener } from "./automation-action.listener";
@@ -63,9 +64,21 @@ import { WebFormIntakeService } from "./web-form-intake.service";
  * no duplicated Prisma query). `TicketKbReferencesController` registered
  * the same way `CustomerNotesController` was in RM-02: its own controller
  * file, same `TicketsService`.
+ *
+ * RM-06 — `IdentityModule` imported the same way, so
+ * `createTicketNote`'s @mention resolution can call the already-exported
+ * `IdentityService.listUsers()` directly instead of duplicating its
+ * branch-scoped user query.
  */
 @Module({
-  imports: [AiModule, ChannelsModule, CustomersModule, KnowledgeBaseModule, QueuesModule],
+  imports: [
+    AiModule,
+    ChannelsModule,
+    CustomersModule,
+    IdentityModule,
+    KnowledgeBaseModule,
+    QueuesModule,
+  ],
   controllers: [
     TicketsController,
     TicketCategoriesController,

@@ -24,6 +24,7 @@ import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
 import { TicketKbReferencesCard } from "@/components/tickets/ticket-kb-references-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
+import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
@@ -93,6 +94,14 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * confirmed-zero cross-link between Ticketing and Knowledge Base — an
  * agent no longer has to leave the ticket to find and reference relevant
  * KB content.
+ *
+ * RM-06 — extends Story 108's presence foundation (deliberately scoped
+ * there to the Users admin list only) into this screen's own assignee
+ * picker: each option now shows the same online/offline `Badge`
+ * `UserListView` already renders, via the same `useAgentPresence` hook —
+ * no new presence-tracking mechanism, just a second consumer. The note
+ * composer (`AddNoteForm`) also gains a basic `@mention` affordance —
+ * see that function's own doc comment.
  *
  * Story 78 — a new "Live Chat" card (`TicketChatCard`), placed right after
  * the status/priority/assignment grid: unlike the read-mostly cards below
@@ -206,6 +215,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
     }
     return map;
   }, [usersQuery.data]);
+
+  // RM-06 — Workspace Presence. Mirrors `UserListView`'s own
+  // `userIds`/`useAgentPresence` pattern exactly.
+  const userIds = useMemo(() => (usersQuery.data ?? []).map((user) => user.id), [usersQuery.data]);
+  const presence = useAgentPresence(userIds);
 
   if (ticketQuery.isLoading) {
     return <TicketDetailSkeleton />;
@@ -366,7 +380,16 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             <SelectContent>
               {(usersQuery.data ?? []).map((user) => (
                 <SelectItem key={user.id} value={user.id}>
-                  {user.fullName}
+                  <span className="flex w-full items-center justify-between gap-2">
+                    <span>{user.fullName}</span>
+                    {/* RM-06 — mirrors `UserListView`'s own presence Badge shape,
+                        just under this namespace's own key names. */}
+                    <Badge variant={presence[user.id] === "online" ? "success" : "secondary"}>
+                      {presence[user.id] === "online"
+                        ? t("detail.presenceOnline")
+                        : t("detail.presenceOffline")}
+                    </Badge>
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -577,6 +600,17 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
  * The smallest UI surface for a one-field create (Design item 8) — an
  * inline textarea + submit button below the notes list, mirroring
  * `AddDepartmentForm`'s submit/error-handling pattern.
+ *
+ * RM-06 — a basic `@mention` affordance (the plan's own words: "not a
+ * full rich-text mentions UI"), deliberately simple: only the trailing
+ * `@word...` run at the very end of the body is ever treated as an active
+ * mention trigger (a boundary check requires the `@` itself to be at the
+ * start of the note or preceded by whitespace, mirroring the backend
+ * parser's own boundary rule in `ticket-mentions.ts`) — no arbitrary
+ * cursor-position tracking mid-string, matching this affordance's own
+ * "basic" scope. Picking a suggestion inserts the exact `fullName` the
+ * backend's `parseMentions` matches against, so what an agent picks here
+ * is always what gets resolved server-side.
  */
 function AddNoteForm({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -584,6 +618,39 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const mutation = useCreateTicketNoteMutation(ticketId);
+  const usersQuery = useUsersQuery();
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+
+  const mentionQuery = useMemo(() => {
+    const lastAt = body.lastIndexOf("@");
+    if (lastAt === -1) {
+      return null;
+    }
+    const charBefore = body[lastAt - 1];
+    if (charBefore !== undefined && !/\s/.test(charBefore)) {
+      return null; // `@` mid-word — never a mention trigger.
+    }
+    const rest = body.slice(lastAt + 1);
+    return /\s/.test(rest) ? null : rest;
+  }, [body]);
+
+  const mentionMatches = useMemo(() => {
+    if (mentionQuery === null || suggestionsDismissed) {
+      return [];
+    }
+    const query = mentionQuery.toLowerCase();
+    return (usersQuery.data ?? [])
+      .filter((user) => user.fullName.toLowerCase().includes(query))
+      .slice(0, 5);
+  }, [mentionQuery, suggestionsDismissed, usersQuery.data]);
+
+  function selectMention(fullName: string): void {
+    const lastAt = body.lastIndexOf("@");
+    if (lastAt === -1) {
+      return;
+    }
+    setBody(`${body.slice(0, lastAt)}@${fullName} `);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -602,14 +669,37 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
   }
 
   return (
-    <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+    <form className="relative mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
       <textarea
         className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
         rows={3}
         value={body}
         placeholder={t("detail.notesPlaceholder")}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={(event) => {
+          setSuggestionsDismissed(false);
+          setBody(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && mentionMatches.length > 0) {
+            setSuggestionsDismissed(true);
+          }
+        }}
       />
+      {mentionMatches.length > 0 && (
+        <ul className="absolute top-full z-10 mt-1 w-56 rounded-md border border-slate-200 bg-white py-1 text-sm shadow-md">
+          {mentionMatches.map((user) => (
+            <li key={user.id}>
+              <button
+                type="button"
+                className="block w-full px-3 py-1.5 text-start hover:bg-slate-50 focus-ring"
+                onClick={() => selectMention(user.fullName)}
+              >
+                {user.fullName}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div>
         <Button type="submit" size="sm" disabled={mutation.isPending || !body.trim()}>
           {mutation.isPending ? t("detail.notesSubmitting") : t("detail.notesSubmit")}

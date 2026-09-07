@@ -64,11 +64,23 @@ export class NotificationsService {
     query: ListNotificationsQueryDto = {},
   ): Promise<Paginated<NotificationSummary>> {
     const { branchId } = this.tenantContext.requireBranchScope();
+    const userId = this.tenantContext.userId;
+    if (!userId) {
+      throw new Error("TenantContext: no active user on this request");
+    }
 
     // Story 88 — `customerId: null` excludes `PortalNotificationLogListener`'s
     // rows (`ticket.updated`/agent-reply `channel.message.created`, scoped
     // to a customer, not this endpoint's branch-wide agent audience) so
     // this endpoint's result set is unchanged by that story.
+    //
+    // RM-06 — `recipientUserId` narrows further: a row with `null` there
+    // (every notification before this story, and every branch-wide one
+    // since) stays visible to the whole branch as always; a row with it
+    // set (a `ticket.mentioned` row) is visible only to that one recipient
+    // — this is the enforcement point for "notifies no one else" outside
+    // realtime, since a mentioned agent's history/unread-count must show
+    // it and every other agent's must not.
     //
     // Story S-8b — lifted into a named constant so `paginate` can issue the
     // count and the page from this one object. That matters more here than
@@ -78,7 +90,11 @@ export class NotificationsService {
     // so a `count` that rebuilt the predicate and reached for the column
     // instead would silently exclude every escalation from `total` while
     // `items` still contained them.
-    const where = { ticket: { branchId }, customerId: null };
+    const where = {
+      ticket: { branchId },
+      customerId: null,
+      OR: [{ recipientUserId: null }, { recipientUserId: userId }],
+    };
 
     /**
      * Story S-8b — `take: MAX_NOTIFICATION_ROWS` (200) replaced by real
@@ -145,14 +161,14 @@ export class NotificationsService {
   /**
    * Story 92 — the agent's own unread count, reusing `listNotifications()`'s
    * exact scoping predicate (branch via the `ticket` relation,
-   * `customerId: null`) plus a `loggedAt` cursor filter. A `null`
-   * `notificationsReadAt` (never marked read) omits the cursor filter
-   * entirely, so every matching row counts as unread — never treated as
-   * "0 unread" or an error. `NotificationLog` itself carries no read state;
-   * the cursor lives on the caller's own `User` row precisely because these
-   * rows are shared by every agent in the branch (see this file's own
-   * `listNotifications` doc comment) — one agent's cursor can never affect
-   * another's count.
+   * `customerId: null`, RM-06's `recipientUserId` filter) plus a
+   * `loggedAt` cursor filter. A `null` `notificationsReadAt` (never marked
+   * read) omits the cursor filter entirely, so every matching row counts
+   * as unread — never treated as "0 unread" or an error. `NotificationLog`
+   * itself carries no read state; the cursor lives on the caller's own
+   * `User` row precisely because these rows are shared by every agent in
+   * the branch (see this file's own `listNotifications` doc comment) —
+   * one agent's cursor can never affect another's count.
    */
   async getUnreadCount(): Promise<{ unreadCount: number }> {
     const { branchId } = this.tenantContext.requireBranchScope();
@@ -170,6 +186,7 @@ export class NotificationsService {
       where: {
         ticket: { branchId },
         customerId: null,
+        OR: [{ recipientUserId: null }, { recipientUserId: userId }],
         ...(user.notificationsReadAt ? { loggedAt: { gt: user.notificationsReadAt } } : {}),
       },
     });
