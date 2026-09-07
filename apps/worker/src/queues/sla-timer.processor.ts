@@ -48,6 +48,11 @@ export class SlaTimerProcessor extends WorkerHost {
       where: {
         OR: [{ responseBreachedNotifiedAt: null }, { resolutionBreachedNotifiedAt: null }],
         ticket: { status: { in: RELEVANT_TICKET_STATUSES } },
+        // RM-25 — a currently-on-hold target is excluded from evaluation
+        // entirely, never breach/at-risk while held. Query-level, not a
+        // loop-body `continue`: the row never becomes a `candidate` at
+        // all, so `evaluateAndFire` is never even called for it.
+        onHoldSince: null,
       },
       select: {
         id: true,

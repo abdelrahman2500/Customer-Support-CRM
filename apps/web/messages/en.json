@@ -214,7 +214,15 @@
       "none": "No SLA target",
       "breached": "Breached",
       "breachedAt": "Breached at {time}",
-      "remaining": "{time} remaining"
+      "remaining": "{time} remaining",
+      "onHold": "On hold",
+      "onHoldSince": "On hold since {time}",
+      "placeOnHold": "Place on hold",
+      "resume": "Resume",
+      "holdConfirmTitle": "Place this ticket on hold?",
+      "holdConfirmDescription": "The SLA clock will pause until you resume it — response/resolution targets will shift forward by however long it stays on hold.",
+      "actionForbidden": "You don't have permission to perform that action.",
+      "actionFailed": "That action couldn't be completed. Please try again."
     },
     "escalations": {
       "targetType": {

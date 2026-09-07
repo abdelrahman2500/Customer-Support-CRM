@@ -27,6 +27,8 @@ import {
   TICKET_RECATEGORIZED_EVENT,
   TICKET_NOTE_ADDED_EVENT,
   TICKET_MENTIONED_EVENT,
+  TICKET_ON_HOLD_EVENT,
+  TICKET_RESUMED_EVENT,
 } from "./tickets.events";
 import { assertValidTicketStatusTransition } from "./ticket-status-transitions";
 import type {
@@ -35,6 +37,8 @@ import type {
   TicketRecategorizedEvent,
   TicketNoteAddedEvent,
   TicketMentionedEvent,
+  TicketOnHoldEvent,
+  TicketResumedEvent,
 } from "./tickets.events";
 
 /**
@@ -100,6 +104,8 @@ export interface TicketSlaTargetSummary {
   slaPolicyId: string;
   responseTargetAt: Date;
   resolutionTargetAt: Date;
+  /** RM-25 — `null` means not on hold. */
+  onHoldSince: Date | null;
 }
 
 export interface TicketListItem extends TicketSummary {
@@ -349,6 +355,7 @@ export class TicketsService {
             slaPolicyId: ticket.slaTarget.slaPolicyId,
             responseTargetAt: ticket.slaTarget.responseTargetAt,
             resolutionTargetAt: ticket.slaTarget.resolutionTargetAt,
+            onHoldSince: ticket.slaTarget.onHoldSince,
           }
         : null,
     }));
@@ -358,6 +365,40 @@ export class TicketsService {
   async getTicket(id: string): Promise<TicketSummary> {
     const ticket = await this.findTicketInScope(id);
     return toTicketSummary(ticket);
+  }
+
+  /**
+   * RM-25 — SLA Pause/Resume. Deliberately touches no `Ticket`/
+   * `SlaTicketTarget` column itself — `findTicketInScope` is only this
+   * method's authorization/scope check (mirrors `getTicket`'s own), and
+   * the actual pause mechanics live entirely in `SlaHoldListener`
+   * (`sla-policies` module), reached only through `TICKET_ON_HOLD_EVENT`.
+   * Always emits, even for a ticket with no `SlaTicketTarget` at all (no
+   * SLA policy ever matched) or one already on hold — the listener is
+   * solely responsible for deciding whether there is anything to actually
+   * do, exactly like `TICKET_RECATEGORIZED_EVENT`'s own "always emit, let
+   * `SlaTargetListener` decide" precedent.
+   */
+  async holdTicket(id: string): Promise<{ id: string }> {
+    const ticket = await this.findTicketInScope(id);
+    const summary = toTicketSummary(ticket);
+    this.eventEmitter.emit(TICKET_ON_HOLD_EVENT, {
+      ticket: summary,
+      actorUserId: this.tenantContext.userId,
+    } satisfies TicketOnHoldEvent);
+    return { id };
+  }
+
+  /** RM-25 — the resume half of `holdTicket`'s own doc comment; identical
+   * shape. */
+  async resumeTicket(id: string): Promise<{ id: string }> {
+    const ticket = await this.findTicketInScope(id);
+    const summary = toTicketSummary(ticket);
+    this.eventEmitter.emit(TICKET_RESUMED_EVENT, {
+      ticket: summary,
+      actorUserId: this.tenantContext.userId,
+    } satisfies TicketResumedEvent);
+    return { id };
   }
 
   async updateTicket(id: string, dto: UpdateTicketDto): Promise<{ id: string }> {
@@ -480,12 +521,15 @@ export class TicketsService {
       note: summary,
     } satisfies TicketNoteAddedEvent);
 
-    // RM-06 — @Mentions. `listUsers()` is the same branch-scoped agent
-    // list the assignee `Select`/mention composer both already render
-    // client-side (`useUsersQuery`) — reused here for resolution rather
-    // than a second, duplicated Prisma query. The author never notifies
-    // themself even if their own name appears in their own note.
-    const branchUsers = await this.identityService.listUsers();
+    // RM-06 — @Mentions. RM-23 regression fix: this used to reuse
+    // `listUsers()`, which RM-23 later capped at `MAX_USERS_ROWS` for its
+    // own admin-screen purpose — wrong here, since a mention must resolve
+    // against every branch member, not just the oldest `MAX_USERS_ROWS`
+    // (see `listUserMentionCandidates`'s own doc comment for the full
+    // story, including how this was actually confirmed broken). The
+    // author never notifies themself even if their own name appears in
+    // their own note.
+    const branchUsers = await this.identityService.listUserMentionCandidates();
     const mentionedUserIds = parseMentions(dto.body, branchUsers).filter(
       (userId) => userId !== authorUserId,
     );

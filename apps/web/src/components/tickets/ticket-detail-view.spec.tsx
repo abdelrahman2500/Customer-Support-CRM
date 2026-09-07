@@ -15,6 +15,8 @@ import {
   useTicketSlaTargetQuery,
   useTicketsQuery,
   useUpdateTicketMutation,
+  useHoldTicketMutation,
+  useResumeTicketMutation,
   useUsersQuery,
 } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
@@ -73,6 +75,9 @@ vi.mock("@/hooks/use-tickets", () => ({
   useCurrentUserQuery: vi.fn(),
   useDepartmentsQuery: vi.fn(),
   useUpdateTicketMutation: vi.fn(),
+  // RM-25 — SLA Pause/Resume.
+  useHoldTicketMutation: vi.fn(),
+  useResumeTicketMutation: vi.fn(),
   useCreateTicketNoteMutation: vi.fn(),
   // RM-04 — `CustomerContextPanel`'s own two hooks; its behavior is
   // covered by its own dedicated describe block below (mirrors this
@@ -205,6 +210,19 @@ describe("TicketDetailView", () => {
     );
     vi.mocked(useUpdateTicketMutation).mockReturnValue({
       mutate: vi.fn(),
+      isError: false,
+      error: null,
+    } as never);
+    // RM-25 — SLA Pause/Resume.
+    vi.mocked(useHoldTicketMutation).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(useResumeTicketMutation).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
       isError: false,
       error: null,
     } as never);
@@ -755,6 +773,106 @@ describe("TicketDetailView", () => {
 
       expect(screen.getByText("detail.historyEmpty")).toBeInTheDocument();
       expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
+    });
+  });
+
+  // RM-25 — SLA Pause/Resume.
+  describe("SLA pause/resume (RM-25)", () => {
+    beforeEach(() => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+    });
+
+    it("shows no hold/resume action when there is no SLA target", () => {
+      vi.mocked(useTicketSlaTargetQuery).mockReturnValue(
+        queryResult({ data: null, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.queryByText("sla.placeOnHold")).not.toBeInTheDocument();
+      expect(screen.queryByText("sla.resume")).not.toBeInTheDocument();
+    });
+
+    it("shows a 'place on hold' action (not immediate — opens a confirmation dialog) for an on-track target", () => {
+      const mutate = vi.fn();
+      vi.mocked(useTicketSlaTargetQuery).mockReturnValue(
+        queryResult({
+          data: {
+            responseTargetAt: "2099-01-01T00:00:00.000Z",
+            resolutionTargetAt: "2099-01-02T00:00:00.000Z",
+            onHoldSince: null,
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      vi.mocked(useHoldTicketMutation).mockReturnValue({
+        mutate,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByText("sla.placeOnHold"));
+
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+      expect(mutate).not.toHaveBeenCalled();
+
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByText("sla.placeOnHold"));
+
+      expect(mutate).toHaveBeenCalledWith(undefined, expect.objectContaining({ onSuccess: expect.any(Function) }));
+    });
+
+    it("renders the on-hold badge and a 'resume' action (no confirmation) for a held target", () => {
+      const mutate = vi.fn();
+      vi.mocked(useTicketSlaTargetQuery).mockReturnValue(
+        queryResult({
+          data: {
+            responseTargetAt: "2099-01-01T00:00:00.000Z",
+            resolutionTargetAt: "2099-01-02T00:00:00.000Z",
+            onHoldSince: "2024-01-01T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      vi.mocked(useResumeTicketMutation).mockReturnValue({
+        mutate,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText(/sla\.onHoldSince/)).toBeInTheDocument();
+      fireEvent.click(screen.getByText("sla.resume"));
+
+      expect(mutate).toHaveBeenCalledOnce();
+    });
+
+    it("shows a forbidden message when the hold action fails with 403", () => {
+      vi.mocked(useTicketSlaTargetQuery).mockReturnValue(
+        queryResult({
+          data: {
+            responseTargetAt: "2099-01-01T00:00:00.000Z",
+            resolutionTargetAt: "2099-01-02T00:00:00.000Z",
+            onHoldSince: null,
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      vi.mocked(useHoldTicketMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isPending: false,
+        isError: true,
+        error: new ApiError("Forbidden", 403),
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("sla.actionForbidden")).toBeInTheDocument();
     });
   });
 

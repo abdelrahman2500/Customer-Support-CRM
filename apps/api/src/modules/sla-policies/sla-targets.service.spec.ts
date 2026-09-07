@@ -77,12 +77,31 @@ describe("SlaTargetsService", () => {
         slaPolicyId: "policy-1",
         responseTargetAt: new Date("2026-01-01T00:30:00.000Z"),
         resolutionTargetAt: new Date("2026-01-01T04:00:00.000Z"),
+        onHoldSince: null,
       };
       prisma.slaTicketTarget.findUnique.mockResolvedValue(target);
 
       const result = await service.getSlaTargetForTicket("ticket-1");
 
       expect(result).toEqual(target);
+    });
+
+    // RM-25 — SLA Pause/Resume.
+    it("passes through a set onHoldSince unchanged", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      const onHoldSince = new Date("2026-01-01T01:00:00.000Z");
+      prisma.slaTicketTarget.findUnique.mockResolvedValue({
+        id: "target-1",
+        ticketId: "ticket-1",
+        slaPolicyId: "policy-1",
+        responseTargetAt: new Date("2026-01-01T00:30:00.000Z"),
+        resolutionTargetAt: new Date("2026-01-01T04:00:00.000Z"),
+        onHoldSince,
+      });
+
+      const result = await service.getSlaTargetForTicket("ticket-1");
+
+      expect(result.onHoldSince).toBe(onHoldSince);
     });
   });
 });

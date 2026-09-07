@@ -851,6 +851,32 @@ export class IdentityService {
     });
   }
 
+  /**
+   * RM-06/RM-23 regression fix — `TicketsService.createTicketNote`'s
+   * @mention resolution used to reuse `listUsers()` for this (documented
+   * at the time as "reused here for resolution rather than a second,
+   * duplicated Prisma query"). RM-23 added `listUsers()`'s own
+   * `MAX_USERS_ROWS` cap for its real purpose — the admin Users *screen*,
+   * genuinely fine to bound since narrowing via search is the documented
+   * mitigation there — but mention resolution has no such mitigation: it
+   * must be able to match against literally any branch member, including
+   * one created after the branch's first `MAX_USERS_ROWS` (ordered
+   * oldest-first). Confirmed as a real, reproducing bug against this
+   * project's own shared dev database (698 users in the seeded branch,
+   * comfortably past the 500-row cap) — a freshly-created agent's own
+   * mentions silently stopped resolving. This method is the fix: no
+   * `take`, and no `branchRoles`/`role` join at all, since `MentionCandidate`
+   * needs only `{ id, fullName }` — cheaper than `listUsers()` per row,
+   * not just uncapped.
+   */
+  async listUserMentionCandidates(): Promise<{ id: string; fullName: string }[]> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    return this.prisma.user.findMany({
+      where: { branchRoles: { some: { branchId } } },
+      select: { id: true, fullName: true },
+    });
+  }
+
   async updateUser(id: string, dto: UpdateUserDto): Promise<{ id: string }> {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {

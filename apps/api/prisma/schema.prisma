@@ -837,6 +837,18 @@ model SlaTicketTarget {
   responseBreachedNotifiedAt   DateTime? @map("response_breached_notified_at")
   resolutionAtRiskNotifiedAt   DateTime? @map("resolution_at_risk_notified_at")
   resolutionBreachedNotifiedAt DateTime? @map("resolution_breached_notified_at")
+  /// RM-25 — SLA Pause/Resume. `null` means not on hold (the common case);
+  /// set to the moment `SlaHoldListener` paused this target's clock. This
+  /// is the single source of truth for "is this ticket currently on
+  /// hold" — deliberately no separate boolean anywhere on `Ticket`
+  /// itself, so the two can never disagree. `SlaTimerProcessor`
+  /// (apps/worker) excludes any row with this set from breach/at-risk
+  /// evaluation entirely; on resume, the held duration
+  /// (`now - onHoldSince`) is added to whichever of
+  /// `responseTargetAt`/`resolutionTargetAt` had not already passed at
+  /// the moment the hold began (a target already breached before the
+  /// hold stays breached — holding never retroactively un-breaches one).
+  onHoldSince                  DateTime? @map("on_hold_since")
   createdAt                    DateTime  @default(now()) @map("created_at")
 
   @@map("sla_ticket_targets")

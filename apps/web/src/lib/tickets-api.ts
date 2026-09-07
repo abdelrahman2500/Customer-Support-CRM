@@ -9,6 +9,8 @@ export interface TicketSlaTarget {
   slaPolicyId: string;
   responseTargetAt: string;
   resolutionTargetAt: string;
+  /** RM-25 — SLA Pause/Resume. `null` means not on hold. */
+  onHoldSince: string | null;
 }
 
 /** Mirrors `apps/api/src/modules/tickets/tickets.service.ts`'s `TicketSummary`. */
@@ -283,6 +285,15 @@ export function updateTicket(id: string, input: UpdateTicketInput): Promise<{ id
     method: "PATCH",
     body: JSON.stringify(input),
   });
+}
+
+/** RM-25 — SLA Pause/Resume. */
+export function holdTicket(id: string): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/tickets/${id}/hold`, { method: "POST" });
+}
+
+export function resumeTicket(id: string): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/tickets/${id}/resume`, { method: "POST" });
 }
 
 /** Story S-8e — see `listTickets`; this replaces the Story 106 cap.

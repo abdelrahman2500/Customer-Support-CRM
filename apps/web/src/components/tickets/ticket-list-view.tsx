@@ -62,6 +62,10 @@ function SlaCell({ ticket }: { ticket: TicketListItem }) {
   if (status.kind === "breached") {
     return <Badge variant="destructive">{t("sla.breached")}</Badge>;
   }
+  // RM-25 — SLA Pause/Resume.
+  if (status.kind === "on-hold") {
+    return <Badge variant="secondary">{t("sla.onHold")}</Badge>;
+  }
   return (
     <span className="text-slate-700">
       {t("sla.remaining", { time: formatRemaining(status.remainingMs) })}

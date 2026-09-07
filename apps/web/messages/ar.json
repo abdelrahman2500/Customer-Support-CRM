@@ -214,7 +214,15 @@
       "none": "لا يوجد هدف اتفاقية مستوى خدمة",
       "breached": "تم الخرق",
       "breachedAt": "تم الخرق في {time}",
-      "remaining": "الوقت المتبقي: {time}"
+      "remaining": "الوقت المتبقي: {time}",
+      "onHold": "معلّق",
+      "onHoldSince": "معلّق منذ {time}",
+      "placeOnHold": "تعليق",
+      "resume": "استئناف",
+      "holdConfirmTitle": "هل تريد تعليق هذه التذكرة؟",
+      "holdConfirmDescription": "ستتوقف ساعة اتفاقية مستوى الخدمة حتى تستأنفها — ستتحرك أهداف الاستجابة/الحل للأمام بمقدار مدة التعليق.",
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "actionFailed": "تعذّر إتمام هذا الإجراء. حاول مرة أخرى."
     },
     "escalations": {
       "targetType": {

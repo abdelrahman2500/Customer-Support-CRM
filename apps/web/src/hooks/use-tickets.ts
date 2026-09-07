@@ -17,6 +17,8 @@ import {
   getTicketHistory,
   getTicketNotes,
   getTicketSlaTarget,
+  holdTicket,
+  resumeTicket,
   listBranches,
   listCustomerOptions,
   listCustomers,
@@ -214,6 +216,30 @@ export function useUpdateTicketMutation(id: string) {
       void queryClient.invalidateQueries({ queryKey: ticketQueryKey(id) });
       void queryClient.invalidateQueries({ queryKey: ticketHistoryQueryKey(id) });
       void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+  });
+}
+
+/** RM-25 — SLA Pause/Resume. Never applies optimistically, same as
+ * `useUpdateTicketMutation`: only invalidates `ticketSlaTargetQueryKey`
+ * after the real `POST` response resolves, forcing a re-fetch of the
+ * authoritative state. */
+export function useHoldTicketMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => holdTicket(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ticketSlaTargetQueryKey(id) });
+    },
+  });
+}
+
+export function useResumeTicketMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => resumeTicket(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ticketSlaTargetQueryKey(id) });
     },
   });
 }

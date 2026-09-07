@@ -43,6 +43,33 @@ describe("deriveSlaStatus", () => {
     );
     expect(result.kind).toBe("breached");
   });
+
+  // RM-25 — SLA Pause/Resume.
+  it("returns 'on-hold' when onHoldSince is set, regardless of where the targets sit", () => {
+    const result = deriveSlaStatus(
+      {
+        // Both targets already in the past — would read as "breached" if
+        // the hold check didn't run first.
+        responseTargetAt: "2024-01-01T00:00:00.000Z",
+        resolutionTargetAt: "2024-01-01T01:00:00.000Z",
+        onHoldSince: "2023-12-31T23:00:00.000Z",
+      },
+      now,
+    );
+    expect(result).toEqual({ kind: "on-hold", onHoldSince: new Date("2023-12-31T23:00:00.000Z") });
+  });
+
+  it("returns 'on-track'/'breached' as before when onHoldSince is null", () => {
+    const result = deriveSlaStatus(
+      {
+        responseTargetAt: "2024-01-01T13:00:00.000Z",
+        resolutionTargetAt: "2024-01-02T12:00:00.000Z",
+        onHoldSince: null,
+      },
+      now,
+    );
+    expect(result.kind).toBe("on-track");
+  });
 });
 
 describe("formatRemaining", () => {

@@ -8,6 +8,8 @@ import { useTranslations } from "next-intl";
 import {
   useCreateTicketNoteMutation,
   useDepartmentsQuery,
+  useHoldTicketMutation,
+  useResumeTicketMutation,
   useTicketCsatQuery,
   useTicketEscalationsQuery,
   useTicketHistoryQuery,
@@ -31,6 +33,7 @@ import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Badge, Button, Input, showSuccessToast, Skeleton } from "@crm/ui";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 const STATUS_OPTIONS: TicketStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
@@ -204,9 +207,13 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const categoriesQuery = useTicketCategoriesQuery();
   const errorMessage = useErrorMessage();
   const mutation = useUpdateTicketMutation(ticketId);
+  // RM-25 — SLA Pause/Resume.
+  const holdMutation = useHoldTicketMutation(ticketId);
+  const resumeMutation = useResumeTicketMutation(ticketId);
 
   const [subjectDraft, setSubjectDraft] = useState<string | null>(null);
   const [aiCategoryNoMatch, setAiCategoryNoMatch] = useState<string | null>(null);
+  const [confirmHoldOpen, setConfirmHoldOpen] = useState(false);
 
   const userNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -463,6 +470,54 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <p className="mt-1 text-sm text-slate-700">
             {t("sla.remaining", { time: formatRemaining(slaStatus.remainingMs) })}
           </p>
+        )}
+        {/* RM-25 — SLA Pause/Resume. Shown instead of a ticking countdown
+            while held: the clock genuinely isn't advancing, so a countdown
+            here would misrepresent it. */}
+        {slaTargetQuery.isSuccess && slaStatus.kind === "on-hold" && (
+          <Badge variant="secondary" className="mt-2">
+            {t("sla.onHoldSince", { time: slaStatus.onHoldSince.toLocaleString(locale) })}
+          </Badge>
+        )}
+        {slaTargetQuery.isSuccess && slaStatus.kind !== "none" && (
+          <div className="mt-2">
+            {slaStatus.kind === "on-hold" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={resumeMutation.isPending}
+                onClick={() => resumeMutation.mutate()}
+              >
+                {t("sla.resume")}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={holdMutation.isPending}
+                onClick={() => setConfirmHoldOpen(true)}
+              >
+                {t("sla.placeOnHold")}
+              </Button>
+            )}
+            <ConfirmDialog
+              open={confirmHoldOpen}
+              onOpenChange={setConfirmHoldOpen}
+              title={t("sla.holdConfirmTitle")}
+              description={t("sla.holdConfirmDescription")}
+              confirmLabel={t("sla.placeOnHold")}
+              onConfirm={() => holdMutation.mutate(undefined, { onSuccess: () => setConfirmHoldOpen(false) })}
+              isPending={holdMutation.isPending}
+            />
+            {(holdMutation.isError || resumeMutation.isError) && (
+              <p className="mt-1 text-xs text-red-600">
+                {errorMessage(holdMutation.error ?? resumeMutation.error, {
+                  forbidden: t("sla.actionForbidden"),
+                  generic: t("sla.actionFailed"),
+                })}
+              </p>
+            )}
+          </div>
         )}
       </div>
 

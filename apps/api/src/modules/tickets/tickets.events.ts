@@ -75,3 +75,28 @@ export interface TicketMentionedEvent {
   recipientUserId: string;
   actorUserId: string;
 }
+
+export const TICKET_ON_HOLD_EVENT = "ticket.on_hold";
+export const TICKET_RESUMED_EVENT = "ticket.resumed";
+
+/**
+ * RM-25 — SLA Pause/Resume. Emitted by `TicketsService.holdTicket`/
+ * `resumeTicket`, mirroring `TicketRecategorizedEvent`'s exact shape and
+ * "always emit, let the subscriber decide what (if anything) to do" — the
+ * same pattern that keeps `TicketsService` from needing to know anything
+ * about `SlaTicketTarget` at all (a different schema, owned by
+ * SLA & Automation). `SlaHoldListener` (`sla-policies` module) is the sole
+ * subscriber of both — see its own doc comment for the actual pause/resume
+ * mechanics, including why a ticket with no `SlaTicketTarget` (no policy
+ * ever matched) or already in the target state is a silent no-op rather
+ * than an error surfaced back through this event.
+ */
+export interface TicketOnHoldEvent {
+  ticket: TicketSummary;
+  actorUserId: string | null;
+}
+
+export interface TicketResumedEvent {
+  ticket: TicketSummary;
+  actorUserId: string | null;
+}

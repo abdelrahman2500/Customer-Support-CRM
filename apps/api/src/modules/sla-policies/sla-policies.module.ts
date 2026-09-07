@@ -4,6 +4,7 @@ import { SlaPoliciesController } from "./sla-policies.controller";
 import { SlaPoliciesService } from "./sla-policies.service";
 import { SlaEscalationListener } from "./sla-escalation.listener";
 import { SlaTargetListener } from "./sla-target.listener";
+import { SlaHoldListener } from "./sla-hold.listener";
 import { SlaTargetsController } from "./sla-targets.controller";
 import { SlaTargetsService } from "./sla-targets.service";
 import { SlaEscalationsController } from "./sla-escalations.controller";
@@ -29,6 +30,11 @@ import { AutomationEvaluationListener } from "./automation-evaluation.listener";
  * same way. `AutomationEvaluationListener` only ever emits
  * `AUTOMATION_RULE_MATCHED_EVENT`; the actual `Ticket` write happens in
  * `TicketsModule`'s own `AutomationActionListener` (Design decision 6).
+ *
+ * RM-25 — `SlaHoldListener` added the same way: reacts to
+ * `TICKET_ON_HOLD_EVENT`/`TICKET_RESUMED_EVENT` (emitted by
+ * `TicketsService.holdTicket`/`resumeTicket`), the only writer of
+ * `SlaTicketTarget.onHoldSince`.
  */
 @Module({
   controllers: [
@@ -46,6 +52,7 @@ import { AutomationEvaluationListener } from "./automation-evaluation.listener";
     AutomationRulesService,
     TenantContext,
     SlaTargetListener,
+    SlaHoldListener,
     SlaEscalationListener,
     AutomationEvaluationListener,
   ],

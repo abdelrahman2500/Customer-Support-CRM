@@ -1481,6 +1481,36 @@ describe("IdentityService", () => {
     });
   });
 
+  // RM-23-regression-fix — see this method's own doc comment: `listUsers()`
+  // gaining a row cap (RM-23) silently broke @mention resolution for any
+  // user created after a branch's first `MAX_USERS_ROWS`, confirmed as a
+  // real, reproducing bug against this project's own shared dev database.
+  describe("listUserMentionCandidates", () => {
+    it("scopes the query to the caller's active branch, selecting only id/fullName, with no take cap", async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+
+      await service.listUserMentionCandidates();
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.user.findMany).toHaveBeenCalledWith({
+        where: { branchRoles: { some: { branchId: "branch-1" } } },
+        select: { id: true, fullName: true },
+      });
+    });
+
+    it("returns exactly the id/fullName pairs Prisma resolves, unmapped", async () => {
+      const rows = [
+        { id: "user-1", fullName: "Jane Agent" },
+        { id: "user-2", fullName: "John Agent" },
+      ];
+      prisma.user.findMany.mockResolvedValue(rows);
+
+      const result = await service.listUserMentionCandidates();
+
+      expect(result).toEqual(rows);
+    });
+  });
+
   describe("updateUser", () => {
     it("throws NotFoundException for an unknown id", async () => {
       prisma.user.findUnique.mockResolvedValue(null);

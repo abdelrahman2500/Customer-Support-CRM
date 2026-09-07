@@ -74,6 +74,7 @@ describe("SlaTimerProcessor", () => {
           where: expect.objectContaining({
             OR: [{ responseBreachedNotifiedAt: null }, { resolutionBreachedNotifiedAt: null }],
             ticket: { status: { in: ["OPEN", "IN_PROGRESS"] } },
+            onHoldSince: null,
           }),
         }),
       );

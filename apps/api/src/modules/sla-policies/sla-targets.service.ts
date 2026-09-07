@@ -8,6 +8,9 @@ export interface SlaTargetSummary {
   slaPolicyId: string;
   responseTargetAt: Date;
   resolutionTargetAt: Date;
+  /** RM-25 — `null` means not on hold. See `SlaHoldListener`'s own doc
+   * comment for the full pause/resume mechanics. */
+  onHoldSince: Date | null;
 }
 
 /**
@@ -42,6 +45,7 @@ export class SlaTargetsService {
       slaPolicyId: target.slaPolicyId,
       responseTargetAt: target.responseTargetAt,
       resolutionTargetAt: target.resolutionTargetAt,
+      onHoldSince: target.onHoldSince,
     };
   }
 }

@@ -11,12 +11,15 @@
 export interface TicketSlaTarget {
   responseTargetAt: string | Date;
   resolutionTargetAt: string | Date;
+  /** RM-25 — SLA Pause/Resume. `null`/absent means not on hold. */
+  onHoldSince?: string | Date | null;
 }
 
 export type SlaStatus =
   | { kind: "none" }
   | { kind: "breached"; targetAt: Date }
-  | { kind: "on-track"; targetAt: Date; remainingMs: number };
+  | { kind: "on-track"; targetAt: Date; remainingMs: number }
+  | { kind: "on-hold"; onHoldSince: Date };
 
 /**
  * The *earlier* of the two targets is the one that governs urgency — once
@@ -29,6 +32,14 @@ export type SlaStatus =
 export function deriveSlaStatus(target: TicketSlaTarget | null, now: Date = new Date()): SlaStatus {
   if (!target) {
     return { kind: "none" };
+  }
+  // RM-25 — checked before any target-timestamp math: a held target's
+  // `responseTargetAt`/`resolutionTargetAt` are whatever they were at the
+  // moment the hold began (frozen, not advancing), so comparing them
+  // against `now` while on hold would show a ticking-toward-breach
+  // countdown for a clock that isn't actually running.
+  if (target.onHoldSince) {
+    return { kind: "on-hold", onHoldSince: new Date(target.onHoldSince) };
   }
   const responseAt = new Date(target.responseTargetAt);
   const resolutionAt = new Date(target.resolutionTargetAt);

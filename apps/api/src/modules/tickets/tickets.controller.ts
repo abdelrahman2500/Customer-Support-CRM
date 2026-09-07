@@ -55,6 +55,22 @@ export class TicketsController {
     return this.ticketsService.updateTicket(id, dto);
   }
 
+  // RM-25 — SLA Pause/Resume. Dedicated actions, not folded into the
+  // general PATCH above: the actual mutation is on `SlaTicketTarget`, a
+  // different schema this controller/service never touches directly
+  // (see `TicketsService.holdTicket`'s own doc comment).
+  @Post(":id/hold")
+  @RequirePermissions("ticket:update")
+  hold(@Param("id") id: string): Promise<{ id: string }> {
+    return this.ticketsService.holdTicket(id);
+  }
+
+  @Post(":id/resume")
+  @RequirePermissions("ticket:update")
+  resume(@Param("id") id: string): Promise<{ id: string }> {
+    return this.ticketsService.resumeTicket(id);
+  }
+
   @Get(":id/history")
   @RequirePermissions("ticket:read")
   getHistory(@Param("id") id: string): Promise<TicketHistoryEntrySummary[]> {

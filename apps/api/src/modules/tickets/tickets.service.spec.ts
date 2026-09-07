@@ -10,6 +10,8 @@ import {
   TICKET_RECATEGORIZED_EVENT,
   TICKET_NOTE_ADDED_EVENT,
   TICKET_MENTIONED_EVENT,
+  TICKET_ON_HOLD_EVENT,
+  TICKET_RESUMED_EVENT,
 } from "./tickets.events";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
@@ -130,12 +132,16 @@ function buildKnowledgeBaseServiceMock() {
   };
 }
 
-/** RM-06 — `listUsers` defaults to `[]` so every pre-existing test (whose
- * note bodies were never written with @mentions in mind) resolves zero
- * mentions and emits no `TICKET_MENTIONED_EVENT`; the dedicated describe
- * block below overrides it per test. */
+/** RM-06 — `listUserMentionCandidates` defaults to `[]` so every
+ * pre-existing test (whose note bodies were never written with @mentions
+ * in mind) resolves zero mentions and emits no `TICKET_MENTIONED_EVENT`;
+ * the dedicated describe block below overrides it per test.
+ * RM-23-regression-fix — renamed from `listUsers`: mention resolution now
+ * calls a dedicated, uncapped method (`IdentityService.listUsers()` itself
+ * gained a row cap for its own admin-screen purpose and is no longer
+ * suitable here — see that method's own doc comment). */
 function buildIdentityServiceMock() {
-  return { listUsers: vi.fn().mockResolvedValue([]) };
+  return { listUserMentionCandidates: vi.fn().mockResolvedValue([]) };
 }
 
 function createService(
@@ -639,6 +645,69 @@ describe("TicketsService", () => {
           customer: { select: { displayName: true } },
         },
       });
+    });
+  });
+
+  // RM-25 — SLA Pause/Resume. Neither method touches `SlaTicketTarget`
+  // itself — both are pure "authorize, then emit" methods, mirroring
+  // `getTicket`'s own authorization shape exactly; the actual pause/resume
+  // mechanics live entirely in `SlaHoldListener` (sla-policies module).
+  const onHoldTicketRow = {
+    id: "ticket-1",
+    subject: "Cannot log in",
+    categoryId: null,
+    category: null,
+    priority: "MEDIUM" as const,
+    status: "OPEN" as const,
+    customerId: "customer-1",
+    contactId: null,
+    departmentId: null,
+    assignedToUserId: null,
+    createdAt: new Date("2024-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+  };
+
+  describe("holdTicket", () => {
+    it("emits TICKET_ON_HOLD_EVENT with the ticket summary and acting user", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(onHoldTicketRow);
+
+      const result = await service.holdTicket("ticket-1");
+
+      expect(result).toEqual({ id: "ticket-1" });
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_ON_HOLD_EVENT, {
+        ticket: expect.objectContaining({ id: "ticket-1" }),
+        actorUserId: "user-1",
+      });
+    });
+
+    it("throws NotFoundException for an unknown/out-of-scope id, without emitting", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(service.holdTicket("missing-id")).rejects.toBeInstanceOf(NotFoundException);
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("resumeTicket", () => {
+    it("emits TICKET_RESUMED_EVENT with the ticket summary and acting user", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(onHoldTicketRow);
+
+      const result = await service.resumeTicket("ticket-1");
+
+      expect(result).toEqual({ id: "ticket-1" });
+      expect(eventEmitter.emit).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_RESUMED_EVENT, {
+        ticket: expect.objectContaining({ id: "ticket-1" }),
+        actorUserId: "user-1",
+      });
+    });
+
+    it("throws NotFoundException for an unknown/out-of-scope id, without emitting", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(service.resumeTicket("missing-id")).rejects.toBeInstanceOf(NotFoundException);
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
   });
 
@@ -1927,7 +1996,7 @@ describe("TicketsService", () => {
       ];
 
       it("emits ticket.mentioned for each resolved recipient, in addition to ticket.note-added", async () => {
-        identityService.listUsers.mockResolvedValue(branchUsers);
+        identityService.listUserMentionCandidates.mockResolvedValue(branchUsers);
         prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
         prisma.ticketNote.create.mockResolvedValue({
           id: "note-1",
@@ -1949,7 +2018,7 @@ describe("TicketsService", () => {
       });
 
       it("emits one ticket.mentioned event per distinct resolved recipient", async () => {
-        identityService.listUsers.mockResolvedValue(branchUsers);
+        identityService.listUserMentionCandidates.mockResolvedValue(branchUsers);
         prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
         prisma.ticketNote.create.mockResolvedValue({
           id: "note-1",
@@ -1974,7 +2043,7 @@ describe("TicketsService", () => {
       });
 
       it("never notifies the note's own author, even if their own name appears in it", async () => {
-        identityService.listUsers.mockResolvedValue(branchUsers);
+        identityService.listUserMentionCandidates.mockResolvedValue(branchUsers);
         prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
         prisma.ticketNote.create.mockResolvedValue({
           id: "note-1",
@@ -1996,7 +2065,7 @@ describe("TicketsService", () => {
       });
 
       it("emits no ticket.mentioned event and never throws for an unresolvable mention", async () => {
-        identityService.listUsers.mockResolvedValue(branchUsers);
+        identityService.listUserMentionCandidates.mockResolvedValue(branchUsers);
         prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
         prisma.ticketNote.create.mockResolvedValue({
           id: "note-1",
@@ -2013,7 +2082,7 @@ describe("TicketsService", () => {
       });
 
       it("emits no ticket.mentioned event for a plain note with no @ at all", async () => {
-        identityService.listUsers.mockResolvedValue(branchUsers);
+        identityService.listUserMentionCandidates.mockResolvedValue(branchUsers);
         prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
         prisma.ticketNote.create.mockResolvedValue({
           id: "note-1",
@@ -2026,7 +2095,7 @@ describe("TicketsService", () => {
         await service.createTicketNote("ticket-1", { body: "Called the customer back." });
 
         expect(eventEmitter.emit).toHaveBeenCalledTimes(1); // note-added only.
-        expect(identityService.listUsers).toHaveBeenCalledOnce();
+        expect(identityService.listUserMentionCandidates).toHaveBeenCalledOnce();
       });
     });
   });
