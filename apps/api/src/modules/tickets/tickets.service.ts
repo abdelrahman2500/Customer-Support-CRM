@@ -11,10 +11,12 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { paginate } from "../../common/pagination/paginate";
 import type { Paginated } from "../../common/pagination/paginated";
 import { TenantContext } from "../../common/tenant/tenant-context";
+import { KnowledgeBaseService } from "../knowledge-base/knowledge-base.service";
 import type { CreateTicketDto } from "./dto/create-ticket.dto";
 import type { UpdateTicketDto } from "./dto/update-ticket.dto";
 import type { ListTicketsQueryDto } from "./dto/list-tickets-query.dto";
 import type { CreateTicketNoteDto } from "./dto/create-ticket-note.dto";
+import type { CreateTicketKbReferenceDto } from "./dto/create-ticket-kb-reference.dto";
 import type { PortalCreateTicketDto } from "../portal/dto/portal-create-ticket.dto";
 import type { SubmitCsatDto } from "../portal/dto/submit-csat.dto";
 import {
@@ -116,6 +118,18 @@ export interface TicketNoteSummary {
   createdAt: Date;
 }
 
+/** RM-05 — `articleTitle` is resolved via the same `article` relation
+ * `categoryName`/`customerName` above are (never a second client round-trip
+ * to fetch it, mirroring `TicketSummary`'s own established convention). */
+export interface TicketKbReferenceSummary {
+  id: string;
+  ticketId: string;
+  articleId: string;
+  articleTitle: string;
+  referencedByUserId: string;
+  createdAt: Date;
+}
+
 export interface TicketCsatSummary {
   id: string;
   ticketId: string;
@@ -149,6 +163,7 @@ export class TicketsService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContext,
     private readonly eventEmitter: EventEmitter2,
+    private readonly knowledgeBaseService: KnowledgeBaseService,
   ) {}
 
   async createTicket(dto: CreateTicketDto): Promise<TicketSummary> {
@@ -460,6 +475,76 @@ export class TicketsService {
       note: summary,
     } satisfies TicketNoteAddedEvent);
     return { id: note.id };
+  }
+
+  /** RM-05 — mirrors `getTicketNotes`'s exact scoping pattern; oldest-first,
+   * same convention as notes. */
+  async listTicketKbReferences(id: string): Promise<TicketKbReferenceSummary[]> {
+    await this.findTicketInScope(id);
+    const references = await this.prisma.ticketKnowledgeBaseReference.findMany({
+      where: { ticketId: id },
+      include: { article: { select: { title: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    return references.map(toTicketKbReferenceSummary);
+  }
+
+  /**
+   * RM-05 — validates the ticket (via `findTicketInScope`, this caller's
+   * own branch) and the article (via `KnowledgeBaseService.getArticle`,
+   * which applies that exact same branch-scoping guarantee independently)
+   * separately, never by comparing the two rows' `branchId` fields
+   * directly — each side's own existing scoping is what makes referencing
+   * an article outside the ticket's branch impossible, since both can only
+   * ever resolve to the caller's own branch. A `DRAFT` article is a valid,
+   * resolvable id (an agent can see drafts via `GET
+   * /knowledge-base/articles/:id`) but not a referenceable one — rejected
+   * with `BadRequestException`, not folded into the 404 case.
+   *
+   * Deliberately emits no domain event and produces no `TicketHistoryEntry`
+   * — see `TicketKnowledgeBaseReference`'s own schema doc comment for why.
+   */
+  async createTicketKbReference(
+    id: string,
+    dto: CreateTicketKbReferenceDto,
+  ): Promise<TicketKbReferenceSummary> {
+    await this.findTicketInScope(id);
+    const article = await this.knowledgeBaseService.getArticle(dto.articleId);
+    if (article.status !== "PUBLISHED") {
+      throw new BadRequestException("Only a published article can be referenced on a ticket");
+    }
+    const referencedByUserId = this.requireAuthenticatedUserId();
+
+    try {
+      const reference = await this.prisma.ticketKnowledgeBaseReference.create({
+        data: { ticketId: id, articleId: dto.articleId, referencedByUserId },
+        include: { article: { select: { title: true } } },
+      });
+      return toTicketKbReferenceSummary(reference);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException("This article is already referenced on this ticket");
+      }
+      throw error;
+    }
+  }
+
+  /** RM-05 — 404s identically for an unknown reference id or one belonging
+   * to a different ticket, same convention as `getDownloadUrl`'s own
+   * ticket-scoped attachment lookup. */
+  async deleteTicketKbReference(id: string, referenceId: string): Promise<{ id: string }> {
+    await this.findTicketInScope(id);
+    const reference = await this.prisma.ticketKnowledgeBaseReference.findFirst({
+      where: { id: referenceId, ticketId: id },
+    });
+    if (!reference) {
+      throw new NotFoundException("Reference not found");
+    }
+    await this.prisma.ticketKnowledgeBaseReference.delete({ where: { id: referenceId } });
+    return { id: referenceId };
   }
 
   /** Agent-facing, read-only — mirrors `getTicketHistory`'s exact scoping
@@ -913,6 +998,24 @@ function toCsatSummary(response: {
     rating: response.rating,
     comment: response.comment,
     createdAt: response.createdAt,
+  };
+}
+
+function toTicketKbReferenceSummary(reference: {
+  id: string;
+  ticketId: string;
+  articleId: string;
+  referencedByUserId: string;
+  createdAt: Date;
+  article: { title: string };
+}): TicketKbReferenceSummary {
+  return {
+    id: reference.id,
+    ticketId: reference.ticketId,
+    articleId: reference.articleId,
+    articleTitle: reference.article.title,
+    referencedByUserId: reference.referencedByUserId,
+    createdAt: reference.createdAt,
   };
 }
 

@@ -93,6 +93,8 @@ model User {
   ticketNotes                 TicketNote[]
   /// RM-02 — this agent's own authored customer notes.
   customerNotes               CustomerNote[]
+  /// RM-05 — this agent's own Knowledge Base article references on tickets.
+  ticketKbReferences          TicketKnowledgeBaseReference[]
   automationRules             AutomationRule[]
   notificationPreferences     NotificationPreference[]
   uploadedAttachments         TicketAttachment[]
@@ -532,6 +534,8 @@ model Ticket {
   status            TicketStatus         @default(OPEN)
   historyEntries    TicketHistoryEntry[]
   notes             TicketNote[]
+  /// RM-05 — Knowledge Base articles referenced on this ticket.
+  kbReferences      TicketKnowledgeBaseReference[]
   csatResponse      TicketCsatResponse?
   slaTarget         SlaTicketTarget?
   slaEscalations    SlaEscalation[]
@@ -605,6 +609,47 @@ model TicketNote {
 
   @@index([ticketId])
   @@map("ticket_notes")
+  @@schema("ticketing")
+}
+
+/// RM-05 — a Knowledge Base article an agent has attached to a Ticket as a
+/// reference, so its context (customer's other open tickets aside, this is
+/// the ticket workspace's own "related reading") is visible without leaving
+/// the ticket screen — see docs/architecture/03-domain-boundaries.md's own
+/// note that Ticketing and Knowledge Base were, until this story, never
+/// cross-linked anywhere in the codebase. Unlike `TicketNote`, this is a
+/// join to a second aggregate root (`KnowledgeBaseArticle`, a different
+/// schema's own standalone root — see its doc comment), not a plain
+/// free-text row, and supports removal (`DELETE
+/// tickets/:id/kb-references/:refId`) — referencing the wrong article by
+/// mistake is meant to be correctable, unlike a note or an uploaded
+/// attachment. No `branchId` of its own: both `Ticket` and
+/// `KnowledgeBaseArticle` are independently scoped to the same caller's
+/// branch via `TenantContext` at creation time (`TicketKbReferencesService`
+/// never compares the two branch ids directly — each side's own existing
+/// scoping guarantee is what makes cross-branch referencing impossible).
+/// `@@unique([ticketId, articleId])`: the same article cannot be attached to
+/// the same ticket twice — a second attempt is a no-op the caller should
+/// treat as "already there," surfaced as a 409, not a silent duplicate row.
+/// Deliberately emits no domain event and produces no `TicketHistoryEntry`:
+/// mirrors `TicketNote`/`TicketAttachment`'s own precedent (neither
+/// participates in the history timeline either) — see this story's own
+/// completion report for why a dedicated event/history-listener extension
+/// was judged not worth the added architecture for one feature.
+model TicketKnowledgeBaseReference {
+  id                 String               @id @default(uuid())
+  ticketId           String               @map("ticket_id")
+  ticket             Ticket               @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  articleId          String               @map("article_id")
+  article            KnowledgeBaseArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  referencedByUserId String               @map("referenced_by_user_id")
+  referencedByUser   User                 @relation(fields: [referencedByUserId], references: [id])
+  createdAt          DateTime             @default(now()) @map("created_at")
+
+  @@unique([ticketId, articleId])
+  @@index([ticketId])
+  @@index([articleId])
+  @@map("ticket_knowledge_base_references")
   @@schema("ticketing")
 }
 
@@ -1059,6 +1104,8 @@ model KnowledgeBaseArticle {
   versions     KnowledgeBaseArticleVersion[]
   /// Story 109 — see `KnowledgeBaseArticleTranslation`'s own doc comment.
   translations KnowledgeBaseArticleTranslation[]
+  /// RM-05 — tickets that have referenced this article.
+  ticketReferences TicketKnowledgeBaseReference[]
 
   @@index([branchId])
   @@map("knowledge_base_articles")

@@ -1838,4 +1838,290 @@ describe("Ticketing (e2e)", () => {
         .expect(404);
     });
   });
+
+  // RM-05 — Ticket ↔ Knowledge Base Linkage.
+  describe("kb references (RM-05)", () => {
+    let kbTicketId: string;
+    let otherKbTicketId: string;
+    let publishedArticleId: string;
+    let draftArticleId: string;
+    const searchMarker = `KbRefMarker${randomUUID().replace(/-/g, "")}`;
+
+    beforeAll(async () => {
+      const ticket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, subject: "KB reference fixture ticket" })
+        .expect(201);
+      kbTicketId = ticket.body.id;
+
+      const otherTicket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, subject: "KB reference fixture other ticket" })
+        .expect(201);
+      otherKbTicketId = otherTicket.body.id;
+
+      const published = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: `Published Fixture Article ${searchMarker}`, body: "Step-by-step..." })
+        .expect(201);
+      publishedArticleId = published.body.id;
+      await request(app.getHttpServer())
+        .patch(`/api/v1/knowledge-base/articles/${publishedArticleId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status: "PUBLISHED" })
+        .expect(200);
+
+      const draft = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: `Draft Fixture Article ${searchMarker}`, body: "Unfinished..." })
+        .expect(201);
+      draftArticleId = draft.body.id;
+    });
+
+    it("rejects an unauthenticated request on every route", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .send({ articleId: publishedArticleId })
+        .expect(401);
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .expect(401);
+      await request(app.getHttpServer())
+        .delete(`/api/v1/tickets/${kbTicketId}/kb-references/${randomUUID()}`)
+        .expect(401);
+    });
+
+    it("returns 404 for a ticket that doesn't exist", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${randomUUID()}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ articleId: publishedArticleId })
+        .expect(404);
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${randomUUID()}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    it("returns 404 for an unknown articleId", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ articleId: randomUUID() })
+        .expect(404);
+    });
+
+    it("rejects referencing a DRAFT article with 400", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ articleId: draftArticleId })
+        .expect(400);
+    });
+
+    it("creates a reference to a PUBLISHED article, persisting the correct shape", async () => {
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const created = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ articleId: publishedArticleId })
+        .expect(201);
+
+      expect(created.body).toMatchObject({
+        ticketId: kbTicketId,
+        articleId: publishedArticleId,
+        articleTitle: expect.stringContaining("Published Fixture Article"),
+        referencedByUserId: me.body.id,
+      });
+      expect(typeof created.body.createdAt).toBe("string");
+
+      const listed = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(listed.body.map((reference: { id: string }) => reference.id)).toContain(
+        created.body.id,
+      );
+    });
+
+    it("rejects attaching the same article to the same ticket twice with 409", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ articleId: publishedArticleId })
+        .expect(409);
+    });
+
+    it("never leaks a reference into a different ticket's list (ticket isolation)", async () => {
+      const forOtherTicket = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${otherKbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(forOtherTicket.body).toEqual([]);
+    });
+
+    it("removes a reference, after which it no longer appears in the list", async () => {
+      const second = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: `Removable Fixture Article ${randomUUID()}`, body: "..." })
+        .expect(201);
+      await request(app.getHttpServer())
+        .patch(`/api/v1/knowledge-base/articles/${second.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status: "PUBLISHED" })
+        .expect(200);
+      const created = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ articleId: second.body.id })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/tickets/${kbTicketId}/kb-references/${created.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const listed = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(
+        listed.body.some((reference: { id: string }) => reference.id === created.body.id),
+      ).toBe(false);
+    });
+
+    it("returns 404 removing a reference id that doesn't exist", async () => {
+      await request(app.getHttpServer())
+        .delete(`/api/v1/tickets/${kbTicketId}/kb-references/${randomUUID()}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+
+    // A freshly created role starts with zero permissions (RM-02's own
+    // precedent) — the one real way to prove a caller genuinely lacking
+    // `ticket:update`/`ticket:read` is rejected.
+    it("rejects a role with no ticket permissions at all (403)", async () => {
+      const role = await request(app.getHttpServer())
+        .post("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ name: `No Ticket Access ${randomUUID()}` })
+        .expect(201);
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const restrictedEmail = `no-ticket-access-${randomUUID()}@example.com`;
+      const restrictedPassword = "restricted-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: restrictedEmail,
+          password: restrictedPassword,
+          fullName: "No Ticket Access",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: role.body.id,
+        })
+        .expect(201);
+      const restrictedLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: restrictedEmail, password: restrictedPassword })
+        .expect(200);
+      const restrictedAccessToken = restrictedLogin.body.accessToken as string;
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${restrictedAccessToken}`)
+        .send({ articleId: publishedArticleId })
+        .expect(403);
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${kbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${restrictedAccessToken}`)
+        .expect(403);
+    });
+
+    // The seeded Agent role's default grant includes `ticket:create`/
+    // `ticket:read`/`ticket:update` and `kb:read` (but not `kb:create`/
+    // `kb:update` — see `knowledge-base.e2e-spec.ts`'s own Story 100 test)
+    // — proving the real, seeded default grant is enough to create/list/
+    // remove a reference to an article an admin already published, without
+    // ever needing to create or publish a KB article itself.
+    it("allows an Agent-role user with the default ticket:update/ticket:read grant", async () => {
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const agentEmail = `agent-kb-ref-${randomUUID()}@example.com`;
+      const agentPassword = "agent-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: agentPassword,
+          fullName: "Test Agent KB Ref",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+      const agentAccessToken = agentLogin.body.accessToken as string;
+
+      const created = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${otherKbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .send({ articleId: publishedArticleId })
+        .expect(201);
+      await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${otherKbTicketId}/kb-references`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(200);
+      await request(app.getHttpServer())
+        .delete(`/api/v1/tickets/${otherKbTicketId}/kb-references/${created.body.id}`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(200);
+    });
+
+    // RM-05 — `GET /knowledge-base/articles?status=PUBLISHED`, the new
+    // filter the ticket workspace's own KB search widget relies on to
+    // never offer a draft as a reference candidate.
+    it("GET /knowledge-base/articles?status=PUBLISHED excludes drafts and includes published articles", async () => {
+      // `search` scopes this to just the two fixture articles above (one
+      // PUBLISHED, one DRAFT, same searchMarker in both titles) regardless
+      // of how many other articles already exist in this shared dev
+      // database's branch — mirrors `customers.e2e-spec.ts`'s own
+      // `searchMarker` convention for the same reason.
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ status: "PUBLISHED", search: searchMarker })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const ids = response.body.items.map((article: { id: string }) => article.id);
+      expect(ids).toContain(publishedArticleId);
+      expect(ids).not.toContain(draftArticleId);
+    });
+  });
 });

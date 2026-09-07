@@ -3,6 +3,7 @@ import { TenantContext } from "../../common/tenant/tenant-context";
 import { AiModule } from "../ai/ai.module";
 import { ChannelsModule } from "../channels/channels.module";
 import { CustomersModule } from "../customers/customers.module";
+import { KnowledgeBaseModule } from "../knowledge-base/knowledge-base.module";
 import { QueuesModule } from "../../queues/queues.module";
 import { AutomationActionListener } from "./automation-action.listener";
 import { TicketAiService } from "./ticket-ai.service";
@@ -11,6 +12,7 @@ import { TicketCategoriesService } from "./ticket-categories.service";
 import { TicketChannelService } from "./ticket-channel.service";
 import { TicketEscalationListener } from "./ticket-escalation.listener";
 import { TicketHistoryListener } from "./ticket-history.listener";
+import { TicketKbReferencesController } from "./ticket-kb-references.controller";
 import { TicketsController } from "./tickets.controller";
 import { TicketsService } from "./tickets.service";
 import { WebFormIntakeController } from "./web-form-intake.controller";
@@ -54,10 +56,22 @@ import { WebFormIntakeService } from "./web-form-intake.service";
  * `Department` CRUD lives in `IdentityModule`: pure branch-scoped CRUD,
  * no cross-module reactions, registered here because `TicketCategory` is
  * owned by the `ticketing` schema.
+ *
+ * RM-05 — `KnowledgeBaseModule` imported the same way `AiModule` etc. are,
+ * so `TicketsService` can inject the already-exported `KnowledgeBaseService`
+ * directly (its own `getArticle` already gives branch-scoped 404 handling —
+ * no duplicated Prisma query). `TicketKbReferencesController` registered
+ * the same way `CustomerNotesController` was in RM-02: its own controller
+ * file, same `TicketsService`.
  */
 @Module({
-  imports: [AiModule, ChannelsModule, CustomersModule, QueuesModule],
-  controllers: [TicketsController, TicketCategoriesController, WebFormIntakeController],
+  imports: [AiModule, ChannelsModule, CustomersModule, KnowledgeBaseModule, QueuesModule],
+  controllers: [
+    TicketsController,
+    TicketCategoriesController,
+    TicketKbReferencesController,
+    WebFormIntakeController,
+  ],
   providers: [
     TicketsService,
     TenantContext,

@@ -12,6 +12,7 @@ import {
 } from "./tickets.events";
 import type { PrismaService } from "../../prisma/prisma.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
+import type { KnowledgeBaseService } from "../knowledge-base/knowledge-base.service";
 import { assertValidTicketStatusTransition } from "./ticket-status-transitions";
 
 // RM-01 — spied, not stubbed: `vi.fn(actual...)` wraps the real
@@ -44,6 +45,12 @@ function buildPrismaMock() {
     ticketNote: {
       findMany: vi.fn(),
       create: vi.fn(),
+    },
+    ticketKnowledgeBaseReference: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
     },
     ticketCsatResponse: {
       findUnique: vi.fn(),
@@ -102,15 +109,36 @@ function buildEventEmitterMock() {
   return { emit: vi.fn() };
 }
 
+/** RM-05 — `getArticle` defaults to a `PUBLISHED` article so every
+ * pre-existing test that never touches KB references is unaffected; the
+ * dedicated describe block below overrides it per test. */
+function buildKnowledgeBaseServiceMock() {
+  return {
+    getArticle: vi.fn().mockResolvedValue({
+      id: "article-1",
+      branchId: "branch-1",
+      title: "How to reset a password",
+      body: "...",
+      category: null,
+      status: "PUBLISHED",
+      publishedAt: new Date("2024-01-01T00:00:00.000Z"),
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+    }),
+  };
+}
+
 function createService(
   prismaMock: ReturnType<typeof buildPrismaMock>,
   tenantMock: ReturnType<typeof buildTenantContextMock>,
   eventEmitterMock: ReturnType<typeof buildEventEmitterMock>,
+  knowledgeBaseServiceMock: ReturnType<typeof buildKnowledgeBaseServiceMock> = buildKnowledgeBaseServiceMock(),
 ): TicketsService {
   return new TicketsService(
     prismaMock as unknown as PrismaService,
     tenantMock as unknown as TenantContext,
     eventEmitterMock as unknown as EventEmitter2,
+    knowledgeBaseServiceMock as unknown as KnowledgeBaseService,
   );
 }
 
@@ -118,6 +146,7 @@ describe("TicketsService", () => {
   let prisma: ReturnType<typeof buildPrismaMock>;
   let tenantContext: ReturnType<typeof buildTenantContextMock>;
   let eventEmitter: ReturnType<typeof buildEventEmitterMock>;
+  let knowledgeBaseService: ReturnType<typeof buildKnowledgeBaseServiceMock>;
   let service: TicketsService;
 
   const baseDto = { customerId: "customer-1", subject: "Cannot log in" };
@@ -127,7 +156,8 @@ describe("TicketsService", () => {
     prisma = buildPrismaMock();
     tenantContext = buildTenantContextMock();
     eventEmitter = buildEventEmitterMock();
-    service = createService(prisma, tenantContext, eventEmitter);
+    knowledgeBaseService = buildKnowledgeBaseServiceMock();
+    service = createService(prisma, tenantContext, eventEmitter, knowledgeBaseService);
   });
 
   describe("createTicket", () => {
@@ -1872,6 +1902,193 @@ describe("TicketsService", () => {
           createdAt: new Date("2026-01-01T00:00:00.000Z"),
         },
       });
+    });
+  });
+
+  describe("listTicketKbReferences (RM-05)", () => {
+    it("throws NotFoundException for an unknown/out-of-scope ticket id", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(service.listTicketKbReferences("missing-id")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.ticketKnowledgeBaseReference.findMany).not.toHaveBeenCalled();
+    });
+
+    it("returns [] for a ticket with no references", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketKnowledgeBaseReference.findMany.mockResolvedValue([]);
+
+      const result = await service.listTicketKbReferences("ticket-1");
+
+      expect(result).toEqual([]);
+    });
+
+    it("scopes and orders references chronologically (asc), including the article's title", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketKnowledgeBaseReference.findMany.mockResolvedValue([
+        {
+          id: "reference-1",
+          ticketId: "ticket-1",
+          articleId: "article-1",
+          referencedByUserId: "user-1",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          article: { title: "How to reset a password" },
+        },
+      ]);
+
+      const result = await service.listTicketKbReferences("ticket-1");
+
+      expect(prisma.ticketKnowledgeBaseReference.findMany).toHaveBeenCalledWith({
+        where: { ticketId: "ticket-1" },
+        include: { article: { select: { title: true } } },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(result).toEqual([
+        {
+          id: "reference-1",
+          ticketId: "ticket-1",
+          articleId: "article-1",
+          articleTitle: "How to reset a password",
+          referencedByUserId: "user-1",
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      ]);
+    });
+  });
+
+  describe("createTicketKbReference (RM-05)", () => {
+    it("throws NotFoundException for a ticket not in the caller's branch, never creating a reference", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createTicketKbReference("missing-id", { articleId: "article-1" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(knowledgeBaseService.getArticle).not.toHaveBeenCalled();
+      expect(prisma.ticketKnowledgeBaseReference.create).not.toHaveBeenCalled();
+    });
+
+    it("propagates NotFoundException for an unknown/out-of-branch article, never creating a reference", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      knowledgeBaseService.getArticle.mockRejectedValue(new NotFoundException("Article not found"));
+
+      await expect(
+        service.createTicketKbReference("ticket-1", { articleId: "missing-article" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticketKnowledgeBaseReference.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a DRAFT article with BadRequestException, never creating a reference", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      knowledgeBaseService.getArticle.mockResolvedValue({
+        id: "article-1",
+        branchId: "branch-1",
+        title: "Unpublished draft",
+        body: "...",
+        category: null,
+        status: "DRAFT",
+        publishedAt: null,
+        createdAt: new Date("2024-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2024-01-01T00:00:00.000Z"),
+      });
+
+      await expect(
+        service.createTicketKbReference("ticket-1", { articleId: "article-1" }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.ticketKnowledgeBaseReference.create).not.toHaveBeenCalled();
+    });
+
+    it("creates the reference as the authenticated actor for a PUBLISHED article", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketKnowledgeBaseReference.create.mockResolvedValue({
+        id: "reference-1",
+        ticketId: "ticket-1",
+        articleId: "article-1",
+        referencedByUserId: "user-1",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        article: { title: "How to reset a password" },
+      });
+
+      const result = await service.createTicketKbReference("ticket-1", { articleId: "article-1" });
+
+      expect(prisma.ticketKnowledgeBaseReference.create).toHaveBeenCalledWith({
+        data: { ticketId: "ticket-1", articleId: "article-1", referencedByUserId: "user-1" },
+        include: { article: { select: { title: true } } },
+      });
+      expect(result).toEqual({
+        id: "reference-1",
+        ticketId: "ticket-1",
+        articleId: "article-1",
+        articleTitle: "How to reset a password",
+        referencedByUserId: "user-1",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      });
+    });
+
+    it("translates a P2002 unique-constraint violation into ConflictException", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketKnowledgeBaseReference.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "6.19.3",
+        }),
+      );
+
+      await expect(
+        service.createTicketKbReference("ticket-1", { articleId: "article-1" }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it("throws when TenantContext has no authenticated user", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      const anonymousTenantContext = buildTenantContextMock("branch-1", null);
+      const anonymousService = createService(
+        prisma,
+        anonymousTenantContext,
+        eventEmitter,
+        knowledgeBaseService,
+      );
+
+      await expect(
+        anonymousService.createTicketKbReference("ticket-1", { articleId: "article-1" }),
+      ).rejects.toThrow("TenantContext: no authenticated user on this request");
+      expect(prisma.ticketKnowledgeBaseReference.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteTicketKbReference (RM-05)", () => {
+    it("throws NotFoundException for a ticket not in the caller's branch", async () => {
+      prisma.ticket.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteTicketKbReference("missing-id", "reference-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticketKnowledgeBaseReference.delete).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException for a reference id that doesn't belong to this ticket", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketKnowledgeBaseReference.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteTicketKbReference("ticket-1", "someone-elses-reference"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.ticketKnowledgeBaseReference.delete).not.toHaveBeenCalled();
+    });
+
+    it("deletes the reference once confirmed scoped to this ticket", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.ticketKnowledgeBaseReference.findFirst.mockResolvedValue({ id: "reference-1" });
+
+      const result = await service.deleteTicketKbReference("ticket-1", "reference-1");
+
+      expect(prisma.ticketKnowledgeBaseReference.findFirst).toHaveBeenCalledWith({
+        where: { id: "reference-1", ticketId: "ticket-1" },
+      });
+      expect(prisma.ticketKnowledgeBaseReference.delete).toHaveBeenCalledWith({
+        where: { id: "reference-1" },
+      });
+      expect(result).toEqual({ id: "reference-1" });
     });
   });
 

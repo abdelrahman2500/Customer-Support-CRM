@@ -124,7 +124,7 @@ export class KnowledgeBaseService {
     const search = query.search?.trim();
     if (search) {
       return this.applyLocaleToPage(
-        await this.searchArticles(branchId, search, query),
+        await this.searchArticles(branchId, search, query, { status: query.status }),
         query.locale,
       );
     }
@@ -133,7 +133,7 @@ export class KnowledgeBaseService {
     // paging on a non-unique key lets a row straddling a page boundary
     // appear twice or vanish.
     const page = await paginate(this.prisma.knowledgeBaseArticle, {
-      where: { branchId },
+      where: { branchId, ...(query.status ? { status: query.status } : {}) },
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       page: query.page,
       pageSize: query.pageSize,
@@ -432,14 +432,19 @@ export class KnowledgeBaseService {
     branchId: string,
     search: string,
     pagination: { page?: number; pageSize?: number } = {},
-    options: { publishedOnly?: boolean } = {},
+    options: { publishedOnly?: boolean; status?: KnowledgeBaseArticleStatus } = {},
   ): Promise<Paginated<ArticleSummary>> {
     const page = pagination.page ?? 1;
     const pageSize = pagination.pageSize ?? DEFAULT_PAGE_SIZE;
     const offset = (page - 1) * pageSize;
+    // RM-05 — `listArticles`' own new `status` filter collapses into the
+    // exact same `PUBLISHED`-only branch `publishedOnly` already drives
+    // (the only status either caller ever actually wants filtered); no new
+    // SQL branch, since nothing today needs a DRAFT-only search.
+    const publishedOnly = options.publishedOnly || options.status === "PUBLISHED";
 
     const [rows, countRows] = await Promise.all([
-      options.publishedOnly
+      publishedOnly
         ? this.prisma.$queryRaw<RawArticleRow[]>`
             SELECT id, branch_id AS "branchId", title, body, category, status,
                    published_at AS "publishedAt", created_at AS "createdAt",
@@ -461,7 +466,7 @@ export class KnowledgeBaseService {
             ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC, id DESC
             LIMIT ${pageSize} OFFSET ${offset}
           `,
-      options.publishedOnly
+      publishedOnly
         ? this.prisma.$queryRaw<{ count: number }[]>`
             SELECT COUNT(*)::int AS count
             FROM knowledge_base.knowledge_base_articles

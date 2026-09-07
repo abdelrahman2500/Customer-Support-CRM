@@ -45,6 +45,26 @@ export function useArticlesQuery(search?: string, page?: number) {
   });
 }
 
+/** RM-05 — the ticket workspace's own KB reference search widget: only
+ * ever searches (never browses the whole branch), and only ever
+ * `PUBLISHED` articles (so an agent is never offered a draft to reference —
+ * `TicketKbReferencesController` separately re-validates this server-side
+ * regardless). A distinct query key/`enabled` gate from `useArticlesQuery`
+ * above (not a parameter on it) since its own empty-search behavior
+ * (return nothing, not "the branch's newest articles") is deliberately
+ * different. */
+export const publishedArticleSearchQueryKey = (search: string) =>
+  ["knowledge-base-articles", "published-search", search] as const;
+
+export function usePublishedArticleSearchQuery(search: string) {
+  const trimmed = search.trim();
+  return useQuery({
+    queryKey: publishedArticleSearchQueryKey(trimmed),
+    queryFn: () => listArticles({ search: trimmed, status: "PUBLISHED", pageSize: 5 }),
+    enabled: trimmed.length > 0,
+  });
+}
+
 export function useArticleQuery(id: string) {
   return useQuery({
     queryKey: articleQueryKey(id),

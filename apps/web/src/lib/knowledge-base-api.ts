@@ -47,8 +47,12 @@ export interface UpdateArticleInput {
  * omitting them reproduces the pre-S-8c request apart from the page bound
  * the API now applies by default.
  */
+/** RM-05 — additive filter, only ever set to `"PUBLISHED"` by the ticket
+ * workspace's own KB reference search widget (`ticket-kb-references-api.ts`)
+ * so it never offers a draft as a reference candidate. */
 export interface ArticleFilters {
   search?: string;
+  status?: ArticleStatus;
   page?: number;
   pageSize?: number;
 }

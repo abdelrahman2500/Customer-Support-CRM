@@ -25,6 +25,12 @@ import {
 } from "@/hooks/use-ticket-messages";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
+import {
+  useCreateTicketKbReferenceMutation,
+  useDeleteTicketKbReferenceMutation,
+  useTicketKbReferencesQuery,
+} from "@/hooks/use-ticket-kb-references";
+import { usePublishedArticleSearchQuery } from "@/hooks/use-knowledge-base";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { ApiError } from "@/lib/api";
 import { showSuccessToast } from "@crm/ui";
@@ -107,6 +113,19 @@ vi.mock("@/hooks/use-ticket-ai", () => ({
 
 vi.mock("@/lib/attachments-api", () => ({
   getAttachmentDownloadUrl: vi.fn(),
+}));
+
+// RM-05 — `TicketKbReferencesCard`'s own hooks; its behavior is covered by
+// its own dedicated describe block below (mirrors this file's own
+// precedent for TicketChatCard/TicketAiCard's hooks above).
+vi.mock("@/hooks/use-ticket-kb-references", () => ({
+  useTicketKbReferencesQuery: vi.fn(),
+  useCreateTicketKbReferenceMutation: vi.fn(),
+  useDeleteTicketKbReferenceMutation: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-knowledge-base", () => ({
+  usePublishedArticleSearchQuery: vi.fn(),
 }));
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -229,6 +248,26 @@ describe("TicketDetailView", () => {
     vi.mocked(useCustomerQuery).mockReturnValue(
       queryResult({ data: { id: "customer-1", contacts: [] }, isSuccess: true }) as never,
     );
+    // RM-05 — `TicketKbReferencesCard`'s own hooks; default to an empty,
+    // successful result so pre-existing tests are unaffected.
+    vi.mocked(useTicketKbReferencesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useCreateTicketKbReferenceMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({ id: "reference-new" }),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(useDeleteTicketKbReferenceMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({ id: "reference-1" }),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(usePublishedArticleSearchQuery).mockReturnValue(queryResult({}) as never);
   });
 
   it("renders the ticket subject and resolved customer name", () => {

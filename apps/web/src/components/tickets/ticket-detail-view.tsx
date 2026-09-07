@@ -22,6 +22,7 @@ import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { CustomerContextPanel } from "@/components/tickets/customer-context-panel";
 import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
+import { TicketKbReferencesCard } from "@/components/tickets/ticket-kb-references-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
@@ -78,12 +79,20 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * yet" or the customer's own rating/comment, mirroring the History card's
  * loading/error/empty/populated shape.
  *
- * Story 66 — a new "Attachments" card, appended last, mirroring the Notes
- * card's own list-plus-inline-form shape: `useAttachmentsQuery` for the
- * list, `useUploadAttachmentMutation` for the file input. Download opens a
+ * Story 66 — a new "Attachments" card, mirroring the Notes card's own
+ * list-plus-inline-form shape: `useAttachmentsQuery` for the list,
+ * `useUploadAttachmentMutation` for the file input. Download opens a
  * short-lived presigned S3 URL in a new tab (`getAttachmentDownloadUrl`) —
  * a plain top-level navigation, not a script-initiated fetch, so no CORS
  * configuration on the object-storage side is needed.
+ *
+ * RM-05 — a new "Knowledge Base References" card (`TicketKbReferencesCard`),
+ * appended last: a read-only list of `PUBLISHED` articles attached to this
+ * ticket (each removable) plus an inline search-and-attach widget over
+ * `GET /knowledge-base/articles?status=PUBLISHED`. Closes the one
+ * confirmed-zero cross-link between Ticketing and Knowledge Base — an
+ * agent no longer has to leave the ticket to find and reference relevant
+ * KB content.
  *
  * Story 78 — a new "Live Chat" card (`TicketChatCard`), placed right after
  * the status/priority/assignment grid: unlike the read-mostly cards below
@@ -129,9 +138,9 @@ const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
  * the editable-subject header, the customer context panel (RM-04), the
  * 5-field status/priority/category/assignee/department grid, the chat
  * card, and the run of bordered sections below it (SLA/Escalations/
- * History/CSAT/Notes/Attachments). Exported so
- * `app/[locale]/(agent)/tickets/[id]/loading.tsx` can render the
- * identical shape during the route transition itself, before this
+ * History/CSAT/Notes/Attachments/KB References — RM-05 added the last).
+ * Exported so `app/[locale]/(agent)/tickets/[id]/loading.tsx` can render
+ * the identical shape during the route transition itself, before this
  * component has even mounted — one skeleton definition, two call sites.
  */
 export function TicketDetailSkeleton() {
@@ -159,7 +168,7 @@ export function TicketDetailSkeleton() {
 
       <Skeleton className="h-40 w-full rounded-md" />
 
-      {Array.from({ length: 6 }).map((_, index) => (
+      {Array.from({ length: 7 }).map((_, index) => (
         <div key={index} className="rounded-md border border-slate-200 bg-white p-4">
           <Skeleton className="h-4 w-32" />
           <Skeleton className="mt-2 h-16 w-full" />
@@ -558,6 +567,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           uploadFailedFallback: t("detail.attachmentsUploadFailed"),
         }}
       />
+
+      <TicketKbReferencesCard ticketId={ticketId} />
     </section>
   );
 }

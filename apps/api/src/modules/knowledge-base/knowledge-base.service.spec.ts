@@ -176,6 +176,42 @@ describe("KnowledgeBaseService", () => {
       );
     });
 
+    // RM-05 — `status` filter (agent-facing, additive).
+    it("adds a status filter to the plain-list path's where clause when given", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listArticles({ status: "PUBLISHED" });
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", status: "PUBLISHED" },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
+      });
+    });
+
+    it("omits the status filter entirely when not given, unchanged from before this story", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listArticles();
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1" },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
+      });
+    });
+
+    it("adds a PUBLISHED status filter to the full-text-search path's SQL when status: PUBLISHED is given", async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+
+      await service.listArticles({ search: "password", status: "PUBLISHED" });
+
+      const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+      expect(strings.join("")).toContain("'PUBLISHED'");
+    });
+
     // Story 102 — Full-Text Search.
     it("matches via $queryRaw full-text search when search is given, bypassing findMany", async () => {
       prisma.$queryRaw.mockResolvedValue([]);
