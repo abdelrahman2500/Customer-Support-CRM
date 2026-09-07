@@ -18,6 +18,7 @@ import {
   PortalNotificationEmailProducer,
   PORTAL_NOTIFICATION_EMAIL_QUEUE,
 } from "./portal-notification-email.producer";
+import { WebhookDispatchProducer, WEBHOOK_DISPATCH_QUEUE } from "./webhook-dispatch.producer";
 
 /**
  * Owns `apps/api`'s BullMQ producer connection — one place all of
@@ -47,6 +48,13 @@ import {
  * `channel-message-delivery`'s `SENT`/`FAILED` status, there is no
  * corresponding UI state anywhere that changes when this send succeeds
  * or fails) — one-directional, api → worker only.
+ *
+ * RM-20 — `webhook-dispatch` (produced here, consumed by `apps/worker`) is
+ * the same one-directional shape as `portal-notification-email`: the
+ * worker durably records every attempt itself
+ * (`WebhookDeliveryAttempt`, via its own `PrismaService`, mirroring
+ * `ChannelMessageDeliveryProcessor`'s convention), so there is nothing left
+ * for `apps/api` to be handed back.
  */
 @Module({
   imports: [
@@ -67,6 +75,7 @@ import {
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_QUEUE }),
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE }),
     BullModule.registerQueue({ name: PORTAL_NOTIFICATION_EMAIL_QUEUE }),
+    BullModule.registerQueue({ name: WEBHOOK_DISPATCH_QUEUE }),
   ],
   providers: [
     HealthCheckProducer,
@@ -79,6 +88,7 @@ import {
     ChannelMessageDeliveryProducer,
     ChannelMessageDeliveryEventsBridgeProcessor,
     PortalNotificationEmailProducer,
+    WebhookDispatchProducer,
   ],
   exports: [
     HealthCheckProducer,
@@ -87,6 +97,7 @@ import {
     TaskRemindersProducer,
     ChannelMessageDeliveryProducer,
     PortalNotificationEmailProducer,
+    WebhookDispatchProducer,
   ],
 })
 export class QueuesModule {}

@@ -80,6 +80,7 @@
       "aiSettings": "إعدادات الذكاء الاصطناعي",
       "quickReplies": "الردود السريعة",
       "ticketCategories": "فئات التذاكر",
+      "webhookSubscriptions": "اشتراكات Webhook",
       "mySessions": "جلساتي",
       "unreadNotificationsLabel": "{count} إشعارات غير مقروءة"
     }
@@ -830,6 +831,48 @@
     "createFailed": "تعذّر إنشاء القاعدة. حاول مرة أخرى.",
     "deactivateConfirmTitle": "هل تريد إلغاء تفعيل قاعدة الأتمتة هذه؟",
     "deactivateConfirmDescription": "سيتوقف \"{name}\" عن العمل على التذاكر الجديدة."
+  },
+  "webhookSubscriptions": {
+    "title": "اشتراكات Webhook",
+    "error": "تعذّر تحميل اشتراكات Webhook.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد اشتراكات Webhook حتى الآن.",
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "activate": "تفعيل",
+    "deactivate": "إلغاء التفعيل",
+    "delete": "حذف",
+    "viewDeliveries": "عرض عمليات التسليم",
+    "hideDeliveries": "إخفاء عمليات التسليم",
+    "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+    "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+    "columns": {
+      "targetUrl": "الرابط المستهدف",
+      "events": "الأحداث",
+      "status": "الحالة",
+      "actions": "الإجراءات"
+    },
+    "deliveryColumns": {
+      "eventType": "الحدث",
+      "result": "النتيجة",
+      "attemptedAt": "وقت المحاولة"
+    },
+    "deliverySucceeded": "نجحت ({status})",
+    "deliveryFailed": "فشلت",
+    "deliveriesError": "تعذّر تحميل سجل التسليم.",
+    "noDeliveries": "لا توجد محاولات تسليم حتى الآن.",
+    "createHeading": "اشتراك Webhook جديد",
+    "targetUrlLabel": "الرابط المستهدف",
+    "eventTypesLabel": "الأحداث المراد الاشتراك بها",
+    "createSubmit": "إنشاء الاشتراك",
+    "createSubmitting": "جارٍ الإنشاء...",
+    "createFailed": "تعذّر إنشاء الاشتراك. حاول مرة أخرى.",
+    "secretRevealedTitle": "مفتاح التوقيع السري",
+    "secretRevealedDescription": "يُعرض هذا مرة واحدة فقط — انسخه الآن. استخدمه للتحقق من ترويسة X-Webhook-Signature في كل عملية تسليم إلى هذا الرابط.",
+    "deactivateConfirmTitle": "هل تريد إلغاء تفعيل اشتراك Webhook هذا؟",
+    "deactivateConfirmDescription": "سيتوقف \"{targetUrl}\" عن استقبال عمليات تسليم جديدة حتى إعادة تفعيله.",
+    "deleteConfirmTitle": "هل تريد حذف اشتراك Webhook هذا؟",
+    "deleteConfirmDescription": "سيتم حذف \"{targetUrl}\" وكامل سجل التسليم الخاص به نهائيًا."
   },
   "quickReplies": {
     "title": "الردود السريعة",

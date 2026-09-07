@@ -80,6 +80,7 @@
       "aiSettings": "AI Settings",
       "quickReplies": "Quick Replies",
       "ticketCategories": "Ticket Categories",
+      "webhookSubscriptions": "Webhook Subscriptions",
       "mySessions": "My Sessions",
       "unreadNotificationsLabel": "{count} unread notifications"
     }
@@ -830,6 +831,48 @@
     "createFailed": "Couldn't create the rule. Please try again.",
     "deactivateConfirmTitle": "Deactivate this automation rule?",
     "deactivateConfirmDescription": "\"{name}\" will stop running against new tickets."
+  },
+  "webhookSubscriptions": {
+    "title": "Webhook Subscriptions",
+    "error": "Couldn't load webhook subscriptions.",
+    "retry": "Retry",
+    "empty": "No webhook subscriptions yet.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "viewDeliveries": "View deliveries",
+    "hideDeliveries": "Hide deliveries",
+    "actionForbidden": "You don't have permission to perform that action.",
+    "actionFailed": "That change couldn't be saved. Please try again.",
+    "columns": {
+      "targetUrl": "Target URL",
+      "events": "Events",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "deliveryColumns": {
+      "eventType": "Event",
+      "result": "Result",
+      "attemptedAt": "Attempted at"
+    },
+    "deliverySucceeded": "Succeeded ({status})",
+    "deliveryFailed": "Failed",
+    "deliveriesError": "Couldn't load the delivery log.",
+    "noDeliveries": "No delivery attempts yet.",
+    "createHeading": "New webhook subscription",
+    "targetUrlLabel": "Target URL",
+    "eventTypesLabel": "Events to subscribe to",
+    "createSubmit": "Create subscription",
+    "createSubmitting": "Creating...",
+    "createFailed": "Couldn't create the subscription. Please try again.",
+    "secretRevealedTitle": "Signing secret",
+    "secretRevealedDescription": "This is shown only once — copy it now. Use it to verify the X-Webhook-Signature header on every delivery to this URL.",
+    "deactivateConfirmTitle": "Deactivate this webhook subscription?",
+    "deactivateConfirmDescription": "\"{targetUrl}\" will stop receiving new deliveries until reactivated.",
+    "deleteConfirmTitle": "Delete this webhook subscription?",
+    "deleteConfirmDescription": "\"{targetUrl}\" and its entire delivery history will be permanently removed."
   },
   "quickReplies": {
     "title": "Quick Replies",

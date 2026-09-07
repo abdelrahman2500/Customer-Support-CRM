@@ -18,6 +18,7 @@ import {
   PortalNotificationEmailProcessor,
   PORTAL_NOTIFICATION_EMAIL_QUEUE,
 } from "./queues/portal-notification-email.processor";
+import { WebhookDispatchProcessor, WEBHOOK_DISPATCH_QUEUE } from "./queues/webhook-dispatch.processor";
 import { ChannelsModule } from "./channels/channels.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AiProviderModule } from "./ai/ai-provider.module";
@@ -43,6 +44,7 @@ import { PinoLoggerService } from "./common/logging/pino-logger.service";
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_QUEUE }),
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE }),
     BullModule.registerQueue({ name: PORTAL_NOTIFICATION_EMAIL_QUEUE }),
+    BullModule.registerQueue({ name: WEBHOOK_DISPATCH_QUEUE }),
     PrismaModule,
     AiProviderModule,
     ChannelsModule,
@@ -54,6 +56,7 @@ import { PinoLoggerService } from "./common/logging/pino-logger.service";
     TaskReminderProcessor,
     ChannelMessageDeliveryProcessor,
     PortalNotificationEmailProcessor,
+    WebhookDispatchProcessor,
     // Story 111 — resolved via `app.get(PinoLoggerService)` in `main.ts`.
     PinoLoggerService,
   ],

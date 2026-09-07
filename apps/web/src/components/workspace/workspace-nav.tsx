@@ -119,6 +119,9 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * inherited for free: `MenuIcon` is direction-neutral (no chevron to
  * flip), and `DropdownMenuContent` shares its floating-panel styling with
  * `Select`, already relied on for RTL throughout this app.
+ *
+ * RM-20 — `webhook-subscriptions` appended as the new last entry before
+ * `my-sessions`, same convention.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -139,6 +142,7 @@ const NAV_ITEMS = [
   { href: "ai-settings", labelKey: "nav.aiSettings" },
   { href: "quick-replies", labelKey: "nav.quickReplies" },
   { href: "ticket-categories", labelKey: "nav.ticketCategories" },
+  { href: "webhook-subscriptions", labelKey: "nav.webhookSubscriptions" },
   { href: "my-sessions", labelKey: "nav.mySessions" },
 ] as const;
 

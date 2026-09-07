@@ -72,6 +72,12 @@ const PERMISSION_CATALOG = [
   "ticket-category:create",
   "ticket-category:read",
   "ticket-category:update",
+  // RM-20 — a single permission for the whole webhook-subscriptions CRUD
+  // surface (create/read/update/delete), mirroring `branding:update`'s own
+  // "one admin-configuration capability, not resource:action-per-verb"
+  // shape rather than `automation:*`'s three-verb split: this resource has
+  // no read-only viewer use case distinct from managing it.
+  "integration:manage",
 ] as const;
 
 // Story 100 — `Agent`'s default grant: exactly what frontline ticket work

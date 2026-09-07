@@ -16,7 +16,7 @@ datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   extensions = [pgvector(map: "vector"), pg_trgm]
-  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base", "ai", "channels", "reporting", "tasks"]
+  schemas    = ["identity", "admin", "customers", "ticketing", "sla", "notifications", "knowledge_base", "ai", "channels", "reporting", "tasks", "integrations"]
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +56,8 @@ model Branch {
   quickReplies          QuickReply[]
   reportDashboards      ReportDashboard[]
   ticketCategories      TicketCategory[]
+  /// RM-20 — this branch's outbound webhook subscriptions.
+  webhookSubscriptions  WebhookSubscription[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -104,6 +106,8 @@ model User {
   channelMessages             ChannelMessage[]
   /// RM-03 — this agent's own personal tasks.
   tasks                       Task[]
+  /// RM-20 — webhook subscriptions this agent registered.
+  createdWebhookSubscriptions WebhookSubscription[]
   /// Story 92 — this agent's own "read up to" cursor over `NotificationLog`
   /// (a per-recipient timestamp, not a column on `NotificationLog` itself,
   /// since those rows are shared by every agent in a branch — see
@@ -1632,4 +1636,67 @@ model Task {
   @@index([dueAt])
   @@map("tasks")
   @@schema("tasks")
+}
+
+// ---------------------------------------------------------------------------
+// integrations schema
+// ---------------------------------------------------------------------------
+
+/// RM-20 — Webhook Subscriptions + Outbound Event Dispatch. The generic
+/// half of the Integration Hub `docs/architecture/09-integrations.md`
+/// describes: an admin registers a target URL against one or more of a
+/// curated, known set of domain event types (`WEBHOOK_EVENT_TYPES` in
+/// `apps/api/src/modules/integrations/webhook-event-types.ts`), and
+/// `WebhookDispatchListener` enqueues a signed HTTP POST to it whenever a
+/// matching event fires for this branch. `secret` is generated once at
+/// creation (`randomBytes(32).toString("hex")`, `WebhookSubscriptionsService`)
+/// and returned exactly once in the create response, never again — mirrors
+/// how a real provider (Stripe, GitHub) hands back a webhook signing secret,
+/// not a value the admin chooses themselves.
+model WebhookSubscription {
+  id                   String                   @id @default(uuid())
+  branchId             String                   @map("branch_id")
+  branch               Branch                   @relation(fields: [branchId], references: [id])
+  targetUrl            String                   @map("target_url")
+  /// HMAC-SHA256 signing key for this subscription's outbound payloads —
+  /// never serialized back out by any read endpoint after creation.
+  secret               String
+  /// One of `WEBHOOK_EVENT_TYPES` per element, validated at the DTO layer
+  /// (Postgres has no enum-array CHECK here, mirroring
+  /// `PortalNotificationPreference.eventType`'s own plain-`String`
+  /// precedent for an admin-extensible-in-code event catalog).
+  subscribedEventTypes String[]                 @map("subscribed_event_types")
+  isActive             Boolean                  @default(true) @map("is_active")
+  createdByUserId      String                   @map("created_by_user_id")
+  createdByUser        User                     @relation(fields: [createdByUserId], references: [id])
+  deliveryAttempts     WebhookDeliveryAttempt[]
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @updatedAt @map("updated_at")
+
+  @@index([branchId])
+  @@map("webhook_subscriptions")
+  @@schema("integrations")
+}
+
+/// RM-20 — one row per outbound HTTP POST attempt (success or failure),
+/// written by `apps/worker`'s `WebhookDispatchProcessor` directly, the same
+/// "durably updates via this app's own `PrismaService`" convention
+/// `ChannelMessageDeliveryProcessor` already established. A subscription
+/// configured with 3 BullMQ attempts that ultimately fails leaves 3 rows
+/// here, not 1 — the admin-visible "delivery attempt log" this story's
+/// acceptance criteria describe is this table's own natural history, not a
+/// separately-maintained summary.
+model WebhookDeliveryAttempt {
+  id             String              @id @default(uuid())
+  subscriptionId String              @map("subscription_id")
+  subscription   WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  eventType      String              @map("event_type")
+  succeeded      Boolean
+  responseStatus Int?                @map("response_status")
+  errorMessage   String?             @map("error_message")
+  attemptedAt    DateTime            @default(now()) @map("attempted_at")
+
+  @@index([subscriptionId, attemptedAt])
+  @@map("webhook_delivery_attempts")
+  @@schema("integrations")
 }
