@@ -1,21 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChannelMessageDeliveryJobPayload } from "./channel-message-delivery.processor";
 import type { PrismaService } from "../prisma/prisma.service";
+import type { ChannelAdapterRegistry } from "../channels/channel-adapter-registry";
 import type { Job, Queue } from "bullmq";
 
 vi.mock("@sentry/node", () => ({ captureException: vi.fn() }));
-vi.mock("./no-op-channel-adapter", () => ({ sendViaNoOpAdapter: vi.fn() }));
 
-// Imported after the mocks so the mocked modules are what the processor sees.
+// Imported after the mock so the mocked module is what the processor sees.
 import * as Sentry from "@sentry/node";
-import { sendViaNoOpAdapter } from "./no-op-channel-adapter";
 import { ChannelMessageDeliveryProcessor, CHANNEL_MESSAGE_DELIVERY_QUEUE } from "./channel-message-delivery.processor";
 
 function buildPrismaMock() {
   return {
     channelMessage: {
+      findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
     },
+  };
+}
+
+function buildAdapterRegistryMock() {
+  return {
+    resolve: vi.fn(),
   };
 }
 
@@ -27,10 +33,12 @@ function buildHandbackQueueMock() {
 
 function createProcessor(
   prismaMock: ReturnType<typeof buildPrismaMock>,
+  adapterRegistryMock: ReturnType<typeof buildAdapterRegistryMock>,
   handbackMock: ReturnType<typeof buildHandbackQueueMock>,
 ): ChannelMessageDeliveryProcessor {
   return new ChannelMessageDeliveryProcessor(
     prismaMock as unknown as PrismaService,
+    adapterRegistryMock as unknown as ChannelAdapterRegistry,
     handbackMock as unknown as Queue,
   );
 }
@@ -45,52 +53,61 @@ function buildJob(
 const PAYLOAD: ChannelMessageDeliveryJobPayload = {
   channelMessageId: "message-1",
   ticketId: "ticket-1",
-  channelType: "EMAIL",
-  body: "Your invoice is attached.",
+  channelType: "LIVE_CHAT",
+  body: "How can I help?",
 };
 
-const UPDATED_ROW = {
+const ROW = {
   id: "message-1",
   ticketId: "ticket-1",
-  channelType: "EMAIL" as const,
+  channelType: "LIVE_CHAT" as const,
   direction: "OUTBOUND" as const,
   senderContactId: null,
   senderUserId: "user-1",
-  body: "Your invoice is attached.",
+  body: "How can I help?",
   createdAt: new Date("2024-01-01T00:00:00.000Z"),
-  deliveryStatus: "SENT" as const,
-  externalMessageId: "noop-abc",
+  deliveryStatus: "PENDING" as const,
+  externalMessageId: null,
   failureReason: null,
   retryCount: 0,
 };
 
+const UPDATED_ROW = {
+  ...ROW,
+  deliveryStatus: "SENT" as const,
+  externalMessageId: "provider-msg-1",
+};
+
 describe("ChannelMessageDeliveryProcessor", () => {
   let prisma: ReturnType<typeof buildPrismaMock>;
+  let adapterRegistry: ReturnType<typeof buildAdapterRegistryMock>;
   let handbackQueue: ReturnType<typeof buildHandbackQueueMock>;
   let processor: ChannelMessageDeliveryProcessor;
 
   beforeEach(() => {
     vi.clearAllMocks();
     prisma = buildPrismaMock();
+    adapterRegistry = buildAdapterRegistryMock();
     handbackQueue = buildHandbackQueueMock();
-    processor = createProcessor(prisma, handbackQueue);
+    processor = createProcessor(prisma, adapterRegistry, handbackQueue);
   });
 
   describe("process", () => {
-    it("sends via the no-op adapter, marks the row SENT with the adapter's externalMessageId, and hands back delivery-sent", async () => {
-      vi.mocked(sendViaNoOpAdapter).mockResolvedValue({ externalMessageId: "noop-abc" });
+    it("resolves the adapter for the job's channelType, sends the fetched row through it, marks the row SENT, and hands back delivery-sent", async () => {
+      const adapter = { send: vi.fn().mockResolvedValue({ externalMessageId: "provider-msg-1" }) };
+      adapterRegistry.resolve.mockReturnValue(adapter);
+      prisma.channelMessage.findUniqueOrThrow.mockResolvedValue(ROW);
       prisma.channelMessage.update.mockResolvedValue(UPDATED_ROW);
       const job = buildJob(PAYLOAD);
 
       await processor.process(job);
 
-      expect(sendViaNoOpAdapter).toHaveBeenCalledWith({
-        channelMessageId: "message-1",
-        body: "Your invoice is attached.",
-      });
+      expect(adapterRegistry.resolve).toHaveBeenCalledWith("LIVE_CHAT");
+      expect(prisma.channelMessage.findUniqueOrThrow).toHaveBeenCalledWith({ where: { id: "message-1" } });
+      expect(adapter.send).toHaveBeenCalledWith(ROW);
       expect(prisma.channelMessage.update).toHaveBeenCalledWith({
         where: { id: "message-1" },
-        data: { deliveryStatus: "SENT", externalMessageId: "noop-abc" },
+        data: { deliveryStatus: "SENT", externalMessageId: "provider-msg-1" },
       });
       expect(handbackQueue.add).toHaveBeenCalledWith("delivery-sent", {
         ticketId: "ticket-1",
@@ -98,8 +115,23 @@ describe("ChannelMessageDeliveryProcessor", () => {
       });
     });
 
+    // RM-14 — Channel Adapter Interface + Registry.
+    it("leaves the message PENDING and logs a warning, without touching Prisma or handing back, when no adapter is registered for the channel", async () => {
+      adapterRegistry.resolve.mockReturnValue(undefined);
+      const job = buildJob({ ...PAYLOAD, channelType: "EMAIL" });
+
+      await processor.process(job);
+
+      expect(adapterRegistry.resolve).toHaveBeenCalledWith("EMAIL");
+      expect(prisma.channelMessage.findUniqueOrThrow).not.toHaveBeenCalled();
+      expect(prisma.channelMessage.update).not.toHaveBeenCalled();
+      expect(handbackQueue.add).not.toHaveBeenCalled();
+    });
+
     it("propagates a rejection from the adapter instead of catching it (BullMQ's own retry then applies)", async () => {
-      vi.mocked(sendViaNoOpAdapter).mockRejectedValue(new Error("transient failure"));
+      const adapter = { send: vi.fn().mockRejectedValue(new Error("transient failure")) };
+      adapterRegistry.resolve.mockReturnValue(adapter);
+      prisma.channelMessage.findUniqueOrThrow.mockResolvedValue(ROW);
       const job = buildJob(PAYLOAD);
 
       await expect(processor.process(job)).rejects.toThrow("transient failure");
@@ -144,7 +176,7 @@ describe("ChannelMessageDeliveryProcessor", () => {
       const error = new Error("Provider rejected: invalid recipient");
       const job = buildJob(PAYLOAD, { attemptsMade: 3, opts: { attempts: 3 } });
       const failedRow = {
-        ...UPDATED_ROW,
+        ...ROW,
         deliveryStatus: "FAILED" as const,
         externalMessageId: null,
         failureReason: "Provider rejected: invalid recipient",
@@ -168,7 +200,7 @@ describe("ChannelMessageDeliveryProcessor", () => {
       const error = new Error("transient failure");
       const job = buildJob(PAYLOAD, { attemptsMade: 1, opts: {} });
       prisma.channelMessage.update.mockResolvedValue({
-        ...UPDATED_ROW,
+        ...ROW,
         deliveryStatus: "FAILED" as const,
         externalMessageId: null,
         failureReason: "transient failure",

@@ -14,6 +14,7 @@ import {
   CHANNEL_MESSAGE_DELIVERY_QUEUE,
 } from "./queues/channel-message-delivery.processor";
 import { CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE } from "./queues/channel-message-delivery-events.types";
+import { ChannelsModule } from "./channels/channels.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AiProviderModule } from "./ai/ai-provider.module";
 import { PinoLoggerService } from "./common/logging/pino-logger.service";
@@ -39,6 +40,7 @@ import { PinoLoggerService } from "./common/logging/pino-logger.service";
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE }),
     PrismaModule,
     AiProviderModule,
+    ChannelsModule,
   ],
   providers: [
     HealthProcessor,

@@ -4,7 +4,7 @@ import type { ChannelMessage, ChannelType } from "@prisma/client";
 import type { Job, Queue } from "bullmq";
 import * as Sentry from "@sentry/node";
 import { PrismaService } from "../prisma/prisma.service";
-import { sendViaNoOpAdapter } from "./no-op-channel-adapter";
+import { ChannelAdapterRegistry } from "../channels/channel-adapter-registry";
 import {
   CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE,
   type ChannelMessageDeliveryOutcomeJobPayload,
@@ -36,11 +36,16 @@ export interface ChannelMessageDeliveryJobPayload {
  * can relay it over the realtime socket — the hand-back carries zero
  * business logic of its own.
  *
- * Calls `sendViaNoOpAdapter` — a no-op stand-in for a real Phase-5
- * provider (see that module's own doc comment) — so this processor
- * proves the queue/status-update loop end-to-end today, with no real
- * external transport plugged in yet. `RM-14`'s adapter registry is what
- * a real provider will eventually replace this call with.
+ * RM-14 — resolves `job.data.channelType` through `ChannelAdapterRegistry`
+ * (replacing RM-13's own bespoke `sendViaNoOpAdapter` stand-in, now
+ * deleted — this is the "real one" that story's own doc comment already
+ * promised) and calls the resolved adapter's `send()`. `EMAIL`/
+ * `WHATSAPP`/`SMS` have no registered adapter yet — that call resolves
+ * `undefined`, and the message deliberately stays `PENDING`: not
+ * configured is not the same as failed, so nothing is marked `FAILED`,
+ * no retry is scheduled, and no hand-back fires (nothing actually
+ * changed). A Phase 5 story registers a real adapter for one of these,
+ * not `apps/worker` itself.
  *
  * On a failure that exhausts every configured retry attempt (the
  * producer sets `attempts: 3`, this repository's first configured BullMQ
@@ -57,6 +62,7 @@ export class ChannelMessageDeliveryProcessor extends WorkerHost {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly adapterRegistry: ChannelAdapterRegistry,
     @InjectQueue(CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE)
     private readonly handbackQueue: Queue<ChannelMessageDeliveryOutcomeJobPayload>,
   ) {
@@ -64,10 +70,18 @@ export class ChannelMessageDeliveryProcessor extends WorkerHost {
   }
 
   async process(job: Job<ChannelMessageDeliveryJobPayload>): Promise<void> {
-    const result = await sendViaNoOpAdapter({
-      channelMessageId: job.data.channelMessageId,
-      body: job.data.body,
+    const adapter = this.adapterRegistry.resolve(job.data.channelType);
+    if (!adapter) {
+      this.logger.warn(
+        `No adapter configured for channel ${job.data.channelType} — message ${job.data.channelMessageId} stays PENDING`,
+      );
+      return;
+    }
+
+    const row = await this.prisma.channelMessage.findUniqueOrThrow({
+      where: { id: job.data.channelMessageId },
     });
+    const result = await adapter.send(row);
 
     const message = await this.prisma.channelMessage.update({
       where: { id: job.data.channelMessageId },
