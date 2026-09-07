@@ -188,23 +188,48 @@ describe("WorkspaceNav", () => {
       ["nav.dashboard", "/en/dashboard"],
       ["nav.tickets", "/en/tickets"],
       ["nav.customers", "/en/customers"],
+      ["nav.knowledgeBase", "/en/knowledge-base"],
+      ["nav.kbCategories", "/en/kb-categories"],
+      ["nav.notifications", "/en/notifications"],
       ["nav.slaPolicies", "/en/sla-policies"],
-      ["nav.businessHours", "/en/business-hours"],
+      ["nav.ticketCategories", "/en/ticket-categories"],
+      ["nav.automationRules", "/en/automation-rules"],
+      ["nav.quickReplies", "/en/quick-replies"],
+      ["nav.reports", "/en/reports"],
+      ["nav.auditLogs", "/en/audit-logs"],
       ["nav.branches", "/en/branches"],
       ["nav.users", "/en/users"],
       ["nav.roles", "/en/roles"],
-      ["nav.auditLogs", "/en/audit-logs"],
-      ["nav.notifications", "/en/notifications"],
-      ["nav.knowledgeBase", "/en/knowledge-base"],
-      ["nav.aiSettings", "/en/ai-settings"],
+      ["nav.notificationTemplates", "/en/notification-templates"],
+      ["nav.webhookSubscriptions", "/en/webhook-subscriptions"],
+      ["nav.apiKeys", "/en/api-keys"],
+      ["nav.settings", "/en/settings"],
+      ["nav.mySessions", "/en/my-sessions"],
     ];
 
-    it("renders a link to every one of the eleven top-level Agent Workspace screens", () => {
+    it("renders a link to every retained top-level Agent Workspace screen", () => {
       render(<WorkspaceNav user={user} />);
 
       for (const [name, href] of EXPECTED_LINKS) {
         expect(screen.getByRole("link", { name })).toHaveAttribute("href", href);
       }
+    });
+
+    // Batch 3 (UX audit) — RM-23's Settings consolidation left `branding`,
+    // `ai-settings` and `business-hours` as duplicate top-level nav entries
+    // alongside the `settings` screen that already embeds all three as
+    // tabs. Their routes are untouched (a direct link/bookmark still
+    // works); only the redundant nav entries are gone.
+    it("no longer links branding/ai-settings/business-hours directly — settings' own tabs cover them", () => {
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.queryByRole("link", { name: "nav.branding" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "nav.aiSettings" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "nav.businessHours" })).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "nav.settings" })).toHaveAttribute(
+        "href",
+        "/en/settings",
+      );
     });
 
     /**
@@ -385,15 +410,23 @@ describe("WorkspaceNav", () => {
       ["nav.dashboard", "/en/dashboard"],
       ["nav.tickets", "/en/tickets"],
       ["nav.customers", "/en/customers"],
+      ["nav.knowledgeBase", "/en/knowledge-base"],
+      ["nav.kbCategories", "/en/kb-categories"],
+      ["nav.notifications", "/en/notifications"],
       ["nav.slaPolicies", "/en/sla-policies"],
-      ["nav.businessHours", "/en/business-hours"],
+      ["nav.ticketCategories", "/en/ticket-categories"],
+      ["nav.automationRules", "/en/automation-rules"],
+      ["nav.quickReplies", "/en/quick-replies"],
+      ["nav.reports", "/en/reports"],
+      ["nav.auditLogs", "/en/audit-logs"],
       ["nav.branches", "/en/branches"],
       ["nav.users", "/en/users"],
       ["nav.roles", "/en/roles"],
-      ["nav.auditLogs", "/en/audit-logs"],
-      ["nav.notifications", "/en/notifications"],
-      ["nav.knowledgeBase", "/en/knowledge-base"],
-      ["nav.aiSettings", "/en/ai-settings"],
+      ["nav.notificationTemplates", "/en/notification-templates"],
+      ["nav.webhookSubscriptions", "/en/webhook-subscriptions"],
+      ["nav.apiKeys", "/en/api-keys"],
+      ["nav.settings", "/en/settings"],
+      ["nav.mySessions", "/en/my-sessions"],
     ];
 
     it("renders a menu toggle with an accessible name", () => {
@@ -411,6 +444,26 @@ describe("WorkspaceNav", () => {
       const menu = await screen.findByRole("menu");
       for (const [name, href] of EXPECTED_LINKS) {
         expect(within(menu).getByRole("menuitem", { name })).toHaveAttribute("href", href);
+      }
+    });
+
+    // Batch 3 (UX audit) — the 23-item flat list is now six named sections.
+    it("labels each section of the menu, mirroring the desktop nav's grouping", async () => {
+      const clickUser = userEvent.setup();
+      render(<WorkspaceNav user={user} />);
+
+      await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+      const menu = await screen.findByRole("menu");
+
+      for (const groupKey of [
+        "workspace",
+        "ticketingConfig",
+        "reporting",
+        "administration",
+        "system",
+        "account",
+      ]) {
+        expect(within(menu).getByText(`nav.groups.${groupKey}`)).toBeInTheDocument();
       }
     });
 

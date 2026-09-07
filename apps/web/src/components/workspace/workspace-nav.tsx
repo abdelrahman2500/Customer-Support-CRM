@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { useState, type CSSProperties } from "react";
+import { Fragment, useState, type CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedUser } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
@@ -16,6 +16,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   MenuIcon,
 } from "@crm/ui";
@@ -133,32 +135,87 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * with its own domain, rather than appended last like every entry above),
  * mirroring how `ticket-categories` sits as the Ticketing domain's own
  * managed-vocabulary screen.
+ *
+ * Batch 3 (UX audit) — the list above had grown to 23 flat, ungrouped
+ * items with no visual sectioning at all. Regrouped into six named
+ * sections (Recon's own proposed grouping) with a divider between
+ * sections on the desktop `<nav>` and a `DropdownMenuLabel`/
+ * `DropdownMenuSeparator` per section in the mobile menu — the items
+ * themselves are unchanged (same hrefs, same labels, same active-route
+ * logic), so this is purely a presentation change over the same flat list
+ * of destinations.
+ *
+ * Also drops the three duplicate entries RM-23's Settings consolidation
+ * left behind: `branding`, `ai-settings` and `business-hours` are now
+ * shown only inside `settings`'s own tabs (`SettingsView`), exactly as
+ * RM-23's own doc comment already described `settings` as "a consolidated
+ * view over the three settings screens already in this list" — it never
+ * actually removed those three from nav. Their routes are untouched and
+ * still reachable by a direct link/bookmark; only the redundant top-level
+ * nav entries are gone.
  */
-const NAV_ITEMS = [
-  { href: "dashboard", labelKey: "nav.dashboard" },
-  { href: "tickets", labelKey: "nav.tickets" },
-  { href: "customers", labelKey: "nav.customers" },
-  { href: "sla-policies", labelKey: "nav.slaPolicies" },
-  { href: "business-hours", labelKey: "nav.businessHours" },
-  { href: "branches", labelKey: "nav.branches" },
-  { href: "users", labelKey: "nav.users" },
-  { href: "roles", labelKey: "nav.roles" },
-  { href: "audit-logs", labelKey: "nav.auditLogs" },
-  { href: "notifications", labelKey: "nav.notifications" },
-  { href: "knowledge-base", labelKey: "nav.knowledgeBase" },
-  { href: "kb-categories", labelKey: "nav.kbCategories" },
-  { href: "reports", labelKey: "nav.reports" },
-  { href: "automation-rules", labelKey: "nav.automationRules" },
-  { href: "notification-templates", labelKey: "nav.notificationTemplates" },
-  { href: "branding", labelKey: "nav.branding" },
-  { href: "ai-settings", labelKey: "nav.aiSettings" },
-  { href: "quick-replies", labelKey: "nav.quickReplies" },
-  { href: "ticket-categories", labelKey: "nav.ticketCategories" },
-  { href: "webhook-subscriptions", labelKey: "nav.webhookSubscriptions" },
-  { href: "api-keys", labelKey: "nav.apiKeys" },
-  { href: "settings", labelKey: "nav.settings" },
-  { href: "my-sessions", labelKey: "nav.mySessions" },
-] as const;
+interface NavLinkItem {
+  readonly href: string;
+  readonly labelKey: string;
+}
+
+interface NavGroup {
+  readonly groupKey: string;
+  readonly items: readonly NavLinkItem[];
+}
+
+const NAV_GROUPS: readonly NavGroup[] = [
+  {
+    groupKey: "workspace",
+    items: [
+      { href: "dashboard", labelKey: "nav.dashboard" },
+      { href: "tickets", labelKey: "nav.tickets" },
+      { href: "customers", labelKey: "nav.customers" },
+      { href: "knowledge-base", labelKey: "nav.knowledgeBase" },
+      { href: "kb-categories", labelKey: "nav.kbCategories" },
+      { href: "notifications", labelKey: "nav.notifications" },
+    ],
+  },
+  {
+    groupKey: "ticketingConfig",
+    items: [
+      { href: "sla-policies", labelKey: "nav.slaPolicies" },
+      { href: "ticket-categories", labelKey: "nav.ticketCategories" },
+      { href: "automation-rules", labelKey: "nav.automationRules" },
+      { href: "quick-replies", labelKey: "nav.quickReplies" },
+    ],
+  },
+  {
+    groupKey: "reporting",
+    items: [
+      { href: "reports", labelKey: "nav.reports" },
+      { href: "audit-logs", labelKey: "nav.auditLogs" },
+    ],
+  },
+  {
+    groupKey: "administration",
+    items: [
+      { href: "branches", labelKey: "nav.branches" },
+      { href: "users", labelKey: "nav.users" },
+      { href: "roles", labelKey: "nav.roles" },
+    ],
+  },
+  {
+    groupKey: "system",
+    items: [
+      { href: "notification-templates", labelKey: "nav.notificationTemplates" },
+      { href: "webhook-subscriptions", labelKey: "nav.webhookSubscriptions" },
+      { href: "api-keys", labelKey: "nav.apiKeys" },
+    ],
+  },
+  {
+    groupKey: "account",
+    items: [
+      { href: "settings", labelKey: "nav.settings" },
+      { href: "my-sessions", labelKey: "nav.mySessions" },
+    ],
+  },
+];
 
 /** RM-11 — the one shared render path for a nav item's visible label plus
  * its Story 92 unread-count badge, so the desktop `<nav>` and the mobile
@@ -169,7 +226,7 @@ function NavItemLabel({
   unreadCount,
   unreadCountKnown,
 }: {
-  item: (typeof NAV_ITEMS)[number];
+  item: NavLinkItem;
   t: ReturnType<typeof useTranslations>;
   unreadCount: number;
   unreadCountKnown: boolean;
@@ -360,22 +417,28 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            {NAV_ITEMS.map((item) => {
-              const href = `/${locale}/${item.href}`;
-              const isActive = pathname === href || pathname?.startsWith(`${href}/`);
-              return (
-                <DropdownMenuItem key={item.href} asChild>
-                  <Link href={href} aria-current={isActive ? "page" : undefined}>
-                    <NavItemLabel
-                      item={item}
-                      t={t}
-                      unreadCount={unreadCount}
-                      unreadCountKnown={unreadCountQuery.isSuccess}
-                    />
-                  </Link>
-                </DropdownMenuItem>
-              );
-            })}
+            {NAV_GROUPS.map((group, groupIndex) => (
+              <Fragment key={group.groupKey}>
+                {groupIndex > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuLabel>{t(`nav.groups.${group.groupKey}`)}</DropdownMenuLabel>
+                {group.items.map((item) => {
+                  const href = `/${locale}/${item.href}`;
+                  const isActive = pathname === href || pathname?.startsWith(`${href}/`);
+                  return (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <Link href={href} aria-current={isActive ? "page" : undefined}>
+                        <NavItemLabel
+                          item={item}
+                          t={t}
+                          unreadCount={unreadCount}
+                          unreadCountKnown={unreadCountQuery.isSuccess}
+                        />
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </Fragment>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -383,30 +446,42 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
         aria-label={t("nav.label")}
         className="hidden items-center gap-4 border-b border-slate-200 bg-white px-6 py-2 text-sm text-slate-600 sm:flex sm:flex-wrap"
       >
-        {NAV_ITEMS.map((item) => {
-          const href = `/${locale}/${item.href}`;
-          // Story 96 — Navigation & Route Robustness. A nested route (e.g.
-          // `/en/tickets/ticket-1`) still marks its own top-level `Tickets`
-          // link current, so it doesn't just match on exact equality.
-          const isActive = pathname === href || pathname?.startsWith(`${href}/`);
-          return (
-            <Link
-              key={item.href}
-              href={href}
-              aria-current={isActive ? "page" : undefined}
-              className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-slate-100 hover:text-slate-900 focus-ring ${
-                isActive ? "bg-slate-100 font-medium text-slate-900" : ""
-              }`}
-            >
-              <NavItemLabel
-                item={item}
-                t={t}
-                unreadCount={unreadCount}
-                unreadCountKnown={unreadCountQuery.isSuccess}
-              />
-            </Link>
-          );
-        })}
+        {NAV_GROUPS.map((group, groupIndex) => (
+          <Fragment key={group.groupKey}>
+            {/* Batch 3 (UX audit) — an inert divider between sections; the
+                section's own name is carried by the mobile menu's
+                `DropdownMenuLabel` instead of repeating a text label in
+                this already-dense horizontal row. */}
+            {groupIndex > 0 && (
+              <span aria-hidden="true" className="h-5 w-px self-stretch bg-slate-200" />
+            )}
+            {group.items.map((item) => {
+              const href = `/${locale}/${item.href}`;
+              // Story 96 — Navigation & Route Robustness. A nested route
+              // (e.g. `/en/tickets/ticket-1`) still marks its own
+              // top-level `Tickets` link current, so it doesn't just match
+              // on exact equality.
+              const isActive = pathname === href || pathname?.startsWith(`${href}/`);
+              return (
+                <Link
+                  key={item.href}
+                  href={href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-slate-100 hover:text-slate-900 focus-ring ${
+                    isActive ? "bg-slate-100 font-medium text-slate-900" : ""
+                  }`}
+                >
+                  <NavItemLabel
+                    item={item}
+                    t={t}
+                    unreadCount={unreadCount}
+                    unreadCountKnown={unreadCountQuery.isSuccess}
+                  />
+                </Link>
+              );
+            })}
+          </Fragment>
+        ))}
       </nav>
     </>
   );

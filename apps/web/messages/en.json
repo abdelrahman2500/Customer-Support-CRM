@@ -85,6 +85,14 @@
       "apiKeys": "API Keys",
       "settings": "Settings",
       "mySessions": "My Sessions",
+      "groups": {
+        "workspace": "Workspace",
+        "ticketingConfig": "Ticketing Configuration",
+        "reporting": "Reporting",
+        "administration": "Administration",
+        "system": "System & Integrations",
+        "account": "Account"
+      },
       "unreadNotificationsLabel": "{count} unread notifications"
     }
   },
@@ -203,6 +211,7 @@
       "kbReferencesAttachFailed": "Couldn't attach the article. Please try again.",
       "kbReferencesRemove": "Remove",
       "kbReferencesRemoveFailed": "Couldn't remove the reference. Please try again.",
+      "backToList": "Back to tickets",
       "notFound": "This ticket could not be found.",
       "loadError": "Couldn't load this ticket.",
       "actionForbidden": "You don't have permission to perform that action.",
@@ -278,6 +287,7 @@
       }
     },
     "detail": {
+      "backToList": "Back to customers",
       "notFound": "This customer could not be found.",
       "loadError": "Couldn't load this customer.",
       "contactsHeading": "Contacts",
@@ -682,6 +692,7 @@
       "categoryLoadError": "Couldn't load categories.",
       "optionsLoading": "Loading…",
       "bodyLabel": "Body",
+      "backToList": "Back to Knowledge Base",
       "notFound": "This article could not be found.",
       "loadError": "Couldn't load this article.",
       "actionForbidden": "You don't have permission to perform that action.",

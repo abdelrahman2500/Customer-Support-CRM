@@ -247,6 +247,20 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
   return (
     <section className="flex flex-col gap-6">
+      {/* Batch 3 (UX audit) — mirrors the portal's own `detail.backToList`
+          pattern exactly (this screen never had one). `rtl:rotate-180` so
+          "back" points the way back in both directions; `aria-hidden`
+          since the adjacent label already names the action. */}
+      <Link
+        href={`/${locale}/tickets`}
+        className="focus-ring self-start rounded-sm text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
+      >
+        <span aria-hidden="true" className="inline-block rtl:rotate-180">
+          &larr;
+        </span>{" "}
+        {t("detail.backToList")}
+      </Link>
+
       <div>
         {/* NAV-2 — no visible heading exists on this page (the subject is
             an editable Input, not static text), so a keyboard/screen-reader

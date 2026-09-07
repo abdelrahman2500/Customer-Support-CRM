@@ -137,6 +137,21 @@ describe("ArticleDetailView", () => {
     expect(screen.getByText("list.publish")).toBeInTheDocument();
   });
 
+  // Batch 3 (UX audit) — mirrors the portal's own equivalent link, which
+  // this screen never had.
+  it("renders a back-to-list link to the Knowledge Base list", () => {
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ data: baseArticle, isSuccess: true }) as never,
+    );
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    expect(screen.getByRole("link", { name: /detail.backToList/ })).toHaveAttribute(
+      "href",
+      "/en/knowledge-base",
+    );
+  });
+
   // RM-27 — the free-text category Input became a Select.
   it("commits a category change immediately on selection", async () => {
     vi.mocked(useArticleQuery).mockReturnValue(

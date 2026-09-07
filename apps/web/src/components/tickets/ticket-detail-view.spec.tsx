@@ -328,6 +328,21 @@ describe("TicketDetailView", () => {
     expect(screen.getByText(/Acme Inc\./)).toBeInTheDocument();
   });
 
+  // Batch 3 (UX audit) — mirrors the portal's own equivalent link, which
+  // this screen never had.
+  it("renders a back-to-list link to the ticket list", () => {
+    vi.mocked(useTicketQuery).mockReturnValue(
+      queryResult({ data: baseTicket, isSuccess: true }) as never,
+    );
+
+    render(<TicketDetailView ticketId="ticket-1" />);
+
+    expect(screen.getByRole("link", { name: /detail.backToList/ })).toHaveAttribute(
+      "href",
+      "/en/tickets",
+    );
+  });
+
   // NAV-2 — this page had no heading landmark at all (the subject is an
   // editable Input, not static text a plain <h1> could reuse).
   it("gives the page a level-1 heading landmark matching the ticket subject", () => {

@@ -478,6 +478,20 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
 
   return (
     <section className="flex flex-col gap-6">
+      {/* Batch 3 (UX audit) — mirrors the portal's own `detail.backToList`
+          pattern exactly (this screen never had one). `rtl:rotate-180` so
+          "back" points the way back in both directions; `aria-hidden`
+          since the adjacent label already names the action. */}
+      <Link
+        href={`/${locale}/customers`}
+        className="focus-ring self-start rounded-sm text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
+      >
+        <span aria-hidden="true" className="inline-block rtl:rotate-180">
+          &larr;
+        </span>{" "}
+        {t("detail.backToList")}
+      </Link>
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* NAV-2 — no visible heading exists on this page (the name is

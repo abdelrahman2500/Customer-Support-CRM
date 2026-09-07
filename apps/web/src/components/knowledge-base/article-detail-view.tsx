@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -106,6 +107,20 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
   return (
     <section className="flex flex-col gap-4">
+      {/* Batch 3 (UX audit) — mirrors the portal's own `detail.backToList`
+          pattern exactly (this screen never had one). `rtl:rotate-180` so
+          "back" points the way back in both directions; `aria-hidden`
+          since the adjacent label already names the action. */}
+      <Link
+        href={`/${locale}/knowledge-base`}
+        className="focus-ring self-start rounded-sm text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
+      >
+        <span aria-hidden="true" className="inline-block rtl:rotate-180">
+          &larr;
+        </span>{" "}
+        {t("detail.backToList")}
+      </Link>
+
       <div className="flex items-center justify-between">
         {/* NAV-2 — no visible heading exists on this page (the title is
             an editable Input, not static text), so a keyboard/screen-reader

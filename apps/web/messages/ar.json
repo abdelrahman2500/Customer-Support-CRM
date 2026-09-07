@@ -85,6 +85,14 @@
       "apiKeys": "مفاتيح API",
       "settings": "الإعدادات",
       "mySessions": "جلساتي",
+      "groups": {
+        "workspace": "مساحة العمل",
+        "ticketingConfig": "إعدادات التذاكر",
+        "reporting": "التقارير",
+        "administration": "الإدارة",
+        "system": "النظام والتكاملات",
+        "account": "الحساب"
+      },
       "unreadNotificationsLabel": "{count} إشعارات غير مقروءة"
     }
   },
@@ -203,6 +211,7 @@
       "kbReferencesAttachFailed": "تعذّر إرفاق المقالة. حاول مرة أخرى.",
       "kbReferencesRemove": "إزالة",
       "kbReferencesRemoveFailed": "تعذّر إزالة المرجع. حاول مرة أخرى.",
+      "backToList": "العودة إلى التذاكر",
       "notFound": "تعذّر العثور على هذه التذكرة.",
       "loadError": "تعذّر تحميل هذه التذكرة.",
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
@@ -278,6 +287,7 @@
       }
     },
     "detail": {
+      "backToList": "العودة إلى العملاء",
       "notFound": "تعذّر العثور على هذا العميل.",
       "loadError": "تعذّر تحميل هذا العميل.",
       "contactsHeading": "جهات الاتصال",
@@ -682,6 +692,7 @@
       "categoryLoadError": "تعذّر تحميل الفئات.",
       "optionsLoading": "جارٍ التحميل…",
       "bodyLabel": "المحتوى",
+      "backToList": "العودة إلى قاعدة المعرفة",
       "notFound": "تعذّر العثور على هذه المقالة.",
       "loadError": "تعذّر تحميل هذه المقالة.",
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",

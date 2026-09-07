@@ -185,6 +185,24 @@ describe("CustomerDetailView", () => {
     expect(within(screen.getByRole("list")).getByText("detail.primaryContact")).toBeInTheDocument();
   });
 
+  // Batch 3 (UX audit) — mirrors the portal's own equivalent link, which
+  // this screen never had.
+  it("renders a back-to-list link to the customer list", () => {
+    mockedUseCustomerQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: { id: "customer-1", displayName: "Acme Inc.", isActive: true, contacts: [] },
+      }) as never,
+    );
+
+    render(<CustomerDetailView customerId="customer-1" />);
+
+    expect(screen.getByRole("link", { name: /detail.backToList/ })).toHaveAttribute(
+      "href",
+      "/en/customers",
+    );
+  });
+
   // NAV-2 — this page had no heading landmark at all (the name is an
   // editable Input, not static text a plain <h1> could reuse).
   it("gives the page a level-1 heading landmark matching the customer's name", () => {
