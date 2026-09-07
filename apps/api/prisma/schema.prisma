@@ -107,6 +107,8 @@ model User {
   notificationPreferences     NotificationPreference[]
   uploadedAttachments         TicketAttachment[]
   uploadedCustomerAttachments CustomerAttachment[]
+  /// RM-28 — this agent's own uploaded Knowledge Base article attachments.
+  uploadedKbArticleAttachments KnowledgeBaseArticleAttachment[]
   channelMessages             ChannelMessage[]
   /// RM-03 — this agent's own personal tasks.
   tasks                       Task[]
@@ -1184,10 +1186,40 @@ model KnowledgeBaseArticle {
   translations KnowledgeBaseArticleTranslation[]
   /// RM-05 — tickets that have referenced this article.
   ticketReferences TicketKnowledgeBaseReference[]
+  /// RM-28 — this article's own uploaded attachments.
+  attachments KnowledgeBaseArticleAttachment[]
 
   @@index([branchId])
   @@index([categoryId])
   @@map("knowledge_base_articles")
+  @@schema("knowledge_base")
+}
+
+/// RM-28 — Knowledge Base Article Attachments. Identical shape to
+/// `customers.CustomerAttachment` (agent-only upload, `uploadedByUserId`
+/// required never nullable — no portal contact ever authors a KB article,
+/// so there is no `uploadedByContactId` counterpart the way
+/// `TicketAttachment` has one) — a separate model per schema, not a
+/// polymorphic entity-type table, mirroring `TicketAttachment`/
+/// `CustomerAttachment`'s own precedent (`AttachmentSummary`'s own doc
+/// comment: "no existing precedent for polymorphic entity tables anywhere
+/// in this schema"). Binary lives in S3-compatible object storage; this
+/// table stores key/filename/size/MIME/owner metadata only, same as its
+/// two siblings.
+model KnowledgeBaseArticleAttachment {
+  id               String               @id @default(uuid())
+  articleId        String               @map("article_id")
+  article          KnowledgeBaseArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  key              String               @unique
+  filename         String
+  size             Int
+  mimeType         String               @map("mime_type")
+  uploadedByUserId String               @map("uploaded_by_user_id")
+  uploadedByUser   User                 @relation(fields: [uploadedByUserId], references: [id])
+  createdAt        DateTime             @default(now()) @map("created_at")
+
+  @@index([articleId])
+  @@map("knowledge_base_article_attachments")
   @@schema("knowledge_base")
 }
 

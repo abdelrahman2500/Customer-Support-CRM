@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { AttachmentsController } from "./attachments.controller";
 import { CustomerAttachmentsController } from "./customer-attachments.controller";
+import { KbArticleAttachmentsController } from "./kb-article-attachments.controller";
 import { AttachmentsService } from "./attachments.service";
 import { S3StorageService } from "./s3-storage.service";
 
@@ -12,9 +13,11 @@ import { S3StorageService } from "./s3-storage.service";
  *
  * Story 67 — `CustomerAttachmentsController` registered alongside
  * `AttachmentsController`, sharing the same `AttachmentsService`/
- * `S3StorageService` (plan Design item 3). */
+ * `S3StorageService` (plan Design item 3).
+ *
+ * RM-28 — `KbArticleAttachmentsController` registered the same way. */
 @Module({
-  controllers: [AttachmentsController, CustomerAttachmentsController],
+  controllers: [AttachmentsController, CustomerAttachmentsController, KbArticleAttachmentsController],
   providers: [AttachmentsService, S3StorageService, TenantContext],
   // Story 103 — `PortalModule` imports this module so `PortalTicketsService`
   // can inject `AttachmentsService` directly, mirroring how it already

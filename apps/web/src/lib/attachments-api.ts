@@ -14,6 +14,9 @@ import { apiFetch, ApiError, getAccessToken, getApiBaseUrl } from "./api";
  * ever reads `id`/`filename`/`size`/etc.), and TypeScript's structural
  * typing means the extra field on the real response is simply ignored,
  * not stripped or invalid.
+ *
+ * RM-28 — `"kb-article"` added as a third owner type, mirroring the
+ * backend's own `knowledge-base/articles/:id/attachments` route exactly.
  */
 export interface AttachmentSummary {
   id: string;
@@ -24,11 +27,12 @@ export interface AttachmentSummary {
   createdAt: string;
 }
 
-export type AttachmentOwner = { type: "ticket" | "customer"; id: string };
+export type AttachmentOwner = { type: "ticket" | "customer" | "kb-article"; id: string };
 
 function ownerBasePath(owner: AttachmentOwner): string {
-  const segment = owner.type === "ticket" ? "tickets" : "customers";
-  return `/${segment}/${owner.id}/attachments`;
+  if (owner.type === "ticket") return `/tickets/${owner.id}/attachments`;
+  if (owner.type === "customer") return `/customers/${owner.id}/attachments`;
+  return `/knowledge-base/articles/${owner.id}/attachments`;
 }
 
 export function listAttachments(owner: AttachmentOwner): Promise<AttachmentSummary[]> {

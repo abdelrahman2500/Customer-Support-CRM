@@ -7,6 +7,7 @@ import {
   useUpdateArticleMutation,
 } from "@/hooks/use-knowledge-base";
 import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
+import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { ApiError } from "@/lib/api";
 
 // Version-history dates are formatted with the active locale (same
@@ -28,6 +29,14 @@ vi.mock("@/hooks/use-knowledge-base", () => ({
 
 vi.mock("@/hooks/use-kb-categories", () => ({
   useKbCategoriesQuery: vi.fn(),
+}));
+
+// RM-28 — AttachmentsCard's own hooks; its behavior is covered in its own
+// dedicated spec (attachments-card.spec.tsx), so this file only needs
+// enough of a mock for ArticleDetailView to render it cleanly.
+vi.mock("@/hooks/use-attachments", () => ({
+  useAttachmentsQuery: vi.fn(),
+  useUploadAttachmentMutation: vi.fn(),
 }));
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -73,6 +82,17 @@ describe("ArticleDetailView", () => {
         isSuccess: true,
       }) as never,
     );
+    // RM-28 — AttachmentsCard's own hooks.
+    vi.mocked(useAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({ id: "attachment-new" }),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
   });
 
   it("renders a loading skeleton while the article query is pending", () => {

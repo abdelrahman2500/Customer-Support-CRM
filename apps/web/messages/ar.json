@@ -684,6 +684,11 @@
       "loadError": "تعذّر تحميل هذه المقالة.",
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
       "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+      "attachmentsHeading": "المرفقات",
+      "attachmentsError": "تعذّر تحميل مرفقات هذه المقالة.",
+      "attachmentsEmpty": "لا توجد مرفقات حتى الآن.",
+      "attachmentsUploading": "جارٍ الرفع...",
+      "attachmentsUploadFailed": "تعذّر رفع الملف. حاول مرة أخرى.",
       "versions": {
         "title": "سجل الإصدارات",
         "empty": "لا توجد إصدارات منشورة لهذه المقالة حتى الآن.",

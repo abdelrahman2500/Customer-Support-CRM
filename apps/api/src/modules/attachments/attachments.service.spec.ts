@@ -24,6 +24,14 @@ function buildPrismaMock() {
       findMany: vi.fn(),
       findFirst: vi.fn(),
     },
+    knowledgeBaseArticle: {
+      findFirst: vi.fn(),
+    },
+    knowledgeBaseArticleAttachment: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
   };
 }
 
@@ -476,6 +484,132 @@ describe("AttachmentsService", () => {
 
       expect(prisma.customerAttachment.findFirst).toHaveBeenCalledWith({
         where: { id: "attachment-1", customerId: "customer-1" },
+      });
+      expect(result).toBe("https://minio.local/presigned-url");
+    });
+  });
+
+  // RM-28 — Knowledge Base Article Attachments. Mirrors every
+  // customer-side test above, scoped by articleId instead of customerId.
+  describe("uploadKbArticleAttachment", () => {
+    it("throws NotFoundException for an unknown/out-of-scope article id", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.uploadKbArticleAttachment("missing-id", validFile),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(s3Storage.uploadObject).not.toHaveBeenCalled();
+    });
+
+    it("rejects a file exceeding the size limit before any S3 call", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({ id: "article-1" });
+
+      await expect(
+        service.uploadKbArticleAttachment("article-1", {
+          ...validFile,
+          size: MAX_ATTACHMENT_SIZE_BYTES + 1,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(s3Storage.uploadObject).not.toHaveBeenCalled();
+      expect(prisma.knowledgeBaseArticleAttachment.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a disallowed MIME type before any S3 call", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({ id: "article-1" });
+
+      await expect(
+        service.uploadKbArticleAttachment("article-1", {
+          ...validFile,
+          mimetype: "application/x-msdownload",
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(s3Storage.uploadObject).not.toHaveBeenCalled();
+      expect(prisma.knowledgeBaseArticleAttachment.create).not.toHaveBeenCalled();
+    });
+
+    it("uploads to S3 with a server-generated key and records the metadata row", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({ id: "article-1" });
+      prisma.knowledgeBaseArticleAttachment.create.mockResolvedValue({
+        ...attachmentRow,
+        id: "kb-attachment-1",
+        articleId: "article-1",
+        key: "knowledge-base-articles/article-1/some-uuid",
+      });
+
+      const result = await service.uploadKbArticleAttachment("article-1", validFile);
+
+      expect(s3Storage.uploadObject).toHaveBeenCalledWith(
+        expect.stringMatching(/^knowledge-base-articles\/article-1\//),
+        validFile.buffer,
+        "image/png",
+      );
+      expect(prisma.knowledgeBaseArticleAttachment.create).toHaveBeenCalledWith({
+        data: {
+          articleId: "article-1",
+          key: expect.stringMatching(/^knowledge-base-articles\/article-1\//),
+          filename: "screenshot.png",
+          size: 1024,
+          mimeType: "image/png",
+          uploadedByUserId: "user-1",
+        },
+      });
+      expect(result).toMatchObject({ id: "kb-attachment-1", articleId: "article-1" });
+      expect(result).not.toHaveProperty("key");
+    });
+  });
+
+  describe("listKbArticleAttachments", () => {
+    it("throws NotFoundException for an unknown/out-of-scope article id", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
+
+      await expect(service.listKbArticleAttachments("missing-id")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it("scopes the query to the article, ordered createdAt desc", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({ id: "article-1" });
+      prisma.knowledgeBaseArticleAttachment.findMany.mockResolvedValue([]);
+
+      await service.listKbArticleAttachments("article-1");
+
+      expect(prisma.knowledgeBaseArticleAttachment.findMany).toHaveBeenCalledWith({
+        where: { articleId: "article-1" },
+        orderBy: { createdAt: "desc" },
+      });
+    });
+  });
+
+  describe("getKbArticleAttachmentDownloadUrl", () => {
+    it("throws NotFoundException for an unknown/out-of-scope article id", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getKbArticleAttachmentDownloadUrl("missing-id", "attachment-1"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("throws NotFoundException for an unknown attachment id", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({ id: "article-1" });
+      prisma.knowledgeBaseArticleAttachment.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.getKbArticleAttachmentDownloadUrl("article-1", "missing-attachment"),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("returns a presigned URL for the attachment's S3 key", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({ id: "article-1" });
+      prisma.knowledgeBaseArticleAttachment.findFirst.mockResolvedValue({
+        ...attachmentRow,
+        articleId: "article-1",
+      });
+      s3Storage.getPresignedDownloadUrl.mockResolvedValue("https://minio.local/presigned-url");
+
+      const result = await service.getKbArticleAttachmentDownloadUrl("article-1", "attachment-1");
+
+      expect(prisma.knowledgeBaseArticleAttachment.findFirst).toHaveBeenCalledWith({
+        where: { id: "attachment-1", articleId: "article-1" },
       });
       expect(result).toBe("https://minio.local/presigned-url");
     });

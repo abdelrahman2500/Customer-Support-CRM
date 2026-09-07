@@ -31,6 +31,18 @@ export interface CustomerAttachmentSummary {
   createdAt: Date;
 }
 
+/** RM-28 — identical shape to `CustomerAttachmentSummary`, `articleId`
+ * instead of `customerId`. */
+export interface KbArticleAttachmentSummary {
+  id: string;
+  articleId: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+  uploadedByUserId: string;
+  createdAt: Date;
+}
+
 export interface UploadedFile {
   originalname: string;
   size: number;
@@ -51,6 +63,10 @@ export interface UploadedFile {
  * convention, same presigned-URL-as-JSON download shape), backed by a
  * separate `CustomerAttachment` model rather than a polymorphic
  * entity-type table (see that model's own doc comment).
+ *
+ * RM-28 — the Knowledge Base article-side methods further below mirror
+ * the customer-side ones exactly (agent-only upload, same shape), backed
+ * by `KnowledgeBaseArticleAttachment`.
  */
 @Injectable()
 export class AttachmentsService {
@@ -216,6 +232,62 @@ export class AttachmentsService {
   }
 
   // ---------------------------------------------------------------------
+  // RM-28 — Knowledge Base Article Attachments. Mirrors the Story 67
+  // customer-side methods above exactly (same `validateFile` check, same
+  // server-generated-key convention, same presigned-URL-as-JSON download
+  // shape), backed by `KnowledgeBaseArticleAttachment` — agent-only
+  // upload, same as `CustomerAttachment` (no portal contact ever authors a
+  // KB article). None of the methods above are touched.
+  // ---------------------------------------------------------------------
+
+  async uploadKbArticleAttachment(
+    articleId: string,
+    file: UploadedFile,
+  ): Promise<KbArticleAttachmentSummary> {
+    await this.findArticleInScope(articleId);
+    this.validateFile(file);
+
+    const key = `knowledge-base-articles/${articleId}/${randomUUID()}`;
+    await this.s3Storage.uploadObject(key, file.buffer, file.mimetype);
+
+    const uploadedByUserId = this.requireAuthenticatedUserId();
+    const attachment = await this.prisma.knowledgeBaseArticleAttachment.create({
+      data: {
+        articleId,
+        key,
+        filename: file.originalname,
+        size: file.size,
+        mimeType: file.mimetype,
+        uploadedByUserId,
+      },
+    });
+    return toKbArticleAttachmentSummary(attachment);
+  }
+
+  async listKbArticleAttachments(articleId: string): Promise<KbArticleAttachmentSummary[]> {
+    await this.findArticleInScope(articleId);
+    const attachments = await this.prisma.knowledgeBaseArticleAttachment.findMany({
+      where: { articleId },
+      orderBy: { createdAt: "desc" },
+    });
+    return attachments.map(toKbArticleAttachmentSummary);
+  }
+
+  async getKbArticleAttachmentDownloadUrl(
+    articleId: string,
+    attachmentId: string,
+  ): Promise<string> {
+    await this.findArticleInScope(articleId);
+    const attachment = await this.prisma.knowledgeBaseArticleAttachment.findFirst({
+      where: { id: attachmentId, articleId },
+    });
+    if (!attachment) {
+      throw new NotFoundException("Attachment not found");
+    }
+    return this.s3Storage.getPresignedDownloadUrl(attachment.key);
+  }
+
+  // ---------------------------------------------------------------------
   // internals
   // ---------------------------------------------------------------------
 
@@ -278,6 +350,20 @@ export class AttachmentsService {
     return customer;
   }
 
+  /** RM-28 — mirrors `findCustomerInScope` exactly, scoped to
+   * `KnowledgeBaseArticle` instead. */
+  private async findArticleInScope(id: string): Promise<{ id: string }> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+    const article = await this.prisma.knowledgeBaseArticle.findFirst({
+      where: { id, branchId },
+      select: { id: true },
+    });
+    if (!article) {
+      throw new NotFoundException("Article not found");
+    }
+    return article;
+  }
+
   /** Every route that uploads an attachment sits behind `AuthGuard`, so
    * `TenantContext.userId` is always populated in practice; this only
    * guards the invariant, mirroring `TicketsService`'s own identical
@@ -325,6 +411,26 @@ function toCustomerAttachmentSummary(attachment: {
   return {
     id: attachment.id,
     customerId: attachment.customerId,
+    filename: attachment.filename,
+    size: attachment.size,
+    mimeType: attachment.mimeType,
+    uploadedByUserId: attachment.uploadedByUserId,
+    createdAt: attachment.createdAt,
+  };
+}
+
+function toKbArticleAttachmentSummary(attachment: {
+  id: string;
+  articleId: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+  uploadedByUserId: string;
+  createdAt: Date;
+}): KbArticleAttachmentSummary {
+  return {
+    id: attachment.id,
+    articleId: attachment.articleId,
     filename: attachment.filename,
     size: attachment.size,
     mimeType: attachment.mimeType,

@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import {
   Select,
   SelectContent,
@@ -41,10 +42,16 @@ import {
  * `useKbCategoriesQuery`, mirroring `TicketDetailView`'s own `categoryId`
  * `Select` exactly (commits immediately on selection, no blur-commit
  * needed since a `Select` has no intermediate typing state).
+ *
+ * RM-28 — an `AttachmentsCard` appended below the body field (plan Design
+ * item: mirrors `TicketDetailView`/`CustomerDetailView`'s own placement),
+ * reusing that shared component with `owner: { type: "kb-article" }` —
+ * no new upload/list/download UI written here.
  */
 export function ArticleDetailView({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
   const errorMessage = useErrorMessage();
+  const { locale } = useParams<{ locale: string }>();
 
   const articleQuery = useArticleQuery(articleId);
   const mutation = useUpdateArticleMutation(articleId);
@@ -184,6 +191,18 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
           }}
         />
       </label>
+
+      <AttachmentsCard
+        owner={{ type: "kb-article", id: articleId }}
+        locale={locale}
+        strings={{
+          heading: t("detail.attachmentsHeading"),
+          error: t("detail.attachmentsError"),
+          empty: t("detail.attachmentsEmpty"),
+          uploading: t("detail.attachmentsUploading"),
+          uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+        }}
+      />
 
       <ArticleVersionHistory articleId={articleId} />
     </section>
