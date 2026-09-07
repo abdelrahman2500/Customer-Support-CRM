@@ -872,7 +872,17 @@
     "deactivateConfirmTitle": "هل تريد إلغاء تفعيل اشتراك Webhook هذا؟",
     "deactivateConfirmDescription": "سيتوقف \"{targetUrl}\" عن استقبال عمليات تسليم جديدة حتى إعادة تفعيله.",
     "deleteConfirmTitle": "هل تريد حذف اشتراك Webhook هذا؟",
-    "deleteConfirmDescription": "سيتم حذف \"{targetUrl}\" وكامل سجل التسليم الخاص به نهائيًا."
+    "deleteConfirmDescription": "سيتم حذف \"{targetUrl}\" وكامل سجل التسليم الخاص به نهائيًا.",
+    "inboundLogHeading": "سجل الطلبات الواردة",
+    "inboundLogError": "تعذّر تحميل سجل الطلبات الواردة.",
+    "noInboundLogs": "لم يتم استلام أي طلبات Webhook واردة حتى الآن.",
+    "inboundColumns": {
+      "providerKey": "المزوّد",
+      "result": "النتيجة",
+      "receivedAt": "وقت الاستلام"
+    },
+    "inboundVerified": "تم التحقق",
+    "inboundRejected": "مرفوض"
   },
   "quickReplies": {
     "title": "الردود السريعة",

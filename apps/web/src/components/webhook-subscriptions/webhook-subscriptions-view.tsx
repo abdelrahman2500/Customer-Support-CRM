@@ -9,6 +9,7 @@ import {
   useWebhookDeliveryAttemptsQuery,
   useWebhookSubscriptionsQuery,
 } from "@/hooks/use-webhook-subscriptions";
+import { useWebhookInboundLogsQuery } from "@/hooks/use-webhook-inbound-logs";
 import { WEBHOOK_EVENT_TYPES } from "@/lib/webhook-subscriptions-api";
 import type { WebhookSubscriptionSummary } from "@/lib/webhook-subscriptions-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
@@ -88,7 +89,89 @@ export function WebhookSubscriptionsView() {
       )}
 
       <AddWebhookSubscriptionForm />
+
+      <InboundWebhookLog />
     </section>
+  );
+}
+
+/** RM-21 — Inbound Webhook Receiver + Signature Verification Framework.
+ * Read-only visibility over every payload `POST
+ * /integrations/webhooks/:providerKey` has received (verified or not) —
+ * mirrors `AuditLogView`'s own paginated-table shape. Lives on this same
+ * page rather than a separate route/nav entry: both halves are the one
+ * "Integrations" surface an admin manages, and this framework has no real
+ * registered provider yet for a dedicated screen to be worth the extra
+ * navigation. */
+function InboundWebhookLog() {
+  const t = useTranslations("webhookSubscriptions");
+  const tCommon = useTranslations("common");
+  const [page, setPage] = useState(1);
+  const logsQuery = useWebhookInboundLogsQuery(page);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold text-slate-900">{t("inboundLogHeading")}</h2>
+
+      {logsQuery.isLoading && <Skeleton className="h-16 w-full" />}
+
+      {logsQuery.isError && (
+        <Alert variant="destructive" className="flex items-center justify-between">
+          <span>{t("inboundLogError")}</span>
+          <Button variant="outline" size="sm" onClick={() => logsQuery.refetch()}>
+            {t("retry")}
+          </Button>
+        </Alert>
+      )}
+
+      {logsQuery.isSuccess && logsQuery.data.items.length === 0 && (
+        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
+          {t("noInboundLogs")}
+        </p>
+      )}
+
+      {logsQuery.isSuccess && logsQuery.data.items.length > 0 && (
+        <>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("inboundColumns.providerKey")}</TableHead>
+                <TableHead>{t("inboundColumns.result")}</TableHead>
+                <TableHead>{t("inboundColumns.receivedAt")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {logsQuery.data.items.map((log) => (
+                <TableRow key={log.id}>
+                  <TableCell className="font-mono text-xs text-slate-800">{log.providerKey}</TableCell>
+                  <TableCell>
+                    <Badge variant={log.verified ? "success" : "destructive"}>
+                      {log.verified ? t("inboundVerified") : (log.rejectReason ?? t("inboundRejected"))}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-slate-500">
+                    {new Date(log.receivedAt).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <Pagination
+            page={logsQuery.data.page}
+            totalPages={logsQuery.data.totalPages}
+            onPageChange={setPage}
+            disabled={logsQuery.isPlaceholderData}
+            label={tCommon("pagination.label")}
+            previousLabel={tCommon("pagination.previous")}
+            nextLabel={tCommon("pagination.next")}
+            indicator={tCommon("pagination.indicator", {
+              page: logsQuery.data.page,
+              totalPages: logsQuery.data.totalPages,
+            })}
+          />
+        </>
+      )}
+    </div>
   );
 }
 

@@ -1700,3 +1700,40 @@ model WebhookDeliveryAttempt {
   @@map("webhook_delivery_attempts")
   @@schema("integrations")
 }
+
+/// RM-21 — Inbound Webhook Receiver + Signature Verification Framework.
+/// Every payload `POST /integrations/webhooks/:providerKey` receives is
+/// written here — verified or not, recognized `providerKey` or not — before
+/// the route responds, so nothing this public, unauthenticated route
+/// receives is ever silently dropped without a trace (mirrors
+/// `WebhookDeliveryAttempt`'s own "every attempt visible" acceptance
+/// criterion, for the inbound half).
+///
+/// Deliberately no `branchId`/tenant scope: unlike every other table this
+/// application writes, a row here can exist for a `providerKey` this
+/// application does not yet recognize at all (no `WebhookVerifier`
+/// registered — this story ships the framework with zero real ones,
+/// mirroring RM-14's own "zero registered adapters" precedent), so there
+/// is no tenant to resolve it against yet. A future provider-specific
+/// story that registers a real verifier and can identify which
+/// branch/customer a payload belongs to is the right place to add that
+/// resolution — not this framework.
+model WebhookInboundLog {
+  id           String   @id @default(uuid())
+  providerKey  String   @map("provider_key")
+  verified     Boolean
+  /// Set only when `verified` is `false` — e.g. "no verifier registered
+  /// for this providerKey", "signature mismatch".
+  rejectReason String?  @map("reject_reason")
+  /// The raw request headers, as received — useful for diagnosing a
+  /// provider's real signing scheme even when verification fails.
+  headers      Json
+  /// The raw request body, exactly as received (not re-serialized) —
+  /// signature verification always runs against these exact bytes.
+  body         String
+  receivedAt   DateTime @default(now()) @map("received_at")
+
+  @@index([providerKey, receivedAt])
+  @@map("webhook_inbound_logs")
+  @@schema("integrations")
+}

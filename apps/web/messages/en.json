@@ -872,7 +872,17 @@
     "deactivateConfirmTitle": "Deactivate this webhook subscription?",
     "deactivateConfirmDescription": "\"{targetUrl}\" will stop receiving new deliveries until reactivated.",
     "deleteConfirmTitle": "Delete this webhook subscription?",
-    "deleteConfirmDescription": "\"{targetUrl}\" and its entire delivery history will be permanently removed."
+    "deleteConfirmDescription": "\"{targetUrl}\" and its entire delivery history will be permanently removed.",
+    "inboundLogHeading": "Inbound webhook log",
+    "inboundLogError": "Couldn't load the inbound webhook log.",
+    "noInboundLogs": "No inbound webhook requests received yet.",
+    "inboundColumns": {
+      "providerKey": "Provider",
+      "result": "Result",
+      "receivedAt": "Received at"
+    },
+    "inboundVerified": "Verified",
+    "inboundRejected": "Rejected"
   },
   "quickReplies": {
     "title": "Quick Replies",

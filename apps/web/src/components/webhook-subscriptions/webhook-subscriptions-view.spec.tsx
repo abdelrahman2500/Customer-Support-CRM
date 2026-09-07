@@ -8,6 +8,7 @@ import {
   useWebhookDeliveryAttemptsQuery,
   useWebhookSubscriptionsQuery,
 } from "@/hooks/use-webhook-subscriptions";
+import { useWebhookInboundLogsQuery } from "@/hooks/use-webhook-inbound-logs";
 import { ApiError } from "@/lib/api";
 
 vi.mock("next-intl", () => ({
@@ -23,11 +24,16 @@ vi.mock("@/hooks/use-webhook-subscriptions", () => ({
   useWebhookDeliveryAttemptsQuery: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-webhook-inbound-logs", () => ({
+  useWebhookInboundLogsQuery: vi.fn(),
+}));
+
 const mockedUseWebhookSubscriptionsQuery = vi.mocked(useWebhookSubscriptionsQuery);
 const mockedUseCreateWebhookSubscriptionMutation = vi.mocked(useCreateWebhookSubscriptionMutation);
 const mockedUseUpdateWebhookSubscriptionMutation = vi.mocked(useUpdateWebhookSubscriptionMutation);
 const mockedUseDeleteWebhookSubscriptionMutation = vi.mocked(useDeleteWebhookSubscriptionMutation);
 const mockedUseWebhookDeliveryAttemptsQuery = vi.mocked(useWebhookDeliveryAttemptsQuery);
+const mockedUseWebhookInboundLogsQuery = vi.mocked(useWebhookInboundLogsQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -70,6 +76,9 @@ describe("WebhookSubscriptionsView", () => {
     mockedUseDeleteWebhookSubscriptionMutation.mockReturnValue(mutationResult() as never);
     mockedUseWebhookDeliveryAttemptsQuery.mockReturnValue(
       queryResult({ data: undefined, isLoading: true }) as never,
+    );
+    mockedUseWebhookInboundLogsQuery.mockReturnValue(
+      queryResult({ data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 }, isSuccess: true }) as never,
     );
   });
 
@@ -298,5 +307,66 @@ describe("WebhookSubscriptionsView", () => {
     fireEvent.submit(screen.getByText("createSubmit").closest("form") as HTMLFormElement);
 
     expect(await screen.findByText("createFailed")).toBeInTheDocument();
+  });
+
+  describe("inbound webhook log (RM-21)", () => {
+    it("shows the empty state when nothing has been received yet", () => {
+      mockedUseWebhookSubscriptionsQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<WebhookSubscriptionsView />);
+
+      expect(screen.getByText("noInboundLogs")).toBeInTheDocument();
+    });
+
+    it("renders a received payload's provider, verification result, and timestamp", () => {
+      mockedUseWebhookSubscriptionsQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      mockedUseWebhookInboundLogsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: {
+            items: [
+              {
+                id: "log-1",
+                providerKey: "stripe",
+                verified: false,
+                rejectReason: "Signature mismatch",
+                headers: {},
+                body: "{}",
+                receivedAt: "2024-01-01T00:00:00.000Z",
+              },
+            ],
+            total: 1,
+            page: 1,
+            pageSize: 25,
+            totalPages: 1,
+          },
+        }) as never,
+      );
+
+      render(<WebhookSubscriptionsView />);
+
+      expect(screen.getByText("stripe")).toBeInTheDocument();
+      expect(screen.getByText("Signature mismatch")).toBeInTheDocument();
+    });
+
+    it("shows a generic error state with a retry action", () => {
+      const refetch = vi.fn();
+      mockedUseWebhookSubscriptionsQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      mockedUseWebhookInboundLogsQuery.mockReturnValue(
+        queryResult({ isError: true, error: new ApiError("Server error", 500), refetch }) as never,
+      );
+
+      render(<WebhookSubscriptionsView />);
+
+      expect(screen.getByText("inboundLogError")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("retry"));
+      expect(refetch).toHaveBeenCalledOnce();
+    });
   });
 });

@@ -14,7 +14,15 @@ import { RedisIoAdapter } from "./realtime/redis-io.adapter";
 import { PinoLoggerService } from "./common/logging/pino-logger.service";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // RM-21 — `rawBody: true` populates `request.rawBody` (the exact,
+  // unparsed bytes) on every request alongside the normal parsed `body` —
+  // needed so `WebhookInboundController` can verify a provider's HMAC
+  // signature against the exact wire bytes it was computed over, not a
+  // re-serialized JSON object (which is not guaranteed to produce
+  // byte-identical output). Every other route is unaffected — Express's
+  // JSON body-parser still runs and populates `req.body` exactly as
+  // before.
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   // Story 111 — docs/architecture/11-quality-and-operations.md: "Structured
   // JSON logs use pino." `bufferLogs: true` above holds Nest's own startup
   // log lines until this is wired, so they go through pino too rather than
