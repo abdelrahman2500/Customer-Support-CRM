@@ -74,6 +74,13 @@ import { PortalNotificationLogListener } from "./portal-notification-log.listene
  * `PortalNotificationEmailProducer`) so `PortalNotificationLogListener`
  * can inject it directly, mirroring exactly how `ChannelsModule`/
  * `TicketsModule` already import `QueuesModule` for their own producers.
+ *
+ * RM-26 — `SlaAtRiskNotificationListener`/`TicketEscalatedNotificationListener`/
+ * `TicketMentionNotificationListener` now also inject `QueuesModule`'s
+ * `AgentNotificationEmailProducer` (already exported alongside
+ * `PortalNotificationEmailProducer`), the same way. No new export needed
+ * here — nothing outside this module consumes the agent-notification-email
+ * producer directly.
  */
 @Module({
   imports: [QueuesModule],

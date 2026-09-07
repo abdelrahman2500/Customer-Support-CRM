@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import { SlaAtRiskNotificationListener } from "./sla-at-risk-notification.listener";
 import { SLA_AT_RISK_EVENT } from "../sla-policies/sla-detection.events";
 import type { PrismaService } from "../../prisma/prisma.service";
+import type { NotificationPreferencesService } from "./notification-preferences.service";
+import type { AgentNotificationEmailProducer } from "../../queues/agent-notification-email.producer";
 
 /** Mimics the shape `PrismaClientKnownRequestError` exposes at `.code` — see
  * `sla-escalation.listener.spec.ts`'s `buildUniqueConstraintError` precedent. */
@@ -18,11 +20,39 @@ function buildPrismaMock() {
     notificationLog: {
       create: vi.fn(),
     },
+    ticket: {
+      findUnique: vi.fn(),
+    },
   };
 }
 
-function createListener(prismaMock: ReturnType<typeof buildPrismaMock>): SlaAtRiskNotificationListener {
-  return new SlaAtRiskNotificationListener(prismaMock as unknown as PrismaService);
+// RM-26 — "no row = enabled" (`inAppEnabled: true`) is the default,
+// mirroring `NotificationPreferencesService.listPreferences`'s own
+// convention, so every pre-existing test below (which never sets this up
+// explicitly) keeps enqueueing exactly as it did before this story added
+// the check.
+function buildNotificationPreferencesServiceMock() {
+  return {
+    listPreferences: vi.fn().mockResolvedValue([{ eventType: "sla.at_risk", inAppEnabled: true }]),
+  };
+}
+
+function buildAgentNotificationEmailProducerMock() {
+  return {
+    enqueue: vi.fn().mockResolvedValue({ id: "job-1" }),
+  };
+}
+
+function createListener(
+  prismaMock: ReturnType<typeof buildPrismaMock>,
+  preferencesMock: ReturnType<typeof buildNotificationPreferencesServiceMock>,
+  emailProducerMock: ReturnType<typeof buildAgentNotificationEmailProducerMock>,
+): SlaAtRiskNotificationListener {
+  return new SlaAtRiskNotificationListener(
+    prismaMock as unknown as PrismaService,
+    preferencesMock as unknown as NotificationPreferencesService,
+    emailProducerMock as unknown as AgentNotificationEmailProducer,
+  );
 }
 
 const atRiskEvent = {
@@ -34,12 +64,17 @@ const atRiskEvent = {
 
 describe("SlaAtRiskNotificationListener", () => {
   let prisma: ReturnType<typeof buildPrismaMock>;
+  let preferences: ReturnType<typeof buildNotificationPreferencesServiceMock>;
+  let emailProducer: ReturnType<typeof buildAgentNotificationEmailProducerMock>;
   let listener: SlaAtRiskNotificationListener;
 
   beforeEach(() => {
     vi.clearAllMocks();
     prisma = buildPrismaMock();
-    listener = createListener(prisma);
+    preferences = buildNotificationPreferencesServiceMock();
+    emailProducer = buildAgentNotificationEmailProducerMock();
+    listener = createListener(prisma, preferences, emailProducer);
+    prisma.ticket.findUnique.mockResolvedValue({ assignedToUserId: "agent-1" });
   });
 
   describe("onSlaAtRisk", () => {
@@ -85,6 +120,86 @@ describe("SlaAtRiskNotificationListener", () => {
           targetType: "response",
           targetAt: new Date("2026-01-02T00:05:00.000Z"),
         },
+      });
+    });
+
+    // RM-26 — Agent Email Notification Delivery.
+    describe("notification email (RM-26)", () => {
+      it("enqueues a notification email for the ticket's assignee once the row is newly written", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+
+        await listener.onSlaAtRisk(atRiskEvent);
+
+        expect(prisma.ticket.findUnique).toHaveBeenCalledWith({
+          where: { id: "ticket-1" },
+          select: { assignedToUserId: true },
+        });
+        expect(preferences.listPreferences).toHaveBeenCalledWith("agent-1");
+        expect(emailProducer.enqueue).toHaveBeenCalledWith({
+          ticketId: "ticket-1",
+          eventType: SLA_AT_RISK_EVENT,
+          recipientUserId: "agent-1",
+        });
+      });
+
+      it("does not enqueue when the row was already logged (P2002) — never re-email a transition already notified", async () => {
+        prisma.notificationLog.create.mockRejectedValue(buildUniqueConstraintError());
+
+        await listener.onSlaAtRisk(atRiskEvent);
+
+        expect(prisma.ticket.findUnique).not.toHaveBeenCalled();
+        expect(emailProducer.enqueue).not.toHaveBeenCalled();
+      });
+
+      it("does not enqueue when the ticket has no assignee", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        prisma.ticket.findUnique.mockResolvedValue({ assignedToUserId: null });
+
+        await listener.onSlaAtRisk(atRiskEvent);
+
+        expect(preferences.listPreferences).not.toHaveBeenCalled();
+        expect(emailProducer.enqueue).not.toHaveBeenCalled();
+      });
+
+      it("does not enqueue when the ticket cannot be found", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        prisma.ticket.findUnique.mockResolvedValue(null);
+
+        await listener.onSlaAtRisk(atRiskEvent);
+
+        expect(emailProducer.enqueue).not.toHaveBeenCalled();
+      });
+
+      it("does not enqueue when the assignee has disabled this event type", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        preferences.listPreferences.mockResolvedValue([
+          { eventType: "sla.at_risk", inAppEnabled: false },
+        ]);
+
+        await listener.onSlaAtRisk(atRiskEvent);
+
+        expect(emailProducer.enqueue).not.toHaveBeenCalled();
+      });
+
+      it("never throws when the ticket lookup fails", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        prisma.ticket.findUnique.mockRejectedValue(new Error("db unavailable"));
+
+        await expect(listener.onSlaAtRisk(atRiskEvent)).resolves.toBeUndefined();
+      });
+
+      it("never throws when the preferences lookup fails", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        preferences.listPreferences.mockRejectedValue(new Error("db unavailable"));
+
+        await expect(listener.onSlaAtRisk(atRiskEvent)).resolves.toBeUndefined();
+      });
+
+      it("never throws when the enqueue itself fails", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        emailProducer.enqueue.mockRejectedValue(new Error("redis unavailable"));
+
+        await expect(listener.onSlaAtRisk(atRiskEvent)).resolves.toBeUndefined();
       });
     });
   });

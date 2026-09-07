@@ -18,6 +18,10 @@ import {
   PortalNotificationEmailProducer,
   PORTAL_NOTIFICATION_EMAIL_QUEUE,
 } from "./portal-notification-email.producer";
+import {
+  AgentNotificationEmailProducer,
+  AGENT_NOTIFICATION_EMAIL_QUEUE,
+} from "./agent-notification-email.producer";
 import { WebhookDispatchProducer, WEBHOOK_DISPATCH_QUEUE } from "./webhook-dispatch.producer";
 
 /**
@@ -55,6 +59,10 @@ import { WebhookDispatchProducer, WEBHOOK_DISPATCH_QUEUE } from "./webhook-dispa
  * (`WebhookDeliveryAttempt`, via its own `PrismaService`, mirroring
  * `ChannelMessageDeliveryProcessor`'s convention), so there is nothing left
  * for `apps/api` to be handed back.
+ *
+ * RM-26 — `agent-notification-email` (produced here, consumed by
+ * `apps/worker`) is the agent-side mirror of `portal-notification-email`:
+ * the identical one-directional, no-hand-back shape.
  */
 @Module({
   imports: [
@@ -75,6 +83,7 @@ import { WebhookDispatchProducer, WEBHOOK_DISPATCH_QUEUE } from "./webhook-dispa
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_QUEUE }),
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE }),
     BullModule.registerQueue({ name: PORTAL_NOTIFICATION_EMAIL_QUEUE }),
+    BullModule.registerQueue({ name: AGENT_NOTIFICATION_EMAIL_QUEUE }),
     BullModule.registerQueue({ name: WEBHOOK_DISPATCH_QUEUE }),
   ],
   providers: [
@@ -88,6 +97,7 @@ import { WebhookDispatchProducer, WEBHOOK_DISPATCH_QUEUE } from "./webhook-dispa
     ChannelMessageDeliveryProducer,
     ChannelMessageDeliveryEventsBridgeProcessor,
     PortalNotificationEmailProducer,
+    AgentNotificationEmailProducer,
     WebhookDispatchProducer,
   ],
   exports: [
@@ -97,6 +107,7 @@ import { WebhookDispatchProducer, WEBHOOK_DISPATCH_QUEUE } from "./webhook-dispa
     TaskRemindersProducer,
     ChannelMessageDeliveryProducer,
     PortalNotificationEmailProducer,
+    AgentNotificationEmailProducer,
     WebhookDispatchProducer,
   ],
 })
