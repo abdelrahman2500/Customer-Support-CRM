@@ -8,7 +8,7 @@ import {
   useUploadMyTicketAttachmentMutation,
 } from "@/hooks/use-portal-attachments";
 import { getMyTicketAttachmentDownloadUrl } from "@/lib/attachments-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Skeleton } from "@crm/ui";
 
 function formatFileSize(bytes: number): string {
@@ -76,6 +76,7 @@ export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
 
 function AddAttachmentForm({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const errorMessage = useErrorMessage();
   const [error, setError] = useState<string | null>(null);
   const mutation = useUploadMyTicketAttachmentMutation(ticketId);
 
@@ -89,7 +90,10 @@ function AddAttachmentForm({ ticketId }: { ticketId: string }) {
       await mutation.mutateAsync(file);
     } catch (uploadError) {
       setError(
-        uploadError instanceof ApiError ? uploadError.message : t("detail.attachmentsUploadFailed"),
+        errorMessage(uploadError, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.attachmentsUploadFailed"),
+        }),
       );
     }
   }

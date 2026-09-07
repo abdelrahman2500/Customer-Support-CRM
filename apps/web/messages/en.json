@@ -331,7 +331,8 @@
       "submitting": "Creating...",
       "success": "Customer \"{name}\" was created.",
       "createTicketLink": "Create a ticket for them",
-      "createFailed": "Couldn't create the customer. Please try again."
+      "createFailed": "Couldn't create the customer. Please try again.",
+      "createForbidden": "You don't have permission to create a customer."
     }
   },
   "users": {
@@ -671,7 +672,8 @@
       "body": "Body",
       "submit": "Create article",
       "submitting": "Creating...",
-      "createFailed": "Couldn't create the article. Please try again."
+      "createFailed": "Couldn't create the article. Please try again.",
+      "createForbidden": "You don't have permission to create an article."
     },
     "detail": {
       "titleLabel": "Article title",
@@ -735,7 +737,8 @@
       "disabled": "Disabled",
       "enable": "Enable",
       "disable": "Disable",
-      "actionFailed": "Couldn't save that change. Please try again."
+      "actionFailed": "Couldn't save that change. Please try again.",
+      "actionForbidden": "You don't have permission to change that preference."
     }
   },
   "reporting": {
@@ -1045,6 +1048,7 @@
     "save": "Save",
     "saving": "Saving...",
     "saveFailed": "Couldn't save this template. Please try again.",
+    "saveForbidden": "You don't have permission to save this template.",
     "eventLabel": {
       "slaAtRisk": "SLA at risk",
       "slaBreached": "SLA breached",
@@ -1063,6 +1067,7 @@
     "save": "Save",
     "saving": "Saving...",
     "saveFailed": "Couldn't save your branding settings. Please try again.",
+    "saveForbidden": "You don't have permission to change branding.",
     "saveSuccess": "Branding saved.",
     "invalidColor": "Enter a hex color, e.g. #0f172a.",
     "previewHeading": "Preview",
@@ -1079,7 +1084,8 @@
     "categorizeLabel": "Categorize",
     "chatLabel": "Portal AI Chatbot",
     "suggestSolutionsLabel": "Suggest Solutions",
-    "saveFailed": "Couldn't save this setting. Please try again."
+    "saveFailed": "Couldn't save this setting. Please try again.",
+    "saveForbidden": "You don't have permission to change these settings."
   },
   "mySessions": {
     "title": "My Sessions",

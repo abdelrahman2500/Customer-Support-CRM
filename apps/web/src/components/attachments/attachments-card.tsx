@@ -5,7 +5,7 @@ import type { ChangeEvent } from "react";
 import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import type { AttachmentOwner } from "@/lib/attachments-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Skeleton } from "@crm/ui";
 
 /** Every string this shared component needs, supplied by the caller's own
@@ -18,6 +18,10 @@ export interface AttachmentsCardStrings {
   empty: string;
   uploading: string;
   uploadFailedFallback: string;
+  /** Batch 1 (UX audit) — both callers already have an `actionForbidden`
+   * string in their own namespace; threaded through so an upload rejected
+   * for permissions shows that instead of the generic upload-failed text. */
+  uploadForbidden: string;
 }
 
 function formatFileSize(bytes: number): string {
@@ -100,6 +104,7 @@ function AddAttachmentForm({
 }) {
   const [error, setError] = useState<string | null>(null);
   const mutation = useUploadAttachmentMutation(owner);
+  const errorMessage = useErrorMessage();
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0];
@@ -111,7 +116,10 @@ function AddAttachmentForm({
       await mutation.mutateAsync(file);
     } catch (uploadError) {
       setError(
-        uploadError instanceof ApiError ? uploadError.message : strings.uploadFailedFallback,
+        errorMessage(uploadError, {
+          forbidden: strings.uploadForbidden,
+          generic: strings.uploadFailedFallback,
+        }),
       );
     }
   }

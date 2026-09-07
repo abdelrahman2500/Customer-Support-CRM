@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateCustomerMutation } from "@/hooks/use-tickets";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Button, Input } from "@crm/ui";
 
 /**
@@ -20,6 +20,7 @@ import { Alert, Button, Input } from "@crm/ui";
  */
 export function CreateCustomerView() {
   const t = useTranslations("customers");
+  const errorMessage = useErrorMessage();
   const { locale } = useParams<{ locale: string }>();
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,12 @@ export function CreateCustomerView() {
       setCreated(customer);
       setDisplayName("");
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("createFailed"));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("create.createForbidden"),
+          generic: t("create.createFailed"),
+        }),
+      );
     }
   }
 

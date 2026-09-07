@@ -12,7 +12,7 @@ import {
 } from "@/hooks/use-ticket-messages";
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Button, Checkbox, cn, Label, Skeleton } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
@@ -173,6 +173,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
  * with a blank-line separator so nothing already typed is discarded. */
 function ChatComposer({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const errorMessage = useErrorMessage();
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [selectedQuickReplyId, setSelectedQuickReplyId] = useState("");
@@ -194,7 +195,12 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
       await activeMutation.mutateAsync({ body: trimmed });
       setBody("");
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("detail.chatSendFailed"));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.chatSendFailed"),
+        }),
+      );
     }
   }
 

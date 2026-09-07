@@ -140,7 +140,7 @@ describe("CreateArticleView", () => {
     expect(screen.getByLabelText("Body")).toHaveValue("Step-by-step...");
   });
 
-  it("shows the generic create-failed fallback for a non-ApiError failure", async () => {
+  it("shows the shared network-error fallback for a non-ApiError failure", async () => {
     const mutateAsync = vi.fn().mockRejectedValue(new Error("network down"));
     mockedUseCreateArticleMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
 
@@ -150,7 +150,11 @@ describe("CreateArticleView", () => {
     fireEvent.change(screen.getByLabelText("Body"), { target: { value: "Step-by-step..." } });
     fireEvent.click(screen.getByRole("button", { name: "Create article" }));
 
-    expect(await screen.findByText("Couldn't create the article. Please try again.")).toBeInTheDocument();
+    // Batch 1 (UX audit) — a non-`ApiError` rejection is a network failure,
+    // never this feature's own generic create-failed text.
+    expect(
+      await screen.findByText("Couldn't reach the server. Check your connection and try again."),
+    ).toBeInTheDocument();
   });
 
   it("disables the submit button while the mutation is pending", () => {

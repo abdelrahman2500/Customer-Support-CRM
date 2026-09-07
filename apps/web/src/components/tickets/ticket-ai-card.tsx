@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
 import type { TicketAiFeature } from "@/lib/ticket-ai-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Button, Skeleton } from "@crm/ui";
 
 const FEATURES: TicketAiFeature[] = ["SUMMARIZE", "SUGGEST_REPLY", "CATEGORIZE", "SUGGEST_SOLUTIONS"];
@@ -45,6 +45,7 @@ export function TicketAiCard({
   onApplyCategory: (category: string) => void;
 }) {
   const t = useTranslations("tickets");
+  const errorMessage = useErrorMessage();
   const [operation, setOperation] = useState<{ feature: TicketAiFeature; logId: string } | null>(
     null,
   );
@@ -58,7 +59,12 @@ export function TicketAiCard({
       const result = await submitMutation.mutateAsync(feature);
       setOperation({ feature, logId: result.id });
     } catch (error) {
-      setSubmitError(error instanceof ApiError ? error.message : t("detail.aiSubmitFailed"));
+      setSubmitError(
+        errorMessage(error, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.aiSubmitFailed"),
+        }),
+      );
     }
   }
 

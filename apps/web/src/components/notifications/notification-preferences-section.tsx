@@ -6,7 +6,7 @@ import {
   useUpdateNotificationPreferenceMutation,
 } from "@/hooks/use-notification-preferences";
 import type { NotificationPreferenceSummary } from "@/lib/notification-preferences-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Badge, Button, Skeleton } from "@crm/ui";
 
 /** The same three event-type strings `NOTIFICATION_EVENT_TYPES` names on the
@@ -67,6 +67,7 @@ export function NotificationPreferencesSection() {
  * `SlaPolicyRow`/`AutomationRuleRow`'s Rules-of-Hooks convention. */
 function PreferenceRow({ preference }: { preference: NotificationPreferenceSummary }) {
   const t = useTranslations("notificationHistory");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateNotificationPreferenceMutation();
 
   const labelKey = EVENT_LABEL_KEYS[preference.eventType];
@@ -91,9 +92,10 @@ function PreferenceRow({ preference }: { preference: NotificationPreferenceSumma
       </div>
       {mutation.isError && (
         <p className="mt-1 text-xs text-red-600">
-          {mutation.error instanceof ApiError
-            ? mutation.error.message
-            : t("preferences.actionFailed")}
+          {errorMessage(mutation.error, {
+            forbidden: t("preferences.actionForbidden"),
+            generic: t("preferences.actionFailed"),
+          })}
         </p>
       )}
     </li>

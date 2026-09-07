@@ -6,7 +6,7 @@ import {
   useCreateNotificationTemplateMutation,
   useNotificationTemplatesQuery,
 } from "@/hooks/use-notification-templates";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from "@crm/ui";
 
 /** RM-30 — the same sentinel-for-"no locale" convention
@@ -101,6 +101,7 @@ function TemplateForm({
   templateByKey: Map<string, string>;
 }) {
   const t = useTranslations("notificationTemplates");
+  const errorMessage = useErrorMessage();
   const mutation = useCreateNotificationTemplateMutation();
   const [locale, setLocale] = useState(UNSET_LOCALE);
   const [text, setText] = useState(templateByKey.get(`${eventType}:${UNSET_LOCALE}`) ?? "");
@@ -121,7 +122,9 @@ function TemplateForm({
         template: text,
       });
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("saveFailed"));
+      setError(
+        errorMessage(submitError, { forbidden: t("saveForbidden"), generic: t("saveFailed") }),
+      );
     }
   }
 

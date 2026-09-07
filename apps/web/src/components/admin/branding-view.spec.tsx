@@ -132,8 +132,8 @@ describe("BrandingView", () => {
     expect(mutateAsync).toHaveBeenCalledWith({ primaryColor: "#abcabc" });
   });
 
-  it("shows an inline error when saving fails", async () => {
-    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Server error", 500));
+  it("shows the generic fallback, not the raw 500 body, when saving fails", async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500));
     mockedUseBrandingQuery.mockReturnValue(
       queryResult({
         data: { logoUrl: null, primaryColor: null, secondaryColor: null },
@@ -149,6 +149,29 @@ describe("BrandingView", () => {
     });
     fireEvent.click(screen.getByText("save"));
 
-    expect(await screen.findByText("Server error")).toBeInTheDocument();
+    // Batch 1 (UX audit) — an unexpected 500's message must never reach the
+    // screen verbatim; only the feature's own generic, translated copy may.
+    expect(await screen.findByText("saveFailed")).toBeInTheDocument();
+    expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
+  });
+
+  it("shows the shared forbidden text for a 403 save failure", async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Forbidden", 403));
+    mockedUseBrandingQuery.mockReturnValue(
+      queryResult({
+        data: { logoUrl: null, primaryColor: null, secondaryColor: null },
+        isSuccess: true,
+      }) as never,
+    );
+    mockedUseUpdateBrandingMutation.mockReturnValue(mutationResult({ mutateAsync }) as never);
+
+    render(<BrandingView />);
+
+    fireEvent.change(screen.getByLabelText("primaryColorLabel"), {
+      target: { value: "#abcabc" },
+    });
+    fireEvent.click(screen.getByText("save"));
+
+    expect(await screen.findByText("saveForbidden")).toBeInTheDocument();
   });
 });

@@ -650,6 +650,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           empty: t("detail.attachmentsEmpty"),
           uploading: t("detail.attachmentsUploading"),
           uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+          uploadForbidden: t("detail.actionForbidden"),
         }}
       />
     </section>

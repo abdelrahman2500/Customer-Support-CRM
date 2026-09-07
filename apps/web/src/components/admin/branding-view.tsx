@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { useBrandingQuery, useUpdateBrandingMutation } from "@/hooks/use-branding";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Button, Input, showSuccessToast, Skeleton } from "@crm/ui";
 
 const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
@@ -53,6 +53,7 @@ function BrandingForm({
   initial: { logoUrl: string | null; primaryColor: string | null; secondaryColor: string | null };
 }) {
   const t = useTranslations("branding");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateBrandingMutation();
   const [logoUrl, setLogoUrl] = useState(initial.logoUrl ?? "");
   const [primaryColor, setPrimaryColor] = useState(initial.primaryColor ?? "");
@@ -82,7 +83,9 @@ function BrandingForm({
       // clicking a dead button.
       showSuccessToast(t("saveSuccess"));
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("saveFailed"));
+      setError(
+        errorMessage(submitError, { forbidden: t("saveForbidden"), generic: t("saveFailed") }),
+      );
     }
   }
 

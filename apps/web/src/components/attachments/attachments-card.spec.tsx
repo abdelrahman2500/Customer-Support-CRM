@@ -14,12 +14,21 @@ vi.mock("@/lib/attachments-api", () => ({
   getAttachmentDownloadUrl: vi.fn(),
 }));
 
+// Batch 1 (UX audit) — `useErrorMessage()` reads `common.errors.*` via
+// `useTranslations("common")`; echoing the key back (mirrors
+// `ticket-detail-view.spec.tsx`'s own convention) is enough to distinguish
+// the network/forbidden/generic branches without a real message catalog.
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => key,
+}));
+
 const strings = {
   heading: "Attachments",
   error: "Couldn't load attachments.",
   empty: "No attachments yet.",
   uploading: "Uploading...",
   uploadFailedFallback: "Upload failed.",
+  uploadForbidden: "Not allowed.",
 };
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -155,7 +164,7 @@ describe("AttachmentsCard", () => {
     });
   });
 
-  it("shows the fallback error message for a non-ApiError upload failure", async () => {
+  it("shows the shared network-error message for a non-ApiError upload failure", async () => {
     vi.mocked(useAttachmentsQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -172,6 +181,51 @@ describe("AttachmentsCard", () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
+    // Batch 1 (UX audit) — a non-`ApiError` rejection is a network failure,
+    // never the feature's own generic fallback text (the mocked `next-intl`
+    // echoes the `common.errors.network` key back verbatim).
+    await screen.findByText("errors.network");
+  });
+
+  it("shows the caller's own forbidden text for a 403 upload rejection", async () => {
+    vi.mocked(useAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockRejectedValue(new ApiError("Forbidden", 403)),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<AttachmentsCard owner={ticketOwner} locale="en" strings={strings} />);
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await screen.findByText(strings.uploadForbidden);
+  });
+
+  it("shows the caller's own generic fallback for an unexpected 500 upload rejection", async () => {
+    vi.mocked(useAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500)),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<AttachmentsCard owner={ticketOwner} locale="en" strings={strings} />);
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    // Never the raw 500 body — that's the exact leak this batch closes.
     await screen.findByText(strings.uploadFailedFallback);
+    expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
   });
 });

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateArticleMutation } from "@/hooks/use-knowledge-base";
 import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Button, Input } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
@@ -28,6 +28,7 @@ const UNSET_CATEGORY = "__unset__";
  */
 export function CreateArticleView() {
   const t = useTranslations("knowledgeBase");
+  const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
@@ -51,7 +52,12 @@ export function CreateArticleView() {
       });
       router.push(`/${locale}/knowledge-base`);
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("create.createFailed"));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("create.createForbidden"),
+          generic: t("create.createFailed"),
+        }),
+      );
     }
   }
 

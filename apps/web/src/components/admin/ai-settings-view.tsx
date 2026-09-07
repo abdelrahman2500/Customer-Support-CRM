@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAiSettingsQuery, useUpdateAiSettingsMutation } from "@/hooks/use-ai-settings";
 import type { AiSettingsSummary } from "@/lib/ai-settings-api";
-import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Button, Skeleton } from "@crm/ui";
 
 type ToggleKey = keyof AiSettingsSummary;
@@ -61,6 +61,7 @@ export function AiSettingsView() {
 
 function AiSettingsForm({ initial }: { initial: AiSettingsSummary }) {
   const t = useTranslations("aiSettings");
+  const errorMessage = useErrorMessage();
   const mutation = useUpdateAiSettingsMutation();
   const [draft, setDraft] = useState<AiSettingsSummary>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +80,9 @@ function AiSettingsForm({ initial }: { initial: AiSettingsSummary }) {
       await mutation.mutateAsync({ [key]: value });
     } catch (submitError) {
       setDraft(initial);
-      setError(submitError instanceof ApiError ? submitError.message : t("saveFailed"));
+      setError(
+        errorMessage(submitError, { forbidden: t("saveForbidden"), generic: t("saveFailed") }),
+      );
     }
   }
 

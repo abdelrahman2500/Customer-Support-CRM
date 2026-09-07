@@ -296,7 +296,7 @@ describe("TicketChatCard", () => {
     expect(screen.getByText("detail.chatSending")).toBeInTheDocument();
   });
 
-  it("shows an inline error when sending fails", async () => {
+  it("shows the shared forbidden text, not the raw backend message, for a 403 send failure", async () => {
     vi.mocked(useTicketMessagesQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -314,10 +314,13 @@ describe("TicketChatCard", () => {
     });
     fireEvent.click(screen.getByText("detail.chatSend"));
 
-    await screen.findByText("You lack permission");
+    // Batch 1 (UX audit) — 403 is classified as "forbidden": always the
+    // feature's own translated copy, never the raw ApiError message.
+    await screen.findByText("detail.actionForbidden");
+    expect(screen.queryByText("You lack permission")).not.toBeInTheDocument();
   });
 
-  it("shows the fallback error message for a non-ApiError send failure", async () => {
+  it("shows the shared network-error message for a non-ApiError send failure", async () => {
     vi.mocked(useTicketMessagesQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -335,7 +338,31 @@ describe("TicketChatCard", () => {
     });
     fireEvent.click(screen.getByText("detail.chatSend"));
 
+    // Batch 1 (UX audit) — a non-`ApiError` rejection is a network failure,
+    // never this feature's own generic fallback text.
+    await screen.findByText("errors.network");
+  });
+
+  it("shows the generic send-failed fallback for an unexpected 500 send failure", async () => {
+    vi.mocked(useTicketMessagesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useCreateTicketMessageMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500)),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<TicketChatCard ticketId="ticket-1" />);
+    fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+      target: { value: "hello" },
+    });
+    fireEvent.click(screen.getByText("detail.chatSend"));
+
     await screen.findByText("detail.chatSendFailed");
+    expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
   });
 
   // RM-13 — Channel Message Delivery Status & Retry Model.

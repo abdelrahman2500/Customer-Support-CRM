@@ -245,7 +245,7 @@ describe("TicketAiCard", () => {
     expect(screen.queryByText("detail.aiUseAsCategory")).not.toBeInTheDocument();
   });
 
-  it("shows an inline error when submitting fails", async () => {
+  it("shows the shared forbidden text, not the raw backend message, for a 403 submit failure", async () => {
     const mutateAsync = vi.fn().mockRejectedValue(new ApiError("You lack permission", 403));
     vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
       mutateAsync,
@@ -255,6 +255,24 @@ describe("TicketAiCard", () => {
     render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
     fireEvent.click(screen.getByText("detail.aiSummarize"));
 
-    expect(await screen.findByText("You lack permission")).toBeInTheDocument();
+    // Batch 1 (UX audit) — 403 is classified as "forbidden", which always
+    // renders the feature's own translated copy, never the raw ApiError
+    // message (that would leak whatever text the backend happened to send).
+    expect(await screen.findByText("detail.actionForbidden")).toBeInTheDocument();
+    expect(screen.queryByText("You lack permission")).not.toBeInTheDocument();
+  });
+
+  it("shows the generic submit-failed fallback for an unexpected 500 submit failure", async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500));
+    vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+      mutateAsync,
+      isPending: false,
+    } as never);
+
+    render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+    fireEvent.click(screen.getByText("detail.aiSummarize"));
+
+    expect(await screen.findByText("detail.aiSubmitFailed")).toBeInTheDocument();
+    expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
   });
 });

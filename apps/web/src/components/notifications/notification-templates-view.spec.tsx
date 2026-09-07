@@ -114,8 +114,8 @@ describe("NotificationTemplatesView", () => {
     expect(mutateAsync).toHaveBeenCalledWith({ eventType: "sla.at_risk", template: "Custom text" });
   });
 
-  it("shows an inline error when saving fails", async () => {
-    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Server error", 500));
+  it("shows the generic fallback, not the raw 500 body, when saving fails", async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500));
     mockedUseNotificationTemplatesQuery.mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -129,7 +129,28 @@ describe("NotificationTemplatesView", () => {
     fireEvent.change(textareas[0]!, { target: { value: "Custom text" } });
     fireEvent.click(screen.getAllByText("save")[0]!);
 
-    expect(await screen.findByText("Server error")).toBeInTheDocument();
+    // Batch 1 (UX audit) — an unexpected 500's message must never reach the
+    // screen verbatim; only the feature's own generic, translated copy may.
+    expect(await screen.findByText("saveFailed")).toBeInTheDocument();
+    expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
+  });
+
+  it("shows the shared forbidden text for a 403 save failure", async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Forbidden", 403));
+    mockedUseNotificationTemplatesQuery.mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    mockedUseCreateNotificationTemplateMutation.mockReturnValue(
+      mutationResult({ mutateAsync }) as never,
+    );
+
+    render(<NotificationTemplatesView />);
+
+    const textareas = screen.getAllByLabelText("templateLabel");
+    fireEvent.change(textareas[0]!, { target: { value: "Custom text" } });
+    fireEvent.click(screen.getAllByText("save")[0]!);
+
+    expect(await screen.findByText("saveForbidden")).toBeInTheDocument();
   });
 
   // RM-30 — Notification Templates: locale-aware content.

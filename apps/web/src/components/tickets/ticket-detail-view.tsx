@@ -643,6 +643,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           empty: t("detail.attachmentsEmpty"),
           uploading: t("detail.attachmentsUploading"),
           uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+          uploadForbidden: t("detail.actionForbidden"),
         }}
       />
 

@@ -171,7 +171,7 @@ describe("TicketAttachmentsCard", () => {
     await screen.findByText("File type not allowed");
   });
 
-  it("shows the fallback error message for a non-ApiError upload failure", async () => {
+  it("shows the shared network-error message for a non-ApiError upload failure", async () => {
     vi.mocked(useMyTicketAttachmentsQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -185,6 +185,43 @@ describe("TicketAttachmentsCard", () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
+    // Batch 1 (UX audit) — a non-`ApiError` rejection is a network failure,
+    // never this feature's own generic fallback text.
+    await screen.findByText("errors.network");
+  });
+
+  it("shows the forbidden text for a 403 upload rejection", async () => {
+    vi.mocked(useMyTicketAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useUploadMyTicketAttachmentMutation).mockReturnValue({
+      mutateAsync: vi.fn().mockRejectedValue(new ApiError("Forbidden", 403)),
+      isPending: false,
+    } as never);
+
+    render(<TicketAttachmentsCard ticketId="ticket-1" />);
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await screen.findByText("detail.actionForbidden");
+  });
+
+  it("shows the generic fallback for an unexpected 500 upload rejection", async () => {
+    vi.mocked(useMyTicketAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useUploadMyTicketAttachmentMutation).mockReturnValue({
+      mutateAsync: vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500)),
+      isPending: false,
+    } as never);
+
+    render(<TicketAttachmentsCard ticketId="ticket-1" />);
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
     await screen.findByText("detail.attachmentsUploadFailed");
+    expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
   });
 });
