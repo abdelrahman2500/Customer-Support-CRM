@@ -122,6 +122,8 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  *
  * RM-20 — `webhook-subscriptions` appended as the new last entry before
  * `my-sessions`, same convention.
+ *
+ * RM-22 — `api-keys` appended the same way.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -143,6 +145,7 @@ const NAV_ITEMS = [
   { href: "quick-replies", labelKey: "nav.quickReplies" },
   { href: "ticket-categories", labelKey: "nav.ticketCategories" },
   { href: "webhook-subscriptions", labelKey: "nav.webhookSubscriptions" },
+  { href: "api-keys", labelKey: "nav.apiKeys" },
   { href: "my-sessions", labelKey: "nav.mySessions" },
 ] as const;
 

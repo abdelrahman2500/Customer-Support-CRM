@@ -81,6 +81,20 @@ const baseEnvSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET must be at least 32 characters"),
   JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
+  /** RM-22 — HMAC key `ApiKeysService.hashApiKey` uses, mirroring
+   * `IdentityService.hashRefreshToken`'s exact "keyed HMAC-SHA256, O(1)
+   * lookup by hash" discipline. Optional and falling back to
+   * `JWT_REFRESH_SECRET` (`ApiKeysService`'s own resolution, not a Zod
+   * default here) rather than required: a required new secret would force
+   * every existing `.env`/CI/deployment to add one before the app could
+   * boot at all, for a credential class this story is the very first to
+   * introduce. Set an actual distinct value in any real deployment that
+   * issues API keys — domain-separating this HMAC key from the refresh-
+   * token one is good hygiene, not a hard security requirement (neither
+   * key is attacker-influenced input).
+   */
+  API_KEY_HASH_SECRET: optionalString,
+
   /** Story 66 — Ticket Attachments is the first real consumer. Keep the
    * local MinIO defaults here so test/CI bootstraps do not fail when the
    * per-app `.env` file is not present yet; production and local overrides

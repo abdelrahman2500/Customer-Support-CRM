@@ -8,6 +8,7 @@ import { AuthModule } from "./common/auth/auth.module";
 import { AuthGuard } from "./common/auth/auth.guard";
 import { AudienceGuard } from "./common/auth/audience.guard";
 import { PermissionsGuard } from "./common/auth/permissions.guard";
+import { ApiKeyGuard } from "./common/auth/api-key.guard";
 import { AuditInterceptor } from "./common/audit/audit.interceptor";
 import { TenantMiddleware } from "./common/tenant/tenant.middleware";
 import { RequestIdMiddleware } from "./common/logging/request-id.middleware";
@@ -66,9 +67,17 @@ import { RealtimeModule } from "./realtime/realtime.module";
     // before AudienceGuard/PermissionsGuard read it. AudienceGuard (Story
     // 52) runs next — which surface a token may be used on is orthogonal to,
     // and checked before, which permissions its role grants.
+    //
+    // RM-22 — ApiKeyGuard runs last of the four: on every existing route
+    // (no `@AllowApiKey()`) it is an immediate no-op, so it cannot affect
+    // AudienceGuard's or PermissionsGuard's own established behavior. On an
+    // `@AllowApiKey()` route, it only ever does anything when AuthGuard's
+    // own JWT strategy did NOT already authenticate the request — see that
+    // guard's own doc comment for the full handoff.
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: AudienceGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    { provide: APP_GUARD, useClass: ApiKeyGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
     // Story 111 — resolved via `app.get(PinoLoggerService)` in `main.ts`.

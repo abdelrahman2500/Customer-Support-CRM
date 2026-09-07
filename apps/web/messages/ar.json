@@ -81,6 +81,7 @@
       "quickReplies": "الردود السريعة",
       "ticketCategories": "فئات التذاكر",
       "webhookSubscriptions": "اشتراكات Webhook",
+      "apiKeys": "مفاتيح API",
       "mySessions": "جلساتي",
       "unreadNotificationsLabel": "{count} إشعارات غير مقروءة"
     }
@@ -883,6 +884,40 @@
     },
     "inboundVerified": "تم التحقق",
     "inboundRejected": "مرفوض"
+  },
+  "apiKeys": {
+    "title": "مفاتيح API",
+    "error": "تعذّر تحميل مفاتيح API.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد مفاتيح API حتى الآن.",
+    "revoke": "إلغاء",
+    "neverUsed": "لم يُستخدم قط",
+    "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+    "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+    "columns": {
+      "label": "التسمية",
+      "keyPrefix": "المفتاح",
+      "scopes": "النطاقات",
+      "status": "الحالة",
+      "lastUsedAt": "آخر استخدام",
+      "actions": "الإجراءات"
+    },
+    "status": {
+      "active": "نشط",
+      "revoked": "مُلغى",
+      "expired": "منتهي الصلاحية"
+    },
+    "createHeading": "مفتاح API جديد",
+    "labelLabel": "التسمية",
+    "labelPlaceholder": "مثال: تكامل CI",
+    "scopesLabel": "النطاقات",
+    "createSubmit": "إنشاء المفتاح",
+    "createSubmitting": "جارٍ الإنشاء...",
+    "createFailed": "تعذّر إنشاء المفتاح. حاول مرة أخرى.",
+    "keyRevealedTitle": "مفتاح API",
+    "keyRevealedDescription": "يُعرض هذا مرة واحدة فقط — انسخه الآن. استخدمه كـ Bearer token: Authorization: Bearer <key>.",
+    "revokeConfirmTitle": "هل تريد إلغاء مفتاح API هذا؟",
+    "revokeConfirmDescription": "سيتوقف \"{label}\" فورًا عن العمل مع كل طلب يستخدمه. لا يمكن التراجع عن هذا الإجراء."
   },
   "quickReplies": {
     "title": "الردود السريعة",

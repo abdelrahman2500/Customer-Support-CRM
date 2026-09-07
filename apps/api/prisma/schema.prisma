@@ -58,6 +58,8 @@ model Branch {
   ticketCategories      TicketCategory[]
   /// RM-20 — this branch's outbound webhook subscriptions.
   webhookSubscriptions  WebhookSubscription[]
+  /// RM-22 — this branch's own machine-to-machine API keys.
+  apiKeys               ApiKey[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -108,6 +110,8 @@ model User {
   tasks                       Task[]
   /// RM-20 — webhook subscriptions this agent registered.
   createdWebhookSubscriptions WebhookSubscription[]
+  /// RM-22 — API keys this agent issued.
+  createdApiKeys              ApiKey[]
   /// Story 92 — this agent's own "read up to" cursor over `NotificationLog`
   /// (a per-recipient timestamp, not a column on `NotificationLog` itself,
   /// since those rows are shared by every agent in a branch — see
@@ -1735,5 +1739,58 @@ model WebhookInboundLog {
 
   @@index([providerKey, receivedAt])
   @@map("webhook_inbound_logs")
+  @@schema("integrations")
+}
+
+/// RM-22 — API-Key Authentication for Machine-to-Machine Consumers.
+/// `docs/architecture/03-domain-boundaries.md`'s own `integrations` row
+/// names "Connection configs" as this schema's scope — an API key is
+/// exactly that (a machine-to-machine connection credential), so this
+/// lives here rather than in `admin` (the plan's own route-naming
+/// shorthand, `/admin/api-keys`, predates this table's actual placement
+/// and is not itself an architectural mandate).
+///
+/// `hashedKey` mirrors `RefreshToken.tokenHash`'s exact discipline: an
+/// HMAC-SHA256 keyed hash (never the raw key) that still supports an O(1)
+/// unique lookup, appropriate for an already-high-entropy generated secret
+/// (unlike `User.passwordHash`'s bcrypt, which exists to slow down
+/// brute-forcing a low-entropy human-chosen secret — an API key has no
+/// such threat model). `keyPrefix` is the raw key's own first 8
+/// characters, stored in plaintext purely so `GET
+/// /integrations/api-keys` can show a human something to recognize the
+/// key by ("crm_a1b2c3d4…") without ever exposing enough to
+/// reconstruct it.
+///
+/// `scopes` mirrors `WebhookSubscription.subscribedEventTypes`'s own
+/// "plain `String[]`, validated at the DTO layer" shape — permission-key-
+/// shaped strings, checked by `ApiKeyGuard` against a route's
+/// `@RequireApiKeyScope(...)`, deliberately parallel to (never merged
+/// with) the human RBAC `Permission`/`@RequirePermissions` system: an API
+/// key is not a user and does not have roles.
+///
+/// `expiresAt` is optional (`null` = never expires); `revokedAt` is the
+/// separate, explicit "an admin turned this off" action — the two are
+/// independent so a key that outlives its own use can still be revoked
+/// before its expiry, and an expired key still shows its original
+/// `revokedAt: null` state in the list (its rejection reason is "expired",
+/// not "revoked"). No rotation mechanism: revoking and issuing a fresh key
+/// achieves the same outcome with less surface, a deliberate non-goal.
+model ApiKey {
+  id              String    @id @default(uuid())
+  branchId        String    @map("branch_id")
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  label           String
+  hashedKey       String    @unique @map("hashed_key")
+  keyPrefix       String    @map("key_prefix")
+  scopes          String[]
+  expiresAt       DateTime? @map("expires_at")
+  revokedAt       DateTime? @map("revoked_at")
+  createdByUserId String    @map("created_by_user_id")
+  createdByUser   User      @relation(fields: [createdByUserId], references: [id])
+  lastUsedAt      DateTime? @map("last_used_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([branchId])
+  @@map("api_keys")
   @@schema("integrations")
 }
