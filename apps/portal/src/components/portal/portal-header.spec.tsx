@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { PortalHeader } from "./portal-header";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
@@ -264,6 +265,61 @@ describe("PortalHeader", () => {
       const links = screen.getAllByRole("link", { name: "nav" });
       const ticketsLink = links.find((link) => link.getAttribute("href") === "/en/tickets")!;
       expect(ticketsLink).toHaveAttribute("aria-current", "page");
+    });
+  });
+
+  // RM-11 — Mobile-Responsive Navigation.
+  describe("collapsed mobile menu (RM-11)", () => {
+    it("renders a menu toggle with an accessible name", () => {
+      render(<PortalHeader contact={contact} />);
+
+      expect(screen.getByRole("button", { name: "nav.menuLabel" })).toBeInTheDocument();
+    });
+
+    it("opens a real menu, with every nav item reachable inside it, once the toggle is clicked", async () => {
+      const clickUser = userEvent.setup();
+      render(<PortalHeader contact={contact} />);
+
+      await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+
+      const menu = await screen.findByRole("menu");
+      const hrefs = within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.getAttribute("href"));
+      expect(hrefs).toContain("/en/tickets");
+      expect(hrefs).toContain("/en/knowledge-base");
+      expect(hrefs).toContain("/en/chat");
+      expect(hrefs).toContain("/en/notifications");
+    });
+
+    it("marks the current top-level route's menu item current, mirroring the desktop nav", async () => {
+      const clickUser = userEvent.setup();
+      pathname = "/en/tickets";
+      render(<PortalHeader contact={contact} />);
+
+      await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+      const menu = await screen.findByRole("menu");
+
+      const items = within(menu).getAllByRole("menuitem");
+      const ticketsItem = items.find((item) => item.getAttribute("href") === "/en/tickets")!;
+      const chatItem = items.find((item) => item.getAttribute("href") === "/en/chat")!;
+      expect(ticketsItem).toHaveAttribute("aria-current", "page");
+      expect(chatItem).not.toHaveAttribute("aria-current");
+    });
+
+    it("shows the unread-count badge on the menu's own notifications item too", async () => {
+      const clickUser = userEvent.setup();
+      mockedUseUnreadNotificationCountQuery.mockReturnValue({
+        data: { unreadCount: 5 },
+        isSuccess: true,
+      } as never);
+
+      render(<PortalHeader contact={contact} />);
+
+      await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+      const menu = await screen.findByRole("menu");
+
+      expect(within(menu).getByLabelText(/unreadNotificationsLabel/)).toHaveTextContent("5");
     });
   });
 

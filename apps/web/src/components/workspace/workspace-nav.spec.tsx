@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { WorkspaceNav } from "./workspace-nav";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
@@ -372,6 +373,100 @@ describe("WorkspaceNav", () => {
           expect(link).not.toHaveAttribute("aria-current");
         }
       }
+    });
+  });
+
+  // RM-11 — Mobile-Responsive Navigation.
+  describe("collapsed mobile menu (RM-11)", () => {
+    // Mirrors "navigation links (Story 44)"'s own `EXPECTED_LINKS` above —
+    // that one is scoped to its own describe block, so this is its own
+    // copy rather than a cross-block reference.
+    const EXPECTED_LINKS: Array<[name: string, href: string]> = [
+      ["nav.dashboard", "/en/dashboard"],
+      ["nav.tickets", "/en/tickets"],
+      ["nav.customers", "/en/customers"],
+      ["nav.slaPolicies", "/en/sla-policies"],
+      ["nav.businessHours", "/en/business-hours"],
+      ["nav.branches", "/en/branches"],
+      ["nav.users", "/en/users"],
+      ["nav.roles", "/en/roles"],
+      ["nav.auditLogs", "/en/audit-logs"],
+      ["nav.notifications", "/en/notifications"],
+      ["nav.knowledgeBase", "/en/knowledge-base"],
+      ["nav.aiSettings", "/en/ai-settings"],
+    ];
+
+    it("renders a menu toggle with an accessible name", () => {
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.getByRole("button", { name: "nav.menuLabel" })).toBeInTheDocument();
+    });
+
+    it("opens a real menu, with every nav item reachable inside it, once the toggle is clicked", async () => {
+      const clickUser = userEvent.setup();
+      render(<WorkspaceNav user={user} />);
+
+      await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+
+      const menu = await screen.findByRole("menu");
+      for (const [name, href] of EXPECTED_LINKS) {
+        expect(within(menu).getByRole("menuitem", { name })).toHaveAttribute("href", href);
+      }
+    });
+
+    it("marks the current top-level route's menu item current, mirroring the desktop nav", async () => {
+      const clickUser = userEvent.setup();
+      pathname = "/en/tickets";
+      render(<WorkspaceNav user={user} />);
+
+      await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+      const menu = await screen.findByRole("menu");
+
+      expect(within(menu).getByRole("menuitem", { name: "nav.tickets" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(within(menu).getByRole("menuitem", { name: "nav.dashboard" })).not.toHaveAttribute(
+        "aria-current",
+      );
+    });
+
+    it("keeps the active locale segment on every menu item under /ar, mirroring the desktop nav", async () => {
+      const clickUser = userEvent.setup();
+      locale = "ar";
+      pathname = "/ar/tickets";
+      try {
+        render(<WorkspaceNav user={user} />);
+
+        await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+        const menu = await screen.findByRole("menu");
+
+        for (const [name, href] of EXPECTED_LINKS) {
+          const arabicHref = href.replace("/en/", "/ar/");
+          expect(within(menu).getByRole("menuitem", { name }), name).toHaveAttribute(
+            "href",
+            arabicHref,
+          );
+        }
+      } finally {
+        locale = "en";
+        pathname = "/en/tickets";
+      }
+    });
+
+    it("shows the unread-count badge on the menu's own notifications item too", async () => {
+      const clickUser = userEvent.setup();
+      mockedUseUnreadNotificationCountQuery.mockReturnValue({
+        data: { unreadCount: 3 },
+        isSuccess: true,
+      } as never);
+
+      render(<WorkspaceNav user={user} />);
+
+      await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+      const menu = await screen.findByRole("menu");
+
+      expect(within(menu).getByLabelText(/unreadNotificationsLabel/)).toHaveTextContent("3");
     });
   });
 

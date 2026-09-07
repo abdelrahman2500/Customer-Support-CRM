@@ -61,6 +61,7 @@
     },
     "nav": {
       "label": "Workspace navigation",
+      "menuLabel": "Open navigation menu",
       "dashboard": "Dashboard",
       "tickets": "Tickets",
       "customers": "Customers",

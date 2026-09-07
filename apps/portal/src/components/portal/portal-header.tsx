@@ -9,7 +9,15 @@ import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
 import { clearAccessToken, logout, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
-import { Badge, Button } from "@crm/ui";
+import {
+  Badge,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  MenuIcon,
+} from "@crm/ui";
 
 /** Story 119 — mirrors `apps/web`'s own `WorkspaceNav` constants/helper
  * exactly; see that file's own doc comment. */
@@ -53,6 +61,14 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * the nav, so it genuinely overflowed the viewport at mobile widths with no
  * visible scroll affordance. All four are fixed here, mirroring
  * `WorkspaceNav`'s own equivalent Story 96 treatment.
+ *
+ * RM-11 — Mobile-Responsive Navigation. Below `sm` the flat `<nav>` below
+ * is hidden (`hidden sm:flex`, RM-10's own pure-CSS pattern) and a
+ * hamburger `DropdownMenuTrigger` takes its place, opening the identical
+ * links as `DropdownMenuItem` `asChild` `Link`s — mirroring
+ * `WorkspaceNav`'s own identical RM-11 change, including its "one shared
+ * `navItems` array feeds both lists" and "`DropdownMenuContent` only
+ * mounts once opened, so the two link sets never coexist" reasoning.
  */
 export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const t = useTranslations("home");
@@ -112,12 +128,36 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
       isActiveHref(href) ? "bg-slate-100 font-medium text-slate-900" : ""
     }`;
 
+  /** RM-11 — the one shared source for the nav's 4 links, so the desktop
+   * `<nav>` and the mobile `DropdownMenu` can never render different
+   * content for the same item. */
+  const navItems: Array<{
+    href: string;
+    label: string;
+    badge?: { count: number; ariaLabel: string };
+  }> = [
+    { href: ticketsHref, label: tTickets("nav") },
+    { href: knowledgeBaseHref, label: tKnowledgeBase("nav") },
+    { href: chatHref, label: tChat("nav") },
+    {
+      href: notificationsHref,
+      label: tNotifications("nav"),
+      badge:
+        unreadCountQuery.isSuccess && unreadCount > 0
+          ? {
+              count: unreadCount,
+              ariaLabel: tNotifications("unreadNotificationsLabel", { count: unreadCount }),
+            }
+          : undefined,
+    },
+  ];
+
   return (
     <header
       style={{ "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties}
       className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
     >
-      <nav aria-label={t("nav.label")} className="flex flex-wrap items-center gap-4 text-sm">
+      <div className="flex items-center gap-2">
         {brandingQuery.data?.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto" />
@@ -128,43 +168,52 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         >
           {t("signedInAs", { name: contact.fullName })}
         </Link>
-        <Link
-          href={ticketsHref}
-          aria-current={isActiveHref(ticketsHref) ? "page" : undefined}
-          className={linkClassName(ticketsHref)}
+        {/* RM-11 — the hamburger toggle only, below `sm`; the flat `<nav>`
+            below takes over at `sm` and up. */}
+        <div className="sm:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" aria-label={t("nav.menuLabel")}>
+                <MenuIcon className="h-4 w-4" aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {navItems.map((item) => (
+                <DropdownMenuItem key={item.href} asChild>
+                  <Link href={item.href} aria-current={isActiveHref(item.href) ? "page" : undefined}>
+                    {item.label}
+                    {item.badge && (
+                      <Badge variant="destructive" aria-label={item.badge.ariaLabel}>
+                        {item.badge.count}
+                      </Badge>
+                    )}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <nav
+          aria-label={t("nav.label")}
+          className="hidden flex-wrap items-center gap-4 text-sm sm:flex"
         >
-          {tTickets("nav")}
-        </Link>
-        <Link
-          href={knowledgeBaseHref}
-          aria-current={isActiveHref(knowledgeBaseHref) ? "page" : undefined}
-          className={linkClassName(knowledgeBaseHref)}
-        >
-          {tKnowledgeBase("nav")}
-        </Link>
-        <Link
-          href={chatHref}
-          aria-current={isActiveHref(chatHref) ? "page" : undefined}
-          className={linkClassName(chatHref)}
-        >
-          {tChat("nav")}
-        </Link>
-        <Link
-          href={notificationsHref}
-          aria-current={isActiveHref(notificationsHref) ? "page" : undefined}
-          className={linkClassName(notificationsHref)}
-        >
-          {tNotifications("nav")}
-          {unreadCountQuery.isSuccess && unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              aria-label={tNotifications("unreadNotificationsLabel", { count: unreadCount })}
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={isActiveHref(item.href) ? "page" : undefined}
+              className={linkClassName(item.href)}
             >
-              {unreadCount}
-            </Badge>
-          )}
-        </Link>
-      </nav>
+              {item.label}
+              {item.badge && (
+                <Badge variant="destructive" aria-label={item.badge.ariaLabel}>
+                  {item.badge.count}
+                </Badge>
+              )}
+            </Link>
+          ))}
+        </nav>
+      </div>
       <div className="flex items-center gap-2">
         <select
           aria-label={t("languageSwitcher.label")}

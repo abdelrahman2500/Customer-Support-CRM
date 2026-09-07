@@ -10,7 +10,15 @@ import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import { useMentionNotifications } from "@/hooks/use-mention-notifications";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Badge, Button } from "@crm/ui";
+import {
+  Badge,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  MenuIcon,
+} from "@crm/ui";
 import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
@@ -97,6 +105,20 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * case to hide it for). Persists the choice (best-effort — a failed
  * `PATCH` never blocks the actual switch) and navigates into the same
  * page under the new locale segment.
+ *
+ * RM-11 — Mobile-Responsive Navigation. Below `sm` the flat, ~19-item
+ * `<nav>` below is hidden (`hidden sm:flex`, the same pure-CSS,
+ * mobile-first pattern RM-10 used) and a hamburger `DropdownMenuTrigger`
+ * takes its place, opening the identical set of links as `DropdownMenuItem`
+ * `asChild` `Link`s. `DropdownMenuContent` only mounts in the DOM once
+ * opened (Radix's own default, unrelated to CSS), so the two link sets
+ * never coexist and every pre-existing test that queries a nav link by
+ * name/href keeps finding exactly one match. `NavItemLabel` is the one
+ * shared render path for a nav item's label + unread badge, so the
+ * desktop and mobile lists can never drift apart. RTL correctness is
+ * inherited for free: `MenuIcon` is direction-neutral (no chevron to
+ * flip), and `DropdownMenuContent` shares its floating-panel styling with
+ * `Select`, already relied on for RTL throughout this app.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -119,6 +141,35 @@ const NAV_ITEMS = [
   { href: "ticket-categories", labelKey: "nav.ticketCategories" },
   { href: "my-sessions", labelKey: "nav.mySessions" },
 ] as const;
+
+/** RM-11 — the one shared render path for a nav item's visible label plus
+ * its Story 92 unread-count badge, so the desktop `<nav>` and the mobile
+ * `DropdownMenu` can never render different content for the same item. */
+function NavItemLabel({
+  item,
+  t,
+  unreadCount,
+  unreadCountKnown,
+}: {
+  item: (typeof NAV_ITEMS)[number];
+  t: ReturnType<typeof useTranslations>;
+  unreadCount: number;
+  unreadCountKnown: boolean;
+}) {
+  return (
+    <>
+      {t(item.labelKey)}
+      {item.href === "notifications" && unreadCountKnown && unreadCount > 0 && (
+        <Badge
+          variant="destructive"
+          aria-label={t("nav.unreadNotificationsLabel", { count: unreadCount })}
+        >
+          {unreadCount}
+        </Badge>
+      )}
+    </>
+  );
+}
 
 export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
   const t = useTranslations("workspace");
@@ -281,9 +332,38 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
           </Button>
         </div>
       </header>
+      {/* RM-11 — the hamburger toggle only, below `sm`; the flat `<nav>`
+          below takes over at `sm` and up. */}
+      <div className="border-b border-slate-200 bg-white px-6 py-2 sm:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" aria-label={t("nav.menuLabel")}>
+              <MenuIcon className="h-4 w-4" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {NAV_ITEMS.map((item) => {
+              const href = `/${locale}/${item.href}`;
+              const isActive = pathname === href || pathname?.startsWith(`${href}/`);
+              return (
+                <DropdownMenuItem key={item.href} asChild>
+                  <Link href={href} aria-current={isActive ? "page" : undefined}>
+                    <NavItemLabel
+                      item={item}
+                      t={t}
+                      unreadCount={unreadCount}
+                      unreadCountKnown={unreadCountQuery.isSuccess}
+                    />
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <nav
         aria-label={t("nav.label")}
-        className="flex flex-wrap items-center gap-4 border-b border-slate-200 bg-white px-6 py-2 text-sm text-slate-600"
+        className="hidden items-center gap-4 border-b border-slate-200 bg-white px-6 py-2 text-sm text-slate-600 sm:flex sm:flex-wrap"
       >
         {NAV_ITEMS.map((item) => {
           const href = `/${locale}/${item.href}`;
@@ -300,15 +380,12 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
                 isActive ? "bg-slate-100 font-medium text-slate-900" : ""
               }`}
             >
-              {t(item.labelKey)}
-              {item.href === "notifications" && unreadCountQuery.isSuccess && unreadCount > 0 && (
-                <Badge
-                  variant="destructive"
-                  aria-label={t("nav.unreadNotificationsLabel", { count: unreadCount })}
-                >
-                  {unreadCount}
-                </Badge>
-              )}
+              <NavItemLabel
+                item={item}
+                t={t}
+                unreadCount={unreadCount}
+                unreadCountKnown={unreadCountQuery.isSuccess}
+              />
             </Link>
           );
         })}

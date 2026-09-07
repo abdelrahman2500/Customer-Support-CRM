@@ -51,7 +51,8 @@
       }
     },
     "nav": {
-      "label": "Portal navigation"
+      "label": "Portal navigation",
+      "menuLabel": "Open navigation menu"
     }
   },
   "tickets": {
