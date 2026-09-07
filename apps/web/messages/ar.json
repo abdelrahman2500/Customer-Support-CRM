@@ -836,6 +836,7 @@
       "assignTo": "التعيين إلى",
       "setCategory": "تعيين الفئة",
       "setDepartment": "تعيين القسم",
+      "setPriority": "تعيين الأولوية",
       "status": "الحالة"
     },
     "createHeading": "قاعدة أتمتة جديدة",
@@ -845,6 +846,7 @@
     "actionAssignToPlaceholder": "اختر وكيلاً",
     "actionSetCategoryLabel": "تعيين الفئة (اختياري)",
     "actionSetDepartmentLabel": "تعيين القسم (اختياري)",
+    "actionSetPriorityLabel": "تعيين الأولوية (اختياري)",
     "noAction": "—",
     "createSubmit": "إنشاء القاعدة",
     "createSubmitting": "جارٍ الإنشاء...",

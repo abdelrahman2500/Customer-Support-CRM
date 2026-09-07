@@ -35,6 +35,8 @@ const matchedEvent: AutomationRuleMatchedEvent = {
   assignToUserId: "user-1",
   setCategoryId: null,
   setDepartmentId: null,
+  setPriority: null,
+  priorityExplicit: false,
 };
 
 const ticketRow = {
@@ -272,6 +274,93 @@ describe("AutomationActionListener", () => {
       prisma.ticket.update.mockResolvedValue({ ...unrouted, departmentId: "dept-1" });
 
       await listener.onAutomationRuleMatched({ ...matchedEvent, setDepartmentId: "dept-1" });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        TICKET_RECATEGORIZED_EVENT,
+        expect.objectContaining({ actorUserId: null }),
+      );
+    });
+  });
+
+  // RM-29 — Automation Rules: auto-set priority action.
+  describe("priority action (RM-29)", () => {
+    it("applies the priority when the ticket's creator never explicitly chose one", async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketRow, assignedToUserId: "user-already" });
+      prisma.ticket.update.mockResolvedValue({ ...ticketRow, priority: "URGENT" });
+
+      await listener.onAutomationRuleMatched({
+        ...matchedEvent,
+        setPriority: "URGENT",
+        priorityExplicit: false,
+      });
+
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: "ticket-1" },
+        data: { priority: "URGENT" },
+        include: { category: { select: { name: true } } },
+      });
+    });
+
+    it("never overrides a priority the ticket's creator explicitly chose", async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketRow, assignedToUserId: "user-already" });
+
+      await listener.onAutomationRuleMatched({
+        ...matchedEvent,
+        setPriority: "URGENT",
+        priorityExplicit: true,
+      });
+
+      expect(prisma.ticket.update).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it("applies priority alongside assignment/category/department in one update", async () => {
+      const untouched = {
+        ...ticketRow,
+        categoryId: null,
+        category: null,
+        departmentId: null,
+        assignedToUserId: null,
+      };
+      prisma.ticket.findUnique.mockResolvedValue(untouched);
+      prisma.ticket.update.mockResolvedValue({
+        ...untouched,
+        categoryId: "category-1",
+        category: { name: "billing" },
+        departmentId: "dept-1",
+        assignedToUserId: "user-1",
+        priority: "URGENT",
+      });
+
+      await listener.onAutomationRuleMatched({
+        ...matchedEvent,
+        setCategoryId: "category-1",
+        setDepartmentId: "dept-1",
+        setPriority: "URGENT",
+        priorityExplicit: false,
+      });
+
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: "ticket-1" },
+        data: {
+          assignedToUser: { connect: { id: "user-1" } },
+          category: { connect: { id: "category-1" } },
+          department: { connect: { id: "dept-1" } },
+          priority: "URGENT",
+        },
+        include: { category: { select: { name: true } } },
+      });
+    });
+
+    it("emits ticket.recategorized when priority changes, even with no category/department change", async () => {
+      prisma.ticket.findUnique.mockResolvedValue({ ...ticketRow, assignedToUserId: "user-already" });
+      prisma.ticket.update.mockResolvedValue({ ...ticketRow, priority: "URGENT" });
+
+      await listener.onAutomationRuleMatched({
+        ...matchedEvent,
+        setPriority: "URGENT",
+        priorityExplicit: false,
+      });
 
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         TICKET_RECATEGORIZED_EVENT,

@@ -3,10 +3,19 @@ import type { TicketNoteSummary, TicketSummary } from "./tickets.service";
 export const TICKET_CREATED_EVENT = "ticket.created";
 export const TICKET_UPDATED_EVENT = "ticket.updated";
 
-/** Emitted once, after `TicketsService.createTicket` successfully persists the row. */
+/** Emitted once, after `TicketsService.createTicket` successfully persists the row.
+ *
+ * RM-29 — `priorityExplicit` added: whether the creating caller's own DTO
+ * included a `priority` (`true`) or left it to default to `MEDIUM`
+ * (`false`). Computed once, here, at the moment of creation — the only
+ * point this fact is ever knowable, since `Ticket.priority` itself is
+ * never `null` and so cannot answer "was this ever explicitly chosen?"
+ * after the fact. Consumed by `AutomationEvaluationListener` to decide
+ * whether an automation rule's `actionSetPriority` may apply. */
 export interface TicketCreatedEvent {
   ticket: TicketSummary;
   actorUserId: string | null;
+  priorityExplicit: boolean;
 }
 
 /** Emitted once, after `TicketsService.updateTicket` successfully persists the row. */

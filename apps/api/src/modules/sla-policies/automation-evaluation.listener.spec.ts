@@ -63,7 +63,7 @@ describe("AutomationEvaluationListener", () => {
   it("does nothing when the ticket no longer exists", async () => {
     prisma.ticket.findUnique.mockResolvedValue(null);
 
-    await listener.onTicketCreated({ ticket, actorUserId: null });
+    await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
     expect(prisma.automationRule.findFirst).not.toHaveBeenCalled();
     expect(eventEmitter.emit).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ describe("AutomationEvaluationListener", () => {
       assignedToUserId: "user-explicit",
     });
 
-    await listener.onTicketCreated({ ticket, actorUserId: null });
+    await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
     expect(prisma.automationRule.findFirst).not.toHaveBeenCalled();
     expect(eventEmitter.emit).not.toHaveBeenCalled();
@@ -90,7 +90,7 @@ describe("AutomationEvaluationListener", () => {
     });
     prisma.automationRule.findFirst.mockResolvedValue(null);
 
-    await listener.onTicketCreated({ ticket, actorUserId: null });
+    await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
     expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
@@ -103,7 +103,7 @@ describe("AutomationEvaluationListener", () => {
     });
     prisma.automationRule.findFirst.mockResolvedValue(null);
 
-    await listener.onTicketCreated({ ticket, actorUserId: null });
+    await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
     expect(prisma.automationRule.findFirst).toHaveBeenCalledWith({
       where: {
@@ -119,6 +119,7 @@ describe("AutomationEvaluationListener", () => {
         eligibleAgentPool: true,
         actionSetCategoryId: true,
         actionSetDepartmentId: true,
+        actionSetPriority: true,
       },
     });
   });
@@ -134,6 +135,7 @@ describe("AutomationEvaluationListener", () => {
     await listener.onTicketCreated({
       ticket: { ...ticket, categoryId: null, categoryName: null },
       actorUserId: null,
+      priorityExplicit: false,
     });
 
     expect(prisma.automationRule.findFirst).toHaveBeenCalledWith(
@@ -154,9 +156,10 @@ describe("AutomationEvaluationListener", () => {
       actionAssignToUserId: "user-1",
       actionSetCategoryId: null,
       actionSetDepartmentId: null,
+      actionSetPriority: null,
     });
 
-    await listener.onTicketCreated({ ticket, actorUserId: null });
+    await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(AUTOMATION_RULE_MATCHED_EVENT, {
       ticketId: "ticket-1",
@@ -164,6 +167,8 @@ describe("AutomationEvaluationListener", () => {
       assignToUserId: "user-1",
       setCategoryId: null,
       setDepartmentId: null,
+      setPriority: null,
+      priorityExplicit: false,
     });
   });
 
@@ -181,12 +186,59 @@ describe("AutomationEvaluationListener", () => {
       actionSetDepartmentId: "dept-1",
     });
 
-    await listener.onTicketCreated({ ticket, actorUserId: null });
+    await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       AUTOMATION_RULE_MATCHED_EVENT,
       expect.objectContaining({ setCategoryId: "category-1", setDepartmentId: "dept-1" }),
     );
+  });
+
+  // RM-29 — Automation Rules: auto-set priority action.
+  describe("priority action (RM-29)", () => {
+    it("includes the matched rule's own actionSetPriority as setPriority in the emitted event", async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        branchId: "branch-1",
+        categoryId: "category-1",
+        assignedToUserId: null,
+      });
+      prisma.automationRule.findFirst.mockResolvedValue({
+        id: "rule-1",
+        actionAssignToUserId: "user-1",
+        actionSetCategoryId: null,
+        actionSetDepartmentId: null,
+        actionSetPriority: "URGENT",
+      });
+
+      await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTOMATION_RULE_MATCHED_EVENT,
+        expect.objectContaining({ setPriority: "URGENT" }),
+      );
+    });
+
+    it("passes the event's own priorityExplicit straight through, never re-deriving it", async () => {
+      prisma.ticket.findUnique.mockResolvedValue({
+        branchId: "branch-1",
+        categoryId: "category-1",
+        assignedToUserId: null,
+      });
+      prisma.automationRule.findFirst.mockResolvedValue({
+        id: "rule-1",
+        actionAssignToUserId: "user-1",
+        actionSetCategoryId: null,
+        actionSetDepartmentId: null,
+        actionSetPriority: "URGENT",
+      });
+
+      await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: true });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTOMATION_RULE_MATCHED_EVENT,
+        expect.objectContaining({ priorityExplicit: true }),
+      );
+    });
   });
 
   // RM-24 — Round-Robin / Load-Based Automatic Assignment.
@@ -215,7 +267,7 @@ describe("AutomationEvaluationListener", () => {
         { assignedToUserId: "user-c", status: "OPEN", _count: { _all: 5 } },
       ]);
 
-      await listener.onTicketCreated({ ticket, actorUserId: null });
+      await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
       expect(prisma.ticket.groupBy).toHaveBeenCalledWith({
         by: ["assignedToUserId", "status"],
@@ -247,7 +299,7 @@ describe("AutomationEvaluationListener", () => {
         { assignedToUserId: "user-b", status: "OPEN", _count: { _all: 1 } },
       ]);
 
-      await listener.onTicketCreated({ ticket, actorUserId: null });
+      await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
       // user-a: 1 + 1 = 2, user-b: 1 — user-b wins.
       expect(eventEmitter.emit).toHaveBeenCalledWith(
@@ -270,7 +322,7 @@ describe("AutomationEvaluationListener", () => {
         { assignedToUserId: "user-a", status: "OPEN", _count: { _all: 2 } },
       ]);
 
-      await listener.onTicketCreated({ ticket, actorUserId: null });
+      await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         AUTOMATION_RULE_MATCHED_EVENT,
@@ -293,7 +345,7 @@ describe("AutomationEvaluationListener", () => {
         { assignedToUserId: "user-b", status: "OPEN", _count: { _all: 2 } },
       ]);
 
-      await listener.onTicketCreated({ ticket, actorUserId: null });
+      await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         AUTOMATION_RULE_MATCHED_EVENT,
@@ -312,7 +364,7 @@ describe("AutomationEvaluationListener", () => {
         actionSetDepartmentId: null,
       });
 
-      await listener.onTicketCreated({ ticket, actorUserId: null });
+      await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
       expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith(
@@ -332,7 +384,7 @@ describe("AutomationEvaluationListener", () => {
         actionSetDepartmentId: null,
       });
 
-      await listener.onTicketCreated({ ticket, actorUserId: null });
+      await listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false });
 
       expect(prisma.ticket.groupBy).not.toHaveBeenCalled();
       expect(eventEmitter.emit).toHaveBeenCalledWith(
@@ -345,7 +397,7 @@ describe("AutomationEvaluationListener", () => {
   it("catches and logs a Prisma failure without rethrowing", async () => {
     prisma.ticket.findUnique.mockRejectedValue(new Error("db unavailable"));
 
-    await expect(listener.onTicketCreated({ ticket, actorUserId: null })).resolves.toBeUndefined();
+    await expect(listener.onTicketCreated({ ticket, actorUserId: null, priorityExplicit: false })).resolves.toBeUndefined();
     expect(eventEmitter.emit).not.toHaveBeenCalled();
   });
 });

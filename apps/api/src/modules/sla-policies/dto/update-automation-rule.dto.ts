@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { AutomationActionAssignmentMode } from "@prisma/client";
+import { AutomationActionAssignmentMode, TicketPriority } from "@prisma/client";
 import {
   ArrayUnique,
   IsArray,
@@ -42,6 +42,13 @@ export class UpdateAutomationRuleDto {
   @IsOptional()
   @IsUUID()
   actionSetDepartmentId?: string;
+
+  /** RM-29 — mirrors `CreateAutomationRuleDto.actionSetPriority`'s own
+   * doc comment. */
+  @ApiProperty({ required: false, enum: TicketPriority })
+  @IsOptional()
+  @IsEnum(TicketPriority)
+  actionSetPriority?: TicketPriority;
 
   /** RM-24 */
   @ApiProperty({ required: false, enum: AutomationActionAssignmentMode })

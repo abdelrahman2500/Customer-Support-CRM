@@ -11,6 +11,7 @@ import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { AUTOMATION_ACTION_ASSIGNMENT_MODES } from "@/lib/automation-rules-api";
 import type { AutomationActionAssignmentMode, AutomationRuleSummary } from "@/lib/automation-rules-api";
+import type { TicketPriority } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
   Alert,
@@ -58,7 +59,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
  * stops mattering once that mode is chosen. The pool picker is a
  * `Checkbox` list, mirroring `AddApiKeyForm`'s own scopes picker (RM-22):
  * this codebase has no multi-select `Select` variant anywhere.
+ *
+ * RM-29 — `actionSetPriority` added, a fourth optional action field
+ * alongside `actionSetCategory`/`actionSetDepartmentId`, resolved the same
+ * "no action" way those two already are (`t("noAction")` placeholder,
+ * `UNSET_PRIORITY` sentinel — mirrors `CreateTicketView`'s own
+ * `UNSET_PRIORITY` precedent). Raw priority values are shown as-is, never
+ * translated — mirrors `CreateTicketView`'s own priority `Select` (this
+ * codebase has no localized priority-label convention anywhere).
  */
+const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+const UNSET_PRIORITY = "__unset__";
 export function AutomationRulesView() {
   const t = useTranslations("automationRules");
   const rulesQuery = useAutomationRulesQuery();
@@ -126,6 +137,7 @@ export function AutomationRulesView() {
               <TableHead>{t("columns.assignTo")}</TableHead>
               <TableHead>{t("columns.setCategory")}</TableHead>
               <TableHead>{t("columns.setDepartment")}</TableHead>
+              <TableHead>{t("columns.setPriority")}</TableHead>
               <TableHead>{t("columns.status")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -208,6 +220,7 @@ function AutomationRuleRow({
           ? (departmentNameById.get(rule.actionSetDepartmentId) ?? rule.actionSetDepartmentId)
           : t("noAction")}
       </TableCell>
+      <TableCell className="text-slate-500">{rule.actionSetPriority ?? t("noAction")}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Badge variant={rule.isActive ? "success" : "secondary"}>
@@ -261,6 +274,7 @@ function AddAutomationRuleForm() {
   const [actionAssignToUserId, setActionAssignToUserId] = useState("");
   const [actionSetCategoryId, setActionSetCategoryId] = useState("");
   const [actionSetDepartmentId, setActionSetDepartmentId] = useState("");
+  const [actionSetPriority, setActionSetPriority] = useState(UNSET_PRIORITY);
   const [actionAssignmentMode, setActionAssignmentMode] =
     useState<AutomationActionAssignmentMode>("FIXED");
   const [eligibleAgentPool, setEligibleAgentPool] = useState<string[]>([]);
@@ -284,6 +298,9 @@ function AddAutomationRuleForm() {
         ...(conditionCategoryId ? { conditionCategoryId } : {}),
         ...(actionSetCategoryId ? { actionSetCategoryId } : {}),
         ...(actionSetDepartmentId ? { actionSetDepartmentId } : {}),
+        ...(actionSetPriority !== UNSET_PRIORITY
+          ? { actionSetPriority: actionSetPriority as TicketPriority }
+          : {}),
         ...(actionAssignmentMode === "LEAST_LOADED" ? { eligibleAgentPool } : {}),
       });
       setName("");
@@ -291,6 +308,7 @@ function AddAutomationRuleForm() {
       setActionAssignToUserId("");
       setActionSetCategoryId("");
       setActionSetDepartmentId("");
+      setActionSetPriority(UNSET_PRIORITY);
       setActionAssignmentMode("FIXED");
       setEligibleAgentPool([]);
     } catch (submitError) {
@@ -395,6 +413,22 @@ function AddAutomationRuleForm() {
                 {(departmentsQuery.data ?? []).map((department) => (
                   <SelectItem key={department.id} value={department.id}>
                     {department.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-slate-600">
+            {t("actionSetPriorityLabel")}
+            <Select value={actionSetPriority} onValueChange={setActionSetPriority}>
+              <SelectTrigger className="w-40" aria-label={t("actionSetPriorityLabel")}>
+                <SelectValue placeholder={t("noAction")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNSET_PRIORITY}>{t("noAction")}</SelectItem>
+                {PRIORITY_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
                   </SelectItem>
                 ))}
               </SelectContent>

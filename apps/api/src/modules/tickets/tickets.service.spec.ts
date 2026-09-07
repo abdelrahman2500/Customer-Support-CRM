@@ -279,6 +279,7 @@ describe("TicketsService", () => {
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_CREATED_EVENT, {
         ticket: result,
         actorUserId: "user-1",
+        priorityExplicit: false,
       });
     });
 
@@ -336,6 +337,33 @@ describe("TicketsService", () => {
 
       expect(prisma.ticket.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ priority: "URGENT" }) }),
+      );
+    });
+
+    // RM-29 — Automation Rules: auto-set priority action. `priorityExplicit`
+    // is the one signal `AutomationEvaluationListener` has for "was this
+    // ticket's priority ever explicitly chosen?" (see
+    // `AutomationRule.actionSetPriority`'s own schema doc comment for why
+    // `Ticket.priority` itself can't answer that after the fact).
+    it("emits priorityExplicit: true when the caller's dto included a priority", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.ticket.create.mockResolvedValue({
+        id: "ticket-1",
+        subject: "Cannot log in",
+        categoryId: null,
+        priority: "URGENT",
+        status: "OPEN",
+        customerId: "customer-1",
+        contactId: null,
+        departmentId: null,
+        assignedToUserId: null,
+      });
+
+      await service.createTicket({ ...baseDto, priority: "URGENT" as never });
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        TICKET_CREATED_EVENT,
+        expect.objectContaining({ priorityExplicit: true }),
       );
     });
   });
@@ -2342,6 +2370,7 @@ describe("TicketsService", () => {
       expect(eventEmitter.emit).toHaveBeenCalledWith(TICKET_CREATED_EVENT, {
         ticket: result,
         actorUserId: null,
+        priorityExplicit: false,
       });
     });
 

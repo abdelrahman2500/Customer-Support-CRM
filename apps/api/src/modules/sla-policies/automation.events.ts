@@ -18,4 +18,16 @@ export interface AutomationRuleMatchedEvent {
    * `TicketCategory` id). */
   setCategoryId: string | null;
   setDepartmentId: string | null;
+  /** RM-29 — the rule's own `actionSetPriority`, `null` when unset.
+   * `AutomationActionListener` applies it only when `priorityExplicit`
+   * (below) is `false` — see `AutomationRule.actionSetPriority`'s own
+   * schema doc comment for why this can't reuse the `setCategoryId`/
+   * `setDepartmentId` null-sentinel guard. */
+  setPriority: string | null;
+  /** RM-29 — carried straight through from `TicketCreatedEvent`
+   * (computed once, at creation time): whether the ticket's creator
+   * explicitly chose a priority. Never re-derived from the ticket's
+   * current `priority` column, which is never `null` and so cannot answer
+   * this question after the fact. */
+  priorityExplicit: boolean;
 }

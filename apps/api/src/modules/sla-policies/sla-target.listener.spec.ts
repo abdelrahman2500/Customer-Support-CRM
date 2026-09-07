@@ -82,7 +82,7 @@ describe("SlaTargetListener", () => {
       prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
       prisma.slaPolicy.findMany.mockResolvedValue([]);
 
-      await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
+      await listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true });
 
       expect(prisma.ticket.findUnique).toHaveBeenCalledWith({
         where: { id: "ticket-1" },
@@ -99,7 +99,7 @@ describe("SlaTargetListener", () => {
     it("does nothing when the ticket cannot be re-fetched (defensive edge case)", async () => {
       prisma.ticket.findUnique.mockResolvedValue(null);
 
-      await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
+      await listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true });
 
       expect(prisma.slaPolicy.findMany).not.toHaveBeenCalled();
       expect(prisma.slaTicketTarget.create).not.toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe("SlaTargetListener", () => {
       prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
       prisma.slaPolicy.findMany.mockResolvedValue([]);
 
-      await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
+      await listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true });
 
       expect(prisma.slaTicketTarget.create).not.toHaveBeenCalled();
     });
@@ -118,7 +118,7 @@ describe("SlaTargetListener", () => {
       prisma.ticket.findUnique.mockResolvedValue(fullTicketRow);
       prisma.slaPolicy.findMany.mockResolvedValue([wildcardPolicy()]);
 
-      await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
+      await listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true });
 
       expect(prisma.slaTicketTarget.create).toHaveBeenCalledWith({
         data: {
@@ -145,7 +145,7 @@ describe("SlaTargetListener", () => {
       });
       prisma.slaPolicy.findMany.mockResolvedValue([wildcard, scoped]);
 
-      await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
+      await listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true });
 
       expect(prisma.slaTicketTarget.create).toHaveBeenCalledWith({
         data: {
@@ -174,7 +174,7 @@ describe("SlaTargetListener", () => {
       // Simulate the service's own `orderBy: { createdAt: "asc" }` ordering.
       prisma.slaPolicy.findMany.mockResolvedValue([earlier, later]);
 
-      await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
+      await listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true });
 
       expect(prisma.slaTicketTarget.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -189,7 +189,7 @@ describe("SlaTargetListener", () => {
       prisma.slaTicketTarget.create.mockRejectedValue(new Error("db unavailable"));
 
       await expect(
-        listener.onTicketCreated({ ticket, actorUserId: "user-1" }),
+        listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true }),
       ).resolves.toBeUndefined();
     });
 
@@ -204,7 +204,7 @@ describe("SlaTargetListener", () => {
         exceptions: [],
       });
 
-      await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
+      await listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true });
 
       expect(prisma.businessHoursCalendar.findFirst).toHaveBeenCalledWith({
         where: { branchId: "branch-1" },
@@ -234,7 +234,7 @@ describe("SlaTargetListener", () => {
       });
 
       await expect(
-        listener.onTicketCreated({ ticket, actorUserId: "user-1" }),
+        listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true }),
       ).resolves.toBeUndefined();
       expect(prisma.slaTicketTarget.create).not.toHaveBeenCalled();
     });

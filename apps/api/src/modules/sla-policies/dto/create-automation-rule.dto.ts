@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { AutomationActionAssignmentMode } from "@prisma/client";
+import { AutomationActionAssignmentMode, TicketPriority } from "@prisma/client";
 import { ArrayUnique, IsArray, IsEnum, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
 
 export class CreateAutomationRuleDto {
@@ -26,6 +26,15 @@ export class CreateAutomationRuleDto {
   @IsOptional()
   @IsUUID()
   actionSetDepartmentId?: string;
+
+  /** RM-29 — applied only when the ticket's creator never explicitly chose
+   * a priority (see `AutomationRule.actionSetPriority`'s own schema doc
+   * comment for why this can't reuse the `null`-sentinel guard
+   * `actionSetCategoryId`/`actionSetDepartmentId` use). */
+  @ApiProperty({ required: false, enum: TicketPriority })
+  @IsOptional()
+  @IsEnum(TicketPriority)
+  actionSetPriority?: TicketPriority;
 
   /** RM-24 — omitted defaults to `FIXED` (Prisma's own column default). */
   @ApiProperty({ required: false, enum: AutomationActionAssignmentMode })

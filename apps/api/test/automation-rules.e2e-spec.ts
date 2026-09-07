@@ -416,6 +416,79 @@ describe("Automation Rules (e2e)", () => {
     }
   });
 
+  // RM-29 — Automation Rules: auto-set priority action.
+  it("auto-sets priority on a newly-created ticket whose creator never explicitly chose one, and logs a ticket.recategorized history entry", async () => {
+    const matchingCategoryId = await createTicketCategory("automation-rules-e2e-priority");
+    await request(app.getHttpServer())
+      .post("/api/v1/automation-rules")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        name: "Auto-escalate priority",
+        conditionCategoryId: matchingCategoryId,
+        actionAssignToUserId: adminUserId,
+        actionSetPriority: "URGENT",
+      })
+      .expect(201);
+
+    const ticket = await createTicket(matchingCategoryId);
+    expect(ticket.assignedToUserId).toBeNull();
+
+    const response = await waitForAssignment(ticket.id);
+    expect(response.body.assignedToUserId).toBe(adminUserId);
+    expect(response.body.priority).toBe("URGENT");
+
+    const history = await waitForHistoryEvent(ticket.id, "ticket.recategorized");
+    expect(history.status).toBe(200);
+    expect(
+      history.body.some(
+        (entry: { eventType: string }) => entry.eventType === "ticket.recategorized",
+      ),
+    ).toBe(true);
+  });
+
+  it("never overrides a priority explicitly chosen at ticket creation", async () => {
+    const matchingCategoryId = await createTicketCategory(
+      "automation-rules-e2e-priority-explicit",
+    );
+    await request(app.getHttpServer())
+      .post("/api/v1/automation-rules")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        name: "Should not override priority",
+        conditionCategoryId: matchingCategoryId,
+        actionAssignToUserId: adminUserId,
+        actionSetPriority: "URGENT",
+      })
+      .expect(201);
+
+    const customer = await request(app.getHttpServer())
+      .post("/api/v1/customers")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ displayName: `Automation rules e2e priority-explicit customer ${randomUUID()}` })
+      .expect(201);
+    const ticket = await request(app.getHttpServer())
+      .post("/api/v1/tickets")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({
+        customerId: customer.body.id,
+        subject: "Explicitly prioritized ticket",
+        categoryId: matchingCategoryId,
+        priority: "LOW",
+      })
+      .expect(201);
+    expect(ticket.body.priority).toBe("LOW");
+
+    // Give the assignment reaction a moment to have fired (it still
+    // assigns adminUserId even though it must not touch priority).
+    await waitForAssignment(ticket.body.id);
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/tickets/${ticket.body.id}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+    expect(response.body.priority).toBe("LOW");
+  });
+
   // RM-24 — Automation Load-Balanced Assignment.
   it("auto-assigns a LEAST_LOADED rule's matching ticket to the eligible pool member with fewer open tickets", async () => {
     const me = await request(app.getHttpServer())

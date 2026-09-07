@@ -836,6 +836,7 @@
       "assignTo": "Assign to",
       "setCategory": "Set category",
       "setDepartment": "Set department",
+      "setPriority": "Set priority",
       "status": "Status"
     },
     "createHeading": "New automation rule",
@@ -845,6 +846,7 @@
     "actionAssignToPlaceholder": "Select an agent",
     "actionSetCategoryLabel": "Set category (optional)",
     "actionSetDepartmentLabel": "Set department (optional)",
+    "actionSetPriorityLabel": "Set priority (optional)",
     "noAction": "—",
     "createSubmit": "Create rule",
     "createSubmitting": "Creating...",

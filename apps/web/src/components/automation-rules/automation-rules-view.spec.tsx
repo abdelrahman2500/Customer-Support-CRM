@@ -329,6 +329,100 @@ describe("AutomationRulesView", () => {
     });
   });
 
+  // RM-29 — Automation Rules: auto-set priority action.
+  describe("priority action (RM-29)", () => {
+    it("shows the rule's own actionSetPriority in its row", () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [{ ...baseRule, actionSetPriority: "URGENT" }], isSuccess: true }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      expect(screen.getAllByText("URGENT").length).toBeGreaterThan(0);
+    });
+
+    it("shows 'no action' when actionSetPriority is unset", () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [{ ...baseRule, actionSetPriority: null }], isSuccess: true }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      expect(screen.getAllByText("noAction").length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("gives the priority picker an accessible name", () => {
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      expect(
+        screen.getByRole("combobox", { name: "actionSetPriorityLabel" }),
+      ).toBeInTheDocument();
+    });
+
+    it("submits actionSetPriority only when a priority is chosen", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({});
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      mockedUseCreateAutomationRuleMutation.mockReturnValue(
+        mutationResult({ mutateAsync }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      fireEvent.change(screen.getByLabelText("nameLabel"), {
+        target: { value: "Auto-escalate" },
+      });
+      fireEvent.click(
+        within(screen.getByText("actionAssignToLabel").closest("label")!).getByRole("combobox"),
+      );
+      fireEvent.click(await screen.findByRole("option", { name: "Jane Agent" }));
+      fireEvent.click(screen.getByRole("combobox", { name: "actionSetPriorityLabel" }));
+      fireEvent.click(await screen.findByRole("option", { name: "URGENT" }));
+
+      const form = screen.getByText("createSubmit").closest("form") as HTMLFormElement;
+      fireEvent.submit(form);
+
+      await vi.waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "Auto-escalate", actionSetPriority: "URGENT" }),
+        );
+      });
+    });
+
+    it("does not submit actionSetPriority when left unset", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({});
+      mockedUseAutomationRulesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      mockedUseCreateAutomationRuleMutation.mockReturnValue(
+        mutationResult({ mutateAsync }) as never,
+      );
+
+      render(<AutomationRulesView />);
+
+      fireEvent.change(screen.getByLabelText("nameLabel"), { target: { value: "No priority" } });
+      fireEvent.click(
+        within(screen.getByText("actionAssignToLabel").closest("label")!).getByRole("combobox"),
+      );
+      fireEvent.click(await screen.findByRole("option", { name: "Jane Agent" }));
+
+      const form = screen.getByText("createSubmit").closest("form") as HTMLFormElement;
+      fireEvent.submit(form);
+
+      await vi.waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "No priority" }),
+        );
+      });
+      expect(mutateAsync.mock.calls[0]?.[0]).not.toHaveProperty("actionSetPriority");
+    });
+  });
+
   // RM-24 — Round-Robin / Load-Based Automatic Assignment.
   describe("assignment mode (RM-24)", () => {
     it("shows the least-loaded label and eligible-agent count for a LEAST_LOADED rule", () => {

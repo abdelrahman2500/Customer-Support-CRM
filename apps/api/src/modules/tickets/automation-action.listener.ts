@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { EventEmitter2, OnEvent } from "@nestjs/event-emitter";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, TicketPriority } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   AUTOMATION_RULE_MATCHED_EVENT,
@@ -37,6 +37,12 @@ import { toTicketSummary } from "./tickets.service";
  * Story 120 — `event.setCategory`/`ticket.category` (free text) became
  * `event.setCategoryId`/`ticket.categoryId`; the write is now a relation
  * `connect`, mirroring `department`'s existing shape exactly.
+ *
+ * RM-29 — `event.setPriority` added, guarded by `!event.priorityExplicit`
+ * rather than a `null` check on the ticket's own `priority` (which is
+ * never `null` — see `AutomationRule.actionSetPriority`'s own schema doc
+ * comment). Folds into the same `wasRecategorized`/
+ * `TICKET_RECATEGORIZED_EVENT` reconciliation path as category/department.
  */
 @Injectable()
 export class AutomationActionListener {
@@ -65,6 +71,13 @@ export class AutomationActionListener {
       if (event.setDepartmentId && !ticket.departmentId) {
         data.department = { connect: { id: event.setDepartmentId } };
       }
+      // RM-29 — guarded by `!event.priorityExplicit`, not a `null` check
+      // on `ticket.priority` (which is never `null` — see
+      // `AutomationRule.actionSetPriority`'s own schema doc comment for
+      // why this field can't reuse the category/department guard shape).
+      if (event.setPriority && !event.priorityExplicit) {
+        data.priority = event.setPriority as TicketPriority;
+      }
       if (Object.keys(data).length === 0) {
         // Every eligible field was already set by the time this event was
         // processed (e.g. an agent claimed/categorized it in the meantime,
@@ -72,7 +85,12 @@ export class AutomationActionListener {
         return;
       }
 
-      const wasRecategorized = data.category !== undefined || data.department !== undefined;
+      // Priority is one of `TICKET_RECATEGORIZED_EVENT`'s own named
+      // SLA-policy-matching fields (see that event's own doc comment) —
+      // an automation-driven priority change reconciles the SLA target
+      // through the exact same signal a human `PATCH` already does.
+      const wasRecategorized =
+        data.category !== undefined || data.department !== undefined || data.priority !== undefined;
 
       const updated = await this.prisma.ticket.update({
         where: { id: event.ticketId },

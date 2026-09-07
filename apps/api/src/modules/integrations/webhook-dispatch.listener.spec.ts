@@ -48,6 +48,10 @@ const ticketEvent = {
     updatedAt: new Date("2024-01-02T00:00:00.000Z"),
   },
   actorUserId: "agent-1",
+  // RM-29 — only `TicketCreatedEvent` actually requires this; harmless
+  // extra property on the `TicketUpdatedEvent`/`TicketEscalatedEvent`
+  // handlers this same fixture is also passed to in the `it.each` below.
+  priorityExplicit: true,
 };
 
 const ONE_MATCHING_SUBSCRIPTION = [{ id: "subscription-1" }];

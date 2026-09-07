@@ -1,9 +1,11 @@
 import { apiFetch } from "./api";
+import type { TicketPriority } from "./tickets-api";
 
 /**
  * Story 57 — SLA & Automation — Automation Rules Foundation. A dedicated
  * API client file, mirroring `sla-policies-api.ts`'s own "distinct domain,
- * own file, no import from `tickets-api.ts`" convention.
+ * own file, no import from `tickets-api.ts`" convention (`TicketPriority`
+ * is a plain shared type import, not a domain dependency).
  *
  * Mirrors the backend's own `AutomationRuleSummary`
  * (`apps/api/src/modules/sla-policies/automation-rules.service.ts`) exactly.
@@ -14,6 +16,12 @@ import { apiFetch } from "./api";
  *
  * RM-24 — `actionAssignmentMode`/`eligibleAgentPool` added, mirroring the
  * backend's own two new fields exactly.
+ *
+ * RM-29 — `actionSetPriority` added, mirroring the backend's own new
+ * field. Typed `TicketPriority`, not `string`, even though the backend
+ * itself stores it as a plain string (see
+ * `AutomationRule.actionSetPriority`'s own schema doc comment for why) —
+ * nothing about that storage detail needs to leak into this client.
  */
 export const AUTOMATION_ACTION_ASSIGNMENT_MODES = ["FIXED", "LEAST_LOADED"] as const;
 export type AutomationActionAssignmentMode = (typeof AUTOMATION_ACTION_ASSIGNMENT_MODES)[number];
@@ -26,6 +34,7 @@ export interface AutomationRuleSummary {
   actionAssignToUserId: string;
   actionSetCategoryId: string | null;
   actionSetDepartmentId: string | null;
+  actionSetPriority: TicketPriority | null;
   actionAssignmentMode: AutomationActionAssignmentMode;
   eligibleAgentPool: string[];
 }
@@ -37,6 +46,7 @@ export interface CreateAutomationRuleInput {
   actionAssignToUserId: string;
   actionSetCategoryId?: string;
   actionSetDepartmentId?: string;
+  actionSetPriority?: TicketPriority;
   actionAssignmentMode?: AutomationActionAssignmentMode;
   eligibleAgentPool?: string[];
 }
@@ -49,6 +59,7 @@ export interface UpdateAutomationRuleInput {
   isActive?: boolean;
   actionSetCategoryId?: string;
   actionSetDepartmentId?: string;
+  actionSetPriority?: TicketPriority;
   actionAssignmentMode?: AutomationActionAssignmentMode;
   eligibleAgentPool?: string[];
 }

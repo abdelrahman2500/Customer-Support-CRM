@@ -835,6 +835,25 @@ model AutomationRule {
   actionSetCategory     TicketCategory? @relation("AutomationRuleActionSet", fields: [actionSetCategoryId], references: [id])
   actionSetDepartmentId String?         @map("action_set_department_id")
   actionSetDepartment   Department?     @relation(fields: [actionSetDepartmentId], references: [id])
+  /// RM-29 — the one action field Story 57 originally deferred alongside
+  /// category/department that Story 83 never actually closed. Deliberately
+  /// a plain nullable `String`, not the `TicketPriority` enum (which lives
+  /// in a different Postgres schema) — mirrors `SlaPolicy.priority`'s own
+  /// precedent exactly. `Ticket.priority` is NOT NULL with a schema
+  /// default (`MEDIUM`), so there is no `null` sentinel the way
+  /// `categoryId`/`departmentId` have to detect "never explicitly chosen"
+  /// after the fact. Closed instead by threading
+  /// `TicketCreatedEvent.priorityExplicit` (computed once, at creation
+  /// time, from whether the caller's own DTO included `priority`) through
+  /// to `AutomationActionListener`, which applies `actionSetPriority` only
+  /// when that flag is `false` — never overriding an explicit human
+  /// choice, same invariant as every other action field, just keyed on a
+  /// boolean carried by the event instead of a nullable column. A priority
+  /// change is one of `TICKET_RECATEGORIZED_EVENT`'s own named
+  /// SLA-policy-matching fields already (see that event's own doc
+  /// comment) — `SlaTargetListener` reconciles with zero new SLA-domain
+  /// code, exactly like the category/department actions already do.
+  actionSetPriority     String?         @map("action_set_priority")
   createdAt             DateTime        @default(now()) @map("created_at")
   updatedAt             DateTime        @updatedAt @map("updated_at")
 

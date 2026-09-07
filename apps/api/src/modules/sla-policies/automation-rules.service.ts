@@ -25,6 +25,9 @@ export interface AutomationRuleSummary {
   /** RM-24 */
   actionAssignmentMode: AutomationActionAssignmentMode;
   eligibleAgentPool: string[];
+  /** RM-29 — plain string, not `TicketPriority` — see
+   * `AutomationRule.actionSetPriority`'s own schema doc comment. */
+  actionSetPriority: string | null;
 }
 
 /**
@@ -36,6 +39,11 @@ export interface AutomationRuleSummary {
  * Never itself reacts to or evaluates against a real `Ticket` —
  * `AutomationEvaluationListener` (this same module) owns that; this
  * service is pure CRUD.
+ *
+ * RM-29 — `actionSetPriority` added alongside `actionSetCategoryId`/
+ * `actionSetDepartmentId`. No `requireXInScope` validation needed (unlike
+ * those two): it's a plain enum value, not a relation — `@IsEnum` at the
+ * DTO layer is already authoritative.
  */
 @Injectable()
 export class AutomationRulesService {
@@ -73,6 +81,7 @@ export class AutomationRulesService {
         actionAssignToUserId: dto.actionAssignToUserId,
         actionSetCategoryId: dto.actionSetCategoryId ?? null,
         actionSetDepartmentId: dto.actionSetDepartmentId ?? null,
+        actionSetPriority: dto.actionSetPriority ?? null,
         ...(dto.actionAssignmentMode !== undefined
           ? { actionAssignmentMode: dto.actionAssignmentMode }
           : {}),
@@ -136,6 +145,7 @@ export class AutomationRulesService {
         ...(dto.actionSetDepartmentId !== undefined
           ? { actionSetDepartmentId: dto.actionSetDepartmentId }
           : {}),
+        ...(dto.actionSetPriority !== undefined ? { actionSetPriority: dto.actionSetPriority } : {}),
         ...(dto.actionAssignmentMode !== undefined
           ? { actionAssignmentMode: dto.actionAssignmentMode }
           : {}),
@@ -157,6 +167,7 @@ export class AutomationRulesService {
     actionAssignToUserId: string;
     actionSetCategoryId: string | null;
     actionSetDepartmentId: string | null;
+    actionSetPriority: string | null;
     actionAssignmentMode: AutomationActionAssignmentMode;
     eligibleAgentPool: string[];
   }> {
@@ -210,6 +221,7 @@ function toAutomationRuleSummary(rule: {
   actionAssignToUserId: string;
   actionSetCategoryId: string | null;
   actionSetDepartmentId: string | null;
+  actionSetPriority: string | null;
   actionAssignmentMode: AutomationActionAssignmentMode;
   eligibleAgentPool: string[];
 }): AutomationRuleSummary {
@@ -221,6 +233,7 @@ function toAutomationRuleSummary(rule: {
     actionAssignToUserId: rule.actionAssignToUserId,
     actionSetCategoryId: rule.actionSetCategoryId,
     actionSetDepartmentId: rule.actionSetDepartmentId,
+    actionSetPriority: rule.actionSetPriority,
     actionAssignmentMode: rule.actionAssignmentMode,
     eligibleAgentPool: rule.eligibleAgentPool,
   };

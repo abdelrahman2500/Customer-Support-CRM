@@ -225,6 +225,7 @@ export class TicketsService {
     this.eventEmitter.emit(TICKET_CREATED_EVENT, {
       ticket: summary,
       actorUserId: this.tenantContext.userId,
+      priorityExplicit: dto.priority !== undefined,
     } satisfies TicketCreatedEvent);
     return summary;
   }
@@ -679,6 +680,10 @@ export class TicketsService {
     this.eventEmitter.emit(TICKET_CREATED_EVENT, {
       ticket: summary,
       actorUserId: null,
+      // RM-29 — this creation path never accepts a `priority` input at
+      // all (see this method's own `data` above): a portal/web-form
+      // -originated ticket is never explicitly prioritized.
+      priorityExplicit: false,
     } satisfies TicketCreatedEvent);
     return summary;
   }

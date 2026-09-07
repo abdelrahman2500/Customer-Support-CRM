@@ -22,6 +22,14 @@ const OPEN_TICKET_STATUSES = ["OPEN", "IN_PROGRESS"] as const;
  * single, already-resolved user id regardless of which mode matched,
  * exactly as it always has — `AutomationActionListener` needs no changes
  * at all and stays completely unaware assignment modes exist.
+ *
+ * RM-29 — `event.priorityExplicit` (from `TicketCreatedEvent`, computed
+ * once at creation time) is passed straight through to
+ * `AUTOMATION_RULE_MATCHED_EVENT` unchanged — never re-derived here, since
+ * nothing about the matched rule or this listener's own re-fetched
+ * `Ticket` row can answer "was this ticket's priority ever explicitly
+ * chosen?" after the fact (see `AutomationRule.actionSetPriority`'s own
+ * schema doc comment).
  */
 @Injectable()
 export class AutomationEvaluationListener {
@@ -62,6 +70,8 @@ export class AutomationEvaluationListener {
         assignToUserId,
         setCategoryId: matchedRule.actionSetCategoryId,
         setDepartmentId: matchedRule.actionSetDepartmentId,
+        setPriority: matchedRule.actionSetPriority,
+        priorityExplicit: event.priorityExplicit,
       } satisfies AutomationRuleMatchedEvent);
     } catch (error) {
       this.logger.error("Failed to evaluate automation rules for ticket.created", error as Error);
@@ -84,6 +94,7 @@ export class AutomationEvaluationListener {
     eligibleAgentPool: string[];
     actionSetCategoryId: string | null;
     actionSetDepartmentId: string | null;
+    actionSetPriority: string | null;
   } | null> {
     const categoryFilter = categoryId
       ? { OR: [{ conditionCategoryId: null }, { conditionCategoryId: categoryId }] }
@@ -99,6 +110,7 @@ export class AutomationEvaluationListener {
         eligibleAgentPool: true,
         actionSetCategoryId: true,
         actionSetDepartmentId: true,
+        actionSetPriority: true,
       },
     });
     return rule;

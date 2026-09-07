@@ -49,7 +49,7 @@ describe("TicketHistoryListener", () => {
 
   describe("onTicketCreated", () => {
     it("persists a history row with the event type, actor, and full snapshot", async () => {
-      await listener.onTicketCreated({ ticket, actorUserId: "user-1" });
+      await listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true });
 
       expect(prisma.ticketHistoryEntry.create).toHaveBeenCalledWith({
         data: {
@@ -65,7 +65,7 @@ describe("TicketHistoryListener", () => {
       prisma.ticketHistoryEntry.create.mockRejectedValue(new Error("db unavailable"));
 
       await expect(
-        listener.onTicketCreated({ ticket, actorUserId: "user-1" }),
+        listener.onTicketCreated({ ticket, actorUserId: "user-1", priorityExplicit: true }),
       ).resolves.toBeUndefined();
     });
   });

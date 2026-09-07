@@ -53,6 +53,7 @@ const ruleRow = {
   actionAssignToUserId: "user-1",
   actionSetCategoryId: null,
   actionSetDepartmentId: null,
+  actionSetPriority: null,
 };
 
 describe("AutomationRulesService", () => {
@@ -93,6 +94,7 @@ describe("AutomationRulesService", () => {
           actionAssignToUserId: "user-1",
           actionSetCategoryId: null,
           actionSetDepartmentId: null,
+          actionSetPriority: null,
         },
       });
     });
@@ -159,6 +161,20 @@ describe("AutomationRulesService", () => {
       });
       expect(prisma.automationRule.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ actionSetDepartmentId: "dept-1" }) }),
+      );
+    });
+
+    // RM-29 — Automation Rules: auto-set priority action. No
+    // `requireXInScope` validation needed — a plain enum value, not a
+    // relation.
+    it("passes through actionSetPriority when given", async () => {
+      prisma.userBranchRole.findFirst.mockResolvedValue({ id: "membership-1" });
+      prisma.automationRule.create.mockResolvedValue({ ...ruleRow, actionSetPriority: "URGENT" });
+
+      await service.createAutomationRule({ ...baseDto, actionSetPriority: "URGENT" });
+
+      expect(prisma.automationRule.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ actionSetPriority: "URGENT" }) }),
       );
     });
   });
@@ -263,6 +279,19 @@ describe("AutomationRulesService", () => {
       expect(prisma.automationRule.update).toHaveBeenCalledWith({
         where: { id: "rule-1" },
         data: { actionSetCategoryId: "category-1", actionSetDepartmentId: "dept-1" },
+      });
+    });
+
+    // RM-29 — Automation Rules: auto-set priority action.
+    it("updates actionSetPriority when provided", async () => {
+      prisma.automationRule.findFirst.mockResolvedValue(ruleRow);
+      prisma.automationRule.update.mockResolvedValue({ id: "rule-1" });
+
+      await service.updateAutomationRule("rule-1", { actionSetPriority: "URGENT" });
+
+      expect(prisma.automationRule.update).toHaveBeenCalledWith({
+        where: { id: "rule-1" },
+        data: { actionSetPriority: "URGENT" },
       });
     });
   });
