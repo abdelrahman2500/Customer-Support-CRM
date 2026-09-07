@@ -14,6 +14,10 @@ import {
   CHANNEL_MESSAGE_DELIVERY_QUEUE,
 } from "./queues/channel-message-delivery.processor";
 import { CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE } from "./queues/channel-message-delivery-events.types";
+import {
+  PortalNotificationEmailProcessor,
+  PORTAL_NOTIFICATION_EMAIL_QUEUE,
+} from "./queues/portal-notification-email.processor";
 import { ChannelsModule } from "./channels/channels.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AiProviderModule } from "./ai/ai-provider.module";
@@ -38,6 +42,7 @@ import { PinoLoggerService } from "./common/logging/pino-logger.service";
     BullModule.registerQueue({ name: TASK_REMINDER_EVENTS_QUEUE }),
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_QUEUE }),
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE }),
+    BullModule.registerQueue({ name: PORTAL_NOTIFICATION_EMAIL_QUEUE }),
     PrismaModule,
     AiProviderModule,
     ChannelsModule,
@@ -48,6 +53,7 @@ import { PinoLoggerService } from "./common/logging/pino-logger.service";
     AiProcessingProcessor,
     TaskReminderProcessor,
     ChannelMessageDeliveryProcessor,
+    PortalNotificationEmailProcessor,
     // Story 111 — resolved via `app.get(PinoLoggerService)` in `main.ts`.
     PinoLoggerService,
   ],

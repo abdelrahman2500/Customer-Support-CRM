@@ -14,6 +14,10 @@ import {
   ChannelMessageDeliveryEventsBridgeProcessor,
   CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE,
 } from "./channel-message-delivery-events-bridge.processor";
+import {
+  PortalNotificationEmailProducer,
+  PORTAL_NOTIFICATION_EMAIL_QUEUE,
+} from "./portal-notification-email.producer";
 
 /**
  * Owns `apps/api`'s BullMQ producer connection — one place all of
@@ -36,6 +40,13 @@ import {
  * hand-back bridge — see `ChannelMessageDeliveryProducer`'s own doc
  * comment for why this is also the queue that introduces this
  * repository's first configured `attempts`/`backoff` retry policy.
+ *
+ * RM-19 — `portal-notification-email` (produced here, consumed by
+ * `apps/worker`) has no hand-back queue of its own: a notification email
+ * has nothing for the worker to report back for realtime relay (unlike
+ * `channel-message-delivery`'s `SENT`/`FAILED` status, there is no
+ * corresponding UI state anywhere that changes when this send succeeds
+ * or fails) — one-directional, api → worker only.
  */
 @Module({
   imports: [
@@ -55,6 +66,7 @@ import {
     BullModule.registerQueue({ name: TASK_REMINDER_EVENTS_QUEUE }),
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_QUEUE }),
     BullModule.registerQueue({ name: CHANNEL_MESSAGE_DELIVERY_EVENTS_QUEUE }),
+    BullModule.registerQueue({ name: PORTAL_NOTIFICATION_EMAIL_QUEUE }),
   ],
   providers: [
     HealthCheckProducer,
@@ -66,6 +78,7 @@ import {
     TaskReminderEventsBridgeProcessor,
     ChannelMessageDeliveryProducer,
     ChannelMessageDeliveryEventsBridgeProcessor,
+    PortalNotificationEmailProducer,
   ],
   exports: [
     HealthCheckProducer,
@@ -73,6 +86,7 @@ import {
     AiProcessingProducer,
     TaskRemindersProducer,
     ChannelMessageDeliveryProducer,
+    PortalNotificationEmailProducer,
   ],
 })
 export class QueuesModule {}

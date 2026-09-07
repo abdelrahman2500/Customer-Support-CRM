@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
+import { QueuesModule } from "../../queues/queues.module";
 import { NotificationsController } from "./notifications.controller";
 import { NotificationsService } from "./notifications.service";
 import { NotificationPreferencesController } from "./notification-preferences.controller";
@@ -68,8 +69,14 @@ import { PortalNotificationLogListener } from "./portal-notification-log.listene
  * column) is what finally lets `NotificationsService.listNotifications`/
  * `getUnreadCount` scope a row to one specific agent instead of the whole
  * branch.
+ *
+ * RM-19 — imports `QueuesModule` (already exports
+ * `PortalNotificationEmailProducer`) so `PortalNotificationLogListener`
+ * can inject it directly, mirroring exactly how `ChannelsModule`/
+ * `TicketsModule` already import `QueuesModule` for their own producers.
  */
 @Module({
+  imports: [QueuesModule],
   controllers: [
     NotificationsController,
     NotificationPreferencesController,

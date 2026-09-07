@@ -4,12 +4,13 @@ import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { getQueueToken } from "@nestjs/bullmq";
-import type { Queue } from "bullmq";
+import type { Job, Queue } from "bullmq";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { AI_PROCESSING_QUEUE } from "../src/queues/ai-processing.producer";
+import { PORTAL_NOTIFICATION_EMAIL_QUEUE } from "../src/queues/portal-notification-email.producer";
 import { TICKET_ESCALATED_EVENT } from "../src/modules/tickets/tickets.events";
 import type {
   TicketCreatedEvent,
@@ -1927,6 +1928,95 @@ describe("Ticketing (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
       expect(listed.body.map((m: { id: string }) => m.id)).toContain(sent.body.id);
+    });
+  });
+
+  // RM-19 — Portal Email Notification Delivery. Proves the real event
+  // wiring (PATCH → ticket.updated → PortalNotificationLogListener →
+  // PortalNotificationPreferencesService → PortalNotificationEmailProducer)
+  // actually enqueues onto the real, Redis-backed queue — mirrors "ticket
+  // AI enqueues a real ai-processing job (Story 76)"'s exact
+  // trigger-via-HTTP-then-inspect-the-real-queue shape. `apps/worker` is
+  // never booted by this suite (same scope boundary as that describe
+  // block), so the actual email send/delivery is proven separately by
+  // `apps/worker/test/portal-notification-email.e2e-spec.ts` against real
+  // Mailhog.
+  describe("ticket update enqueues a real portal-notification-email job (RM-19)", () => {
+    // `TicketsService.updateTicket` fires `TICKET_UPDATED_EVENT` via
+    // `EventEmitter2#emit` (fire-and-forget — it does not await listener
+    // promises), so `PortalNotificationLogListener#onTicketUpdated`
+    // (including this story's own preference check + enqueue) can still be
+    // running after the PATCH response has already come back. Poll for the
+    // job the same way `audit-logs-read.e2e-spec.ts`'s own
+    // `waitForAuditLogRow` polls for its own async-listener side effect,
+    // rather than asserting immediately after the response.
+    async function waitForJob(
+      queue: Queue<{ ticketId: string; eventType: string }>,
+      ticketId: string,
+      { timeoutMs = 5000, intervalMs = 100 }: { timeoutMs?: number; intervalMs?: number } = {},
+    ): Promise<Job<{ ticketId: string; eventType: string }> | undefined> {
+      const deadline = Date.now() + timeoutMs;
+      do {
+        const jobs = await queue.getJobs(["waiting", "active", "completed"]);
+        const job = jobs.find((candidate) => candidate.data.ticketId === ticketId);
+        if (job) {
+          return job;
+        }
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      } while (Date.now() < deadline);
+      return undefined;
+    }
+
+    it("enqueues a job when the ticket's contact has an email on file (the default — no preference row yet)", async () => {
+      const contact = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${customerId}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ fullName: "RM-19 Notification Contact", email: `rm19-${randomUUID()}@example.com` })
+        .expect(201);
+      const notifyTicket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, contactId: contact.body.id, subject: "RM-19 notification fixture" })
+        .expect(201);
+
+      const queue: Queue<{ ticketId: string; eventType: string }> = app.get(
+        getQueueToken(PORTAL_NOTIFICATION_EMAIL_QUEUE),
+      );
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/tickets/${notifyTicket.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ priority: "HIGH" })
+        .expect(200);
+
+      const job = await waitForJob(queue, notifyTicket.body.id);
+      expect(job).toBeDefined();
+      expect(job?.data).toEqual({ ticketId: notifyTicket.body.id, eventType: "ticket.updated" });
+
+      await job?.remove();
+    });
+
+    it("does not enqueue a job when the ticket has no contact at all", async () => {
+      const noContactTicket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, subject: "RM-19 no-contact notification fixture" })
+        .expect(201);
+
+      const queue: Queue<{ ticketId: string; eventType: string }> = app.get(
+        getQueueToken(PORTAL_NOTIFICATION_EMAIL_QUEUE),
+      );
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/tickets/${noContactTicket.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ priority: "HIGH" })
+        .expect(200);
+
+      // No positive event to wait for here, so give the (non-)listener the
+      // same window the positive test gives a real one, then assert absence.
+      const job = await waitForJob(queue, noContactTicket.body.id, { timeoutMs: 1000 });
+      expect(job).toBeUndefined();
     });
   });
 

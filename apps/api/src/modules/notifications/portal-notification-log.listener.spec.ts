@@ -4,6 +4,8 @@ import { PortalNotificationLogListener } from "./portal-notification-log.listene
 import { TICKET_UPDATED_EVENT } from "../tickets/tickets.events";
 import { CHANNEL_MESSAGE_CREATED_EVENT } from "../channels/channel-messages.events";
 import type { PrismaService } from "../../prisma/prisma.service";
+import type { PortalNotificationPreferencesService } from "./portal-notification-preferences.service";
+import type { PortalNotificationEmailProducer } from "../../queues/portal-notification-email.producer";
 
 /** Mimics the shape `PrismaClientKnownRequestError` exposes at `.code` — see
  * `sla-at-risk-notification.listener.spec.ts`'s `buildUniqueConstraintError` precedent. */
@@ -25,10 +27,36 @@ function buildPrismaMock() {
   };
 }
 
+// RM-19 — "no row = enabled" (`inAppEnabled: true`) is the default,
+// mirroring `PortalNotificationPreferencesService.listPreferences`'s own
+// convention, so every pre-existing test below (which never sets this up
+// explicitly) keeps enqueueing exactly as it did before this story added
+// the check.
+function buildPortalNotificationPreferencesServiceMock() {
+  return {
+    listPreferences: vi.fn().mockResolvedValue([
+      { eventType: "ticket.updated", inAppEnabled: true },
+      { eventType: "channel.message.created", inAppEnabled: true },
+    ]),
+  };
+}
+
+function buildPortalNotificationEmailProducerMock() {
+  return {
+    enqueue: vi.fn().mockResolvedValue({ id: "job-1" }),
+  };
+}
+
 function createListener(
   prismaMock: ReturnType<typeof buildPrismaMock>,
+  preferencesMock: ReturnType<typeof buildPortalNotificationPreferencesServiceMock>,
+  emailProducerMock: ReturnType<typeof buildPortalNotificationEmailProducerMock>,
 ): PortalNotificationLogListener {
-  return new PortalNotificationLogListener(prismaMock as unknown as PrismaService);
+  return new PortalNotificationLogListener(
+    prismaMock as unknown as PrismaService,
+    preferencesMock as unknown as PortalNotificationPreferencesService,
+    emailProducerMock as unknown as PortalNotificationEmailProducer,
+  );
 }
 
 const updatedEvent = {
@@ -41,7 +69,7 @@ const updatedEvent = {
     status: "OPEN" as const,
     customerId: "customer-1",
     customerName: null,
-    contactId: null,
+    contactId: "contact-1",
     departmentId: null,
     assignedToUserId: null,
     createdAt: new Date("2024-01-01T00:00:00.000Z"),
@@ -52,12 +80,16 @@ const updatedEvent = {
 
 describe("PortalNotificationLogListener", () => {
   let prisma: ReturnType<typeof buildPrismaMock>;
+  let preferences: ReturnType<typeof buildPortalNotificationPreferencesServiceMock>;
+  let emailProducer: ReturnType<typeof buildPortalNotificationEmailProducerMock>;
   let listener: PortalNotificationLogListener;
 
   beforeEach(() => {
     vi.clearAllMocks();
     prisma = buildPrismaMock();
-    listener = createListener(prisma);
+    preferences = buildPortalNotificationPreferencesServiceMock();
+    emailProducer = buildPortalNotificationEmailProducerMock();
+    listener = createListener(prisma, preferences, emailProducer);
   });
 
   describe("onTicketUpdated", () => {
@@ -86,6 +118,67 @@ describe("PortalNotificationLogListener", () => {
       prisma.notificationLog.create.mockRejectedValue(new Error("db unavailable"));
 
       await expect(listener.onTicketUpdated(updatedEvent)).resolves.toBeUndefined();
+    });
+
+    // RM-19 — Portal Email Notification Delivery.
+    describe("notification email (RM-19)", () => {
+      it("enqueues a notification email for the ticket's contactId once the row is newly written", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+
+        await listener.onTicketUpdated(updatedEvent);
+
+        expect(preferences.listPreferences).toHaveBeenCalledWith("contact-1");
+        expect(emailProducer.enqueue).toHaveBeenCalledWith({
+          ticketId: "ticket-1",
+          eventType: TICKET_UPDATED_EVENT,
+        });
+      });
+
+      it("does not enqueue when the row was already logged (P2002) — never re-email an update already notified", async () => {
+        prisma.notificationLog.create.mockRejectedValue(buildUniqueConstraintError());
+
+        await listener.onTicketUpdated(updatedEvent);
+
+        expect(preferences.listPreferences).not.toHaveBeenCalled();
+        expect(emailProducer.enqueue).not.toHaveBeenCalled();
+      });
+
+      it("does not enqueue when the ticket has no contactId at all", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+
+        await listener.onTicketUpdated({
+          ...updatedEvent,
+          ticket: { ...updatedEvent.ticket, contactId: null },
+        });
+
+        expect(preferences.listPreferences).not.toHaveBeenCalled();
+        expect(emailProducer.enqueue).not.toHaveBeenCalled();
+      });
+
+      it("does not enqueue when the contact has disabled this event type", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        preferences.listPreferences.mockResolvedValue([
+          { eventType: "ticket.updated", inAppEnabled: false },
+        ]);
+
+        await listener.onTicketUpdated(updatedEvent);
+
+        expect(emailProducer.enqueue).not.toHaveBeenCalled();
+      });
+
+      it("never throws when the preferences lookup fails — a failed enqueue must not affect the already-persisted NotificationLog write", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        preferences.listPreferences.mockRejectedValue(new Error("db unavailable"));
+
+        await expect(listener.onTicketUpdated(updatedEvent)).resolves.toBeUndefined();
+      });
+
+      it("never throws when the enqueue itself fails", async () => {
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        emailProducer.enqueue.mockRejectedValue(new Error("redis unavailable"));
+
+        await expect(listener.onTicketUpdated(updatedEvent)).resolves.toBeUndefined();
+      });
     });
   });
 
@@ -120,14 +213,14 @@ describe("PortalNotificationLogListener", () => {
     };
 
     it("persists a NotificationLog row when the message is an agent reply (senderUserId set)", async () => {
-      prisma.ticket.findUnique.mockResolvedValue({ customerId: "customer-1" });
+      prisma.ticket.findUnique.mockResolvedValue({ customerId: "customer-1", contactId: "contact-1" });
       prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
 
       await listener.onChannelMessageCreated(agentReplyEvent);
 
       expect(prisma.ticket.findUnique).toHaveBeenCalledWith({
         where: { id: "ticket-1" },
-        select: { customerId: true },
+        select: { customerId: true, contactId: true },
       });
       expect(prisma.notificationLog.create).toHaveBeenCalledWith({
         data: {
@@ -155,7 +248,7 @@ describe("PortalNotificationLogListener", () => {
     });
 
     it("does not throw when the same message already has a logged notification (P2002)", async () => {
-      prisma.ticket.findUnique.mockResolvedValue({ customerId: "customer-1" });
+      prisma.ticket.findUnique.mockResolvedValue({ customerId: "customer-1", contactId: "contact-1" });
       prisma.notificationLog.create.mockRejectedValue(buildUniqueConstraintError());
 
       await expect(listener.onChannelMessageCreated(agentReplyEvent)).resolves.toBeUndefined();
@@ -165,6 +258,44 @@ describe("PortalNotificationLogListener", () => {
       prisma.ticket.findUnique.mockRejectedValue(new Error("db unavailable"));
 
       await expect(listener.onChannelMessageCreated(agentReplyEvent)).resolves.toBeUndefined();
+    });
+
+    // RM-19 — Portal Email Notification Delivery.
+    describe("notification email (RM-19)", () => {
+      it("enqueues a notification email for the ticket's contactId once the row is newly written", async () => {
+        prisma.ticket.findUnique.mockResolvedValue({ customerId: "customer-1", contactId: "contact-1" });
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+
+        await listener.onChannelMessageCreated(agentReplyEvent);
+
+        expect(preferences.listPreferences).toHaveBeenCalledWith("contact-1");
+        expect(emailProducer.enqueue).toHaveBeenCalledWith({
+          ticketId: "ticket-1",
+          eventType: CHANNEL_MESSAGE_CREATED_EVENT,
+        });
+      });
+
+      it("does not enqueue when the ticket has no contactId at all", async () => {
+        prisma.ticket.findUnique.mockResolvedValue({ customerId: "customer-1", contactId: null });
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+
+        await listener.onChannelMessageCreated(agentReplyEvent);
+
+        expect(preferences.listPreferences).not.toHaveBeenCalled();
+        expect(emailProducer.enqueue).not.toHaveBeenCalled();
+      });
+
+      it("does not enqueue when the contact has disabled this event type", async () => {
+        prisma.ticket.findUnique.mockResolvedValue({ customerId: "customer-1", contactId: "contact-1" });
+        prisma.notificationLog.create.mockResolvedValue({ id: "log-1" });
+        preferences.listPreferences.mockResolvedValue([
+          { eventType: "channel.message.created", inAppEnabled: false },
+        ]);
+
+        await listener.onChannelMessageCreated(agentReplyEvent);
+
+        expect(emailProducer.enqueue).not.toHaveBeenCalled();
+      });
     });
   });
 });
