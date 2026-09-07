@@ -191,7 +191,7 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
           {article.title}
         </Link>
       </TableCell>
-      <TableCell className="text-slate-500">{article.category ?? t("list.noCategory")}</TableCell>
+      <TableCell className="text-slate-500">{article.categoryName ?? t("list.noCategory")}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Badge variant={article.status === "PUBLISHED" ? "success" : "secondary"}>

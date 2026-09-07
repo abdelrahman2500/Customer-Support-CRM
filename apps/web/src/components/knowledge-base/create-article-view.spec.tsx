@@ -1,8 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { CreateArticleView } from "./create-article-view";
 import { useCreateArticleMutation } from "@/hooks/use-knowledge-base";
+import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { ApiError } from "@/lib/api";
 import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
@@ -18,7 +19,12 @@ vi.mock("@/hooks/use-knowledge-base", () => ({
   useCreateArticleMutation: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-kb-categories", () => ({
+  useKbCategoriesQuery: vi.fn(),
+}));
+
 const mockedUseCreateArticleMutation = vi.mocked(useCreateArticleMutation);
+const mockedUseKbCategoriesQuery = vi.mocked(useKbCategoriesQuery);
 
 function renderWithLocale(locale: "en" | "ar" = "en") {
   const messages = locale === "en" ? enMessages : arMessages;
@@ -32,6 +38,10 @@ function renderWithLocale(locale: "en" | "ar" = "en") {
 describe("CreateArticleView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedUseKbCategoriesQuery.mockReturnValue({
+      data: [{ id: "category-1", branchId: "branch-1", name: "account", isActive: true }],
+      isSuccess: true,
+    } as never);
   });
 
   it("renders the form (English)", () => {
@@ -81,7 +91,8 @@ describe("CreateArticleView", () => {
     renderWithLocale("en");
 
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "How to reset a password" } });
-    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "account" } });
+    fireEvent.click(within(screen.getByText("Category").closest("label")!).getByRole("combobox"));
+    fireEvent.click(await screen.findByRole("option", { name: "account" }));
     fireEvent.change(screen.getByLabelText("Body"), { target: { value: "Step-by-step..." } });
     fireEvent.click(screen.getByRole("button", { name: "Create article" }));
 
@@ -89,7 +100,7 @@ describe("CreateArticleView", () => {
       expect(mutateAsync).toHaveBeenCalledWith({
         title: "How to reset a password",
         body: "Step-by-step...",
-        category: "account",
+        categoryId: "category-1",
       }),
     );
     expect(push).toHaveBeenCalledWith("/en/knowledge-base");

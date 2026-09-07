@@ -121,7 +121,7 @@ export function ArticleListView() {
               >
                 {article.title}
               </Link>
-              <span className="text-slate-500">{article.category ?? t("list.noCategory")}</span>
+              <span className="text-slate-500">{article.categoryName ?? t("list.noCategory")}</span>
             </li>
           ))}
         </ol>

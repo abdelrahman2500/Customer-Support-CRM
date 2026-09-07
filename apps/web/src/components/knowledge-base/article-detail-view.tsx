@@ -8,21 +8,39 @@ import {
   useArticleVersionsQuery,
   useUpdateArticleMutation,
 } from "@/hooks/use-knowledge-base";
+import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@crm/ui";
 
 /**
  * Story 51 — Article Detail/Edit. Mirrors `TicketDetailView`'s
  * loading/not-found/generic-error states exactly, and `SlaPolicyRow`'s
- * blur-commit-with-revert-on-error field pattern for title/body/category.
+ * blur-commit-with-revert-on-error field pattern for title/body.
  * The publish/unpublish toggle mirrors `SlaPolicyRow`'s activate/deactivate
  * button (Design item 10).
  *
  * Story 65 — a read-only "Version History" section appended below the
  * existing fields (plan Design item 5); no other behavior changed.
+ *
+ * RM-27 — the free-text category `Input` became a `Select` sourced from
+ * `useKbCategoriesQuery`, mirroring `TicketDetailView`'s own `categoryId`
+ * `Select` exactly (commits immediately on selection, no blur-commit
+ * needed since a `Select` has no intermediate typing state).
  */
 export function ArticleDetailView({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
@@ -30,10 +48,10 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
   const articleQuery = useArticleQuery(articleId);
   const mutation = useUpdateArticleMutation(articleId);
+  const categoriesQuery = useKbCategoriesQuery();
 
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [bodyDraft, setBodyDraft] = useState<string | null>(null);
-  const [categoryDraft, setCategoryDraft] = useState<string | null>(null);
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
 
   if (articleQuery.isLoading) {
@@ -126,16 +144,29 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
       <label className="flex flex-col gap-1 text-xs text-slate-600">
         {t("detail.categoryLabel")}
-        <Input
-          className="max-w-xs"
-          defaultValue={article.category ?? ""}
-          onChange={(event) => setCategoryDraft(event.target.value)}
-          onBlur={() => {
-            if (categoryDraft !== null && categoryDraft !== (article.category ?? "")) {
-              mutation.mutate({ category: categoryDraft });
-            }
-          }}
-        />
+        <Select
+          value={article.categoryId ?? undefined}
+          disabled={mutation.isPending || categoriesQuery.isLoading}
+          onValueChange={(value) => mutation.mutate({ categoryId: value })}
+        >
+          <SelectTrigger aria-label={t("detail.categoryLabel")} className="max-w-xs">
+            <SelectValue
+              placeholder={
+                categoriesQuery.isLoading ? t("detail.optionsLoading") : t("detail.noCategory")
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {(categoriesQuery.data ?? []).map((category) => (
+              <SelectItem key={category.id} value={category.id}>
+                {category.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {categoriesQuery.isError && (
+          <span className="text-xs text-red-600">{t("detail.categoryLoadError")}</span>
+        )}
       </label>
 
       <label className="flex flex-col gap-1 text-xs text-slate-600">

@@ -29,6 +29,10 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
   let portalAccessToken: string;
   let draftArticleId: string;
   let publishedArticleId: string;
+  // RM-27 — `category` (free text) replaced by `categoryId`; this fixture
+  // article needs a category first, created via `POST /kb-categories`.
+  let accountCategoryId: string;
+  let accountCategoryName: string;
   const contactEmail = `portal-kb-contact-${randomUUID()}@example.com`;
   const portalPassword = "a-strong-portal-password-1";
 
@@ -81,6 +85,14 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
       .expect(200);
     portalAccessToken = portalLogin.body.accessToken;
 
+    accountCategoryName = `account-${randomUUID()}`;
+    const accountCategory = await request(app.getHttpServer())
+      .post("/api/v1/kb-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: accountCategoryName })
+      .expect(201);
+    accountCategoryId = accountCategory.body.id;
+
     const draftArticle = await request(app.getHttpServer())
       .post("/api/v1/knowledge-base/articles")
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -94,7 +106,7 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
       .send({
         title: "How to reset your password",
         body: "Step-by-step instructions...",
-        category: "account",
+        categoryId: accountCategoryId,
       })
       .expect(201);
     publishedArticleId = publishedArticle.body.id;
@@ -144,7 +156,8 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
     expect(response.body).toMatchObject({
       id: publishedArticleId,
       title: "How to reset your password",
-      category: "account",
+      categoryId: accountCategoryId,
+      categoryName: accountCategoryName,
       status: "PUBLISHED",
     });
   });

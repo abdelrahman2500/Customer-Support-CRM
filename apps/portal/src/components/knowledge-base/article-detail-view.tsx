@@ -58,7 +58,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h1 className="text-lg font-semibold text-slate-900">{article.title}</h1>
-        {article.category && <p className="mt-1 text-xs text-slate-500">{article.category}</p>}
+        {article.categoryName && <p className="mt-1 text-xs text-slate-500">{article.categoryName}</p>}
         <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{article.body}</p>
       </div>
     </section>

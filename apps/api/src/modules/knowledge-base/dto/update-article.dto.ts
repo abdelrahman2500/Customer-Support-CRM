@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsEnum, IsOptional, IsString, MinLength } from "class-validator";
+import { IsEnum, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
 import { KnowledgeBaseArticleStatus } from "@prisma/client";
 
 export class UpdateArticleDto {
@@ -15,10 +15,13 @@ export class UpdateArticleDto {
   @MinLength(1)
   body?: string;
 
+  /** RM-27 — `category` (free text) replaced by `categoryId` (exact-id
+   * reference into `KnowledgeBaseCategory`), mirroring
+   * `UpdateTicketDto.categoryId`'s own schema change. */
   @ApiProperty({ required: false })
   @IsOptional()
-  @IsString()
-  category?: string;
+  @IsUUID()
+  categoryId?: string;
 
   @ApiProperty({ required: false, enum: KnowledgeBaseArticleStatus })
   @IsOptional()

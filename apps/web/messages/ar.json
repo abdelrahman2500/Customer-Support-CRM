@@ -73,6 +73,7 @@
       "auditLogs": "سجل التدقيق",
       "notifications": "سجل الإشعارات",
       "knowledgeBase": "قاعدة المعرفة",
+      "kbCategories": "فئات قاعدة المعرفة",
       "reports": "التقارير",
       "automationRules": "قواعد الأتمتة",
       "notificationTemplates": "قوالب الإشعارات",
@@ -666,6 +667,7 @@
       "title": "مقالة جديدة",
       "articleTitle": "العنوان",
       "category": "الفئة",
+      "categoryDefault": "بدون فئة",
       "body": "المحتوى",
       "submit": "إنشاء المقالة",
       "submitting": "جارٍ الإنشاء...",
@@ -674,6 +676,9 @@
     "detail": {
       "titleLabel": "عنوان المقالة",
       "categoryLabel": "الفئة",
+      "noCategory": "بدون فئة",
+      "categoryLoadError": "تعذّر تحميل الفئات.",
+      "optionsLoading": "جارٍ التحميل…",
       "bodyLabel": "المحتوى",
       "notFound": "تعذّر العثور على هذه المقالة.",
       "loadError": "تعذّر تحميل هذه المقالة.",
@@ -992,6 +997,31 @@
     "createSuccess": "تم إنشاء الفئة \"{name}\".",
     "deactivateConfirmTitle": "هل تريد إلغاء تفعيل هذه الفئة؟",
     "deactivateConfirmDescription": "لن تظهر \"{name}\" بعد الآن عند اختيار فئة لتذكرة أو سياسة اتفاقية مستوى خدمة أو قاعدة أتمتة جديدة — لن تتأثر التذاكر التي تستخدمها بالفعل."
+  },
+  "kbCategories": {
+    "heading": "فئات قاعدة المعرفة",
+    "description": "إدارة مفردات الفئات التي تختار منها مقالات قاعدة المعرفة.",
+    "error": "تعذّر تحميل فئات قاعدة المعرفة.",
+    "retry": "إعادة المحاولة",
+    "empty": "لا توجد فئات قاعدة معرفة حتى الآن.",
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "activate": "تفعيل",
+    "deactivate": "إلغاء التفعيل",
+    "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+    "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+    "columns": {
+      "name": "الاسم",
+      "status": "الحالة"
+    },
+    "nameLabel": "الاسم",
+    "createPlaceholder": "مثال: الفوترة",
+    "createSubmit": "إضافة فئة",
+    "createSubmitting": "جارٍ الإضافة...",
+    "createFailed": "تعذّر إنشاء الفئة. حاول مرة أخرى.",
+    "createSuccess": "تم إنشاء الفئة \"{name}\".",
+    "deactivateConfirmTitle": "هل تريد إلغاء تفعيل هذه الفئة؟",
+    "deactivateConfirmDescription": "لن تظهر \"{name}\" بعد الآن عند اختيار فئة لمقالة — لن تتأثر المقالات التي تستخدمها بالفعل."
   },
   "notificationTemplates": {
     "title": "قوالب الإشعارات",

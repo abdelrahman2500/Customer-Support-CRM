@@ -6,13 +6,16 @@ import type { PaginatedResponse } from "./paginated";
  * backend's `ArticleSummary` exactly
  * (`apps/api/src/modules/knowledge-base/knowledge-base.service.ts`) — every
  * article returned here is guaranteed `status: "PUBLISHED"`.
- */
+ *
+ * RM-27 — `category` (free text) replaced by `categoryId`/`categoryName`,
+ * mirroring `apps/web`'s own `ArticleSummary` schema change. */
 export interface PortalArticleSummary {
   id: string;
   branchId: string;
   title: string;
   body: string;
-  category: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
   status: "PUBLISHED";
   publishedAt: string;
   createdAt: string;

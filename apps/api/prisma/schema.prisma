@@ -60,6 +60,8 @@ model Branch {
   webhookSubscriptions  WebhookSubscription[]
   /// RM-22 — this branch's own machine-to-machine API keys.
   apiKeys               ApiKey[]
+  /// RM-27 — this branch's managed Knowledge Base category vocabulary.
+  knowledgeBaseCategories KnowledgeBaseCategory[]
   createdAt             DateTime               @default(now()) @map("created_at")
 
   @@unique([organizationId, name])
@@ -1157,7 +1159,13 @@ model KnowledgeBaseArticle {
   branch       Branch                            @relation(fields: [branchId], references: [id])
   title        String
   body         String
-  category     String?
+  /// RM-27 — the original plain-`String?` free-text `category` column
+  /// replaced by a real FK into `KnowledgeBaseCategory`, mirroring Story
+  /// 120's `Ticket.categoryId`/`TicketCategory` precedent exactly (same
+  /// silent-fragmentation risk exact-string matching created). See
+  /// `KnowledgeBaseCategory`'s own doc comment.
+  categoryId   String?                           @map("category_id")
+  category     KnowledgeBaseCategory?            @relation(fields: [categoryId], references: [id])
   status       KnowledgeBaseArticleStatus        @default(DRAFT)
   publishedAt  DateTime?                         @map("published_at")
   createdAt    DateTime                          @default(now()) @map("created_at")
@@ -1178,7 +1186,42 @@ model KnowledgeBaseArticle {
   ticketReferences TicketKnowledgeBaseReference[]
 
   @@index([branchId])
+  @@index([categoryId])
   @@map("knowledge_base_articles")
+  @@schema("knowledge_base")
+}
+
+/// RM-27 — the managed vocabulary `KnowledgeBaseArticle.categoryId`
+/// references, replacing the free-text `category` column that model
+/// previously carried. Branch-scoped, mirrors `TicketCategory`'s exact
+/// shape (`id`/`branchId`/`name`/`isActive`, `@@unique([branchId, name])`)
+/// — including that model's own precedent of no delete route, only
+/// rename + activate/deactivate: a category is never actually deleted, so
+/// "what happens to an article that still references a deleted category"
+/// is a question this schema never has to answer. An inactive category
+/// remains valid on every article that already references it;
+/// `KbCategoriesService.listKbCategories`'s own `includeInactive` flag
+/// controls whether it still appears in a "pick a category for something
+/// new" UI going forward.
+///
+/// `KnowledgeBaseArticleVersion.category` (below) is deliberately NOT a
+/// reference to this model — it stays a plain `String?` name *snapshot*
+/// taken at publish time, decoupled from this taxonomy's mutable state so
+/// a later category rename/deactivation never changes what a published
+/// version says it was categorized as at the time.
+model KnowledgeBaseCategory {
+  id        String   @id @default(uuid())
+  branchId  String   @map("branch_id")
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  articles  KnowledgeBaseArticle[]
+
+  @@unique([branchId, name])
+  @@map("knowledge_base_categories")
   @@schema("knowledge_base")
 }
 
@@ -1199,6 +1242,10 @@ model KnowledgeBaseArticleVersion {
   versionNumber Int                  @map("version_number")
   title         String
   body          String
+  /// RM-27 — deliberately still a plain `String?`, never a
+  /// `KnowledgeBaseCategory` FK: a name *snapshot* of whichever category
+  /// was set at publish time, not a live reference. See
+  /// `KnowledgeBaseCategory`'s own doc comment for why.
   category      String?
   publishedAt   DateTime             @map("published_at")
   createdAt     DateTime             @default(now()) @map("created_at")

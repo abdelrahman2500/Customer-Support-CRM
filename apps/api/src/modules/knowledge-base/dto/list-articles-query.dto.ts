@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import { IsEnum, IsOptional, IsString, IsUUID } from "class-validator";
 import { KbLocale, KnowledgeBaseArticleStatus } from "@prisma/client";
 import { PaginationQueryDto } from "../../../common/pagination/pagination-query.dto";
 
@@ -35,6 +35,11 @@ import { PaginationQueryDto } from "../../../common/pagination/pagination-query.
  * returned before this — an agent should not be offered a draft to
  * reference (the same article status `TicketKbReferencesService`
  * separately re-validates server-side before actually attaching it).
+ *
+ * RM-27 — `categoryId`, additive and optional like every filter above: the
+ * agent-facing `listArticles` path reads it and narrows accordingly, exact
+ * -id equality, mirroring `ListTicketsQueryDto.categoryId`'s own schema
+ * change from a free-text `category` filter.
  */
 export class ListArticlesQueryDto extends PaginationQueryDto {
   @ApiProperty({ required: false })
@@ -51,4 +56,9 @@ export class ListArticlesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(KnowledgeBaseArticleStatus)
   status?: KnowledgeBaseArticleStatus;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
 }

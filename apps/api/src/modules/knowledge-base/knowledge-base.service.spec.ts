@@ -22,6 +22,17 @@ function buildPrismaMock() {
       findMany: ReturnType<typeof vi.fn>;
       upsert: ReturnType<typeof vi.fn>;
     };
+    // RM-27 — `requireCategoryInScope`'s lookup, plus `findUnique` for the
+    // version-snapshot category-name resolution in `updateArticle`.
+    // Defaults to a truthy match so every pre-existing test that passes a
+    // `categoryId` through `updateArticle`/`createArticle` without itself
+    // caring about category-scope validation continues to exercise the
+    // exact same downstream behavior it always has — mirrors
+    // `tickets.service.spec.ts`'s own `ticketCategory` mock exactly.
+    knowledgeBaseCategory: {
+      findFirst: ReturnType<typeof vi.fn>;
+      findUnique: ReturnType<typeof vi.fn>;
+    };
     $queryRaw: ReturnType<typeof vi.fn>;
     $transaction: ReturnType<typeof vi.fn>;
   } = {
@@ -43,6 +54,10 @@ function buildPrismaMock() {
     knowledgeBaseArticleTranslation: {
       findMany: vi.fn().mockResolvedValue([]),
       upsert: vi.fn(),
+    },
+    knowledgeBaseCategory: {
+      findFirst: vi.fn().mockResolvedValue({ id: "category-1" }),
+      findUnique: vi.fn().mockResolvedValue(null),
     },
     // Story 102 — `searchArticles`'s tagged-template `$queryRaw` calls.
     // Mocked as a plain function: invoking it as a tagged template
@@ -79,22 +94,58 @@ function createService(
   );
 }
 
+/** RM-27 — mirrors `toArticleSummary`'s own flattening exactly, so test
+ * fixtures never have to hand-duplicate it. Only used to build expected
+ * *output* shapes from a raw Prisma-relation-shaped row fixture. */
+function expectedSummary(row: {
+  id: string;
+  branchId: string;
+  title: string;
+  body: string;
+  categoryId: string | null;
+  category: { name: string } | null;
+  status: string;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: row.id,
+    branchId: row.branchId,
+    title: row.title,
+    body: row.body,
+    categoryId: row.categoryId,
+    categoryName: row.category?.name ?? null,
+    status: row.status,
+    publishedAt: row.publishedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+const CATEGORY_NAME_INCLUDE = { category: { select: { name: true } } };
+
 describe("KnowledgeBaseService", () => {
   let prisma: ReturnType<typeof buildPrismaMock>;
   let tenantContext: ReturnType<typeof buildTenantContextMock>;
   let service: KnowledgeBaseService;
 
+  // RM-27 — the Prisma-relation shape (`categoryId` + `category: {name}|null`),
+  // exactly what a `findFirst`/`findMany`/`create`/`update` call carrying
+  // `include: CATEGORY_NAME_INCLUDE` actually returns.
   const baseArticleRow = {
     id: "article-1",
     branchId: "branch-1",
     title: "How to reset a password",
     body: "Step-by-step instructions...",
-    category: null,
+    categoryId: null as string | null,
+    category: null as { name: string } | null,
     status: "DRAFT" as const,
     publishedAt: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
   };
+  const baseArticleSummary = expectedSummary(baseArticleRow);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -113,32 +164,52 @@ describe("KnowledgeBaseService", () => {
       });
 
       expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.knowledgeBaseCategory.findFirst).not.toHaveBeenCalled();
       expect(prisma.knowledgeBaseArticle.create).toHaveBeenCalledWith({
         data: {
           branchId: "branch-1",
           title: "How to reset a password",
           body: "Step-by-step instructions...",
-          category: null,
+          categoryId: null,
         },
+        include: CATEGORY_NAME_INCLUDE,
       });
-      expect(result).toEqual(baseArticleRow);
+      expect(result).toEqual(baseArticleSummary);
     });
 
-    it("passes through category when given", async () => {
+    it("validates categoryId in scope and passes it through when given", async () => {
+      prisma.knowledgeBaseCategory.findFirst.mockResolvedValue({ id: "category-1" });
       prisma.knowledgeBaseArticle.create.mockResolvedValue({
         ...baseArticleRow,
-        category: "account",
+        categoryId: "category-1",
+        category: { name: "account" },
       });
 
       await service.createArticle({
         title: "How to reset a password",
         body: "Step-by-step instructions...",
-        category: "account",
+        categoryId: "category-1",
       });
 
+      expect(prisma.knowledgeBaseCategory.findFirst).toHaveBeenCalledWith({
+        where: { id: "category-1", branchId: "branch-1" },
+      });
       expect(prisma.knowledgeBaseArticle.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ category: "account" }) }),
+        expect.objectContaining({ data: expect.objectContaining({ categoryId: "category-1" }) }),
       );
+    });
+
+    it("throws NotFoundException for an unknown categoryId, never creating the article", async () => {
+      prisma.knowledgeBaseCategory.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createArticle({
+          title: "How to reset a password",
+          body: "Step-by-step instructions...",
+          categoryId: "unknown-category",
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.knowledgeBaseArticle.create).not.toHaveBeenCalled();
     });
   });
 
@@ -154,6 +225,7 @@ describe("KnowledgeBaseService", () => {
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         skip: 0,
         take: 25,
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -187,6 +259,7 @@ describe("KnowledgeBaseService", () => {
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         skip: 0,
         take: 25,
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -200,6 +273,22 @@ describe("KnowledgeBaseService", () => {
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         skip: 0,
         take: 25,
+        include: CATEGORY_NAME_INCLUDE,
+      });
+    });
+
+    // RM-27 — `categoryId` filter.
+    it("adds a categoryId filter to the plain-list path's where clause when given", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      await service.listArticles({ categoryId: "category-1" });
+
+      expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith({
+        where: { branchId: "branch-1", categoryId: "category-1" },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        skip: 0,
+        take: 25,
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -210,6 +299,32 @@ describe("KnowledgeBaseService", () => {
 
       const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
       expect(strings.join("")).toContain("'PUBLISHED'");
+    });
+
+    // RM-27 — `categoryId` filter on the full-text-search path.
+    it("adds a categoryId filter to the full-text-search path's SQL when given", async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+
+      await service.listArticles({ search: "password", categoryId: "category-1" });
+
+      const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...unknown[],
+      ];
+      expect(strings.join("")).toContain("a.category_id");
+      expect(values).toContain("category-1");
+    });
+
+    it("omits the categoryId filter entirely when not given, unchanged from before this story", async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
+
+      await service.listArticles({ search: "password" });
+
+      const [, ...values] = prisma.$queryRaw.mock.calls[0] as [
+        TemplateStringsArray,
+        ...unknown[],
+      ];
+      expect(values).toEqual(["branch-1", "password", "password", 25, 0]);
     });
 
     // Story 102 — Full-Text Search.
@@ -233,11 +348,14 @@ describe("KnowledgeBaseService", () => {
     });
 
     it("maps raw $queryRaw rows through the same shape as the plain-list path", async () => {
-      prisma.$queryRaw.mockResolvedValue([baseArticleRow]);
+      // RM-27 — the raw SQL row is already flat (categoryId/categoryName),
+      // unlike the Prisma-relation-shaped `baseArticleRow` — see
+      // `RawArticleRow`'s own doc comment.
+      prisma.$queryRaw.mockResolvedValue([baseArticleSummary]);
 
       const result = await service.listArticles({ search: "password" });
 
-      expect(result.items).toEqual([baseArticleRow]);
+      expect(result.items).toEqual([baseArticleSummary]);
     });
 
     it("treats a whitespace-only search as no search at all", async () => {
@@ -251,6 +369,7 @@ describe("KnowledgeBaseService", () => {
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         skip: 0,
         take: 25,
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -264,6 +383,7 @@ describe("KnowledgeBaseService", () => {
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         skip: 0,
         take: 25,
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -286,7 +406,7 @@ describe("KnowledgeBaseService", () => {
         where: { articleId: { in: ["article-1"] }, locale: "AR" },
       });
       expect(result.items).toEqual([
-        { ...baseArticleRow, title: "كيفية إعادة تعيين كلمة المرور", body: "تعليمات..." },
+        { ...baseArticleSummary, title: "كيفية إعادة تعيين كلمة المرور", body: "تعليمات..." },
       ]);
     });
 
@@ -296,7 +416,7 @@ describe("KnowledgeBaseService", () => {
 
       const result = await service.listArticles({ locale: "AR" as never });
 
-      expect(result.items).toEqual([baseArticleRow]);
+      expect(result.items).toEqual([baseArticleSummary]);
     });
 
     it("never queries translations when locale is omitted", async () => {
@@ -305,7 +425,7 @@ describe("KnowledgeBaseService", () => {
       const result = await service.listArticles();
 
       expect(prisma.knowledgeBaseArticleTranslation.findMany).not.toHaveBeenCalled();
-      expect(result.items).toEqual([baseArticleRow]);
+      expect(result.items).toEqual([baseArticleSummary]);
     });
   });
 
@@ -316,6 +436,7 @@ describe("KnowledgeBaseService", () => {
       await expect(service.getArticle("missing-id")).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.knowledgeBaseArticle.findFirst).toHaveBeenCalledWith({
         where: { id: "missing-id", branchId: "branch-1" },
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -325,7 +446,7 @@ describe("KnowledgeBaseService", () => {
       const result = await service.getArticle("article-1");
 
       expect(prisma.knowledgeBaseArticleTranslation.findMany).not.toHaveBeenCalled();
-      expect(result).toEqual(baseArticleRow);
+      expect(result).toEqual(baseArticleSummary);
     });
 
     // Story 109 — Multi-locale content.
@@ -344,7 +465,7 @@ describe("KnowledgeBaseService", () => {
       const result = await service.getArticle("article-1", "AR" as never);
 
       expect(result).toEqual({
-        ...baseArticleRow,
+        ...baseArticleSummary,
         title: "العنوان بالعربية",
         body: "النص بالعربية",
       });
@@ -356,7 +477,7 @@ describe("KnowledgeBaseService", () => {
 
       const result = await service.getArticle("article-1", "AR" as never);
 
-      expect(result).toEqual(baseArticleRow);
+      expect(result).toEqual(baseArticleSummary);
     });
   });
 
@@ -378,6 +499,7 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.update).toHaveBeenCalledWith({
         where: { id: "article-1" },
         data: { title: "Updated title" },
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -389,6 +511,7 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.update).toHaveBeenCalledWith({
         where: { id: "article-1" },
         data: { status: "PUBLISHED", publishedAt: expect.any(Date) },
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -404,6 +527,7 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.update).toHaveBeenCalledWith({
         where: { id: "article-1" },
         data: { status: "DRAFT" },
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -415,6 +539,51 @@ describe("KnowledgeBaseService", () => {
       expect(prisma.knowledgeBaseArticle.update).toHaveBeenCalledWith({
         where: { id: "article-1" },
         data: { body: "Revised instructions..." },
+        include: CATEGORY_NAME_INCLUDE,
+      });
+    });
+
+    // RM-27 — categoryId validation.
+    it("validates a given categoryId is in scope before applying it", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      prisma.knowledgeBaseCategory.findFirst.mockResolvedValue({ id: "category-1" });
+
+      await service.updateArticle("article-1", { categoryId: "category-1" });
+
+      expect(prisma.knowledgeBaseCategory.findFirst).toHaveBeenCalledWith({
+        where: { id: "category-1", branchId: "branch-1" },
+      });
+      expect(prisma.knowledgeBaseArticle.update).toHaveBeenCalledWith({
+        where: { id: "article-1" },
+        data: { categoryId: "category-1" },
+        include: CATEGORY_NAME_INCLUDE,
+      });
+    });
+
+    it("throws NotFoundException for an unknown categoryId, never updating the article", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+      prisma.knowledgeBaseCategory.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateArticle("article-1", { categoryId: "unknown-category" }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.knowledgeBaseArticle.update).not.toHaveBeenCalled();
+    });
+
+    it("never validates categoryId when it is explicitly cleared (null)", async () => {
+      prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({
+        ...baseArticleRow,
+        categoryId: "category-1",
+        category: { name: "Billing" },
+      });
+
+      await service.updateArticle("article-1", { categoryId: null as never });
+
+      expect(prisma.knowledgeBaseCategory.findFirst).not.toHaveBeenCalled();
+      expect(prisma.knowledgeBaseArticle.update).toHaveBeenCalledWith({
+        where: { id: "article-1" },
+        data: { categoryId: null },
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -440,7 +609,7 @@ describe("KnowledgeBaseService", () => {
           versionNumber: 1,
           title: "How to reset your password",
           body: baseArticleRow.body,
-          category: baseArticleRow.category,
+          category: null,
           publishedAt: expect.any(Date),
         },
       });
@@ -451,6 +620,7 @@ describe("KnowledgeBaseService", () => {
           status: "PUBLISHED",
           publishedAt: expect.any(Date),
         },
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -473,7 +643,7 @@ describe("KnowledgeBaseService", () => {
           versionNumber: 2,
           title: baseArticleRow.title,
           body: "Revised, more detailed instructions...",
-          category: baseArticleRow.category,
+          category: null,
           publishedAt: expect.any(Date),
         },
       });
@@ -499,6 +669,61 @@ describe("KnowledgeBaseService", () => {
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(prisma.knowledgeBaseArticleVersion.create).not.toHaveBeenCalled();
+    });
+
+    // RM-27 — version snapshot category-name resolution.
+    describe("version snapshot category-name resolution", () => {
+      it("resolves the new category's current name when categoryId changes while publishing", async () => {
+        prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(baseArticleRow);
+        prisma.knowledgeBaseCategory.findFirst.mockResolvedValue({ id: "category-2" });
+        prisma.knowledgeBaseCategory.findUnique.mockResolvedValue({ name: "Billing" });
+
+        await service.updateArticle("article-1", {
+          categoryId: "category-2",
+          status: "PUBLISHED" as never,
+        });
+
+        expect(prisma.knowledgeBaseCategory.findUnique).toHaveBeenCalledWith({
+          where: { id: "category-2" },
+          select: { name: true },
+        });
+        expect(prisma.knowledgeBaseArticleVersion.create).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ category: "Billing" }) }),
+        );
+      });
+
+      it("keeps the existing article's resolved category name when categoryId is omitted", async () => {
+        prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({
+          ...baseArticleRow,
+          categoryId: "category-1",
+          category: { name: "Billing" },
+        });
+
+        await service.updateArticle("article-1", { status: "PUBLISHED" as never });
+
+        expect(prisma.knowledgeBaseCategory.findUnique).not.toHaveBeenCalled();
+        expect(prisma.knowledgeBaseArticleVersion.create).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ category: "Billing" }) }),
+        );
+      });
+
+      it("clears the version's category name to null when categoryId is explicitly cleared while publishing", async () => {
+        prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({
+          ...baseArticleRow,
+          categoryId: "category-1",
+          category: { name: "Billing" },
+        });
+
+        await service.updateArticle("article-1", {
+          categoryId: null as never,
+          status: "PUBLISHED" as never,
+        });
+
+        expect(prisma.knowledgeBaseCategory.findUnique).not.toHaveBeenCalled();
+        expect(prisma.knowledgeBaseArticleVersion.create).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ category: null }) }),
+        );
+      });
     });
   });
 
@@ -552,6 +777,7 @@ describe("KnowledgeBaseService", () => {
     status: "PUBLISHED" as const,
     publishedAt: new Date("2026-01-02T00:00:00.000Z"),
   };
+  const publishedArticleSummary = expectedSummary(publishedArticleRow);
 
   describe("listPublishedArticlesForBranch", () => {
     it("scopes the query to the given branch and PUBLISHED status, ordered publishedAt desc", async () => {
@@ -564,6 +790,7 @@ describe("KnowledgeBaseService", () => {
         orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
         skip: 0,
         take: 25,
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -617,6 +844,7 @@ describe("KnowledgeBaseService", () => {
         orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
         skip: 0,
         take: 25,
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -630,6 +858,7 @@ describe("KnowledgeBaseService", () => {
         orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
         skip: 0,
         take: 25,
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 
@@ -644,7 +873,7 @@ describe("KnowledgeBaseService", () => {
         locale: "AR" as never,
       });
 
-      expect(result.items).toEqual([{ ...publishedArticleRow, title: "عنوان", body: "نص" }]);
+      expect(result.items).toEqual([{ ...publishedArticleSummary, title: "عنوان", body: "نص" }]);
     });
 
     it("falls back to the base title/body when no translation exists for the requested locale", async () => {
@@ -655,7 +884,7 @@ describe("KnowledgeBaseService", () => {
         locale: "AR" as never,
       });
 
-      expect(result.items).toEqual([publishedArticleRow]);
+      expect(result.items).toEqual([publishedArticleSummary]);
     });
   });
 
@@ -667,8 +896,9 @@ describe("KnowledgeBaseService", () => {
 
       expect(prisma.knowledgeBaseArticle.findFirst).toHaveBeenCalledWith({
         where: { id: "article-2", branchId: "branch-1", status: "PUBLISHED" },
+        include: CATEGORY_NAME_INCLUDE,
       });
-      expect(result).toEqual(publishedArticleRow);
+      expect(result).toEqual(publishedArticleSummary);
     });
 
     // Story 109 — Multi-locale content.
@@ -684,7 +914,7 @@ describe("KnowledgeBaseService", () => {
         "AR" as never,
       );
 
-      expect(result).toEqual({ ...publishedArticleRow, title: "عنوان", body: "نص" });
+      expect(result).toEqual({ ...publishedArticleSummary, title: "عنوان", body: "نص" });
     });
 
     it("falls back to the base title/body when no translation exists for the requested locale", async () => {
@@ -697,7 +927,7 @@ describe("KnowledgeBaseService", () => {
         "AR" as never,
       );
 
-      expect(result).toEqual(publishedArticleRow);
+      expect(result).toEqual(publishedArticleSummary);
     });
 
     it("throws NotFoundException for an unknown id", async () => {
@@ -718,6 +948,7 @@ describe("KnowledgeBaseService", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.knowledgeBaseArticle.findFirst).toHaveBeenCalledWith({
         where: { id: "article-1", branchId: "branch-1", status: "PUBLISHED" },
+        include: CATEGORY_NAME_INCLUDE,
       });
     });
 

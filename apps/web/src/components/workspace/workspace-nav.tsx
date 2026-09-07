@@ -128,6 +128,11 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * RM-23 — `settings` appended the same way — a consolidated view over the
  * three settings screens already in this list (`branding`, `aiSettings`,
  * `businessHours`), not a replacement for any of them.
+ *
+ * RM-27 — `kb-categories` inserted right after `knowledge-base` (grouped
+ * with its own domain, rather than appended last like every entry above),
+ * mirroring how `ticket-categories` sits as the Ticketing domain's own
+ * managed-vocabulary screen.
  */
 const NAV_ITEMS = [
   { href: "dashboard", labelKey: "nav.dashboard" },
@@ -141,6 +146,7 @@ const NAV_ITEMS = [
   { href: "audit-logs", labelKey: "nav.auditLogs" },
   { href: "notifications", labelKey: "nav.notifications" },
   { href: "knowledge-base", labelKey: "nav.knowledgeBase" },
+  { href: "kb-categories", labelKey: "nav.kbCategories" },
   { href: "reports", labelKey: "nav.reports" },
   { href: "automation-rules", labelKey: "nav.automationRules" },
   { href: "notification-templates", labelKey: "nav.notificationTemplates" },

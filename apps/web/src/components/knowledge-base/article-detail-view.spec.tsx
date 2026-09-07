@@ -6,6 +6,7 @@ import {
   useArticleVersionsQuery,
   useUpdateArticleMutation,
 } from "@/hooks/use-knowledge-base";
+import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { ApiError } from "@/lib/api";
 
 // Version-history dates are formatted with the active locale (same
@@ -25,6 +26,10 @@ vi.mock("@/hooks/use-knowledge-base", () => ({
   useUpdateArticleMutation: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-kb-categories", () => ({
+  useKbCategoriesQuery: vi.fn(),
+}));
+
 function queryResult(overrides: Record<string, unknown>) {
   return {
     data: undefined,
@@ -41,7 +46,8 @@ const baseArticle = {
   branchId: "branch-1",
   title: "How to reset a password",
   body: "Step-by-step instructions...",
-  category: "account",
+  categoryId: "category-1",
+  categoryName: "account",
   status: "DRAFT" as const,
   publishedAt: null,
   createdAt: "2026-01-01T00:00:00.000Z",
@@ -60,6 +66,13 @@ describe("ArticleDetailView", () => {
     // Story 65 — default: version history query still pending, matching
     // every pre-existing test's own expectation of not asserting on it.
     vi.mocked(useArticleVersionsQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+    // RM-27 — the category picker's own query.
+    vi.mocked(useKbCategoriesQuery).mockReturnValue(
+      queryResult({
+        data: [{ id: "category-1", branchId: "branch-1", name: "account", isActive: true }],
+        isSuccess: true,
+      }) as never,
+    );
   });
 
   it("renders a loading skeleton while the article query is pending", () => {
@@ -98,10 +111,40 @@ describe("ArticleDetailView", () => {
     render(<ArticleDetailView articleId="article-1" />);
 
     expect(screen.getByDisplayValue("How to reset a password")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("account")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "detail.categoryLabel" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Step-by-step instructions...")).toBeInTheDocument();
     expect(screen.getByText("list.draft")).toBeInTheDocument();
     expect(screen.getByText("list.publish")).toBeInTheDocument();
+  });
+
+  // RM-27 — the free-text category Input became a Select.
+  it("commits a category change immediately on selection", async () => {
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ data: baseArticle, isSuccess: true }) as never,
+    );
+    vi.mocked(useKbCategoriesQuery).mockReturnValue(
+      queryResult({
+        data: [
+          { id: "category-1", branchId: "branch-1", name: "account", isActive: true },
+          { id: "category-2", branchId: "branch-1", name: "billing", isActive: true },
+        ],
+        isSuccess: true,
+      }) as never,
+    );
+    const mutate = vi.fn();
+    vi.mocked(useUpdateArticleMutation).mockReturnValue({
+      mutate,
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "detail.categoryLabel" }));
+    fireEvent.click(await screen.findByRole("option", { name: "billing" }));
+
+    expect(mutate).toHaveBeenCalledWith({ categoryId: "category-2" });
   });
 
   // NAV-2 — this page had no heading landmark at all (the title is an

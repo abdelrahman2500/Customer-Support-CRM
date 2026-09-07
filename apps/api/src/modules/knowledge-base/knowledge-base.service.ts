@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import type { KbLocale, KnowledgeBaseArticleStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
@@ -16,12 +17,25 @@ export interface ArticleSummary {
   branchId: string;
   title: string;
   body: string;
-  category: string | null;
+  /** RM-27 — `KnowledgeBaseArticle.category` (free text) replaced by a
+   * real FK. `categoryName` is resolved via the `category` relation
+   * (never denormalized onto `KnowledgeBaseArticle` itself) — see
+   * `CATEGORY_NAME_INCLUDE`. */
+  categoryId: string | null;
+  categoryName: string | null;
   status: KnowledgeBaseArticleStatus;
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** RM-27 — spread into a Prisma `include` wherever a `KnowledgeBaseArticle`
+ * row is turned into an `ArticleSummary`, so `categoryName` is always
+ * resolved via the relation, never denormalized. Mirrors
+ * `TicketsService`'s own `CATEGORY_NAME_INCLUDE` exactly. */
+const CATEGORY_NAME_INCLUDE = {
+  category: { select: { name: true } },
+} as const;
 
 /** Story 109 — one article's content in one locale. */
 export interface ArticleTranslationSummary {
@@ -35,7 +49,11 @@ export interface ArticleTranslationSummary {
 }
 
 /** Story 65 — one immutable snapshot of an article's content at the moment
- * it was published. Mirrors `ArticleSummary`'s own flat shape. */
+ * it was published. Mirrors `ArticleSummary`'s own flat shape.
+ *
+ * RM-27 — `category` deliberately stays a plain `string | null` *name*
+ * snapshot, never a live `categoryId` FK — see `KnowledgeBaseArticleVersion
+ * .category`'s own schema doc comment for why. */
 export interface ArticleVersionSummary {
   id: string;
   articleId: string;
@@ -89,6 +107,18 @@ export interface ArticleVersionSummary {
  * side; `searchArticles` is deliberately untouched — full-text search
  * stays English-only against the base `search_vector` column (this
  * story's own plan doc, "Non-goals").
+ *
+ * RM-27 — the original plain-`String?` free-text `category` column
+ * replaced with a real, branch-scoped `KnowledgeBaseCategory` FK,
+ * mirroring Story 120's `Ticket.categoryId`/`TicketCategory` precedent
+ * exactly (same silent-fragmentation risk exact-string matching created,
+ * closed the same way). `categoryId` is validated against the caller's own
+ * branch via `requireCategoryInScope` on both `createArticle` and
+ * `updateArticle`; `categoryName` is always resolved through the
+ * `category` relation via `CATEGORY_NAME_INCLUDE`, never denormalized.
+ * `listArticles` gains an optional `categoryId` exact-id equality filter.
+ * `KnowledgeBaseArticleVersion.category` is deliberately untouched — see
+ * that field's own doc comment.
  */
 @Injectable()
 export class KnowledgeBaseService {
@@ -100,13 +130,18 @@ export class KnowledgeBaseService {
   async createArticle(dto: CreateArticleDto): Promise<ArticleSummary> {
     const { branchId } = this.tenantContext.requireBranchScope();
 
+    if (dto.categoryId) {
+      await this.requireCategoryInScope(dto.categoryId, branchId);
+    }
+
     const article = await this.prisma.knowledgeBaseArticle.create({
       data: {
         branchId,
         title: dto.title,
         body: dto.body,
-        category: dto.category ?? null,
+        categoryId: dto.categoryId ?? null,
       },
+      include: CATEGORY_NAME_INCLUDE,
     });
     return toArticleSummary(article);
   }
@@ -124,7 +159,10 @@ export class KnowledgeBaseService {
     const search = query.search?.trim();
     if (search) {
       return this.applyLocaleToPage(
-        await this.searchArticles(branchId, search, query, { status: query.status }),
+        await this.searchArticles(branchId, search, query, {
+          status: query.status,
+          categoryId: query.categoryId,
+        }),
         query.locale,
       );
     }
@@ -132,12 +170,35 @@ export class KnowledgeBaseService {
     // batched publish writes several rows in the same millisecond, and
     // paging on a non-unique key lets a row straddling a page boundary
     // appear twice or vanish.
-    const page = await paginate(this.prisma.knowledgeBaseArticle, {
-      where: { branchId, ...(query.status ? { status: query.status } : {}) },
-      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-      page: query.page,
-      pageSize: query.pageSize,
-    });
+    //
+    // RM-27 — the delegate is wrapped rather than passed directly, the
+    // same reason (and shape) `TicketsService.listTickets` wraps its own:
+    // `paginate`'s `PaginatableDelegate` has no `include`, and the wrapper
+    // adds ONLY `include: CATEGORY_NAME_INCLUDE` — `where` still comes
+    // from `paginate`'s single `options.where`, spread into both queries.
+    const page = await paginate(
+      {
+        count: (args: { where: Prisma.KnowledgeBaseArticleWhereInput }) =>
+          this.prisma.knowledgeBaseArticle.count(args),
+        findMany: (args: {
+          where: Prisma.KnowledgeBaseArticleWhereInput;
+          orderBy: Prisma.KnowledgeBaseArticleOrderByWithRelationInput[];
+          skip: number;
+          take: number;
+        }) =>
+          this.prisma.knowledgeBaseArticle.findMany({ ...args, include: CATEGORY_NAME_INCLUDE }),
+      },
+      {
+        where: {
+          branchId,
+          ...(query.status ? { status: query.status } : {}),
+          ...(query.categoryId !== undefined ? { categoryId: query.categoryId } : {}),
+        },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        page: query.page,
+        pageSize: query.pageSize,
+      },
+    );
     return this.applyLocaleToPage(
       { ...page, items: page.items.map(toArticleSummary) },
       query.locale,
@@ -161,32 +222,68 @@ export class KnowledgeBaseService {
    * `$transaction` as the article `update` — a version is never created
    * without the corresponding publish landing, or vice versa (plan Design
    * items 1/2). A plain content edit or an unpublish creates no version.
+   *
+   * RM-27 — `dto.categoryId` is validated (when present and non-null) via
+   * `requireCategoryInScope`, mirroring `TicketsService.updateTicket`'s
+   * exact same-shaped guard. The version snapshot's `category` field
+   * (a name, not an id — see `ArticleVersionSummary`'s own doc comment)
+   * is resolved once, right before the version row is written: an explicit
+   * `dto.categoryId` change resolves that category's current name (inside
+   * the same transaction, so it is consistent with whatever
+   * `requireCategoryInScope` already validated); an omitted `dto.categoryId`
+   * (`undefined`) keeps whatever category name the existing article
+   * currently resolves to (already available from `findArticleInScope`'s
+   * own `CATEGORY_NAME_INCLUDE`, no second query needed); an explicit
+   * `null` (clearing the category) resolves to `null`.
    */
   async updateArticle(id: string, dto: UpdateArticleDto): Promise<{ id: string }> {
+    const { branchId } = this.tenantContext.requireBranchScope();
     const existing = await this.findArticleInScope(id);
     const isPublishing = dto.status === "PUBLISHED";
+
+    if (dto.categoryId !== undefined && dto.categoryId !== null) {
+      await this.requireCategoryInScope(dto.categoryId, branchId);
+    }
 
     const data = {
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.body !== undefined ? { body: dto.body } : {}),
-      ...(dto.category !== undefined ? { category: dto.category } : {}),
+      ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
       ...(dto.status !== undefined ? { status: dto.status } : {}),
       ...(isPublishing ? { publishedAt: new Date() } : {}),
     };
 
     if (!isPublishing) {
-      await this.prisma.knowledgeBaseArticle.update({ where: { id }, data });
+      await this.prisma.knowledgeBaseArticle.update({
+        where: { id },
+        data,
+        include: CATEGORY_NAME_INCLUDE,
+      });
       return { id };
     }
 
     const merged = {
       title: dto.title ?? existing.title,
       body: dto.body ?? existing.body,
-      category: dto.category !== undefined ? dto.category : existing.category,
     };
     const publishedAt = data.publishedAt as Date;
 
     await this.prisma.$transaction(async (tx) => {
+      // RM-27 — resolve the version snapshot's category *name*, not id —
+      // see this method's own doc comment above.
+      let resolvedCategoryName: string | null;
+      if (dto.categoryId === undefined) {
+        resolvedCategoryName = existing.category?.name ?? null;
+      } else if (dto.categoryId === null) {
+        resolvedCategoryName = null;
+      } else {
+        const category = await tx.knowledgeBaseCategory.findUnique({
+          where: { id: dto.categoryId },
+          select: { name: true },
+        });
+        resolvedCategoryName = category?.name ?? null;
+      }
+
       const lastVersion = await tx.knowledgeBaseArticleVersion.findFirst({
         where: { articleId: id },
         orderBy: { versionNumber: "desc" },
@@ -198,11 +295,11 @@ export class KnowledgeBaseService {
           versionNumber: (lastVersion?.versionNumber ?? 0) + 1,
           title: merged.title,
           body: merged.body,
-          category: merged.category,
+          category: resolvedCategoryName,
           publishedAt,
         },
       });
-      await tx.knowledgeBaseArticle.update({ where: { id }, data });
+      await tx.knowledgeBaseArticle.update({ where: { id }, data, include: CATEGORY_NAME_INCLUDE });
     });
     return { id };
   }
@@ -284,12 +381,25 @@ export class KnowledgeBaseService {
     // visibility rule as the branch is: a portal reader must never learn a
     // draft exists, including through `total`. Passing one `where` to
     // `paginate` is what guarantees the count and the page agree on it.
-    const page = await paginate(this.prisma.knowledgeBaseArticle, {
-      where: { branchId, status: "PUBLISHED" },
-      orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
-      page: query.page,
-      pageSize: query.pageSize,
-    });
+    const page = await paginate(
+      {
+        count: (args: { where: Prisma.KnowledgeBaseArticleWhereInput }) =>
+          this.prisma.knowledgeBaseArticle.count(args),
+        findMany: (args: {
+          where: Prisma.KnowledgeBaseArticleWhereInput;
+          orderBy: Prisma.KnowledgeBaseArticleOrderByWithRelationInput[];
+          skip: number;
+          take: number;
+        }) =>
+          this.prisma.knowledgeBaseArticle.findMany({ ...args, include: CATEGORY_NAME_INCLUDE }),
+      },
+      {
+        where: { branchId, status: "PUBLISHED" },
+        orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+        page: query.page,
+        pageSize: query.pageSize,
+      },
+    );
     return this.applyLocaleToPage(
       { ...page, items: page.items.map(toArticleSummary) },
       query.locale,
@@ -305,6 +415,7 @@ export class KnowledgeBaseService {
   ): Promise<ArticleSummary> {
     const article = await this.prisma.knowledgeBaseArticle.findFirst({
       where: { id, branchId, status: "PUBLISHED" },
+      include: CATEGORY_NAME_INCLUDE,
     });
     if (!article) {
       throw new NotFoundException("Article not found");
@@ -321,7 +432,8 @@ export class KnowledgeBaseService {
     branchId: string;
     title: string;
     body: string;
-    category: string | null;
+    categoryId: string | null;
+    category: { name: string } | null;
     status: KnowledgeBaseArticleStatus;
     publishedAt: Date | null;
     createdAt: Date;
@@ -330,11 +442,23 @@ export class KnowledgeBaseService {
     const { branchId } = this.tenantContext.requireBranchScope();
     const article = await this.prisma.knowledgeBaseArticle.findFirst({
       where: { id, branchId },
+      include: CATEGORY_NAME_INCLUDE,
     });
     if (!article) {
       throw new NotFoundException("Article not found");
     }
     return article;
+  }
+
+  /** RM-27 — mirrors `TicketsService.requireCategoryInScope`'s exact
+   * shape. */
+  private async requireCategoryInScope(categoryId: string, branchId: string): Promise<void> {
+    const category = await this.prisma.knowledgeBaseCategory.findFirst({
+      where: { id: categoryId, branchId },
+    });
+    if (!category) {
+      throw new NotFoundException("Knowledge Base category not found");
+    }
   }
 
   /**
@@ -404,6 +528,24 @@ export class KnowledgeBaseService {
    * id-then-refetch approach while actually preserving that order (a
    * Prisma `findMany({ where: { id: { in: [...] } } })` re-fetch would
    * not honor the original rank order).
+   *
+   * RM-27 — the articles table is now aliased `a`, LEFT JOINed to
+   * `knowledge_base_categories AS kbc` to resolve `categoryName` (mirrors
+   * `CATEGORY_NAME_INCLUDE`'s relation, just expressed in raw SQL). An
+   * optional `categoryId` filter is threaded through the same way
+   * `publishedOnly` already is: this file's Prisma version (6.19) has no
+   * existing `Prisma.sql`/`Prisma.join` fragment-composition precedent
+   * anywhere else in this codebase, and a mocked `$queryRaw` in
+   * `knowledge-base.service.spec.ts` asserts against the *flattened*
+   * `strings`/`values` a tagged-template call produces — composing
+   * `Prisma.sql` fragments would make those already-existing assertions
+   * (interpolated `values` in exact positional order) unable to express
+   * what actually reached Postgres without also teaching the test double
+   * to flatten nested fragments itself. So, mirroring the existing
+   * `publishedOnly ? ... : ...` ternary shape exactly, this now branches
+   * on both `publishedOnly` and whether a `categoryId` filter is present —
+   * four explicit query-string variants per query (rows, count) rather
+   * than a combinatorial fragment-builder.
    */
   /**
    * Story S-8c — the full-text path pages too, which `paginate` cannot do
@@ -414,10 +556,10 @@ export class KnowledgeBaseService {
    * So the two guarantees `paginate` provides are reproduced here by hand:
    *
    * - **One predicate.** The count and the page are issued from the same
-   *   `publishedOnly` branch with the same interpolated `branchId`/
-   *   `search`, so `total` can never be counted over a wider scope than
-   *   `items` — which for the portal means never disclosing that drafts
-   *   exist.
+   *   `publishedOnly`/`categoryId` branch with the same interpolated
+   *   `branchId`/`search`/`categoryId`, so `total` can never be counted
+   *   over a wider scope than `items` — which for the portal means never
+   *   disclosing that drafts exist.
    * - **Deterministic order.** `ts_rank` ties constantly, far more than a
    *   timestamp does: any two articles matching the same single term
    *   usually score identically. Without `, id` a paged search would repeat
@@ -432,7 +574,11 @@ export class KnowledgeBaseService {
     branchId: string,
     search: string,
     pagination: { page?: number; pageSize?: number } = {},
-    options: { publishedOnly?: boolean; status?: KnowledgeBaseArticleStatus } = {},
+    options: {
+      publishedOnly?: boolean;
+      status?: KnowledgeBaseArticleStatus;
+      categoryId?: string;
+    } = {},
   ): Promise<Paginated<ArticleSummary>> {
     const page = pagination.page ?? 1;
     const pageSize = pagination.pageSize ?? DEFAULT_PAGE_SIZE;
@@ -442,44 +588,96 @@ export class KnowledgeBaseService {
     // (the only status either caller ever actually wants filtered); no new
     // SQL branch, since nothing today needs a DRAFT-only search.
     const publishedOnly = options.publishedOnly || options.status === "PUBLISHED";
+    const categoryId = options.categoryId;
+    const hasCategory = categoryId !== undefined;
 
     const [rows, countRows] = await Promise.all([
       publishedOnly
-        ? this.prisma.$queryRaw<RawArticleRow[]>`
-            SELECT id, branch_id AS "branchId", title, body, category, status,
-                   published_at AS "publishedAt", created_at AS "createdAt",
-                   updated_at AS "updatedAt"
-            FROM knowledge_base.knowledge_base_articles
-            WHERE branch_id = ${branchId}
-              AND status = 'PUBLISHED'
-              AND search_vector @@ websearch_to_tsquery('english', ${search})
-            ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC, id DESC
-            LIMIT ${pageSize} OFFSET ${offset}
-          `
-        : this.prisma.$queryRaw<RawArticleRow[]>`
-            SELECT id, branch_id AS "branchId", title, body, category, status,
-                   published_at AS "publishedAt", created_at AS "createdAt",
-                   updated_at AS "updatedAt"
-            FROM knowledge_base.knowledge_base_articles
-            WHERE branch_id = ${branchId}
-              AND search_vector @@ websearch_to_tsquery('english', ${search})
-            ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ${search})) DESC, id DESC
-            LIMIT ${pageSize} OFFSET ${offset}
-          `,
+        ? hasCategory
+          ? this.prisma.$queryRaw<RawArticleRow[]>`
+              SELECT a.id, a.branch_id AS "branchId", a.title, a.body,
+                     a.category_id AS "categoryId", kbc.name AS "categoryName", a.status,
+                     a.published_at AS "publishedAt", a.created_at AS "createdAt",
+                     a.updated_at AS "updatedAt"
+              FROM knowledge_base.knowledge_base_articles AS a
+              LEFT JOIN knowledge_base.knowledge_base_categories AS kbc ON kbc.id = a.category_id
+              WHERE a.branch_id = ${branchId}
+                AND a.status = 'PUBLISHED'
+                AND a.category_id = ${categoryId}
+                AND a.search_vector @@ websearch_to_tsquery('english', ${search})
+              ORDER BY ts_rank(a.search_vector, websearch_to_tsquery('english', ${search})) DESC, a.id DESC
+              LIMIT ${pageSize} OFFSET ${offset}
+            `
+          : this.prisma.$queryRaw<RawArticleRow[]>`
+              SELECT a.id, a.branch_id AS "branchId", a.title, a.body,
+                     a.category_id AS "categoryId", kbc.name AS "categoryName", a.status,
+                     a.published_at AS "publishedAt", a.created_at AS "createdAt",
+                     a.updated_at AS "updatedAt"
+              FROM knowledge_base.knowledge_base_articles AS a
+              LEFT JOIN knowledge_base.knowledge_base_categories AS kbc ON kbc.id = a.category_id
+              WHERE a.branch_id = ${branchId}
+                AND a.status = 'PUBLISHED'
+                AND a.search_vector @@ websearch_to_tsquery('english', ${search})
+              ORDER BY ts_rank(a.search_vector, websearch_to_tsquery('english', ${search})) DESC, a.id DESC
+              LIMIT ${pageSize} OFFSET ${offset}
+            `
+        : hasCategory
+          ? this.prisma.$queryRaw<RawArticleRow[]>`
+              SELECT a.id, a.branch_id AS "branchId", a.title, a.body,
+                     a.category_id AS "categoryId", kbc.name AS "categoryName", a.status,
+                     a.published_at AS "publishedAt", a.created_at AS "createdAt",
+                     a.updated_at AS "updatedAt"
+              FROM knowledge_base.knowledge_base_articles AS a
+              LEFT JOIN knowledge_base.knowledge_base_categories AS kbc ON kbc.id = a.category_id
+              WHERE a.branch_id = ${branchId}
+                AND a.category_id = ${categoryId}
+                AND a.search_vector @@ websearch_to_tsquery('english', ${search})
+              ORDER BY ts_rank(a.search_vector, websearch_to_tsquery('english', ${search})) DESC, a.id DESC
+              LIMIT ${pageSize} OFFSET ${offset}
+            `
+          : this.prisma.$queryRaw<RawArticleRow[]>`
+              SELECT a.id, a.branch_id AS "branchId", a.title, a.body,
+                     a.category_id AS "categoryId", kbc.name AS "categoryName", a.status,
+                     a.published_at AS "publishedAt", a.created_at AS "createdAt",
+                     a.updated_at AS "updatedAt"
+              FROM knowledge_base.knowledge_base_articles AS a
+              LEFT JOIN knowledge_base.knowledge_base_categories AS kbc ON kbc.id = a.category_id
+              WHERE a.branch_id = ${branchId}
+                AND a.search_vector @@ websearch_to_tsquery('english', ${search})
+              ORDER BY ts_rank(a.search_vector, websearch_to_tsquery('english', ${search})) DESC, a.id DESC
+              LIMIT ${pageSize} OFFSET ${offset}
+            `,
       publishedOnly
-        ? this.prisma.$queryRaw<{ count: number }[]>`
-            SELECT COUNT(*)::int AS count
-            FROM knowledge_base.knowledge_base_articles
-            WHERE branch_id = ${branchId}
-              AND status = 'PUBLISHED'
-              AND search_vector @@ websearch_to_tsquery('english', ${search})
-          `
-        : this.prisma.$queryRaw<{ count: number }[]>`
-            SELECT COUNT(*)::int AS count
-            FROM knowledge_base.knowledge_base_articles
-            WHERE branch_id = ${branchId}
-              AND search_vector @@ websearch_to_tsquery('english', ${search})
-          `,
+        ? hasCategory
+          ? this.prisma.$queryRaw<{ count: number }[]>`
+              SELECT COUNT(*)::int AS count
+              FROM knowledge_base.knowledge_base_articles AS a
+              WHERE a.branch_id = ${branchId}
+                AND a.status = 'PUBLISHED'
+                AND a.category_id = ${categoryId}
+                AND a.search_vector @@ websearch_to_tsquery('english', ${search})
+            `
+          : this.prisma.$queryRaw<{ count: number }[]>`
+              SELECT COUNT(*)::int AS count
+              FROM knowledge_base.knowledge_base_articles AS a
+              WHERE a.branch_id = ${branchId}
+                AND a.status = 'PUBLISHED'
+                AND a.search_vector @@ websearch_to_tsquery('english', ${search})
+            `
+        : hasCategory
+          ? this.prisma.$queryRaw<{ count: number }[]>`
+              SELECT COUNT(*)::int AS count
+              FROM knowledge_base.knowledge_base_articles AS a
+              WHERE a.branch_id = ${branchId}
+                AND a.category_id = ${categoryId}
+                AND a.search_vector @@ websearch_to_tsquery('english', ${search})
+            `
+          : this.prisma.$queryRaw<{ count: number }[]>`
+              SELECT COUNT(*)::int AS count
+              FROM knowledge_base.knowledge_base_articles AS a
+              WHERE a.branch_id = ${branchId}
+                AND a.search_vector @@ websearch_to_tsquery('english', ${search})
+            `,
     ]);
 
     const total = countRows[0]?.count ?? 0;
@@ -507,25 +705,39 @@ export class KnowledgeBaseService {
  * `toArticleSummary`'s existing input shape exactly. `status` arrives as a
  * plain string from `$queryRaw` (Postgres enums have no special client-side
  * type), safely narrowed since it always originates from this table's own
- * `KnowledgeBaseArticleStatus` column. */
+ * `KnowledgeBaseArticleStatus` column.
+ *
+ * RM-27 — `categoryId`/`categoryName` replace the old bare `category`,
+ * already flat (no relation object) since this is a raw SQL row, not a
+ * Prisma `include` result. */
 interface RawArticleRow {
   id: string;
   branchId: string;
   title: string;
   body: string;
-  category: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
   status: KnowledgeBaseArticleStatus;
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
+/** RM-27 — accepts either shape a `KnowledgeBaseArticle` row arrives in:
+ * the raw `$queryRaw` row (`searchArticles`, already flat `categoryName`)
+ * or the Prisma-relation shape (`category: { name } | null`, via
+ * `CATEGORY_NAME_INCLUDE`). Mirrors `TicketsService`'s own
+ * `toTicketSummary` shape. */
 function toArticleSummary(article: {
   id: string;
   branchId: string;
   title: string;
   body: string;
-  category: string | null;
+  categoryId: string | null;
+  /** Optional — the Prisma-relation shape only. */
+  category?: { name: string } | null;
+  /** Optional — the raw `$queryRaw` row shape only, already flat. */
+  categoryName?: string | null;
   status: KnowledgeBaseArticleStatus;
   publishedAt: Date | null;
   createdAt: Date;
@@ -536,7 +748,8 @@ function toArticleSummary(article: {
     branchId: article.branchId,
     title: article.title,
     body: article.body,
-    category: article.category,
+    categoryId: article.categoryId,
+    categoryName: article.categoryName ?? article.category?.name ?? null,
     status: article.status,
     publishedAt: article.publishedAt,
     createdAt: article.createdAt,

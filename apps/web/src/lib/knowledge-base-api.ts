@@ -10,13 +10,17 @@ import type { PaginatedResponse } from "./paginated";
 export type ArticleStatus = "DRAFT" | "PUBLISHED";
 
 /** Mirrors the backend's own `ArticleSummary` exactly
- * (`apps/api/src/modules/knowledge-base/knowledge-base.service.ts`). */
+ * (`apps/api/src/modules/knowledge-base/knowledge-base.service.ts`).
+ *
+ * RM-27 — `category` (free text) replaced by `categoryId`/`categoryName`,
+ * mirroring `tickets-api.ts`'s own `TicketSummary` schema change. */
 export interface ArticleSummary {
   id: string;
   branchId: string;
   title: string;
   body: string;
-  category: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
   status: ArticleStatus;
   publishedAt: string | null;
   createdAt: string;
@@ -27,14 +31,14 @@ export interface ArticleSummary {
 export interface CreateArticleInput {
   title: string;
   body: string;
-  category?: string;
+  categoryId?: string;
 }
 
 /** Mirrors the existing `UpdateArticleDto` exactly (`apps/api/src/modules/knowledge-base/dto/update-article.dto.ts`). */
 export interface UpdateArticleInput {
   title?: string;
   body?: string;
-  category?: string;
+  categoryId?: string;
   status?: ArticleStatus;
 }
 
@@ -50,9 +54,12 @@ export interface UpdateArticleInput {
 /** RM-05 — additive filter, only ever set to `"PUBLISHED"` by the ticket
  * workspace's own KB reference search widget (`ticket-kb-references-api.ts`)
  * so it never offers a draft as a reference candidate. */
+/** RM-27 — additive exact-id filter, mirroring `ListArticlesQueryDto
+ * .categoryId`'s own schema change from a free-text `category` filter. */
 export interface ArticleFilters {
   search?: string;
   status?: ArticleStatus;
+  categoryId?: string;
   page?: number;
   pageSize?: number;
 }

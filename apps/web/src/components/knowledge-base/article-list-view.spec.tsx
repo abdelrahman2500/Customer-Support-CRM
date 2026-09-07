@@ -74,7 +74,8 @@ const baseArticle = {
   branchId: "branch-1",
   title: "How to reset a password",
   body: "Step-by-step instructions...",
-  category: "account",
+  categoryId: "category-1",
+  categoryName: "account",
   status: "DRAFT" as const,
   publishedAt: null,
   createdAt: "2026-01-01T00:00:00.000Z",
@@ -161,7 +162,10 @@ describe("ArticleListView", () => {
 
   it("falls back to the placeholder label for an unscoped category", () => {
     mockedUseArticlesQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: page([{ ...baseArticle, category: null }]) }) as never,
+      queryResult({
+        isSuccess: true,
+        data: page([{ ...baseArticle, categoryId: null, categoryName: null }]),
+      }) as never,
     );
 
     render(<ArticleListView />);

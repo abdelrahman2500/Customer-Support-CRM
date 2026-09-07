@@ -73,6 +73,7 @@
       "auditLogs": "Audit Log",
       "notifications": "Notification History",
       "knowledgeBase": "Knowledge Base",
+      "kbCategories": "KB Categories",
       "reports": "Reports",
       "automationRules": "Automation Rules",
       "notificationTemplates": "Notification Templates",
@@ -666,6 +667,7 @@
       "title": "New article",
       "articleTitle": "Title",
       "category": "Category",
+      "categoryDefault": "No category",
       "body": "Body",
       "submit": "Create article",
       "submitting": "Creating...",
@@ -674,6 +676,9 @@
     "detail": {
       "titleLabel": "Article title",
       "categoryLabel": "Category",
+      "noCategory": "No category",
+      "categoryLoadError": "Couldn't load categories.",
+      "optionsLoading": "Loading…",
       "bodyLabel": "Body",
       "notFound": "This article could not be found.",
       "loadError": "Couldn't load this article.",
@@ -992,6 +997,31 @@
     "createSuccess": "Category \"{name}\" created.",
     "deactivateConfirmTitle": "Deactivate this category?",
     "deactivateConfirmDescription": "\"{name}\" will no longer appear when picking a category for a new ticket, SLA policy, or automation rule — tickets already using it are unaffected."
+  },
+  "kbCategories": {
+    "heading": "Knowledge Base Categories",
+    "description": "Manage the category vocabulary Knowledge Base articles pick from.",
+    "error": "Couldn't load Knowledge Base categories.",
+    "retry": "Retry",
+    "empty": "No Knowledge Base categories yet.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "actionForbidden": "You don't have permission to perform that action.",
+    "actionFailed": "That change couldn't be saved. Please try again.",
+    "columns": {
+      "name": "Name",
+      "status": "Status"
+    },
+    "nameLabel": "Name",
+    "createPlaceholder": "e.g. Billing",
+    "createSubmit": "Add category",
+    "createSubmitting": "Adding...",
+    "createFailed": "Couldn't create the category. Please try again.",
+    "createSuccess": "Category \"{name}\" created.",
+    "deactivateConfirmTitle": "Deactivate this category?",
+    "deactivateConfirmDescription": "\"{name}\" will no longer appear when picking a category for an article — articles already using it are unaffected."
   },
   "notificationTemplates": {
     "title": "Notification Templates",

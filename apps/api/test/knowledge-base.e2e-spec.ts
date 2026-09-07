@@ -25,6 +25,14 @@ describe("Knowledge Base (e2e)", () => {
   let app: INestApplication;
   let adminAccessToken: string;
   let articleId: string;
+  // RM-27 — `category` (free text) replaced by `categoryId`; every article
+  // fixture below that needs a category first creates one via `POST
+  // /kb-categories`, uniquely-named per run so this suite's own fixtures
+  // never collide with concurrent e2e activity in the shared dev database.
+  let accountCategoryId: string;
+  let accountCategoryName: string;
+  let accountsCategoryId: string;
+  let accountsCategoryName: string;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -48,6 +56,22 @@ describe("Knowledge Base (e2e)", () => {
       .send({ email, password })
       .expect(200);
     adminAccessToken = loginResponse.body.accessToken;
+
+    accountCategoryName = `account-${randomUUID()}`;
+    const accountCategory = await request(app.getHttpServer())
+      .post("/api/v1/kb-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: accountCategoryName })
+      .expect(201);
+    accountCategoryId = accountCategory.body.id;
+
+    accountsCategoryName = `accounts-${randomUUID()}`;
+    const accountsCategory = await request(app.getHttpServer())
+      .post("/api/v1/kb-categories")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: accountsCategoryName })
+      .expect(201);
+    accountsCategoryId = accountsCategory.body.id;
   });
 
   afterAll(async () => {
@@ -82,14 +106,23 @@ describe("Knowledge Base (e2e)", () => {
       .send({
         title: "How to reset a password",
         body: "Step-by-step instructions...",
-        category: "account",
+        categoryId: accountCategoryId,
       })
       .expect(201);
 
     expect(response.body.status).toBe("DRAFT");
     expect(response.body.publishedAt).toBeNull();
-    expect(response.body.category).toBe("account");
+    expect(response.body.categoryId).toBe(accountCategoryId);
+    expect(response.body.categoryName).toBe(accountCategoryName);
     articleId = response.body.id;
+  });
+
+  it("rejects an unknown categoryId with 404", async () => {
+    await request(app.getHttpServer())
+      .post("/api/v1/knowledge-base/articles")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ title: "Bad category", body: "...", categoryId: randomUUID() })
+      .expect(404);
   });
 
   it("lists articles in the caller's branch, including the new one", async () => {
@@ -143,11 +176,11 @@ describe("Knowledge Base (e2e)", () => {
       .expect(400);
   });
 
-  it("updates title/body/category", async () => {
+  it("updates title/body/categoryId", async () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/knowledge-base/articles/${articleId}`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ title: "How to reset your password", category: "accounts" })
+      .send({ title: "How to reset your password", categoryId: accountsCategoryId })
       .expect(200);
 
     const after = await request(app.getHttpServer())
@@ -155,7 +188,16 @@ describe("Knowledge Base (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     expect(after.body.title).toBe("How to reset your password");
-    expect(after.body.category).toBe("accounts");
+    expect(after.body.categoryId).toBe(accountsCategoryId);
+    expect(after.body.categoryName).toBe(accountsCategoryName);
+  });
+
+  it("rejects an unknown categoryId on update with 404", async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/v1/knowledge-base/articles/${articleId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ categoryId: randomUUID() })
+      .expect(404);
   });
 
   it("publishes the article, stamping publishedAt", async () => {
@@ -205,7 +247,7 @@ describe("Knowledge Base (e2e)", () => {
       articleId,
       versionNumber: 1,
       title: "How to reset your password",
-      category: "accounts",
+      category: accountsCategoryName,
     });
     expect(versions.body[0].publishedAt).not.toBeNull();
   });

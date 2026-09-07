@@ -72,6 +72,11 @@ const PERMISSION_CATALOG = [
   "ticket-category:create",
   "ticket-category:read",
   "ticket-category:update",
+  // RM-27 — the managed vocabulary `KnowledgeBaseArticle.categoryId`
+  // references, mirroring `ticket-category:*`'s own three-verb shape.
+  "kb-category:create",
+  "kb-category:read",
+  "kb-category:update",
   // RM-20 — a single permission for the whole webhook-subscriptions CRUD
   // surface (create/read/update/delete), mirroring `branding:update`'s own
   // "one admin-configuration capability, not resource:action-per-verb"
@@ -104,6 +109,9 @@ const ROLE_GRANTS: Record<string, readonly string[]> = {
     "kb:read",
     "quick-reply:read",
     "ticket-category:read",
+    // RM-27 — agents pick a KB category day to day, mirroring
+    // `ticket-category:read`'s own grant.
+    "kb-category:read",
     "notification:read",
     "sla:read",
   ],
