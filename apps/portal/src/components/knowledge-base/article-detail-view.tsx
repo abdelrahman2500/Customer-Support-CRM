@@ -8,6 +8,19 @@ import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 
+/** Batch 2 (UX audit) — extracted so `loading.tsx` (the App Router route
+ * segment shown during the RSC/bundle fetch, before this component has even
+ * mounted) can render the identical shape, mirroring
+ * `TicketDetailSkeleton`'s own precedent exactly. */
+export function ArticleDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <Skeleton className="h-8 w-1/2" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  );
+}
+
 /** Story 54 — read-only article detail; mirrors `TicketDetailView`'s
  * loading/not-found/generic-error convention.
  *
@@ -19,12 +32,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
   const articleQuery = usePublishedArticleQuery(articleId, locale.toUpperCase() as KbLocale);
 
   if (articleQuery.isLoading) {
-    return (
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-8 w-1/2" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
+    return <ArticleDetailSkeleton />;
   }
 
   if (articleQuery.isError) {

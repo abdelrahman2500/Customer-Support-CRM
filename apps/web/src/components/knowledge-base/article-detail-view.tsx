@@ -48,6 +48,21 @@ import {
  * reusing that shared component with `owner: { type: "kb-article" }` —
  * no new upload/list/download UI written here.
  */
+/** Batch 2 (UX audit) — extracted so `loading.tsx` (the App Router route
+ * segment shown during the RSC/bundle fetch, before this component has even
+ * mounted) can render the identical shape, mirroring `TicketDetailSkeleton`/
+ * `CustomerDetailSkeleton`'s own precedent exactly: one definition, two call
+ * sites, zero visible swap between the route-level and query-level loading
+ * states. */
+export function ArticleDetailSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <Skeleton className="h-8 w-1/2" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  );
+}
+
 export function ArticleDetailView({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
   const errorMessage = useErrorMessage();
@@ -62,12 +77,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
 
   if (articleQuery.isLoading) {
-    return (
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-8 w-1/2" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
+    return <ArticleDetailSkeleton />;
   }
 
   if (articleQuery.isError) {
