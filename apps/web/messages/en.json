@@ -750,7 +750,9 @@
       "heading": "Agent Performance",
       "empty": "No tickets assigned yet.",
       "openLabel": "Open",
-      "resolvedLabel": "Resolved"
+      "resolvedLabel": "Resolved",
+      "modeLiveSnapshot": "Live snapshot — tickets currently assigned, by status",
+      "modeCreatedInRange": "Tickets created in the selected range, by current status"
     },
     "ticketAging": {
       "heading": "Ticket Aging"
@@ -773,16 +775,16 @@
       "uncategorized": "Uncategorized"
     },
     "dashboards": {
-      "pickerLabel": "Dashboard",
+      "pickerLabel": "Saved View",
       "allReports": "All reports",
       "sharedOptionLabel": "{name} (shared)",
-      "saveCurrentView": "Save current view as dashboard…",
+      "saveCurrentView": "Save current view…",
       "share": "Share with branch",
       "unshare": "Stop sharing",
-      "delete": "Delete dashboard",
-      "deleteConfirmTitle": "Delete this dashboard?",
+      "delete": "Delete saved view",
+      "deleteConfirmTitle": "Delete this saved view?",
       "deleteConfirmDescription": "\"{name}\" will be removed for everyone it is shared with. This can't be undone.",
-      "nameLabel": "Dashboard name",
+      "nameLabel": "Saved view name",
       "shareLabel": "Share with branch",
       "save": "Save",
       "cancel": "Cancel"

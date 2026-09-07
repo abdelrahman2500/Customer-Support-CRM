@@ -750,7 +750,9 @@
       "heading": "أداء الوكلاء",
       "empty": "لا توجد تذاكر مسندة حتى الآن.",
       "openLabel": "مفتوحة",
-      "resolvedLabel": "محلولة"
+      "resolvedLabel": "محلولة",
+      "modeLiveSnapshot": "لقطة حية — التذاكر المسندة حاليًا، حسب الحالة",
+      "modeCreatedInRange": "التذاكر المُنشأة ضمن النطاق المحدد، حسب حالتها الحالية"
     },
     "ticketAging": {
       "heading": "قِدَم التذاكر"
@@ -773,16 +775,16 @@
       "uncategorized": "بدون فئة"
     },
     "dashboards": {
-      "pickerLabel": "لوحة المعلومات",
+      "pickerLabel": "عرض محفوظ",
       "allReports": "كل التقارير",
       "sharedOptionLabel": "{name} (مشتركة)",
-      "saveCurrentView": "حفظ العرض الحالي كلوحة معلومات…",
+      "saveCurrentView": "حفظ العرض الحالي…",
       "share": "المشاركة مع الفرع",
       "unshare": "إيقاف المشاركة",
-      "delete": "حذف لوحة المعلومات",
-      "deleteConfirmTitle": "هل تريد حذف لوحة المعلومات هذه؟",
+      "delete": "حذف العرض المحفوظ",
+      "deleteConfirmTitle": "هل تريد حذف هذا العرض المحفوظ؟",
       "deleteConfirmDescription": "ستُحذف \"{name}\" لكل من تمت مشاركتها معه. لا يمكن التراجع عن هذا الإجراء.",
-      "nameLabel": "اسم لوحة المعلومات",
+      "nameLabel": "اسم العرض المحفوظ",
       "shareLabel": "المشاركة مع الفرع",
       "save": "حفظ",
       "cancel": "إلغاء"

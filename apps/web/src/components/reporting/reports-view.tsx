@@ -102,6 +102,15 @@ function formatUsd(amount: number): string {
  * control, exactly like "All reports" always has (Story 93's own explicit
  * decision against per-card independent controls).
  *
+ * RM-09 — this feature's user-facing copy (`reporting.dashboards.*`)
+ * renamed "Dashboard" -> "Saved View" throughout (English and Arabic):
+ * it shared the word "dashboard" with the unrelated Agent Dashboard
+ * (`dashboard-view.tsx`, a live ticket queue, independently computed, no
+ * link between the two screens), and nothing else. Every internal
+ * identifier (`useDashboardsQuery`, `DashboardSummary`, `selectedDashboardId`,
+ * etc.) is deliberately unchanged — this was a user-facing copy fix only,
+ * not a rename of the underlying feature or its API.
+ *
  * Story 121 — a seventh card, `GET /reports/ai-usage`, added the same
  * way; no permission/layout-shell change beyond widening "All reports."
  * Total cost plus a per-`AiFeature` breakdown, with an explicit caveat
@@ -143,6 +152,16 @@ function formatUsd(amount: number): string {
  * loading/forbidden/error states are untouched: a chart is just a new
  * shape of `children`, the one thing that shell was already designed to
  * vary per widget.
+ *
+ * RM-09 — the Agent Performance card gains a small mode caption
+ * ("Live snapshot..." / "Tickets created in the selected range...")
+ * driven by the exact same `range.from || range.to` check the date-range
+ * control's own Clear button already uses to decide "is a filter
+ * active" — `ReportingService.getAgentPerformance`'s own doc comment
+ * already disclosed this widget silently answers a different question
+ * depending on whether a range is set; this surfaces that distinction
+ * instead of leaving it implicit. See the `dashboards.*` doc comment
+ * above for this story's other half (the "Dashboard" naming collision).
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
@@ -310,6 +329,18 @@ export function ReportsView() {
             exportPath="agent-performance"
             range={range}
           >
+            {/* RM-09 — this widget silently answers a different question
+                depending on whether a date filter is active (see
+                `ReportingService.getAgentPerformance`'s own doc comment):
+                with none, a live workload snapshot; with one, a
+                created-in-range outcome breakdown. Surfaced explicitly so
+                the two meanings are never ambiguous to whoever is reading
+                it. */}
+            <p className="mb-2 text-xs text-slate-500">
+              {range.from || range.to
+                ? t("agentPerformance.modeCreatedInRange")
+                : t("agentPerformance.modeLiveSnapshot")}
+            </p>
             {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length === 0 && (
               <p className="text-sm text-slate-500">{t("agentPerformance.empty")}</p>
             )}

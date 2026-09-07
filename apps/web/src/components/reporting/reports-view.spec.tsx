@@ -339,6 +339,38 @@ describe("ReportsView", () => {
     });
   });
 
+  // RM-09 — Agent Performance's dual-semantics mode indicator.
+  describe("agent-performance mode indicator (RM-09)", () => {
+    it("shows the live-snapshot caption when no date range is active", () => {
+      render(<ReportsView />);
+
+      expect(screen.getByText("agentPerformance.modeLiveSnapshot")).toBeInTheDocument();
+      expect(screen.queryByText("agentPerformance.modeCreatedInRange")).not.toBeInTheDocument();
+    });
+
+    it("switches to the created-in-range caption once a date range is active", () => {
+      render(<ReportsView />);
+
+      fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
+        target: { value: "2026-01-01" },
+      });
+
+      expect(screen.getByText("agentPerformance.modeCreatedInRange")).toBeInTheDocument();
+      expect(screen.queryByText("agentPerformance.modeLiveSnapshot")).not.toBeInTheDocument();
+    });
+
+    it("reverts to the live-snapshot caption once the range is cleared", () => {
+      render(<ReportsView />);
+
+      fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
+        target: { value: "2026-01-01" },
+      });
+      fireEvent.click(screen.getByText("dateRange.clear"));
+
+      expect(screen.getByText("agentPerformance.modeLiveSnapshot")).toBeInTheDocument();
+    });
+  });
+
   it("shows a forbidden message on a card whose query 403s, independent of the others", () => {
     mockedUseTicketVolumeQuery.mockReturnValue(
       queryResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
