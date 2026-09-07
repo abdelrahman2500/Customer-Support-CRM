@@ -5,13 +5,15 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
+  useCreateTicketEmailMessageMutation,
   useCreateTicketMessageMutation,
+  useEmailChannelStatusQuery,
   useTicketMessagesQuery,
 } from "@/hooks/use-ticket-messages";
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { ApiError } from "@/lib/api";
-import { Alert, Button, cn, Skeleton } from "@crm/ui";
+import { Alert, Button, Checkbox, cn, Label, Skeleton } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /**
@@ -36,6 +38,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
  * for the same message id, and `useTicketRealtime`'s handler now upserts
  * by id (RM-13's own `mergeChannelMessage` change) instead of ignoring a
  * repeat id, so this label updates in place with no extra wiring here.
+ *
+ * RM-15 — `ChatComposer` gains a "send by email" checkbox, visible only
+ * once `useEmailChannelStatusQuery()` confirms an `EMAIL` adapter is
+ * actually configured (`GET /channels/email-status`) — never offering an
+ * action that would just leave a message `PENDING` forever. Checked,
+ * `send()` calls `POST /tickets/:id/messages/email`
+ * (`useCreateTicketEmailMessageMutation`) instead of the existing Live
+ * Chat endpoint; every other part of the composer — the textarea, quick
+ * replies, error handling — is shared unchanged between the two.
  */
 export function TicketChatCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -165,18 +176,22 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [selectedQuickReplyId, setSelectedQuickReplyId] = useState("");
+  const [sendAsEmail, setSendAsEmail] = useState(false);
   const mutation = useCreateTicketMessageMutation(ticketId);
+  const emailMutation = useCreateTicketEmailMessageMutation(ticketId);
+  const emailStatusQuery = useEmailChannelStatusQuery();
   const quickRepliesQuery = useQuickRepliesQuery();
   const activeQuickReplies = (quickRepliesQuery.data ?? []).filter((reply) => reply.isActive);
+  const activeMutation = sendAsEmail ? emailMutation : mutation;
 
   async function send(): Promise<void> {
     const trimmed = body.trim();
-    if (!trimmed || mutation.isPending) {
+    if (!trimmed || activeMutation.isPending) {
       return;
     }
     setError(null);
     try {
-      await mutation.mutateAsync({ body: trimmed });
+      await activeMutation.mutateAsync({ body: trimmed });
       setBody("");
     } catch (submitError) {
       setError(submitError instanceof ApiError ? submitError.message : t("detail.chatSendFailed"));
@@ -225,14 +240,25 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
         rows={2}
         value={body}
         placeholder={t("detail.chatPlaceholder")}
-        disabled={mutation.isPending}
+        disabled={activeMutation.isPending}
         aria-label={t("detail.chatPlaceholder")}
         onChange={(event) => setBody(event.target.value)}
         onKeyDown={handleKeyDown}
       />
+      {emailStatusQuery.data?.configured && (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id={`send-as-email-${ticketId}`}
+            checked={sendAsEmail}
+            disabled={activeMutation.isPending}
+            onCheckedChange={(checked) => setSendAsEmail(checked === true)}
+          />
+          <Label htmlFor={`send-as-email-${ticketId}`}>{t("detail.sendByEmailLabel")}</Label>
+        </div>
+      )}
       <div>
-        <Button type="submit" size="sm" disabled={mutation.isPending || !body.trim()}>
-          {mutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
+        <Button type="submit" size="sm" disabled={activeMutation.isPending || !body.trim()}>
+          {activeMutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
         </Button>
       </div>
       {error && <Alert variant="destructive">{error}</Alert>}

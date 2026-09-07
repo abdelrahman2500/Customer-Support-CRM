@@ -2,7 +2,9 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TicketChatCard } from "./ticket-chat-card";
 import {
+  useCreateTicketEmailMessageMutation,
   useCreateTicketMessageMutation,
+  useEmailChannelStatusQuery,
   useTicketMessagesQuery,
 } from "@/hooks/use-ticket-messages";
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
@@ -20,6 +22,8 @@ vi.mock("next-intl", () => ({
 vi.mock("@/hooks/use-ticket-messages", () => ({
   useTicketMessagesQuery: vi.fn(),
   useCreateTicketMessageMutation: vi.fn(),
+  useCreateTicketEmailMessageMutation: vi.fn(),
+  useEmailChannelStatusQuery: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-tickets", () => ({
@@ -143,6 +147,20 @@ describe("TicketChatCard", () => {
       isError: false,
       error: null,
     } as never);
+    // RM-15 — defaults to "not configured" (no checkbox, no separate
+    // mutation exercised) so every pre-existing test below keeps testing
+    // exactly the Live Chat flow it always has; the "send by email
+    // (RM-15)" describe block below overrides this explicitly.
+    vi.mocked(useCreateTicketEmailMessageMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue(myOwnMessage),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(useEmailChannelStatusQuery).mockReturnValue(
+      queryResult({ data: { configured: false }, isSuccess: true }) as never,
+    );
     vi.mocked(useQuickRepliesQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -395,6 +413,131 @@ describe("TicketChatCard", () => {
       render(<TicketChatCard ticketId="ticket-1" />);
 
       expect(screen.getByText("detail.chatDeliveryStatus.FAILED")).toHaveClass("text-danger-solid");
+    });
+  });
+
+  // RM-15 — Email Adapter (Outbound).
+  describe("send by email (RM-15)", () => {
+    it("renders no checkbox at all when email isn't configured (the default today)", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(screen.queryByText("detail.sendByEmailLabel")).not.toBeInTheDocument();
+      expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    });
+
+    it("renders the checkbox once email is configured", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useEmailChannelStatusQuery).mockReturnValue(
+        queryResult({ data: { configured: true }, isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(screen.getByRole("checkbox", { name: "detail.sendByEmailLabel" })).toBeInTheDocument();
+    });
+
+    it("sends via the Live Chat endpoint by default even when email is configured (checkbox unchecked)", async () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useEmailChannelStatusQuery).mockReturnValue(
+        queryResult({ data: { configured: true }, isSuccess: true }) as never,
+      );
+      const liveChatMutateAsync = vi.fn().mockResolvedValue(myOwnMessage);
+      const emailMutateAsync = vi.fn().mockResolvedValue(myOwnMessage);
+      vi.mocked(useCreateTicketMessageMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: liveChatMutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      vi.mocked(useCreateTicketEmailMessageMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: emailMutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+      fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+        target: { value: "How can I help?" },
+      });
+      fireEvent.click(screen.getByText("detail.chatSend"));
+
+      await vi.waitFor(() => {
+        expect(liveChatMutateAsync).toHaveBeenCalledWith({ body: "How can I help?" });
+      });
+      expect(emailMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("sends via the email endpoint instead once the checkbox is checked", async () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useEmailChannelStatusQuery).mockReturnValue(
+        queryResult({ data: { configured: true }, isSuccess: true }) as never,
+      );
+      const liveChatMutateAsync = vi.fn().mockResolvedValue(myOwnMessage);
+      const emailMutateAsync = vi.fn().mockResolvedValue(myOwnMessage);
+      vi.mocked(useCreateTicketMessageMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: liveChatMutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      vi.mocked(useCreateTicketEmailMessageMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: emailMutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+      fireEvent.click(screen.getByRole("checkbox", { name: "detail.sendByEmailLabel" }));
+      fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+        target: { value: "Your invoice is attached." },
+      });
+      fireEvent.click(screen.getByText("detail.chatSend"));
+
+      await vi.waitFor(() => {
+        expect(emailMutateAsync).toHaveBeenCalledWith({ body: "Your invoice is attached." });
+      });
+      expect(liveChatMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("shows the inline error message when the email send is rejected", async () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useEmailChannelStatusQuery).mockReturnValue(
+        queryResult({ data: { configured: true }, isSuccess: true }) as never,
+      );
+      vi.mocked(useCreateTicketEmailMessageMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(new ApiError("This ticket has no contact to email.", 400)),
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+      fireEvent.click(screen.getByRole("checkbox", { name: "detail.sendByEmailLabel" }));
+      fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+        target: { value: "hello" },
+      });
+      fireEvent.click(screen.getByText("detail.chatSend"));
+
+      await screen.findByText("This ticket has no contact to email.");
     });
   });
 

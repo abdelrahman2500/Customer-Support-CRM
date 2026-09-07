@@ -211,8 +211,33 @@ the app run misconfigured.
 | `SENTRY_DSN`                                      | no                     | Sentry or a self-hosted GlitchTip.                                                                                                                                                                                                                                                                                                                                                                        |
 
 `apps/worker` reads `NODE_ENV`, `DATABASE_URL`, `APP_DATABASE_URL`,
-`REDIS_URL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` and `SENTRY_DSN` from the
-same contract.
+`REDIS_URL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `SENTRY_DSN` and (RM-15)
+`SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` from
+the same contract, validated by its own
+`apps/worker/src/env.validation.ts`.
+
+### `apps/worker`-only: outbound email (RM-15)
+
+| Variable        | Required   | Notes                                                                                                                                                                                                                              |
+| --------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SMTP_HOST`     | no         | With `SMTP_FROM`, both must be set for `EmailAdapter` to register at all — see below.                                                                                                                                             |
+| `SMTP_PORT`     | no (`587`) |                                                                                                                                                                                                                                     |
+| `SMTP_USER`     | no         | Omit for an unauthenticated relay (e.g. local Mailhog).                                                                                                                                                                           |
+| `SMTP_PASSWORD` | no         |                                                                                                                                                                                                                                     |
+| `SMTP_FROM`     | no         | The `From:` address every outbound email is sent as.                                                                                                                                                                              |
+
+Local dev/CI point these at the already-running Mailhog sandbox
+(`docker-compose.yml`: SMTP on `1025`, its own web UI/JSON API on `8025`) —
+zero cost, nothing ever leaves the machine/CI job. With `SMTP_HOST`/
+`SMTP_FROM` unset (every environment before this story, and any real
+deployment that has not yet made a production email-relay decision —
+`.squad/plans/core-completion-roadmap/02-product-decisions.md` Decision
+Record 1), `ChannelAdapterRegistry` registers no `EMAIL` adapter at all: an
+outbound email `ChannelMessage` stays `PENDING`, exactly like `WHATSAPP`/
+`SMS` today — never a crash, never a silent drop. **No paid provider
+(SendGrid/SES/Mailgun/Resend/Twilio/etc.) is wired in anywhere** — a real
+production relay is a separate, later decision, not something this
+environment-variable contract itself chooses.
 
 ### Empty string vs unset
 

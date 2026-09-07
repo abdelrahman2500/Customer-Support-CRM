@@ -67,6 +67,33 @@ export const envSchema = z.object({
    * own doc comment).
    */
   SENTRY_DSN: optionalString,
+
+  /**
+   * RM-15 — `EmailAdapter`'s SMTP transport config. All five deliberately
+   * optional (same "unset is a valid, expected state" semantics as
+   * `ANTHROPIC_API_KEY` above): with no `SMTP_HOST`, `ChannelsModule`
+   * registers no `EMAIL` adapter at all — `ChannelAdapterRegistry.resolve
+   * ("EMAIL")` then returns `undefined`, exactly RM-14's own existing
+   * "not configured" behavior, not a new failure mode. Local dev points
+   * these at the already-running Mailhog sandbox (`docker-compose.yml`:
+   * `localhost:1025`); production rollout to a real relay is a separate,
+   * later decision (`.squad/plans/core-completion-roadmap/
+   * 02-product-decisions.md`, Decision Record 1) this story does not make.
+   * `SMTP_PORT` defaults to `587` (the standard submission port) only
+   * when `SMTP_HOST` — and therefore a real value — is actually present;
+   * `z.coerce.number()` turns the env string into a real number.
+   */
+  SMTP_HOST: optionalString,
+  SMTP_PORT: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.coerce.number().int().positive().default(587),
+  ),
+  SMTP_USER: optionalString,
+  SMTP_PASSWORD: optionalString,
+  /** The `From:` address `EmailAdapter` sends as. Required, alongside
+   * `SMTP_HOST`, for the adapter to actually register — see
+   * `channels.module.ts`'s own factory. */
+  SMTP_FROM: optionalString,
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createTicketMessage, getTicketMessages } from "@/lib/ticket-messages-api";
+import {
+  createTicketEmailMessage,
+  createTicketMessage,
+  getEmailChannelStatus,
+  getTicketMessages,
+} from "@/lib/ticket-messages-api";
 import type { ChannelMessageSummary, CreateChannelMessageInput } from "@/lib/ticket-messages-api";
 
 export const ticketMessagesQueryKey = (id: string) => ["ticket", id, "messages"] as const;
@@ -61,5 +66,34 @@ export function useCreateTicketMessageMutation(id: string) {
         (current: ChannelMessageSummary[] | undefined) => mergeChannelMessage(current, message),
       );
     },
+  });
+}
+
+/** RM-15 — the email equivalent of `useCreateTicketMessageMutation` above,
+ * identical shape (same merge-on-success, same never-assumes-success
+ * rule) — only the endpoint it calls differs. */
+export function useCreateTicketEmailMessageMutation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateChannelMessageInput) => createTicketEmailMessage(id, input),
+    onSuccess: (message) => {
+      queryClient.setQueryData(
+        ticketMessagesQueryKey(id),
+        (current: ChannelMessageSummary[] | undefined) => mergeChannelMessage(current, message),
+      );
+    },
+  });
+}
+
+/** RM-15 — a capability check, not per-ticket data: `staleTime: Infinity`
+ * since whether SMTP is configured cannot change mid-session (only a
+ * server restart with different env vars would change it), so refetching
+ * it more than once per page load would only add network traffic for a
+ * value that never actually changes. */
+export function useEmailChannelStatusQuery() {
+  return useQuery({
+    queryKey: ["channels", "email-status"] as const,
+    queryFn: getEmailChannelStatus,
+    staleTime: Infinity,
   });
 }

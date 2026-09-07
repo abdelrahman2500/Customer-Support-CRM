@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import { QueuesModule } from "../../queues/queues.module";
 import { ChannelMessagesService } from "./channel-messages.service";
+import { EmailStatusController } from "./email-status.controller";
 import { QuickRepliesController } from "./quick-replies.controller";
 import { QuickRepliesService } from "./quick-replies.service";
 
@@ -24,10 +25,16 @@ import { QuickRepliesService } from "./quick-replies.service";
  * RM-13 — imports `QueuesModule` (already exports `ChannelMessageDeliveryProducer`)
  * so `ChannelMessagesService` can inject it directly, mirroring exactly how
  * `AiModule`/`TicketsModule` import `QueuesModule` for `AiProcessingProducer`.
+ *
+ * RM-15 — `EmailStatusController` added the same way `QuickRepliesController`
+ * was: its own controller file, registered here since it's channel-level
+ * (not ticket-scoped) — see that controller's own doc comment for why it
+ * carries no service/provider of its own (just `ConfigService`, already
+ * globally available).
  */
 @Module({
   imports: [QueuesModule],
-  controllers: [QuickRepliesController],
+  controllers: [QuickRepliesController, EmailStatusController],
   providers: [ChannelMessagesService, QuickRepliesService, TenantContext],
   exports: [ChannelMessagesService],
 })

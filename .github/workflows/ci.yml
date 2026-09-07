@@ -51,6 +51,16 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # RM-15 — needs no custom command (unlike minio below), so it can be
+      # a plain `services:` container like postgres/redis. No image-native
+      # health-check tool exists to pass as `--health-cmd`, so readiness
+      # is confirmed by the explicit "Wait for Mailhog" step below instead
+      # — mirrors "Wait for MinIO"'s exact reasoning.
+      mailhog:
+        image: mailhog/mailhog:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,6 +104,24 @@ jobs:
         # directly (bypassing turbo) with real prerequisites and env.
         run: pnpm test
 
+      - name: Wait for Mailhog
+        # RM-15 — same reasoning as "Wait for MinIO" below: a plain
+        # `services:` container starts immediately but isn't necessarily
+        # accepting connections yet: apps/worker's own Mailhog-backed e2e
+        # suite ("Worker integration tests" below) needs its HTTP API
+        # actually answering before it runs.
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8025/api/v2/messages > /dev/null; then
+              echo "Mailhog is ready"
+              exit 0
+            fi
+            echo "Waiting for Mailhog to become ready... ($i/30)"
+            sleep 1
+          done
+          echo "::error::Mailhog did not become ready within 30 seconds"
+          exit 1
+
       - name: Start MinIO
         # apps/api's e2e suite boots the real AppModule, which includes
         # S3StorageService (Story 66) — it needs a real S3-compatible
@@ -134,6 +162,24 @@ jobs:
         env:
           APP_DATABASE_URL: "postgresql://crm_app:crm_app_dev_password@localhost:5432/crm?schema=public"
         run: pnpm --filter @crm/api test:e2e
+
+      - name: Worker integration tests
+        # RM-15 — apps/worker's own e2e suite (sla-timer.processor.e2e-spec.ts,
+        # now also email-adapter.e2e-spec.ts) was never invoked anywhere in
+        # this workflow before this story — confirmed by recon. It has no
+        # `test:e2e:prepare`/reset step of its own (apps/worker has no
+        # migration ownership) and instead relies on the seeded branch the
+        # "Integration tests" step above already left in place, mirroring
+        # that spec's own documented precondition. SMTP_HOST/PORT/FROM are
+        # scoped to this step only, pointing at the mailhog service above —
+        # every other apps/worker suite (and every apps/api suite) is
+        # unaffected by their absence.
+        env:
+          APP_DATABASE_URL: "postgresql://crm_app:crm_app_dev_password@localhost:5432/crm?schema=public"
+          SMTP_HOST: "localhost"
+          SMTP_PORT: "1025"
+          SMTP_FROM: "support@example.test"
+        run: pnpm --filter @crm/worker test:e2e
 
   browser-e2e:
     name: Browser E2E (Playwright)

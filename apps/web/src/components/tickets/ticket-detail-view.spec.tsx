@@ -20,7 +20,9 @@ import {
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import {
+  useCreateTicketEmailMessageMutation,
   useCreateTicketMessageMutation,
+  useEmailChannelStatusQuery,
   useTicketMessagesQuery,
 } from "@/hooks/use-ticket-messages";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
@@ -92,9 +94,13 @@ vi.mock("@/hooks/use-attachments", () => ({
 // Story 78 — TicketChatCard's own hooks; its behavior is covered in its own
 // dedicated spec (mirrors AttachmentsCard's own precedent), so this file
 // only needs enough of a mock for TicketDetailView to render it cleanly.
+// RM-15 adds two more (send-by-email + its own config-status check) for
+// the exact same reason.
 vi.mock("@/hooks/use-ticket-messages", () => ({
   useTicketMessagesQuery: vi.fn(),
   useCreateTicketMessageMutation: vi.fn(),
+  useCreateTicketEmailMessageMutation: vi.fn(),
+  useEmailChannelStatusQuery: vi.fn(),
 }));
 
 // Story 91 — TicketChatCard's ChatComposer also reads this hook directly;
@@ -232,6 +238,19 @@ describe("TicketDetailView", () => {
       isError: false,
       error: null,
     } as never);
+    // RM-15 — defaults to "not configured", mirroring
+    // ticket-chat-card.spec.tsx's own default: this file only needs
+    // TicketChatCard to render cleanly, not to exercise its email flow.
+    vi.mocked(useCreateTicketEmailMessageMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({ id: "message-new" }),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+    vi.mocked(useEmailChannelStatusQuery).mockReturnValue(
+      queryResult({ data: { configured: false }, isSuccess: true }) as never,
+    );
     vi.mocked(useQuickRepliesQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );

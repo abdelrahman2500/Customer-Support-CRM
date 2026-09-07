@@ -50,3 +50,29 @@ export function createTicketMessage(
     body: JSON.stringify(input),
   });
 }
+
+/** RM-15 — `POST /tickets/:id/messages/email` (`ticket:create`, same
+ * permission as `createTicketMessage` above). Reuses the identical
+ * request shape — only the channel differs. Resolves the moment the
+ * message is created `PENDING`; its eventual `SENT`/`FAILED` transition
+ * arrives over the existing realtime relay, same as every other message. */
+export function createTicketEmailMessage(
+  id: string,
+  input: CreateChannelMessageInput,
+): Promise<ChannelMessageSummary> {
+  return apiFetch<ChannelMessageSummary>(`/tickets/${id}/messages/email`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export interface EmailChannelStatus {
+  configured: boolean;
+}
+
+/** RM-15 — `GET /channels/email-status`. A capability signal, not
+ * ticket-scoped data: whether `TicketChatCard` should offer a "send by
+ * email" action at all. */
+export function getEmailChannelStatus(): Promise<EmailChannelStatus> {
+  return apiFetch<EmailChannelStatus>(`/channels/email-status`);
+}

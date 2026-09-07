@@ -154,6 +154,22 @@ const baseEnvSchema = z.object({
    * either provider — no provider-specific code branches here.
    */
   SENTRY_DSN: optionalString,
+
+  /**
+   * RM-15 — deliberately narrower than the `ANTHROPIC_API_KEY` precedent
+   * this comment's own header describes removing: `apps/api` never
+   * constructs an SMTP transport or sends anything (`apps/worker`'s own
+   * `EmailAdapter` does, from its own independently-validated copy of
+   * these same two variables) — this pair exists here for exactly one
+   * purpose, `GET /channels/email-status`'s presence check, so
+   * `TicketChatCard`'s "send by email" composer option can avoid
+   * offering an action that would just sit `PENDING` forever. Only the
+   * two variables that presence-check gates on are duplicated — `SMTP_PORT`/
+   * `SMTP_USER`/`SMTP_PASSWORD` stay worker-only, since nothing here ever
+   * needs them.
+   */
+  SMTP_HOST: optionalString,
+  SMTP_FROM: optionalString,
 });
 
 export const envSchema = baseEnvSchema.superRefine((env, ctx) => {

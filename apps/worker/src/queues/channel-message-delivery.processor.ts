@@ -54,6 +54,21 @@ export interface ChannelMessageDeliveryJobPayload {
  * still has attempts remaining hands back nothing — BullMQ's own
  * scheduled retry will call `process()` again, exactly as if this were
  * the first attempt.
+ *
+ * RM-15 — a minimal, schema-free idempotency guard: `process()` never
+ * calls `adapter.send()` for a row already `SENT`/`DELIVERED` (checked
+ * against the same `findUniqueOrThrow` read `send()` itself needs, no
+ * extra query). This is not a claim of true exactly-once SMTP delivery —
+ * a real mail transport can accept a message and then have the
+ * connection drop before this process ever records that success, and a
+ * subsequent retry of that *same* attempt has no way to know the first
+ * one actually landed. What this guard *does* rule out is the case this
+ * repository's own architecture could otherwise create: a second,
+ * independent job for a message BullMQ already completed (a stray
+ * duplicate enqueue, a replayed job) re-sending it. BullMQ itself
+ * remains the only retry authority — this guard adds no second retry
+ * mechanism, only a check before the one send this method ever performs
+ * per invocation.
  */
 @Injectable()
 @Processor(CHANNEL_MESSAGE_DELIVERY_QUEUE)
@@ -81,6 +96,12 @@ export class ChannelMessageDeliveryProcessor extends WorkerHost {
     const row = await this.prisma.channelMessage.findUniqueOrThrow({
       where: { id: job.data.channelMessageId },
     });
+    if (row.deliveryStatus === "SENT" || row.deliveryStatus === "DELIVERED") {
+      this.logger.warn(
+        `Channel message ${job.data.channelMessageId} is already ${row.deliveryStatus} — skipping a duplicate send`,
+      );
+      return;
+    }
     const result = await adapter.send(row);
 
     const message = await this.prisma.channelMessage.update({

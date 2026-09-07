@@ -174,4 +174,24 @@ export class TicketsController {
   getMessages(@Param("id") id: string): Promise<ChannelMessageSummary[]> {
     return this.ticketChannelService.listMessagesForAgent(id);
   }
+
+  /**
+   * RM-15 — the agent-facing email equivalent of `sendMessage` above, same
+   * `ticket:create` permission (sending an email is the same "adds
+   * ticket-visible content" action as sending a chat message; no new
+   * permission is warranted — see `TicketChannelService.
+   * createAgentEmailMessage`'s own doc comment). Reuses the same
+   * `CreateChannelMessageDto` — the request shape is identical, only the
+   * channel differs. Responds `201` with the message already `PENDING`;
+   * the eventual `SENT`/`FAILED` transition arrives over the existing
+   * `channel.message.created` realtime relay, unchanged.
+   */
+  @Post(":id/messages/email")
+  @RequirePermissions("ticket:create")
+  sendEmailMessage(
+    @Param("id") id: string,
+    @Body() dto: CreateChannelMessageDto,
+  ): Promise<ChannelMessageSummary> {
+    return this.ticketChannelService.createAgentEmailMessage(id, dto.body);
+  }
 }

@@ -1839,6 +1839,97 @@ describe("Ticketing (e2e)", () => {
     });
   });
 
+  // RM-15 — Email Adapter (Outbound). Gated by the same `ticket:create`
+  // as Live Chat's own `sendMessage` route above — mirrors that
+  // describe block's own conventions exactly.
+  describe("ticket messages / send by email (RM-15)", () => {
+    it("rejects an unauthenticated request", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketId}/messages/email`)
+        .send({ body: "Should not be created" })
+        .expect(401);
+    });
+
+    it("returns 404 for a ticket that doesn't exist", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${randomUUID()}/messages/email`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Should not be created" })
+        .expect(404);
+    });
+
+    it("rejects with 400 when the ticket has no contact at all", async () => {
+      // Deliberately no `contactId` — unlike `ticketId` (the shared
+      // fixture, which does have one) and unlike `agentTicket`/every
+      // other ticket created above.
+      const ticketWithoutContact = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, subject: "RM-15 no-contact fixture" })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketWithoutContact.body.id}/messages/email`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Your invoice is attached." })
+        .expect(400);
+    });
+
+    it("rejects with 400 when the ticket's contact has no email on file", async () => {
+      const contact = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${customerId}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ fullName: "No Email Contact" })
+        .expect(201);
+      const ticketWithoutEmail = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, contactId: contact.body.id, subject: "RM-15 no-email fixture" })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${ticketWithoutEmail.body.id}/messages/email`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Your invoice is attached." })
+        .expect(400);
+    });
+
+    it("creates an OUTBOUND EMAIL message PENDING for a ticket whose contact has an email on file, and it appears in the ticket's message list", async () => {
+      const contact = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${customerId}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ fullName: "RM-15 Emailable Contact", email: `rm15-${randomUUID()}@example.com` })
+        .expect(201);
+      const emailTicket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId, contactId: contact.body.id, subject: "RM-15 email fixture" })
+        .expect(201);
+
+      const sent = await request(app.getHttpServer())
+        .post(`/api/v1/tickets/${emailTicket.body.id}/messages/email`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ body: "Your invoice is attached." })
+        .expect(201);
+
+      expect(sent.body).toMatchObject({
+        ticketId: emailTicket.body.id,
+        channelType: "EMAIL",
+        direction: "OUTBOUND",
+        senderUserId: adminUserId,
+        senderContactId: null,
+        body: "Your invoice is attached.",
+        deliveryStatus: "PENDING",
+      });
+
+      const listed = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${emailTicket.body.id}/messages`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(listed.body.map((m: { id: string }) => m.id)).toContain(sent.body.id);
+    });
+  });
+
   // RM-05 — Ticket ↔ Knowledge Base Linkage.
   describe("kb references (RM-05)", () => {
     let kbTicketId: string;

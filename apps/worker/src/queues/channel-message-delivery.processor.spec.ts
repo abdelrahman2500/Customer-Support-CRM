@@ -138,6 +138,35 @@ describe("ChannelMessageDeliveryProcessor", () => {
       expect(prisma.channelMessage.update).not.toHaveBeenCalled();
       expect(handbackQueue.add).not.toHaveBeenCalled();
     });
+
+    // RM-15 — the minimal idempotency guard.
+    it.each(["SENT", "DELIVERED"] as const)(
+      "skips the send and logs a warning, without touching Prisma or handing back, when the fetched row is already %s",
+      async (deliveryStatus) => {
+        const adapter = { send: vi.fn() };
+        adapterRegistry.resolve.mockReturnValue(adapter);
+        prisma.channelMessage.findUniqueOrThrow.mockResolvedValue({ ...ROW, deliveryStatus });
+        const job = buildJob(PAYLOAD);
+
+        await processor.process(job);
+
+        expect(adapter.send).not.toHaveBeenCalled();
+        expect(prisma.channelMessage.update).not.toHaveBeenCalled();
+        expect(handbackQueue.add).not.toHaveBeenCalled();
+      },
+    );
+
+    it("still sends when the fetched row is PENDING or FAILED (a genuine retry, not a duplicate)", async () => {
+      const adapter = { send: vi.fn().mockResolvedValue({ externalMessageId: "provider-msg-1" }) };
+      adapterRegistry.resolve.mockReturnValue(adapter);
+      prisma.channelMessage.findUniqueOrThrow.mockResolvedValue({ ...ROW, deliveryStatus: "FAILED" });
+      prisma.channelMessage.update.mockResolvedValue(UPDATED_ROW);
+      const job = buildJob(PAYLOAD);
+
+      await processor.process(job);
+
+      expect(adapter.send).toHaveBeenCalledOnce();
+    });
   });
 
   describe("onFailed", () => {

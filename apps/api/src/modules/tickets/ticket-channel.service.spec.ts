@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TicketChannelService } from "./ticket-channel.service";
 import type { ChannelMessagesService } from "../channels/channel-messages.service";
 import type { TenantContext } from "../../common/tenant/tenant-context";
+import type { CustomersService } from "../customers/customers.service";
 import type { TicketsService } from "./tickets.service";
 
 function buildTicketsServiceMock() {
@@ -16,6 +17,7 @@ function buildChannelMessagesServiceMock() {
     createOutboundFromUser: vi.fn(),
     createInboundFromContact: vi.fn(),
     createSystemMessage: vi.fn(),
+    enqueueOutboundDelivery: vi.fn(),
     listForTicket: vi.fn(),
   };
 }
@@ -24,15 +26,23 @@ function buildTenantContextMock(userId: string | null = "user-1") {
   return { userId };
 }
 
+function buildCustomersServiceMock() {
+  return {
+    getCustomer: vi.fn(),
+  };
+}
+
 function createService(
   ticketsMock: ReturnType<typeof buildTicketsServiceMock>,
   channelMessagesMock: ReturnType<typeof buildChannelMessagesServiceMock>,
   tenantMock: ReturnType<typeof buildTenantContextMock>,
+  customersMock: ReturnType<typeof buildCustomersServiceMock> = buildCustomersServiceMock(),
 ): TicketChannelService {
   return new TicketChannelService(
     ticketsMock as unknown as TicketsService,
     channelMessagesMock as unknown as ChannelMessagesService,
     tenantMock as unknown as TenantContext,
+    customersMock as unknown as CustomersService,
   );
 }
 
@@ -40,6 +50,7 @@ describe("TicketChannelService", () => {
   let ticketsService: ReturnType<typeof buildTicketsServiceMock>;
   let channelMessagesService: ReturnType<typeof buildChannelMessagesServiceMock>;
   let tenantContext: ReturnType<typeof buildTenantContextMock>;
+  let customersService: ReturnType<typeof buildCustomersServiceMock>;
   let service: TicketChannelService;
 
   beforeEach(() => {
@@ -47,7 +58,8 @@ describe("TicketChannelService", () => {
     ticketsService = buildTicketsServiceMock();
     channelMessagesService = buildChannelMessagesServiceMock();
     tenantContext = buildTenantContextMock();
-    service = createService(ticketsService, channelMessagesService, tenantContext);
+    customersService = buildCustomersServiceMock();
+    service = createService(ticketsService, channelMessagesService, tenantContext, customersService);
   });
 
   describe("createAgentMessage", () => {
@@ -83,6 +95,105 @@ describe("TicketChannelService", () => {
         "TenantContext: no authenticated user on this request",
       );
       expect(channelMessagesService.createOutboundFromUser).not.toHaveBeenCalled();
+    });
+  });
+
+  // RM-15 — Email Adapter (Outbound).
+  describe("createAgentEmailMessage", () => {
+    it("verifies ticket access, resolves the contact's email, then enqueues an OUTBOUND EMAIL delivery from the authenticated user", async () => {
+      ticketsService.getTicket.mockResolvedValue({
+        id: "ticket-1",
+        customerId: "customer-1",
+        contactId: "contact-1",
+      });
+      customersService.getCustomer.mockResolvedValue({
+        id: "customer-1",
+        contacts: [{ id: "contact-1", email: "jane@example.com" }],
+      });
+      channelMessagesService.enqueueOutboundDelivery.mockResolvedValue({ id: "message-1" });
+
+      const result = await service.createAgentEmailMessage("ticket-1", "Your invoice is attached.");
+
+      expect(ticketsService.getTicket).toHaveBeenCalledWith("ticket-1");
+      expect(customersService.getCustomer).toHaveBeenCalledWith("customer-1");
+      expect(channelMessagesService.enqueueOutboundDelivery).toHaveBeenCalledWith(
+        "ticket-1",
+        "EMAIL",
+        "user-1",
+        "Your invoice is attached.",
+      );
+      expect(result).toEqual({ id: "message-1" });
+    });
+
+    it("propagates a NotFoundException from getTicket for an out-of-scope ticket, never resolving a contact or enqueueing", async () => {
+      const notFound = new Error("Ticket not found");
+      ticketsService.getTicket.mockRejectedValue(notFound);
+
+      await expect(service.createAgentEmailMessage("unknown", "body")).rejects.toThrow(notFound);
+      expect(customersService.getCustomer).not.toHaveBeenCalled();
+      expect(channelMessagesService.enqueueOutboundDelivery).not.toHaveBeenCalled();
+    });
+
+    it("throws when no authenticated user exists on TenantContext", async () => {
+      ticketsService.getTicket.mockResolvedValue({
+        id: "ticket-1",
+        customerId: "customer-1",
+        contactId: "contact-1",
+      });
+      tenantContext.userId = null;
+
+      await expect(service.createAgentEmailMessage("ticket-1", "body")).rejects.toThrow(
+        "TenantContext: no authenticated user on this request",
+      );
+      expect(channelMessagesService.enqueueOutboundDelivery).not.toHaveBeenCalled();
+    });
+
+    it("rejects with a clear message when the ticket has no contact at all", async () => {
+      ticketsService.getTicket.mockResolvedValue({
+        id: "ticket-1",
+        customerId: "customer-1",
+        contactId: null,
+      });
+
+      await expect(service.createAgentEmailMessage("ticket-1", "body")).rejects.toThrow(
+        "This ticket has no contact to email.",
+      );
+      expect(customersService.getCustomer).not.toHaveBeenCalled();
+      expect(channelMessagesService.enqueueOutboundDelivery).not.toHaveBeenCalled();
+    });
+
+    it("rejects with a clear message when the ticket's contact has no email on file", async () => {
+      ticketsService.getTicket.mockResolvedValue({
+        id: "ticket-1",
+        customerId: "customer-1",
+        contactId: "contact-1",
+      });
+      customersService.getCustomer.mockResolvedValue({
+        id: "customer-1",
+        contacts: [{ id: "contact-1", email: null }],
+      });
+
+      await expect(service.createAgentEmailMessage("ticket-1", "body")).rejects.toThrow(
+        "This ticket's contact has no email address on file.",
+      );
+      expect(channelMessagesService.enqueueOutboundDelivery).not.toHaveBeenCalled();
+    });
+
+    it("rejects when the ticket's contactId no longer matches any of the customer's contacts", async () => {
+      ticketsService.getTicket.mockResolvedValue({
+        id: "ticket-1",
+        customerId: "customer-1",
+        contactId: "contact-stale",
+      });
+      customersService.getCustomer.mockResolvedValue({
+        id: "customer-1",
+        contacts: [{ id: "contact-1", email: "jane@example.com" }],
+      });
+
+      await expect(service.createAgentEmailMessage("ticket-1", "body")).rejects.toThrow(
+        "This ticket's contact has no email address on file.",
+      );
+      expect(channelMessagesService.enqueueOutboundDelivery).not.toHaveBeenCalled();
     });
   });
 

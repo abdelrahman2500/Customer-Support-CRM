@@ -25,3 +25,23 @@ if (!Element.prototype.releasePointerCapture) {
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
+
+// RM-15 — jsdom implements no `ResizeObserver` at all, and Radix UI's
+// `Checkbox` (installed by Story S-3, first actually rendered inside a
+// real `<form>` by a test in this story — `TicketChatCard`'s "send by
+// email" checkbox) renders a hidden native `<input>` "bubble" for
+// form-submission compatibility whenever it detects a `<form>` ancestor,
+// sized via a `ResizeObserver`-backed hook. Without this no-op polyfill,
+// rendering a form-embedded `Checkbox` in any test throws
+// `ResizeObserver is not defined` — the same category of well-known,
+// standard Radix+jsdom test-environment gap `hasPointerCapture`/
+// `scrollIntoView` above already document, not an application behavior
+// change. `packages/ui`'s own `checkbox.spec.tsx` never renders inside a
+// `<form>`, so it never needed this.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}

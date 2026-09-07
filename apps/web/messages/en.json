@@ -155,6 +155,7 @@
         "SENT": "Sent",
         "FAILED": "Delivery failed"
       },
+      "sendByEmailLabel": "Send by email",
       "aiHeading": "AI Assist",
       "aiSummarize": "Summarize",
       "aiSuggestReply": "Suggest Reply",

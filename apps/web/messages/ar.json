@@ -155,6 +155,7 @@
         "SENT": "تم الإرسال",
         "FAILED": "فشل التسليم"
       },
+      "sendByEmailLabel": "إرسال عبر البريد الإلكتروني",
       "aiHeading": "مساعد الذكاء الاصطناعي",
       "aiSummarize": "تلخيص",
       "aiSuggestReply": "اقتراح رد",
