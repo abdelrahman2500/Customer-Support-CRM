@@ -49,15 +49,25 @@ export default function LoginPage() {
 
       if (!response.ok) {
         setError(t("loginFailed"));
+        setSubmitting(false);
         return;
       }
 
       const { accessToken } = (await response.json()) as { accessToken: string };
       setAccessToken(accessToken);
       router.push(`/${locale}/home`);
+      // UX audit — deliberately no `setSubmitting(false)` here. Mirrors
+      // apps/web's own login page fix: the destination route's layout does
+      // a server-side auth-init round trip (`fetchCurrentContact()` in
+      // `(customer)/layout.tsx`) before it can render anything, and
+      // `router.push` doesn't wait for that to resolve. Resetting
+      // `submitting` immediately used to flip this button back to its idle
+      // "Sign in" state while the still-visible login page sat frozen for
+      // that entire round trip. Leaving `submitting` true keeps the button
+      // disabled/pending until this component unmounts (real navigation)
+      // or an error path below explicitly clears it.
     } catch {
       setError(t("loginFailed"));
-    } finally {
       setSubmitting(false);
     }
   }

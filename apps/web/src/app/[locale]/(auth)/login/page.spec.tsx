@@ -65,6 +65,33 @@ describe("LoginPage", () => {
     expect(push).toHaveBeenCalledWith("/en/tickets");
   });
 
+  // UX audit — the destination route's own layout does a server-side
+  // auth-init round trip before it can render anything, and `router.push`
+  // doesn't wait for that. The button used to flip back to its idle
+  // "Sign in" state right here, on a still-visible /login page, for that
+  // entire round trip — this locks in the fix: it stays pending/disabled
+  // past the successful push, until this component unmounts.
+  it("keeps the sign-in button pending/disabled after a successful submit, past the push call", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ accessToken: "signed.access.token" }),
+    } as Response);
+
+    render(<LoginPage />);
+    fireEvent.change(screen.getByText("email").querySelector("input")!, {
+      target: { value: "ada@example.com" },
+    });
+    fireEvent.change(screen.getByText("password").querySelector("input")!, {
+      target: { value: "correct-password" },
+    });
+    fireEvent.click(screen.getByText("signIn"));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/en/tickets"));
+    expect(screen.getByText("signingIn")).toBeInTheDocument();
+    expect(screen.queryByText("signIn")).not.toBeInTheDocument();
+    expect(screen.getByText("signingIn").closest("button")).toBeDisabled();
+  });
+
   it("shows a generic sign-in-failed message on a non-2xx response, without navigating", async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
 
