@@ -7,6 +7,7 @@ Each bounded context below becomes one NestJS module (in `apps/api`) and, where 
 | Identity & Access        | `identity`       | Branches, departments, users, roles, permissions, sessions               | Owns `TenantContext` resolution.                                               |
 | Customer Management      | `customers`      | Customer profiles, contacts, interaction history, attachment metadata    | Binary content is in object storage.                                           |
 | Ticketing                | `ticketing`      | Tickets, categories, priorities, statuses, assignments, history/timeline | Core entity; emits `ticket.created`, `ticket.updated`, and `ticket.escalated`. |
+| Tasks                    | `tasks`          | Agent-owned personal to-dos (title, notes, priority, due date), optionally linked to a ticket/customer | Owner-scoped, not branch-scoped; emits `task.reminder_due` on its own due-date timer. |
 | Communication / Channels | `channels`       | Channel configuration, inbound/outbound messages, threads, quick replies | Receives normalized Integration Hub events.                                    |
 | SLA & Automation         | `sla`            | SLA policies, timers, escalation and automation rules                    | Subscribes to ticketing events.                                                |
 | Knowledge Base           | `knowledge_base` | Articles, categories, FAQs, publish state, search index                  | Uses full-text and vector search.                                              |

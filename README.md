@@ -238,16 +238,17 @@ on your machine. Redis is on its default `6379`; MinIO on `9000`
 
 ```bash
 cp .env.example apps/api/.env
-cp .env.example apps/worker/.env   # worker only reads REDIS_URL/NODE_ENV from it
+cp .env.example apps/worker/.env   # worker reads DATABASE_URL/APP_DATABASE_URL/REDIS_URL/
+                                    # NODE_ENV/SENTRY_DSN plus its own ANTHROPIC_*/SMTP_* —
+                                    # see apps/worker/src/env.validation.ts
 echo 'NEXT_PUBLIC_API_URL="http://localhost:3001/api/v1"' > apps/web/.env.local
 echo 'NEXT_PUBLIC_API_URL="http://localhost:3001/api/v1"' > apps/portal/.env.local
 ```
 
-`.env.example`'s `DATABASE_URL` points at port **5432** by default. If
-you're using `docker compose`'s Postgres as started above, change the port
-in `apps/api/.env` to **5433** to match; if you're pointing at a native
-Postgres install on 5432 instead, leave it as-is and skip starting the
-`postgres` container.
+`.env.example`'s `DATABASE_URL` already points at port **5433**, matching
+`docker compose`'s Postgres started above. If you're pointing at a native
+Postgres install on 5432 instead, change the port in `apps/api/.env` (and
+`apps/worker/.env`) to **5432** and skip starting the `postgres` container.
 
 ### 4. Apply the database schema and seed data
 
@@ -265,6 +266,16 @@ user from `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`.
 pnpm dev
 ```
 
+`apps/api` creates its S3 bucket (`S3_BUCKET`, `crm-attachments` by
+default) automatically on startup if it doesn't already exist
+(`S3StorageService.onModuleInit`) — no separate MinIO console step is
+needed for a fresh local MinIO container.
+
+Confirm the stack is actually up with `curl http://localhost:3001/health/ready`
+— `{"status":"ok",...}` means the API can reach both Postgres and Redis; a
+503 names which one it can't (see **Application URLs** below for both
+health routes).
+
 ## Environment Variables
 
 Values below are read from `apps/api/.env` and `apps/worker/.env` (see
@@ -274,17 +285,23 @@ Values below are read from `apps/api/.env` and `apps/worker/.env` (see
 |---|---|
 | `NODE_ENV` | Runtime mode (`development`/`production`/`test`). |
 | `PORT` | `apps/api` HTTP port (default `3001`). |
-| `DATABASE_URL` | PostgreSQL connection string. |
+| `DATABASE_URL` | PostgreSQL connection string — the migration/owner role (`prisma migrate deploy`/`prisma db seed`/`prisma generate`). |
+| `APP_DATABASE_URL` (optional) | The restricted runtime `crm_app` role `apps/api`/`apps/worker` actually connect as when set (denied schema changes and `admin.audit_logs` UPDATE/DELETE); falls back to `DATABASE_URL` when unset. |
 | `REDIS_URL` | Redis connection string (BullMQ queues + Socket.IO adapter). |
 | `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL` | Access-token signing secret (min 32 chars) and lifetime (default `15m`). |
-| `JWT_REFRESH_SECRET` / `JWT_REFRESH_TTL_DAYS` | Refresh-token signing secret and lifetime in days (default `7`). |
-| `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` | Object storage config for attachments (defaults match the local MinIO container). |
+| `JWT_REFRESH_SECRET` / `JWT_REFRESH_TTL_DAYS` | Refresh-token signing secret and lifetime in days (default `7`). Must differ from `JWT_ACCESS_SECRET`. |
+| `API_KEY_HASH_SECRET` (optional) | HMAC key `apps/api` hashes agent API keys with; falls back to `JWT_REFRESH_SECRET` when unset. |
+| `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` | Object storage config for attachments (defaults match the local MinIO container; all four required explicitly in production). |
 | `CORS_ORIGINS` | Comma-separated allowed browser origins for the REST API and Socket.IO gateway. Unset = no cross-origin access allowed. |
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | Read only by `prisma/seed.ts`, to create the initial SuperAdmin. |
 | `ANTHROPIC_API_KEY` (optional) | Enables the real Anthropic AI provider (`apps/worker`). Absent = AI features fall back to a no-op "disabled" provider that still logs the request but never calls out. Not present in `.env.example` — add it yourself to enable AI. |
 | `ANTHROPIC_MODEL` (optional) | Model id for the Anthropic provider; defaults to `claude-sonnet-4-5-20250929`. |
+| `SMTP_HOST` / `SMTP_FROM` (optional) | Read by both apps: `apps/worker`'s `EmailAdapter` is the actual SMTP transport (local dev points these at the Mailhog sandbox on `localhost:1025`); `apps/api` only uses their presence to answer `GET /channels/email-status`, so the chat composer's "send by email" option isn't offered when no adapter is configured. With no `SMTP_HOST`, no `EMAIL` channel adapter registers at all — not an error. |
+| `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` (optional, `apps/worker` only) | The rest of `EmailAdapter`'s SMTP transport config; `SMTP_PORT` defaults to `587`. |
+| `SENTRY_DSN` (optional) | Read by `apps/api` and `apps/worker`. Unhandled exceptions are always caught and logged locally either way; a set DSN additionally reports them to Sentry or a Sentry-protocol-compatible self-hosted GlitchTip. |
 | `AUTH_COOKIE_SAMESITE` (optional) | `SameSite` for the httpOnly refresh-token cookie: `strict` (default), `lax`, or `none`. Only needs changing when the deployed frontends and the API sit on different registrable domains — see [`docs/deployment.md`](./docs/deployment.md). |
 | `NEXT_PUBLIC_API_URL` | Base API URL used by both `apps/web` and `apps/portal` (`http://localhost:3001/api/v1` locally). **Compiled into the browser bundle at build time** — for a container image it must be passed as a `--build-arg`, not a runtime variable. |
+| `NEXT_PUBLIC_SENTRY_DSN` (optional) | Same DSN as `SENTRY_DSN`, read by `apps/web`/`apps/portal`. Must be `NEXT_PUBLIC_`-prefixed and set at *build* time (only `NEXT_PUBLIC_*` vars are inlined into the browser bundle) — each app's server/edge runtime still reads the plain `SENTRY_DSN` above. |
 
 > **Deploying?** `CORS_ORIGINS` is required in production, the two JWT
 > secrets must differ, and `NEXT_PUBLIC_API_URL` must be set when the
@@ -301,6 +318,7 @@ Values below are read from `apps/api/.env` and `apps/worker/.env` (see
 | Agent Workspace (`apps/web`) | http://localhost:3000 |
 | Customer Portal (`apps/portal`) | http://localhost:3002 |
 | API (`apps/api`) | http://localhost:3001 (routes under `/api/v1`) |
+| API liveness / readiness | http://localhost:3001/health / http://localhost:3001/health/ready (unversioned — not under `/api/v1`; readiness checks Postgres and Redis, 503 if either is unreachable) |
 | Swagger/OpenAPI docs | http://localhost:3001/api/docs (non-production only) |
 | `apps/worker` | no HTTP port — background process, logs to console |
 | PostgreSQL (Docker) | localhost:5433 (see port note above) |
@@ -345,11 +363,15 @@ pnpm --filter @crm/e2e test        # browser E2E (Playwright) — boots pre-buil
                                     # dedicated `browser-e2e` CI job.
 ```
 
-`apps/api/test/` currently holds 33 e2e spec files covering identity/RBAC,
+`apps/api/test/` currently holds 54 e2e spec files covering identity/RBAC,
 customers, tickets, SLA/business-hours/escalations, automation rules,
-attachments, knowledge base, notifications (preferences/templates/read),
-audit logs, branding, realtime foundations, AI settings/processing, and the
-full Customer Portal surface (auth, tickets, KB, chat, branding).
+attachments, knowledge base (including category taxonomy and article
+attachments), notifications (preferences/templates/read), audit logs,
+branding, realtime foundations, AI settings/processing, tasks, webhook
+subscriptions/inbound logs, API keys, and the full Customer Portal surface
+(auth, tickets, KB, chat, branding). This count drifts as new stories land —
+`find apps/api/test -iname "*.e2e-spec.ts" | wc -l` is the source of truth,
+not this sentence.
 
 CI (`.github/workflows/ci.yml`) runs on every PR and push to `main`:
 install → Prisma generate → lint → typecheck → build → unit tests
