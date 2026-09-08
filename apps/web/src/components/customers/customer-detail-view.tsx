@@ -503,13 +503,19 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           <h1 className="sr-only">{customer.displayName}</h1>
           <Input
             className="w-56 text-lg font-semibold"
-            defaultValue={customer.displayName}
+            // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
+            // rejected edit can be explicitly reverted, mirroring
+            // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern.
+            value={displayNameDraft ?? customer.displayName}
             aria-label={t("detail.displayNameLabel")}
             onChange={(event) => setDisplayNameDraft(event.target.value)}
             onBlur={() => {
               const value = displayNameDraft?.trim();
               if (value && displayNameDraft !== customer.displayName) {
-                updateCustomerMutation.mutate({ displayName: value });
+                updateCustomerMutation.mutate(
+                  { displayName: value },
+                  { onError: () => setDisplayNameDraft(customer.displayName) },
+                );
               }
             }}
           />

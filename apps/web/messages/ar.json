@@ -218,6 +218,9 @@
       "actionFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
       "statusUpdateSuccess": "تم تحديث الحالة إلى {status}.",
       "priorityUpdateSuccess": "تم تحديث الأولوية إلى {priority}.",
+      "categoryUpdateSuccess": "تم تحديث الفئة إلى {category}.",
+      "assignedAgentUpdateSuccess": "تم تعيين الوكيل إلى {agent}.",
+      "departmentUpdateSuccess": "تم تحديث القسم إلى {department}.",
       "optionsLoading": "جارٍ التحميل…"
     },
     "sla": {

@@ -218,6 +218,9 @@
       "actionFailed": "That change couldn't be saved. Please try again.",
       "statusUpdateSuccess": "Status updated to {status}.",
       "priorityUpdateSuccess": "Priority updated to {priority}.",
+      "categoryUpdateSuccess": "Category updated to {category}.",
+      "assignedAgentUpdateSuccess": "Assigned agent updated to {agent}.",
+      "departmentUpdateSuccess": "Department updated to {department}.",
       "optionsLoading": "Loading…"
     },
     "sla": {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { act, render, screen, fireEvent, within } from "@testing-library/react";
 import { TicketDetailView } from "./ticket-detail-view";
 import {
   useCreateTicketNoteMutation,
@@ -424,7 +424,35 @@ describe("TicketDetailView", () => {
       fireEvent.change(input, { target: { value: "Cannot log in anymore" } });
       fireEvent.blur(input);
 
-      expect(mutate).toHaveBeenCalledWith({ subject: "Cannot log in anymore" });
+      // Batch 5 (UX audit) — the mutation now also carries an `onError`
+      // revert callback (second arg), mirroring `SlaPolicyRow`'s pattern.
+      expect(mutate).toHaveBeenCalledWith(
+        { subject: "Cannot log in anymore" },
+        expect.objectContaining({ onError: expect.any(Function) }),
+      );
+    });
+
+    it("reverts the subject field to the server value when the mutation is rejected", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      const mutate = vi.fn();
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const input = screen.getByDisplayValue("Cannot log in");
+      fireEvent.change(input, { target: { value: "Cannot log in anymore" } });
+      fireEvent.blur(input);
+
+      const onError = mutate.mock.calls[0]![1].onError as () => void;
+      act(() => onError());
+
+      expect(screen.getByDisplayValue("Cannot log in")).toBeInTheDocument();
     });
 
     it("does not commit the subject when blurred unchanged", () => {
@@ -518,7 +546,71 @@ describe("TicketDetailView", () => {
       fireEvent.click(screen.getByText("detail.noDepartment"));
       fireEvent.click(await screen.findByRole("option", { name: "Billing" }));
 
-      expect(mutate).toHaveBeenCalledWith({ departmentId: "dept-1" });
+      // Batch 5 (UX audit) — carries an `onSuccess` toast now too, mirroring
+      // the status/priority Selects (second arg).
+      expect(mutate).toHaveBeenCalledWith(
+        { departmentId: "dept-1" },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
+    });
+
+    // Batch 5 (UX audit) — category/assignedAgent/department previously
+    // committed silently while status/priority already confirmed
+    // themselves; all five immediate-commit fields on this page now do.
+    it("shows a translated success toast once the category-update mutation actually succeeds", async () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketCategoriesQuery).mockReturnValue(
+        queryResult({
+          data: [{ id: "category-2", branchId: "branch-1", name: "Billing", isActive: true }],
+          isSuccess: true,
+        }) as never,
+      );
+      const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
+        options?.onSuccess?.();
+      });
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByRole("combobox", { name: "detail.category" }));
+      fireEvent.click(await screen.findByRole("option", { name: "Billing" }));
+
+      expect(mockedShowSuccessToast).toHaveBeenCalledWith(
+        'detail.categoryUpdateSuccess:{"category":"Billing"}',
+      );
+    });
+
+    it("shows a translated success toast once the department-update mutation actually succeeds", async () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useDepartmentsQuery).mockReturnValue(
+        queryResult({
+          data: [{ id: "dept-1", branchId: "branch-1", name: "Billing" }],
+          isSuccess: true,
+        }) as never,
+      );
+      const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
+        options?.onSuccess?.();
+      });
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByText("detail.noDepartment"));
+      fireEvent.click(await screen.findByRole("option", { name: "Billing" }));
+
+      expect(mockedShowSuccessToast).toHaveBeenCalledWith(
+        'detail.departmentUpdateSuccess:{"department":"Billing"}',
+      );
     });
 
     // Story 94 — success feedback.

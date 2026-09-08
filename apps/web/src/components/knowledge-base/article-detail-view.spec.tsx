@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { act, render, screen, fireEvent, within } from "@testing-library/react";
 import { ArticleDetailView } from "./article-detail-view";
 import {
   useArticleQuery,
@@ -214,7 +214,36 @@ describe("ArticleDetailView", () => {
     fireEvent.change(input, { target: { value: "How to reset your password" } });
     fireEvent.blur(input);
 
-    expect(mutate).toHaveBeenCalledWith({ title: "How to reset your password" });
+    // Batch 5 (UX audit) — the mutation now also carries an `onError`
+    // revert callback (second arg), mirroring `SlaPolicyRow`'s pattern.
+    expect(mutate).toHaveBeenCalledWith(
+      { title: "How to reset your password" },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+  });
+
+  it("reverts the title field to the server value when the mutation is rejected", () => {
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ data: baseArticle, isSuccess: true }) as never,
+    );
+    const mutate = vi.fn();
+    vi.mocked(useUpdateArticleMutation).mockReturnValue({
+      mutate,
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    const input = screen.getByDisplayValue("How to reset a password");
+    fireEvent.change(input, { target: { value: "How to reset your password" } });
+    fireEvent.blur(input);
+
+    const onError = mutate.mock.calls[0]![1].onError as () => void;
+    act(() => onError());
+
+    expect(screen.getByDisplayValue("How to reset a password")).toBeInTheDocument();
   });
 
   it("does not commit the title when blurred unchanged", () => {

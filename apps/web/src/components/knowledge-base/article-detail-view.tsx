@@ -131,13 +131,16 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         <h1 className="sr-only">{article.title}</h1>
         <Input
           className="max-w-md text-lg font-semibold"
-          defaultValue={article.title}
+          // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
+          // rejected edit can be explicitly reverted, mirroring
+          // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern.
+          value={titleDraft ?? article.title}
           aria-label={t("detail.titleLabel")}
           onChange={(event) => setTitleDraft(event.target.value)}
           onBlur={() => {
             const value = titleDraft?.trim();
             if (value && titleDraft !== article.title) {
-              mutation.mutate({ title: value });
+              mutation.mutate({ title: value }, { onError: () => setTitleDraft(article.title) });
             }
           }}
         />
@@ -206,12 +209,14 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         <textarea
           className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
           rows={10}
-          defaultValue={article.body}
+          // Batch 5 (UX audit) — controlled, same revert-on-error rationale
+          // as the title field above.
+          value={bodyDraft ?? article.body}
           onChange={(event) => setBodyDraft(event.target.value)}
           onBlur={() => {
             const value = bodyDraft?.trim();
             if (value && bodyDraft !== article.body) {
-              mutation.mutate({ body: value });
+              mutation.mutate({ body: value }, { onError: () => setBodyDraft(article.body) });
             }
           }}
         />

@@ -271,13 +271,22 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <h1 className="sr-only">{ticket.subject}</h1>
         <Input
           className="w-full max-w-md text-lg font-semibold"
-          defaultValue={ticket.subject}
+          // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
+          // rejected edit can be explicitly reverted, mirroring
+          // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern:
+          // `subjectDraft` starts `null` (this hook runs before `ticket`
+          // exists, above the loading/error early-returns) and falls back
+          // to the server's own value until the field is actually touched.
+          value={subjectDraft ?? ticket.subject}
           aria-label={t("detail.subjectLabel")}
           onChange={(event) => setSubjectDraft(event.target.value)}
           onBlur={() => {
             const value = subjectDraft?.trim();
             if (value && subjectDraft !== ticket.subject) {
-              mutation.mutate({ subject: value });
+              mutation.mutate(
+                { subject: value },
+                { onError: () => setSubjectDraft(ticket.subject) },
+              );
             }
           }}
         />
@@ -363,7 +372,22 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <Select
             value={ticket.categoryId ?? undefined}
             disabled={mutation.isPending || categoriesQuery.isLoading}
-            onValueChange={(value) => mutation.mutate({ categoryId: value })}
+            onValueChange={(value) =>
+              mutation.mutate(
+                { categoryId: value },
+                {
+                  // Batch 5 (UX audit) — mirrors the status/priority Selects
+                  // just above: every immediate-commit field on this page
+                  // now confirms itself the same way, not just two of five.
+                  onSuccess: () => {
+                    const category = (categoriesQuery.data ?? []).find((c) => c.id === value);
+                    showSuccessToast(
+                      t("detail.categoryUpdateSuccess", { category: category?.name ?? value }),
+                    );
+                  },
+                },
+              )
+            }
           >
             <SelectTrigger aria-label={t("detail.category")}>
               <SelectValue
@@ -389,7 +413,19 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <Select
             value={ticket.assignedToUserId ?? undefined}
             disabled={mutation.isPending || usersQuery.isLoading}
-            onValueChange={(value) => mutation.mutate({ assignedToUserId: value })}
+            onValueChange={(value) =>
+              mutation.mutate(
+                { assignedToUserId: value },
+                {
+                  onSuccess: () =>
+                    showSuccessToast(
+                      t("detail.assignedAgentUpdateSuccess", {
+                        agent: userNameById.get(value) ?? value,
+                      }),
+                    ),
+                },
+              )
+            }
           >
             <SelectTrigger aria-label={t("detail.assignedAgent")}>
               <SelectValue
@@ -421,7 +457,21 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <Select
             value={ticket.departmentId ?? undefined}
             disabled={mutation.isPending || departmentsQuery.isLoading}
-            onValueChange={(value) => mutation.mutate({ departmentId: value })}
+            onValueChange={(value) =>
+              mutation.mutate(
+                { departmentId: value },
+                {
+                  onSuccess: () => {
+                    const department = (departmentsQuery.data ?? []).find((d) => d.id === value);
+                    showSuccessToast(
+                      t("detail.departmentUpdateSuccess", {
+                        department: department?.name ?? value,
+                      }),
+                    );
+                  },
+                },
+              )
+            }
           >
             <SelectTrigger aria-label={t("detail.department")}>
               <SelectValue

@@ -400,7 +400,27 @@ describe("CustomerDetailView", () => {
       fireEvent.change(input, { target: { value: "Acme Corp." } });
       fireEvent.blur(input);
 
-      expect(mutate).toHaveBeenCalledWith({ displayName: "Acme Corp." });
+      // Batch 5 (UX audit) — the mutation now also carries an `onError`
+      // revert callback (second arg), mirroring `SlaPolicyRow`'s pattern.
+      expect(mutate).toHaveBeenCalledWith(
+        { displayName: "Acme Corp." },
+        expect.objectContaining({ onError: expect.any(Function) }),
+      );
+    });
+
+    it("reverts the display name field to the server value when the mutation is rejected", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      const input = screen.getByDisplayValue("Acme Inc.");
+      fireEvent.change(input, { target: { value: "Acme Corp." } });
+      fireEvent.blur(input);
+
+      const onError = mutate.mock.calls[0]![1].onError as () => void;
+      act(() => onError());
+
+      expect(screen.getByDisplayValue("Acme Inc.")).toBeInTheDocument();
     });
 
     it("does not commit when the display name is blurred unchanged", () => {
