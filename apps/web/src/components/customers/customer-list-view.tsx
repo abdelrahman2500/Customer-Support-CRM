@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomersQuery } from "@/hooks/use-tickets";
 import type { ListCustomersFilters } from "@/lib/tickets-api";
+import { useUrlFilters } from "@/lib/url-filters";
 import {
   Badge,
   Button,
@@ -48,6 +49,32 @@ function sortAriaValue(
   return filters.sortDir === "asc" ? "ascending" : "descending";
 }
 
+/** Batch 4 (UX audit) — the URL <-> `ListCustomersFilters` mapping for this
+ * view's own `useUrlFilters`, mirroring `ticket-list-view.tsx`'s identical
+ * pair exactly (see that file for the "why skip the default sort" note). */
+function parseCustomerFilters(params: URLSearchParams): ListCustomersFilters {
+  const page = params.get("page");
+  return {
+    sortBy: (params.get("sortBy") as ListCustomersFilters["sortBy"]) ?? "createdAt",
+    sortDir: (params.get("sortDir") as ListCustomersFilters["sortDir"]) ?? "asc",
+    ...(params.get("search") ? { search: params.get("search")! } : {}),
+    ...(params.get("isActive")
+      ? { isActive: params.get("isActive") as ListCustomersFilters["isActive"] }
+      : {}),
+    ...(page ? { page: Number(page) } : {}),
+  };
+}
+
+function serializeCustomerFilters(filters: ListCustomersFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.search) params.set("search", filters.search);
+  if (filters.isActive) params.set("isActive", filters.isActive);
+  if (filters.sortBy && filters.sortBy !== "createdAt") params.set("sortBy", filters.sortBy);
+  if (filters.sortDir && filters.sortDir !== "asc") params.set("sortDir", filters.sortDir);
+  if (filters.page) params.set("page", String(filters.page));
+  return params;
+}
+
 /**
  * Story 26 — Customer List. Mirrors `TicketListView`'s structure exactly.
  *
@@ -64,17 +91,27 @@ function sortAriaValue(
  * RM-10 — every `TableCell` below now carries a `label` matching its
  * column's own `TableHead` text, and the filter bar stacks one control
  * per row below `sm`, mirroring `TicketListView`'s own identical change.
+ *
+ * Batch 4 (UX audit) — filters/search/sort/page now live in the URL via
+ * `useUrlFilters`, mirroring `TicketListView`'s identical change (see that
+ * file's own doc comment for the full rationale, including why this is now
+ * a thin `Suspense` wrapper around `CustomerListViewContent`).
  */
 export function CustomerListView() {
+  return (
+    <Suspense fallback={null}>
+      <CustomerListViewContent />
+    </Suspense>
+  );
+}
+
+function CustomerListViewContent() {
   const t = useTranslations("customers");
   const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
-  const [filters, setFilters] = useState<ListCustomersFilters>({
-    sortBy: "createdAt",
-    sortDir: "asc",
-  });
+  const [filters, setFilters] = useUrlFilters(parseCustomerFilters, serializeCustomerFilters);
 
   const customersQuery = useCustomersQuery(filters);
   /** Story S-7 — see `TicketListView`: the rows to render regardless of

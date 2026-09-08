@@ -28,6 +28,9 @@ import type { UpdateRoleDto } from "./dto/update-role.dto";
 import type { SetRolePermissionsDto } from "./dto/set-role-permissions.dto";
 import type { UpdateUserAssignmentDto } from "./dto/update-user-assignment.dto";
 import type { GrantBranchAssignmentDto } from "./dto/grant-branch-assignment.dto";
+import type { ListUsersQueryDto } from "./dto/list-users-query.dto";
+import { paginate } from "../../common/pagination/paginate";
+import type { Paginated } from "../../common/pagination/paginated";
 
 const BCRYPT_ROUNDS = 12;
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
@@ -849,6 +852,95 @@ export class IdentityService {
         },
       ];
     });
+  }
+
+  /**
+   * Batch 4 (UX audit) — real pagination for the admin Users *screen*,
+   * replacing `listUsers()`'s own `MAX_USERS_ROWS` cap there specifically.
+   * `listUsers()`/`GET /identity/users` itself is untouched: every one of
+   * its other callers (assignee pickers, audit-log actor names, chat
+   * sender-name lookups, ...) genuinely needs every branch member, not one
+   * page — mirrors this file's own `listUserMentionCandidates` precedent
+   * for that identical distinction, just one level up (a second endpoint
+   * rather than a second internal method, since here the *existing*
+   * `GET /identity/users` is the one every picker already depends on).
+   *
+   * The delegate is wrapped (not passed to `paginate` directly) for the
+   * same reason `TicketsService.listTickets` wraps `prisma.ticket`:
+   * `paginate`'s `PaginatableDelegate` has no `include`, and `UserSummary`
+   * needs the same `branchRoles`/`role` join `listUsers()` already uses.
+   */
+  async listUsersPaged(query: ListUsersQueryDto = {}): Promise<Paginated<UserSummary>> {
+    const { branchId } = this.tenantContext.requireBranchScope();
+
+    const where: Prisma.UserWhereInput = {
+      branchRoles: { some: { branchId } },
+      ...(query.search
+        ? {
+            OR: [
+              { fullName: { contains: query.search, mode: "insensitive" } },
+              { email: { contains: query.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    const { items: users, ...pagination } = await paginate(
+      {
+        count: (args: { where: Prisma.UserWhereInput }) => this.prisma.user.count(args),
+        findMany: (args: {
+          where: Prisma.UserWhereInput;
+          orderBy: Prisma.UserOrderByWithRelationInput[];
+          skip: number;
+          take: number;
+        }) =>
+          this.prisma.user.findMany({
+            ...args,
+            include: {
+              branchRoles: {
+                where: { branchId },
+                include: { role: true },
+                orderBy: { createdAt: "asc" },
+              },
+            },
+          }),
+      },
+      {
+        where,
+        // `id` tiebreaker: `createdAt` isn't unique (bulk-seeded users can
+        // share a timestamp to the millisecond), and offset paging over a
+        // non-unique sort repeats a row on one page while dropping it from
+        // the next — same reasoning `listCustomers`/`listTickets` already
+        // document for their own tiebreakers.
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        page: query.page,
+        pageSize: query.pageSize,
+      },
+    );
+
+    // Mirrors `listUsers()`'s own mapping exactly (see that method's doc
+    // comment for why the `flatMap`/guard is defensive-only).
+    const items = users.flatMap((user) => {
+      const active = user.branchRoles[0];
+      if (!active) {
+        return [];
+      }
+      return [
+        {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          isActive: user.isActive,
+          roles: [...new Set(user.branchRoles.map((br) => br.role.name))],
+          roleId: active.roleId,
+          departmentId: active.departmentId,
+          isLocked: user.lockedUntil !== null && user.lockedUntil > new Date(),
+          lockedUntil: user.lockedUntil,
+        },
+      ];
+    });
+
+    return { ...pagination, items };
   }
 
   /**

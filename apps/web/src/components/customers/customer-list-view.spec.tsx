@@ -4,10 +4,17 @@ import { CustomerListView } from "./customer-list-view";
 import { useCustomersQuery } from "@/hooks/use-tickets";
 
 const push = vi.fn();
+const replace = vi.fn();
+// Batch 4 (UX audit) — filters now live in the URL via `useUrlFilters`;
+// mutable so the dedicated "URL state (Batch 4)" describe block can
+// exercise it, every other test in this file leaves it at "".
+let searchParamsString = "";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace }),
+  usePathname: () => "/en/customers",
+  useSearchParams: () => new URLSearchParams(searchParamsString),
 }));
 
 vi.mock("next-intl", () => ({
@@ -60,6 +67,7 @@ function page(items: unknown[], overrides: Record<string, unknown> = {}) {
 describe("CustomerListView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsString = "";
   });
 
   it("shows a skeleton on the initial load, before any data exists", () => {
@@ -397,6 +405,48 @@ describe("CustomerListView", () => {
 
       expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
+    });
+  });
+
+  // Batch 4 (UX audit) — mirrors `ticket-list-view.spec.tsx`'s identical
+  // block exactly.
+  describe("URL state (Batch 4)", () => {
+    it("initializes filters from the URL's own query string on first render", () => {
+      searchParamsString = "search=acme&isActive=false";
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+
+      render(<CustomerListView />);
+
+      expect(mockedUseCustomersQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ search: "acme", isActive: "false" }),
+      );
+    });
+
+    it("writes a filter change to the URL via router.replace, not push", () => {
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+
+      render(<CustomerListView />);
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "acme" },
+      });
+      fireEvent.blur(screen.getByLabelText("list.searchLabel"));
+
+      expect(replace).toHaveBeenCalledWith("/en/customers?search=acme", { scroll: false });
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("never writes the default sort into the URL", () => {
+      mockedUseCustomersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+
+      render(<CustomerListView />);
+
+      expect(replace).not.toHaveBeenCalled();
     });
   });
 });

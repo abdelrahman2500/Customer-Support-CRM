@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -10,17 +10,20 @@ import {
   useUnlockUserMutation,
   useUpdateUserAssignmentMutation,
   useUpdateUserMutation,
-  useUsersQuery,
+  useUserListQuery,
 } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
 import { useAgentPresence, type PresenceStatus } from "@/hooks/use-agent-presence";
-import type { UserSummary } from "@/lib/tickets-api";
+import type { ListUsersFilters, UserSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
+import { useUrlFilters } from "@/lib/url-filters";
 import {
-  Alert,
   Badge,
   Button,
+  FetchingIndicator,
   Input,
+  Pagination,
+  QueryStateCard,
   Skeleton,
   Table,
   TableBody,
@@ -31,6 +34,24 @@ import {
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
+
+/** Batch 4 (UX audit) — the URL <-> `ListUsersFilters` mapping for this
+ * view's own `useUrlFilters`, mirroring `customer-list-view.tsx`'s
+ * identical pair (no sort here — `GET /identity/users/paged` has none). */
+function parseUserListFilters(params: URLSearchParams): ListUsersFilters {
+  const page = params.get("page");
+  return {
+    ...(params.get("search") ? { search: params.get("search")! } : {}),
+    ...(page ? { page: Number(page) } : {}),
+  };
+}
+
+function serializeUserListFilters(filters: ListUsersFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.search) params.set("search", filters.search);
+  if (filters.page) params.set("page", String(filters.page));
+  return params;
+}
 
 /** Same sentinel string `CreateUserView` uses for its own optional
  * department picker — kept as an equivalent local constant since
@@ -97,47 +118,93 @@ const UNSET_DEPARTMENT = "__unset__";
  * column's own `TableHead` text, mirroring `TicketListView`'s/
  * `CustomerListView`'s identical change. This screen has no filter/search
  * bar to stack, so that half of the pattern doesn't apply here.
+ *
+ * Batch 4 (UX audit) — real pagination (`useUserListQuery`/`GET
+ * /identity/users/paged`) replaces the old `MAX_USERS_ROWS`-capped,
+ * unpaginated `useUsersQuery` this screen used, closing the Recon's P1
+ * finding: a branch with more staff than the cap could never see or manage
+ * its overflow. Gains the search input the previous doc comment's "no
+ * filter/search bar" line explicitly disclaimed — a real, page-based list
+ * needs one to be usable past page 1. Filters/page now live in the URL via
+ * `useUrlFilters` (mirroring every other list view's identical Batch 4
+ * change), so `UserListView` is now a thin `Suspense` wrapper around
+ * `UserListViewContent`.
  */
 export function UserListView() {
+  return (
+    <Suspense fallback={null}>
+      <UserListViewContent />
+    </Suspense>
+  );
+}
+
+function UserListViewContent() {
   const t = useTranslations("users");
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
-  const usersQuery = useUsersQuery();
-  const userIds = useMemo(() => (usersQuery.data ?? []).map((user) => user.id), [usersQuery.data]);
+
+  const [filters, setFilters] = useUrlFilters(parseUserListFilters, serializeUserListFilters);
+  const usersQuery = useUserListQuery(filters);
+  const page = usersQuery.data;
+  const users = page?.items;
+
+  const userIds = useMemo(() => (users ?? []).map((user) => user.id), [users]);
   const presence = useAgentPresence(userIds);
+
+  function updateSearch(value: string) {
+    setFilters((current) => ({ ...current, search: value || undefined, page: undefined }));
+  }
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          <FetchingIndicator active={usersQuery.isPlaceholderData} label={tCommon("updating")} />
+        </div>
         <Button size="sm" asChild>
           <Link href={`/${locale}/users/new`}>{t("list.createButton")}</Link>
         </Button>
       </div>
 
-      {usersQuery.isLoading && (
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2, 3, 4].map((row) => (
-            <Skeleton key={row} className="h-10 w-full" />
-          ))}
-        </div>
-      )}
+      <Input
+        aria-label={t("list.searchLabel")}
+        placeholder={t("list.searchPlaceholder")}
+        defaultValue={filters.search ?? ""}
+        onBlur={(event) => updateSearch(event.target.value.trim())}
+        className="max-w-sm"
+      />
 
-      {usersQuery.isError && (
-        <Alert variant="destructive" className="flex items-center justify-between">
-          <span>{t("list.error")}</span>
-          <Button variant="outline" size="sm" onClick={() => usersQuery.refetch()}>
-            {t("list.retry")}
-          </Button>
-        </Alert>
-      )}
-
-      {usersQuery.isSuccess && usersQuery.data.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("list.empty")}
-        </p>
-      )}
-
-      {usersQuery.isSuccess && usersQuery.data.length > 0 && (
+      <QueryStateCard
+        isLoading={usersQuery.isPending}
+        isError={usersQuery.isError && users === undefined}
+        isEmpty={users !== undefined && users.length === 0}
+        isFiltered={Boolean(filters.search)}
+        loadingLabel={tCommon("loading")}
+        loadingPlaceholder={
+          <div className="flex flex-col gap-2">
+            {[0, 1, 2, 3, 4].map((row) => (
+              <Skeleton key={row} className="h-10 w-full" />
+            ))}
+          </div>
+        }
+        error={{
+          title: t("list.error"),
+          retryLabel: t("list.retry"),
+          onRetry: () => void usersQuery.refetch(),
+        }}
+        backgroundError={
+          usersQuery.isError && users !== undefined
+            ? {
+                title: t("list.error"),
+                retryLabel: t("list.retry"),
+                onRetry: () => void usersQuery.refetch(),
+              }
+            : undefined
+        }
+        empty={{ title: t("list.empty") }}
+        noResults={{ title: t("list.noResults") }}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -149,11 +216,24 @@ export function UserListView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {usersQuery.data.map((user) => (
+            {(users ?? []).map((user) => (
               <UserRow key={user.id} user={user} presence={presence[user.id]} />
             ))}
           </TableBody>
         </Table>
+      </QueryStateCard>
+
+      {page !== undefined && (
+        <Pagination
+          page={page.page}
+          totalPages={page.totalPages}
+          onPageChange={(next) => setFilters((current) => ({ ...current, page: next }))}
+          disabled={usersQuery.isPlaceholderData}
+          label={tCommon("pagination.label")}
+          previousLabel={tCommon("pagination.previous")}
+          nextLabel={tCommon("pagination.next")}
+          indicator={tCommon("pagination.indicator", { page: page.page, totalPages: page.totalPages })}
+        />
       )}
     </section>
   );

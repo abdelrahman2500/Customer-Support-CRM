@@ -25,6 +25,7 @@ import {
   listDepartments,
   listTickets,
   listUsers,
+  listUsersPaged,
   resetPassword,
   revokeContactPortalAccess,
   setContactPortalPassword,
@@ -44,6 +45,7 @@ import type {
   CreateUserInput,
   ListCustomersFilters,
   ListTicketsFilters,
+  ListUsersFilters,
   ResetPasswordInput,
   SetContactPortalPasswordInput,
   UpdateContactInput,
@@ -183,6 +185,22 @@ export function useCustomerOptionsQuery() {
 
 export function useUsersQuery() {
   return useQuery({ queryKey: ["users"], queryFn: listUsers, staleTime: 5 * 60_000 });
+}
+
+/** Batch 4 (UX audit) — real pagination for the admin Users screen
+ * (`GET /identity/users/paged`), mirroring `useCustomersQuery`'s shape
+ * exactly. Deliberately separate from `useUsersQuery` above: every other
+ * caller of that one (assignee pickers, audit-log actor names, ...) needs
+ * every branch member, not one page — see `listUsersPaged`'s own doc
+ * comment. */
+export const usersListQueryKey = (filters: ListUsersFilters) => ["users-paged", filters] as const;
+
+export function useUserListQuery(filters: ListUsersFilters) {
+  return useQuery({
+    queryKey: usersListQueryKey(filters),
+    queryFn: () => listUsersPaged(filters),
+    ...preservePreviousResults,
+  });
 }
 
 /** Story 78 — the signed-in agent's own id, needed by `TicketChatCard` to

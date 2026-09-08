@@ -2,13 +2,21 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { ArticleListView } from "./article-list-view";
 import { useArticlesQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
+import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { ApiError } from "@/lib/api";
 
 const push = vi.fn();
+const replace = vi.fn();
+// Batch 4 (UX audit) — filters now live in the URL via `useUrlFilters`;
+// mutable so the dedicated "URL state (Batch 4)" describe block can
+// exercise it, every other test in this file leaves it at "".
+let searchParamsString = "";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace }),
+  usePathname: () => "/en/knowledge-base",
+  useSearchParams: () => new URLSearchParams(searchParamsString),
 }));
 
 vi.mock("next-intl", () => ({
@@ -21,8 +29,13 @@ vi.mock("@/hooks/use-knowledge-base", () => ({
   useUpdateArticleMutation: vi.fn(),
 }));
 
+vi.mock("@/hooks/use-kb-categories", () => ({
+  useKbCategoriesQuery: vi.fn(),
+}));
+
 const mockedUseArticlesQuery = vi.mocked(useArticlesQuery);
 const mockedUseUpdateArticleMutation = vi.mocked(useUpdateArticleMutation);
+const mockedUseKbCategoriesQuery = vi.mocked(useKbCategoriesQuery);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -85,7 +98,9 @@ const baseArticle = {
 describe("ArticleListView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsString = "";
     mockedUseUpdateArticleMutation.mockReturnValue(mutationResult() as never);
+    mockedUseKbCategoriesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
   });
 
   it("shows a loading state while the articles query is pending", () => {
@@ -266,7 +281,7 @@ describe("ArticleListView", () => {
     });
 
     // Story S-8c — the hook takes `(search, page)`; typing resets the page.
-    expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("password", undefined);
+    expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("password", undefined, undefined);
   });
 
   it("shows a distinct no-results state (not the create-prompting empty state) when a search yields nothing", () => {
@@ -323,7 +338,7 @@ describe("ArticleListView", () => {
       });
       fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
 
-      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("password", 3);
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("password", 3, undefined);
     });
 
     it("requests the previous page", () => {
@@ -331,7 +346,7 @@ describe("ArticleListView", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "pagination.previous" }));
 
-      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("", 1);
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("", 1, undefined);
     });
 
     it("disables previous on the first page", () => {
@@ -413,7 +428,7 @@ describe("ArticleListView", () => {
 
       // Move off page 1 first, so the reset is observable.
       fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
-      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("", 3);
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("", 3, undefined);
 
       fireEvent.change(screen.getByLabelText("list.searchLabel"), {
         target: { value: "reset" },
@@ -421,7 +436,7 @@ describe("ArticleListView", () => {
 
       // `undefined` rather than 1: the same request, and it keeps the query
       // key identical to a first visit.
-      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("reset", undefined);
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("reset", undefined, undefined);
     });
 
     it("still shows the empty state for a genuinely empty page", () => {
@@ -433,6 +448,88 @@ describe("ArticleListView", () => {
 
       expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
       expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    });
+  });
+
+  // Batch 4 (UX audit).
+  describe("category filter", () => {
+    it("passes the selected category through to useArticlesQuery", async () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+      mockedUseKbCategoriesQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "category-1", branchId: "branch-1", name: "account", isActive: true }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ArticleListView />);
+      fireEvent.click(screen.getByRole("combobox", { name: "list.filterCategory" }));
+      fireEvent.click(await screen.findByRole("option", { name: "account" }));
+
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith(
+        "",
+        undefined,
+        "category-1",
+      );
+    });
+
+    it("resets to page 1 when the category changes, in the same update", async () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([], { total: 60, page: 3, totalPages: 3 }) }) as never,
+      );
+      mockedUseKbCategoriesQuery.mockReturnValue(
+        queryResult({
+          data: [{ id: "category-1", branchId: "branch-1", name: "account", isActive: true }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<ArticleListView />);
+      fireEvent.click(screen.getByRole("combobox", { name: "list.filterCategory" }));
+      fireEvent.click(await screen.findByRole("option", { name: "account" }));
+
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("", undefined, "category-1");
+    });
+  });
+
+  // Batch 4 (UX audit) — filters/search/category/page now live in the URL,
+  // so a filtered list survives navigating into an article and back.
+  describe("URL state (Batch 4)", () => {
+    it("initializes filters from the URL's own query string on first render", () => {
+      searchParamsString = "search=reset&categoryId=category-1&page=2";
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+
+      render(<ArticleListView />);
+
+      expect(mockedUseArticlesQuery).toHaveBeenLastCalledWith("reset", 2, "category-1");
+    });
+
+    it("writes a search change to the URL via router.replace, not push", () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+
+      render(<ArticleListView />);
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "reset" },
+      });
+
+      expect(replace).toHaveBeenCalledWith("/en/knowledge-base?search=reset", { scroll: false });
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("writes no query string for the default, unfiltered list", () => {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+
+      render(<ArticleListView />);
+
+      expect(replace).not.toHaveBeenCalled();
     });
   });
 });

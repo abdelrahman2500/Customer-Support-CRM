@@ -634,6 +634,55 @@ describe("Identity & Access (e2e)", () => {
     expect(emails).toContain(agentEmail);
   });
 
+  // Batch 4 (UX audit) — real pagination for the admin Users screen. Scoped
+  // by `search` (not an unfiltered page 1) so this doesn't depend on how
+  // many users this branch has accumulated ahead of `agentEmail` in
+  // creation order — `MAX_USERS_ROWS`'s own removal from this endpoint is
+  // exactly the point, so a branch legitimately past 500/25 rows must not
+  // make this test flaky.
+  it("lists users via the paginated GET /identity/users/paged, in a Paginated<UserSummary> envelope", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/identity/users/paged")
+      .query({ search: agentEmail })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      page: 1,
+      pageSize: 25,
+      total: expect.any(Number),
+      totalPages: expect.any(Number),
+    });
+    const emails = response.body.items.map((user: { email: string }) => user.email);
+    expect(emails).toContain(agentEmail);
+  });
+
+  it("filters GET /identity/users/paged by search (fullName or email, case-insensitive)", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/identity/users/paged")
+      .query({ search: agentEmail.toUpperCase() })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    const emails = response.body.items.map((user: { email: string }) => user.email);
+    expect(emails).toEqual([agentEmail]);
+  });
+
+  it("respects page/pageSize on GET /identity/users/paged", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/identity/users/paged")
+      .query({ page: 1, pageSize: 1 })
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
+    expect(response.body.items).toHaveLength(1);
+    expect(response.body.pageSize).toBe(1);
+  });
+
+  it("rejects GET /identity/users/paged with no token", async () => {
+    await request(app.getHttpServer()).get("/api/v1/identity/users/paged").expect(401);
+  });
+
   it("rejects the Agent user attempting to create another user (403)", async () => {
     const loginResponse = await request(app.getHttpServer())
       .post("/api/v1/auth/login")

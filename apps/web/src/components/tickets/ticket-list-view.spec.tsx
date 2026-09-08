@@ -4,9 +4,20 @@ import { TicketListView } from "./ticket-list-view";
 import { useCustomersQuery, useTicketsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 
+// Batch 4 (UX audit) — filters now live in the URL via `useUrlFilters`
+// (`usePathname`/`useSearchParams`/`router.replace`), alongside the
+// existing `router.push`/`useParams` this view already used. `searchParams`
+// is mutable so the dedicated "URL state (Batch 4)" describe block below
+// can exercise it; every other test in this file leaves it at "".
+const push = vi.fn();
+const replace = vi.fn();
+let searchParamsString = "";
+
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push, replace }),
+  usePathname: () => "/en/tickets",
+  useSearchParams: () => new URLSearchParams(searchParamsString),
 }));
 
 vi.mock("next-intl", () => ({
@@ -68,6 +79,7 @@ function page(items: unknown[], overrides: Record<string, unknown> = {}) {
 describe("TicketListView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsString = "";
     mockedUseCustomersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     mockedUseUsersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     mockedUseTicketCategoriesQuery.mockReturnValue(
@@ -623,6 +635,47 @@ describe("TicketListView", () => {
       // A rapid double-click must not queue a second jump.
       expect(screen.getByRole("button", { name: "pagination.previous" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "pagination.next" })).toBeDisabled();
+    });
+  });
+
+  // Batch 4 (UX audit) — filters/search/sort/page now live in the URL, so a
+  // filtered list survives navigating away and back via the browser's own
+  // Back button, and a filtered URL is bookmarkable/shareable.
+  describe("URL state (Batch 4)", () => {
+    it("initializes filters from the URL's own query string on first render", () => {
+      searchParamsString = "status=OPEN&categoryId=category-1";
+      mockedUseTicketsQuery.mockReturnValue(queryResult({ isSuccess: true, data: page([]) }) as never);
+
+      render(<TicketListView />);
+
+      expect(mockedUseTicketsQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: "OPEN", categoryId: "category-1" }),
+      );
+    });
+
+    it("writes a filter change to the URL via router.replace, not push", () => {
+      mockedUseTicketsQuery.mockReturnValue(queryResult({ isSuccess: true, data: page([]) }) as never);
+
+      render(<TicketListView />);
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "printer" },
+      });
+      fireEvent.blur(screen.getByLabelText("list.searchLabel"));
+
+      expect(replace).toHaveBeenCalledWith("/en/tickets?search=printer", { scroll: false });
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("never writes the default sort into the URL", () => {
+      mockedUseTicketsQuery.mockReturnValue(queryResult({ isSuccess: true, data: page([]) }) as never);
+
+      render(<TicketListView />);
+
+      // The very first render's own state->URL sync must not add
+      // `sortBy=createdAt&sortDir=desc` for the view's own default sort —
+      // an empty query string is what a fresh, unfiltered list should
+      // round-trip to.
+      expect(replace).not.toHaveBeenCalled();
     });
   });
 });

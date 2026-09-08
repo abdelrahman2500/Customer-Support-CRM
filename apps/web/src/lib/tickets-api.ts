@@ -169,7 +169,9 @@ export interface ListTicketsFilters {
 /** Story 101 — widened from `ListTicketsFilters`-only to also accept
  * `ListCustomersFilters`, so `listCustomers` can reuse it too rather than
  * duplicating this exact same loop a second time in the same file. */
-function toQueryString(filters: ListTicketsFilters | ListCustomersFilters): string {
+function toQueryString(
+  filters: ListTicketsFilters | ListCustomersFilters | ListUsersFilters,
+): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value === undefined || value === "") {
@@ -443,6 +445,26 @@ export function createCustomerNote(
 
 export function listUsers(): Promise<UserSummary[]> {
   return apiFetch<UserSummary[]>("/identity/users");
+}
+
+/** Batch 4 (UX audit) — the admin Users screen's own real-pagination
+ * filters, mirroring `ListCustomersFilters`'s shape (search + page/pageSize,
+ * no sort — `GET /identity/users/paged` has none, see that DTO's own doc
+ * comment). Deliberately a distinct type/endpoint from `listUsers()`
+ * above: every other caller of that one needs every branch member, not one
+ * page. */
+export interface ListUsersFilters {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export function listUsersPaged(
+  filters: ListUsersFilters = {},
+): Promise<PaginatedResponse<UserSummary>> {
+  return apiFetch<PaginatedResponse<UserSummary>>(
+    `/identity/users/paged${toQueryString(filters)}`,
+  );
 }
 
 /** Story 38 — mirrors `apps/api/src/modules/identity/identity.service.ts`'s

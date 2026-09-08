@@ -35,6 +35,7 @@ function buildPrismaMock() {
     user: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       update: vi.fn(),
       create: vi.fn(async (args: { data: { email: string } }) => ({
         id: "new-user-id",
@@ -1478,6 +1479,102 @@ describe("IdentityService", () => {
           departmentId: "dept-old",
         }),
       ]);
+    });
+  });
+
+  // Batch 4 (UX audit) — real pagination for the admin Users screen,
+  // replacing `listUsers()`'s own `MAX_USERS_ROWS` cap there specifically.
+  describe("listUsersPaged", () => {
+    beforeEach(() => {
+      prisma.user.count.mockResolvedValue(1);
+    });
+
+    it("scopes both the count and the page fetch to the caller's active branch", async () => {
+      prisma.user.findMany.mockResolvedValue([
+        {
+          id: "user-1",
+          email: "a@example.com",
+          fullName: "A",
+          isActive: true,
+          lockedUntil: null,
+          branchRoles: [{ branchId: "branch-1", roleId: "role-1", departmentId: null, role: { name: "Agent" } }],
+        },
+      ]);
+
+      const result = await service.listUsersPaged();
+
+      expect(tenantContext.requireBranchScope).toHaveBeenCalledOnce();
+      expect(prisma.user.count).toHaveBeenCalledWith({
+        where: { branchRoles: { some: { branchId: "branch-1" } } },
+      });
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { branchRoles: { some: { branchId: "branch-1" } } },
+          skip: 0,
+          take: 25,
+        }),
+      );
+      expect(result).toEqual({
+        items: [
+          expect.objectContaining({ id: "user-1", email: "a@example.com", roles: ["Agent"] }),
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 25,
+        totalPages: 1,
+      });
+    });
+
+    it("never applies a row cap — the old MAX_USERS_ROWS take is gone from this path", async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+
+      await service.listUsersPaged({ pageSize: 100 });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 100 }),
+      );
+      expect(prisma.user.findMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({ take: 500 }),
+      );
+    });
+
+    it("matches fullName or email, case-insensitive, when search is given", async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+
+      await service.listUsersPaged({ search: "ada" });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            branchRoles: { some: { branchId: "branch-1" } },
+            OR: [
+              { fullName: { contains: "ada", mode: "insensitive" } },
+              { email: { contains: "ada", mode: "insensitive" } },
+            ],
+          },
+        }),
+      );
+    });
+
+    it("requests the given page/pageSize", async () => {
+      prisma.user.findMany.mockResolvedValue([]);
+      prisma.user.count.mockResolvedValue(60);
+
+      const result = await service.listUsersPaged({ page: 2, pageSize: 25 });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 25, take: 25 }),
+      );
+      expect(result).toEqual(
+        expect.objectContaining({ page: 2, pageSize: 25, total: 60, totalPages: 3 }),
+      );
+    });
+
+    it("propagates TenantContext's error when there is no active branch", async () => {
+      tenantContext = buildTenantContextMock(null);
+      service = createService(prisma, jwtService, configService, tenantContext);
+
+      await expect(service.listUsersPaged()).rejects.toThrow(/no active branch/);
     });
   });
 

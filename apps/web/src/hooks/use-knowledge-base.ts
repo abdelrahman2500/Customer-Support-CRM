@@ -29,15 +29,19 @@ import { preservePreviousResults } from "@/lib/list-query";
  * key's shape stays greppable, and so mutations that invalidate the bare
  * `["knowledge-base-articles"]` prefix keep matching every page - which is
  * how publishing an article still refreshes the list.
+ *
+ * Batch 4 (UX audit) — `categoryId` appended the same way: the backend's
+ * `ListArticlesQueryDto.categoryId` (RM-27) was already a real, working
+ * filter with no frontend caller for it on this list.
  */
-export const articlesQueryKey = (search?: string, page?: number) =>
-  ["knowledge-base-articles", search ?? "", page ?? 1] as const;
+export const articlesQueryKey = (search?: string, page?: number, categoryId?: string) =>
+  ["knowledge-base-articles", search ?? "", page ?? 1, categoryId ?? ""] as const;
 export const articleQueryKey = (id: string) => ["knowledge-base-articles", id] as const;
 
-export function useArticlesQuery(search?: string, page?: number) {
+export function useArticlesQuery(search?: string, page?: number, categoryId?: string) {
   return useQuery({
-    queryKey: articlesQueryKey(search, page),
-    queryFn: () => listArticles({ search, page }),
+    queryKey: articlesQueryKey(search, page, categoryId),
+    queryFn: () => listArticles({ search, page, categoryId }),
     // Story S-7 — `search` is the key, so typing is a new query, and since
     // Story S-8c so is a page change. Keep the previous results visible
     // while the new ones load.

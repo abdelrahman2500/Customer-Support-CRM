@@ -8,7 +8,7 @@ import {
   useUnlockUserMutation,
   useUpdateUserAssignmentMutation,
   useUpdateUserMutation,
-  useUsersQuery,
+  useUserListQuery,
 } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
 import { io } from "socket.io-client";
@@ -91,14 +91,21 @@ function buildSocketMock() {
  */
 
 const push = vi.fn();
+const replace = vi.fn();
+// Batch 4 (UX audit) — filters now live in the URL via `useUrlFilters`;
+// mutable so the dedicated "URL state (Batch 4)" describe block can
+// exercise it, every other test in this file leaves it at "".
+let searchParamsString = "";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, replace }),
+  usePathname: () => "/en/users",
+  useSearchParams: () => new URLSearchParams(searchParamsString),
 }));
 
 vi.mock("@/hooks/use-tickets", () => ({
-  useUsersQuery: vi.fn(),
+  useUserListQuery: vi.fn(),
   useUpdateUserMutation: vi.fn(),
   useDepartmentsQuery: vi.fn(),
   useUpdateUserAssignmentMutation: vi.fn(),
@@ -110,7 +117,10 @@ vi.mock("@/hooks/use-roles", () => ({
   useRolesQuery: vi.fn(),
 }));
 
-const mockedUseUsersQuery = vi.mocked(useUsersQuery);
+// Kept as `mockedUseUsersQuery` (rather than renamed) so the large number of
+// existing call sites below don't all need touching for Batch 4's
+// `useUsersQuery` -> `useUserListQuery` swap — only this wiring line changed.
+const mockedUseUsersQuery = vi.mocked(useUserListQuery);
 const mockedUseUpdateUserMutation = vi.mocked(useUpdateUserMutation);
 const mockedUseDepartmentsQuery = vi.mocked(useDepartmentsQuery);
 const mockedUseUpdateUserAssignmentMutation = vi.mocked(useUpdateUserAssignmentMutation);
@@ -121,11 +131,28 @@ const mockedUseRolesQuery = vi.mocked(useRolesQuery);
 function queryResult(overrides: Record<string, unknown> = {}) {
   return {
     data: undefined,
+    isPending: false,
+    isPlaceholderData: false,
     isLoading: false,
     isError: false,
     isSuccess: false,
     error: null,
     refetch: vi.fn(),
+    ...overrides,
+  };
+}
+
+/** Batch 4 (UX audit) — `GET /identity/users/paged` returns a
+ * `Paginated<UserSummary>` envelope; mirrors `customer-list-view.spec.tsx`'s
+ * own `page()` helper exactly. Defaults to one full page so every existing
+ * call site (all written against a flat array) reads as it did before. */
+function page(items: unknown[], overrides: Record<string, unknown> = {}) {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    pageSize: 25,
+    totalPages: 1,
     ...overrides,
   };
 }
@@ -175,6 +202,7 @@ describe("UserListView", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsString = "";
     socket = buildSocketMock();
     vi.mocked(io).mockReturnValue(socket as never);
     vi.mocked(getAccessToken).mockReturnValue("test-token");
@@ -189,7 +217,7 @@ describe("UserListView", () => {
   });
 
   it("links 'New user' to /users/new", () => {
-    mockedUseUsersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseUsersQuery.mockReturnValue(queryResult({ data: page([]), isSuccess: true }) as never);
 
     renderView();
 
@@ -197,7 +225,7 @@ describe("UserListView", () => {
   });
 
   it("shows a loading state while the users query is pending", () => {
-    mockedUseUsersQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+    mockedUseUsersQuery.mockReturnValue(queryResult({ isPending: true }) as never);
 
     renderView();
 
@@ -205,7 +233,7 @@ describe("UserListView", () => {
   });
 
   it("shows the empty state when the query succeeds with zero users", () => {
-    mockedUseUsersQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
+    mockedUseUsersQuery.mockReturnValue(queryResult({ data: page([]), isSuccess: true }) as never);
 
     renderView();
 
@@ -225,7 +253,7 @@ describe("UserListView", () => {
 
   it("renders a row per user once the query succeeds, with an editable email, an editable full name, and a status badge", () => {
     mockedUseUsersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
     );
 
     renderView();
@@ -243,7 +271,7 @@ describe("UserListView", () => {
   describe("presence", () => {
     it("joins agent:{id}:presence for every listed user", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
 
       renderView();
@@ -256,7 +284,7 @@ describe("UserListView", () => {
 
     it("shows Online once the socket relays an online transition for that user", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
 
       renderView();
@@ -271,7 +299,7 @@ describe("UserListView", () => {
     it("keeps each user's presence independent", () => {
       const secondUser = { ...baseUser, id: "user-2", email: "second@example.com" };
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser, secondUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser, secondUser]) }) as never,
       );
 
       renderView();
@@ -287,7 +315,7 @@ describe("UserListView", () => {
 
   it("renders the Role select pre-populated with the user's current role", () => {
     mockedUseUsersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
     );
 
     renderView();
@@ -298,7 +326,7 @@ describe("UserListView", () => {
 
   it("renders the Department select pre-populated with the user's current department", () => {
     mockedUseUsersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
     );
 
     renderView();
@@ -311,7 +339,7 @@ describe("UserListView", () => {
     mockedUseUsersQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [{ ...baseUser, departmentId: null }],
+        data: page([{ ...baseUser, departmentId: null }]),
       }) as never,
     );
 
@@ -326,7 +354,7 @@ describe("UserListView", () => {
       const renameMutate = vi.fn();
       const assignmentMutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
         mutationResult({ mutate: renameMutate }) as never,
@@ -353,7 +381,7 @@ describe("UserListView", () => {
     it("commits an email change on blur when the email changed", () => {
       const mutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
@@ -372,7 +400,7 @@ describe("UserListView", () => {
     it("does not fire the update mutation on blur when the email is unchanged", () => {
       const mutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
@@ -391,7 +419,7 @@ describe("UserListView", () => {
   // second, distinct element with the same accessible name) is clicked.
   it("does not deactivate immediately — clicking 'Deactivate' opens a confirmation dialog first", () => {
     mockedUseUsersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
     );
     const renameMutate = vi.fn();
     mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
@@ -407,7 +435,7 @@ describe("UserListView", () => {
     const renameMutate = vi.fn();
     const assignmentMutate = vi.fn();
     mockedUseUsersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
     );
     mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
     mockedUseUpdateUserAssignmentMutation.mockReturnValue(
@@ -430,7 +458,7 @@ describe("UserListView", () => {
   it("activating an inactive user does not require confirmation", () => {
     const renameMutate = vi.fn();
     mockedUseUsersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [{ ...baseUser, isActive: false }] }) as never,
+      queryResult({ isSuccess: true, data: page([{ ...baseUser, isActive: false }]) }) as never,
     );
     mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
 
@@ -446,7 +474,7 @@ describe("UserListView", () => {
       const renameMutate = vi.fn();
       const assignmentMutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
         mutationResult({ mutate: renameMutate }) as never,
@@ -468,7 +496,7 @@ describe("UserListView", () => {
     it("changing the Department select to a different department commits { departmentId }", async () => {
       const assignmentMutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({ mutate: assignmentMutate }) as never,
@@ -486,7 +514,7 @@ describe("UserListView", () => {
     it("changing the Department select to 'No department' commits { departmentId: null }", async () => {
       const assignmentMutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({ mutate: assignmentMutate }) as never,
@@ -506,7 +534,7 @@ describe("UserListView", () => {
     // now resolve each picker directly, without positional indexing.
     it("gives the Role and Department pickers accessible names matching their visible labels", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
 
       renderView();
@@ -518,7 +546,7 @@ describe("UserListView", () => {
 
   it("shows independent load-error messages for the Role and Department pickers", () => {
     mockedUseUsersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
     );
     mockedUseRolesQuery.mockReturnValue(queryResult({ isError: true }) as never);
     mockedUseDepartmentsQuery.mockReturnValue(queryResult({ isError: true }) as never);
@@ -532,7 +560,7 @@ describe("UserListView", () => {
   // Story 97 — Loading & Skeleton UX.
   it("disables the Role and Department pickers, and shows a loading indicator, while their own options queries are loading", () => {
     mockedUseUsersQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: [baseUser] }) as never,
+      queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
     );
     mockedUseRolesQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
     mockedUseDepartmentsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
@@ -549,7 +577,7 @@ describe("UserListView", () => {
   describe("3-way error handling on the rename/activate mutation", () => {
     it("renders the forbidden message when rejected with 403", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
         mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
@@ -571,7 +599,7 @@ describe("UserListView", () => {
 
     it("renders a generic action-failed message for a non-403 mutation error", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
         mutationResult({ isError: true, error: new ApiError("Server error", 500) }) as never,
@@ -589,7 +617,7 @@ describe("UserListView", () => {
   describe("3-way error handling on the email field", () => {
     it("renders the forbidden message when the update mutation is rejected with 403", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
         mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
@@ -605,7 +633,7 @@ describe("UserListView", () => {
 
     it("renders the backend's own message verbatim when rejected with 409 (duplicate email)", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
         mutationResult({
@@ -628,7 +656,7 @@ describe("UserListView", () => {
     // feature's generic "couldn't be saved" copy — see `error-message.ts`.
     it("renders the shared network-failure message when the rejection is not an ApiError", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
         mutationResult({ isError: true, error: new Error("network down") }) as never,
@@ -648,7 +676,7 @@ describe("UserListView", () => {
   describe("3-way error handling on the assignment mutation", () => {
     it("renders the forbidden message when the assignment mutation is rejected with 403", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
@@ -663,7 +691,7 @@ describe("UserListView", () => {
 
     it("renders the backend's own message verbatim when rejected with 400 (e.g. assigning an inactive role)", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({
@@ -679,7 +707,7 @@ describe("UserListView", () => {
 
     it("renders the backend's own message verbatim when rejected with 409 (duplicate exact assignment)", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({
@@ -695,7 +723,7 @@ describe("UserListView", () => {
 
     it("renders the shared network-failure message when the assignment rejection is not an ApiError", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserAssignmentMutation.mockReturnValue(
         mutationResult({ isError: true, error: new Error("network down") }) as never,
@@ -716,7 +744,7 @@ describe("UserListView", () => {
     // secondary action.
     it("styles the reset-password trigger as destructive, matching its own confirmation dialog", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
 
       renderView();
@@ -726,7 +754,7 @@ describe("UserListView", () => {
 
     it("keeps the reset-password button disabled until the draft is at least 8 characters", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
 
       renderView();
@@ -747,7 +775,7 @@ describe("UserListView", () => {
     it("does not commit on blur, and clicking 'Reset password' opens a confirmation dialog rather than committing immediately", () => {
       const mutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseResetPasswordMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
@@ -769,7 +797,7 @@ describe("UserListView", () => {
     it("commits with the exact { newPassword } payload only once the confirmation dialog's own Reset password button is clicked", () => {
       const mutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseResetPasswordMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
@@ -795,7 +823,7 @@ describe("UserListView", () => {
       // mutation, under which the component's local draft state is left
       // untouched (there is no `onError` handler on this control at all).
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseResetPasswordMutation.mockReturnValue(mutationResult() as never);
 
@@ -818,7 +846,7 @@ describe("UserListView", () => {
         capturedOnSuccess = options?.onSuccess;
       });
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseResetPasswordMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
@@ -847,7 +875,7 @@ describe("UserListView", () => {
   describe("3-way error handling on the reset-password mutation", () => {
     it("renders the forbidden message when rejected with 403", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseResetPasswordMutation.mockReturnValue(
         mutationResult({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
@@ -862,7 +890,7 @@ describe("UserListView", () => {
 
     it("renders the backend's own message verbatim for a non-403 ApiError", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseResetPasswordMutation.mockReturnValue(
         mutationResult({
@@ -878,7 +906,7 @@ describe("UserListView", () => {
 
     it("renders the shared network-failure message when the rejection is not an ApiError", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseResetPasswordMutation.mockReturnValue(
         mutationResult({ isError: true, error: new Error("network down") }) as never,
@@ -898,7 +926,7 @@ describe("UserListView", () => {
       const assignmentMutate = vi.fn();
       const resetPasswordMutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
         mutationResult({ mutate: renameMutate }) as never,
@@ -929,7 +957,7 @@ describe("UserListView", () => {
       const assignmentMutate = vi.fn();
       const resetPasswordMutate = vi.fn();
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
         mutationResult({ mutate: renameMutate }) as never,
@@ -969,7 +997,7 @@ describe("UserListView", () => {
   describe("mobile card labels (RM-10)", () => {
     it("renders each column's own label text inside its cell", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
 
       renderView();
@@ -988,7 +1016,7 @@ describe("UserListView", () => {
   describe("account lockout", () => {
     it("does not render a Locked badge or Unlock button for an unlocked user", () => {
       mockedUseUsersQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: [baseUser] }) as never,
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
       );
 
       renderView();
@@ -1001,7 +1029,7 @@ describe("UserListView", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+          data: page([{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }]),
         }) as never,
       );
 
@@ -1016,7 +1044,7 @@ describe("UserListView", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+          data: page([{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }]),
         }) as never,
       );
       mockedUseUnlockUserMutation.mockReturnValue(
@@ -1034,7 +1062,7 @@ describe("UserListView", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+          data: page([{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }]),
         }) as never,
       );
       mockedUseUnlockUserMutation.mockReturnValue(mutationResult({ isPending: true }) as never);
@@ -1048,7 +1076,7 @@ describe("UserListView", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+          data: page([{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }]),
         }) as never,
       );
       mockedUseUnlockUserMutation.mockReturnValue(
@@ -1070,7 +1098,7 @@ describe("UserListView", () => {
       mockedUseUsersQuery.mockReturnValue(
         queryResult({
           isSuccess: true,
-          data: [{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }],
+          data: page([{ ...baseUser, isLocked: true, lockedUntil: "2026-01-01T00:15:00.000Z" }]),
         }) as never,
       );
       mockedUseUpdateUserMutation.mockReturnValue(
@@ -1093,6 +1121,72 @@ describe("UserListView", () => {
       expect(renameMutate).not.toHaveBeenCalled();
       expect(assignmentMutate).not.toHaveBeenCalled();
       expect(resetPasswordMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  // Batch 4 (UX audit) — real pagination replaces the old `MAX_USERS_ROWS`
+  // cap; filters/page live in the URL, mirroring every other list view's
+  // identical change.
+  describe("pagination and search (Batch 4)", () => {
+    it("renders the pager once there is more than one page", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([baseUser], { total: 60, page: 2, totalPages: 3 }),
+        }) as never,
+      );
+
+      renderView();
+
+      expect(screen.getByRole("navigation")).toBeInTheDocument();
+    });
+
+    it("renders no pager when everything fits on one page", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
+      );
+
+      renderView();
+
+      expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    });
+
+    it("passes the searched term through to useUserListQuery on blur", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+
+      renderView();
+      fireEvent.change(screen.getByLabelText("Search"), { target: { value: "ada" } });
+      fireEvent.blur(screen.getByLabelText("Search"));
+
+      expect(mockedUseUsersQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({ search: "ada" }),
+      );
+    });
+
+    it("initializes filters from the URL's own query string on first render", () => {
+      searchParamsString = "search=ada&page=2";
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+
+      renderView();
+
+      expect(mockedUseUsersQuery).toHaveBeenLastCalledWith({ search: "ada", page: 2 });
+    });
+
+    it("writes a search change to the URL via router.replace, not push", () => {
+      mockedUseUsersQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+
+      renderView();
+      fireEvent.change(screen.getByLabelText("Search"), { target: { value: "ada" } });
+      fireEvent.blur(screen.getByLabelText("Search"));
+
+      expect(replace).toHaveBeenCalledWith("/en/users?search=ada", { scroll: false });
+      expect(push).not.toHaveBeenCalled();
     });
   });
 });

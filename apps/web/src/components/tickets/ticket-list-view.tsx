@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -9,6 +9,7 @@ import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { ListTicketsFilters, TicketListItem } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
+import { useUrlFilters } from "@/lib/url-filters";
 import {
   Badge,
   Button,
@@ -53,6 +54,43 @@ function sortAriaValue(
   return filters.sortDir === "asc" ? "ascending" : "descending";
 }
 
+/** Batch 4 (UX audit) — the URL <-> `ListTicketsFilters` mapping for this
+ * view's own `useUrlFilters`. Only the fields this screen's UI actually
+ * drives round-trip; `sortBy`/`sortDir` default to this view's own
+ * pre-existing default (`createdAt`/`desc`) both when parsing an absent
+ * param and when serializing that default back out, so the common,
+ * unsorted-from-the-user's-perspective case never grows a query string. */
+function parseTicketFilters(params: URLSearchParams): ListTicketsFilters {
+  const page = params.get("page");
+  return {
+    sortBy: (params.get("sortBy") as ListTicketsFilters["sortBy"]) ?? "createdAt",
+    sortDir: (params.get("sortDir") as ListTicketsFilters["sortDir"]) ?? "desc",
+    ...(params.get("status") ? { status: params.get("status") as ListTicketsFilters["status"] } : {}),
+    ...(params.get("priority")
+      ? { priority: params.get("priority") as ListTicketsFilters["priority"] }
+      : {}),
+    ...(params.get("categoryId") ? { categoryId: params.get("categoryId")! } : {}),
+    ...(params.get("assignedToUserId")
+      ? { assignedToUserId: params.get("assignedToUserId")! }
+      : {}),
+    ...(params.get("search") ? { search: params.get("search")! } : {}),
+    ...(page ? { page: Number(page) } : {}),
+  };
+}
+
+function serializeTicketFilters(filters: ListTicketsFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.priority) params.set("priority", filters.priority);
+  if (filters.categoryId) params.set("categoryId", filters.categoryId);
+  if (filters.assignedToUserId) params.set("assignedToUserId", filters.assignedToUserId);
+  if (filters.search) params.set("search", filters.search);
+  if (filters.sortBy && filters.sortBy !== "createdAt") params.set("sortBy", filters.sortBy);
+  if (filters.sortDir && filters.sortDir !== "desc") params.set("sortDir", filters.sortDir);
+  if (filters.page) params.set("page", String(filters.page));
+  return params;
+}
+
 function SlaCell({ ticket }: { ticket: TicketListItem }) {
   const t = useTranslations("tickets");
   const status = deriveSlaStatus(ticket.slaTarget);
@@ -95,17 +133,31 @@ function SlaCell({ ticket }: { ticket: TicketListItem }) {
  * column's own `TableHead` text, and the filter bar stacks one control
  * per row below `sm` — `@crm/ui`'s `Table` primitive does the rest (see
  * that file's own doc comment): no bespoke card markup lives here.
+ *
+ * Batch 4 (UX audit) — filters/search/sort/page now live in the URL via
+ * `useUrlFilters` instead of a plain `useState`, so a filtered, sorted,
+ * paged list survives navigating into a ticket and back (the single
+ * most-repeated Recon finding across this app's list screens), and is
+ * bookmarkable/shareable. `TicketListView` is now a thin `Suspense`
+ * wrapper: `useSearchParams()` (inside `useUrlFilters`) requires one around
+ * any component that calls it, per Next.js's own static-rendering
+ * requirement — the real view moved to `TicketListViewContent`.
  */
 export function TicketListView() {
+  return (
+    <Suspense fallback={null}>
+      <TicketListViewContent />
+    </Suspense>
+  );
+}
+
+function TicketListViewContent() {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
-  const [filters, setFilters] = useState<ListTicketsFilters>({
-    sortBy: "createdAt",
-    sortDir: "desc",
-  });
+  const [filters, setFilters] = useUrlFilters(parseTicketFilters, serializeTicketFilters);
 
   const ticketsQuery = useTicketsQuery(filters);
   /** Story S-7 — whoever they came from: a completed fetch, the previous

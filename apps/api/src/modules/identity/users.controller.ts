@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import type { Paginated } from "../../common/pagination/paginated";
 import { RequirePermissions } from "../../common/auth/require-permissions.decorator";
+import { ListUsersQueryDto } from "./dto/list-users-query.dto";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
@@ -93,6 +95,21 @@ export class UsersController {
   @RequirePermissions("user:read")
   listUsers(): Promise<UserSummary[]> {
     return this.identityService.listUsers();
+  }
+
+  /**
+   * Batch 4 (UX audit) — real pagination for the admin Users screen. A
+   * second route rather than a query-shaped `GET users`: every existing
+   * caller of `listUsers()` above (assignee pickers, audit-log actor
+   * names, ...) depends on its flat, unbounded-in-practice array response
+   * — changing that shape would break all of them. Same
+   * `user:read` permission; this is a different read shape of the same
+   * resource, not a different capability.
+   */
+  @Get("users/paged")
+  @RequirePermissions("user:read")
+  listUsersPaged(@Query() query: ListUsersQueryDto): Promise<Paginated<UserSummary>> {
+    return this.identityService.listUsersPaged(query);
   }
 
   @Patch("users/:id")
