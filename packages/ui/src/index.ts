@@ -124,7 +124,7 @@ export {
   SelectScrollDownButton,
 } from "./components/select";
 
-export { Skeleton, SkeletonText, SkeletonCard } from "./components/skeleton";
+export { Skeleton, SkeletonText, SkeletonCard, RouteLoadingSkeleton } from "./components/skeleton";
 export type { SkeletonTextProps, SkeletonCardProps } from "./components/skeleton";
 
 export { SuccessToaster } from "./components/success-toaster";

@@ -46,6 +46,14 @@ export function TicketAiCard({
 }) {
   const t = useTranslations("tickets");
   const errorMessage = useErrorMessage();
+  // Global Navigation Loading (UX audit) — `submitMutation` is one shared
+  // mutation object for all four buttons below, so `submitMutation.isPending`
+  // alone can't say *which* of them was clicked; every button would show a
+  // spinner at once, implying all four features are running. This tracks
+  // just the clicked one, so `isLoading` lands on that single button while
+  // `disabled` (from `submitMutation.isPending` alone, unchanged) still
+  // blocks the other three from being clicked mid-submit.
+  const [pendingFeature, setPendingFeature] = useState<TicketAiFeature | null>(null);
   const [operation, setOperation] = useState<{ feature: TicketAiFeature; logId: string } | null>(
     null,
   );
@@ -55,6 +63,7 @@ export function TicketAiCard({
 
   async function submit(feature: TicketAiFeature): Promise<void> {
     setSubmitError(null);
+    setPendingFeature(feature);
     try {
       const result = await submitMutation.mutateAsync(feature);
       setOperation({ feature, logId: result.id });
@@ -65,6 +74,8 @@ export function TicketAiCard({
           generic: t("detail.aiSubmitFailed"),
         }),
       );
+    } finally {
+      setPendingFeature(null);
     }
   }
 
@@ -80,6 +91,7 @@ export function TicketAiCard({
             variant="outline"
             size="sm"
             disabled={submitMutation.isPending}
+            isLoading={pendingFeature === feature}
             onClick={() => void submit(feature)}
           >
             {t(FEATURE_LABEL_KEYS[feature])}

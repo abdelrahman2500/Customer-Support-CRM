@@ -785,7 +785,15 @@ function ReportCardSkeleton({ variant }: { variant: "list" | "stat" }) {
  * inline error next to the button rather than replacing the card's already-
  * loaded content with a full error state (mirrors this component's own
  * `invalidRange`/`forbidden` split: a failure in one concern must never
- * blank out data that loaded successfully in another). */
+ * blank out data that loaded successfully in another).
+ *
+ * Global Navigation Loading (UX audit) — the export button previously only
+ * `disabled` itself while `isExporting`, with no visible change at all
+ * (unlike every other mutation button in this codebase, which at least
+ * text-swaps); a CSV download that takes a few seconds looked like the
+ * click hadn't registered. `isLoading` (not a manual `disabled` alongside
+ * it — redundant, `Button` already implies `disabled` while loading) fixes
+ * all eight call sites via this one shared card. */
 function ReportCard({
   heading,
   query,
@@ -847,7 +855,7 @@ function ReportCard({
           <Button
             variant="outline"
             size="sm"
-            disabled={isExporting}
+            isLoading={isExporting}
             onClick={() => void handleExport()}
           >
             {t("export.button")}

@@ -262,6 +262,42 @@ describe("TicketAiCard", () => {
     expect(screen.queryByText("You lack permission")).not.toBeInTheDocument();
   });
 
+  // Global Navigation Loading (UX audit) — `pendingFeature` tracking.
+  it("shows isLoading only on the clicked action's own button while its submit is in flight", async () => {
+    let resolveMutate: (value: { id: string; outcome: string }) => void = () => {};
+    const mutateAsync = vi.fn(
+      () =>
+        new Promise<{ id: string; outcome: string }>((resolve) => {
+          resolveMutate = resolve;
+        }),
+    );
+    vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+      mutateAsync,
+      isPending: false,
+    } as never);
+
+    render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+
+    const summarizeButton = screen.getByRole("button", { name: "detail.aiSummarize" });
+    const categorizeButton = screen.getByRole("button", { name: "detail.aiCategorize" });
+    fireEvent.click(summarizeButton);
+
+    await vi.waitFor(() => {
+      expect(summarizeButton).toHaveAttribute("aria-busy", "true");
+    });
+    // The clicked button's own accessible name survives — Button's isLoading
+    // hides the label visually, not from the accessibility tree.
+    expect(summarizeButton).toHaveAccessibleName("detail.aiSummarize");
+    // The other three actions never claim to be loading too.
+    expect(categorizeButton).not.toHaveAttribute("aria-busy");
+
+    resolveMutate({ id: "log-1", outcome: "PENDING" });
+
+    await vi.waitFor(() => {
+      expect(summarizeButton).not.toHaveAttribute("aria-busy");
+    });
+  });
+
   it("shows the generic submit-failed fallback for an unexpected 500 submit failure", async () => {
     const mutateAsync = vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500));
     vi.mocked(useSubmitAiOperationMutation).mockReturnValue({

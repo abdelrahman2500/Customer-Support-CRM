@@ -83,3 +83,41 @@ export function SkeletonCard({ lines = 2, barClassName, className, ...props }: S
     </Card>
   );
 }
+
+/**
+ * Global Navigation Loading — the generic route-transition fallback for
+ * every route segment that has no page-specific skeleton of its own.
+ *
+ * `TicketDetailSkeleton`/`CustomerDetailSkeleton`/`ArticleDetailSkeleton`
+ * (Story 97) already solved this exact "frozen page, no feedback during the
+ * RSC-payload/bundle fetch for the new segment" gap for the three detail
+ * routes, by shaping a `loading.tsx` after the page's own layout. Extending
+ * that same per-page-shaped treatment to every other route (list pages,
+ * settings/admin screens, the dashboard — ~30 segments across both apps)
+ * would mean hand-shaping and maintaining that many bespoke skeletons for a
+ * transition that, unlike a page's own `query.isLoading` render, is only
+ * ever on screen for the duration of a route change. This is the one
+ * generic shape those segments share instead: a heading bar (every one of
+ * them renders a page title first) over two card-shaped content blocks
+ * (the two most common shapes below it — a table or a form). It is not
+ * meant to preview any specific page's real layout, only to replace
+ * "nothing changed yet" with "something is happening" the instant a
+ * navigation starts, exactly as `loading.tsx` already does natively via
+ * Suspense for the three routes that have one.
+ *
+ * `aria-hidden` on every bar (inherited from `Skeleton`/`SkeletonCard`), no
+ * live region: mirrors Story 97's own three skeletons exactly, none of
+ * which announce themselves either — App Router's own focus management
+ * moves focus into the new page once it mounts, and that page's real
+ * content (or its own `query.isLoading` skeleton) takes over the
+ * accessible story from there.
+ */
+export function RouteLoadingSkeleton() {
+  return (
+    <div className="flex flex-col gap-4" aria-hidden="true">
+      <Skeleton className="h-7 w-48" />
+      <SkeletonCard lines={4} />
+      <SkeletonCard lines={4} />
+    </div>
+  );
+}

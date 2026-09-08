@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import { Skeleton, SkeletonText, SkeletonCard } from "./skeleton";
+import { Skeleton, SkeletonText, SkeletonCard, RouteLoadingSkeleton } from "./skeleton";
 
 /**
  * Story S-2 — ported from `apps/portal`'s own `skeleton.spec.tsx`, which was
@@ -111,5 +111,31 @@ describe("SkeletonCard", () => {
     expect(card).toHaveClass("rounded-md");
     expect(card).toHaveClass("border-rule");
     expect(card).toHaveClass("bg-surface");
+  });
+});
+
+/**
+ * Global Navigation Loading — the generic per-route `loading.tsx` fallback.
+ * Mirrors `SkeletonCard`'s own "hidden as a single subtree" convention:
+ * each bar is `aria-hidden` (inherited from `Skeleton`/`SkeletonCard`), and
+ * there is no live region, exactly like Story 97's three page-specific
+ * skeletons this generic one stands in for everywhere else.
+ */
+describe("RouteLoadingSkeleton", () => {
+  it("renders a heading bar plus two card-shaped content blocks", () => {
+    const { container } = render(<RouteLoadingSkeleton />);
+
+    // 1 heading bar + 2 cards, each a heading + 4 body bars (5 bars/card).
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(1 + 2 * 5);
+  });
+
+  it("is hidden from assistive technology, with no live region", () => {
+    const { container } = render(<RouteLoadingSkeleton />);
+
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(container.querySelector("[aria-live]")).toBeNull();
+    for (const bar of container.querySelectorAll(".animate-pulse")) {
+      expect(bar.closest("[aria-hidden]")).not.toBeNull();
+    }
   });
 });

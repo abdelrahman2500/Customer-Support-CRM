@@ -956,6 +956,31 @@ describe("ReportsView", () => {
       );
     });
 
+    // Global Navigation Loading (UX audit) — before this, the export button
+    // only disabled itself with zero visible state change, unlike every
+    // other mutation button in this codebase.
+    it("shows isLoading on the clicked export button while the download is in flight", async () => {
+      let resolveDownload: (value: { blob: Blob; filename: string }) => void = () => {};
+      mockedDownloadReportCsv.mockReturnValue(
+        new Promise((resolve) => {
+          resolveDownload = resolve;
+        }),
+      );
+
+      render(<ReportsView />);
+      const exportButton = screen.getAllByRole("button", { name: "export.button" })[0]!;
+      fireEvent.click(exportButton);
+
+      await waitFor(() => expect(exportButton).toHaveAttribute("aria-busy", "true"));
+      // The label survives — Button's isLoading hides it visually, not from
+      // the accessibility tree, exactly as every other loading button here.
+      expect(exportButton).toHaveAccessibleName("export.button");
+
+      resolveDownload({ blob: new Blob(["a"]), filename: "report.csv" });
+
+      await waitFor(() => expect(exportButton).not.toHaveAttribute("aria-busy"));
+    });
+
     it("shows an inline error when the export fails, without disturbing the card's already-loaded content", async () => {
       mockedDownloadReportCsv.mockRejectedValue(new ApiError("Server error", 500));
 
