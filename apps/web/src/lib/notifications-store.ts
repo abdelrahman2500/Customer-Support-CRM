@@ -46,15 +46,42 @@ const AUTO_DISMISS_MS = 10_000;
  * events without breaking the UI" without needing a scrollable inbox. */
 const MAX_VISIBLE = 5;
 
+/**
+ * Batch 7 (UX audit) — the real-world identity of an event, as opposed to
+ * `add()`'s own per-call `id` (always a fresh UUID). No dedup existed
+ * before this: two deliveries of literally the same backend event (a
+ * socket reconnect replaying a room-join, a duplicate emit) always minted
+ * a second toast — latent under normal single-mount operation, but no
+ * guard existed against it. `targetType` distinguishes an SLA ticket's
+ * response-target toast from its resolution-target one; a ticket only
+ * ever has one `ticket.escalated` notification worth showing per ticket.
+ */
+function dedupeKey(eventType: BranchNotificationEventType, payload: BranchNotificationPayload): string {
+  if (eventType === "ticket.escalated") {
+    const { ticket } = payload as TicketEscalatedNotificationPayload;
+    return `${eventType}:${ticket.id}`;
+  }
+  const { ticketId, targetType } = payload as SlaDetectionNotificationPayload;
+  return `${eventType}:${ticketId}:${targetType}`;
+}
+
 interface NotificationsState {
   notifications: BranchNotification[];
   add: (eventType: BranchNotificationEventType, payload: BranchNotificationPayload) => void;
   dismiss: (id: string) => void;
 }
 
-export const useNotificationsStore = create<NotificationsState>((set) => ({
+export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   notifications: [],
   add: (eventType, payload) => {
+    const key = dedupeKey(eventType, payload);
+    // A duplicate of an event already on screen is dropped rather than
+    // stacked a second time — its existing toast, and auto-dismiss timer,
+    // are left exactly as they were.
+    if (get().notifications.some((n) => dedupeKey(n.eventType, n.payload) === key)) {
+      return;
+    }
+
     const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
     set((state) => ({
       notifications: [{ id, eventType, payload, receivedAt: Date.now() }, ...state.notifications].slice(

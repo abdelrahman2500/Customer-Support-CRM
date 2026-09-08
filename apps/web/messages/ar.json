@@ -46,6 +46,7 @@
     "appName": "نظام إدارة خدمة العملاء",
     "signedInAs": "مسجّل الدخول باسم {name}",
     "signOut": "تسجيل الخروج",
+    "realtimeReconnecting": "الاتصال اللحظي منقطع. جارٍ إعادة المحاولة…",
     "branchSwitcher": {
       "label": "تبديل الفرع",
       "branchAndDepartment": "{branch} — {department}",

@@ -9,8 +9,10 @@ import { useBrandingQuery } from "@/hooks/use-branding";
 import { useMyBranchMembershipsQuery } from "@/hooks/use-branch-memberships";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import { useMentionNotifications } from "@/hooks/use-mention-notifications";
+import { useRealtimeConnectionIssue } from "@/lib/realtime-connection";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
+  Alert,
   Badge,
   Button,
   DropdownMenu,
@@ -259,6 +261,10 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
   // unread-count badge already needs to stay live regardless of which
   // screen is open.
   useMentionNotifications(user.id);
+  // Batch 7 (UX audit) — the shared realtime connection's status; no
+  // realtime hook anywhere previously surfaced a dropped connection to the
+  // user at all (silence, indistinguishable from "nothing happened yet").
+  const connectionIssue = useRealtimeConnectionIssue();
   const membershipsQuery = useMyBranchMembershipsQuery();
   const memberships = membershipsQuery.data ?? [];
   const errorMessage = useErrorMessage();
@@ -407,6 +413,17 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
           </Button>
         </div>
       </header>
+      {/* Batch 7 (UX audit) — a non-destructive banner while the shared
+          realtime connection is down after having been up (see
+          `useRealtimeConnectionIssue`'s own doc comment for exactly which
+          case that is). Live notifications/presence/ticket updates are
+          simply not arriving right now; nothing here is destructive or
+          blocks the rest of the page. */}
+      {connectionIssue && (
+        <Alert variant="default" className="rounded-none border-x-0 border-t-0 text-center text-xs">
+          {t("realtimeReconnecting")}
+        </Alert>
+      )}
       {/* RM-11 — the hamburger toggle only, below `sm`; the flat `<nav>`
           below takes over at `sm` and up. */}
       <div className="border-b border-slate-200 bg-white px-6 py-2 sm:hidden">

@@ -46,6 +46,7 @@
     "appName": "Customer Support CRM",
     "signedInAs": "Signed in as {name}",
     "signOut": "Sign out",
+    "realtimeReconnecting": "Live updates are disconnected. Reconnecting…",
     "branchSwitcher": {
       "label": "Switch branch",
       "branchAndDepartment": "{branch} — {department}",

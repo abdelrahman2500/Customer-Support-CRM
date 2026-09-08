@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { io } from "socket.io-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
+import {
+  acquireSharedSocket,
+  joinRoomOnConnect,
+  releaseSharedSocket,
+} from "@/lib/realtime-connection";
 import { tasksQueryKey } from "./use-tasks";
 
 const TASK_REMINDER_DUE_EVENT = "task.reminder_due";
@@ -18,27 +22,20 @@ const TASK_REMINDER_DUE_EVENT = "task.reminder_due";
  * (`RealtimeGateway.authorizeRoom`'s own `agent:(.+):tasks` case — own id
  * only, no branch-membership fallback: a task reminder is strictly
  * personal). Connects on mount, disconnects on unmount/id change.
+ *
+ * Batch 7 (UX audit) — acquires the shared, pooled socket connection
+ * (`realtime-connection.ts`) instead of opening its own.
  */
 export function useTaskReminders(userId: string | null): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!userId) {
-      return;
-    }
-    const token = getAccessToken();
-    if (!token) {
+    if (!userId || !getAccessToken()) {
       return;
     }
 
-    const socket = io(getSocketBaseUrl(), {
-      auth: { token },
-      transports: ["websocket"],
-    });
-
-    socket.on("connect", () => {
-      socket.emit("join", { room: `agent:${userId}:tasks` });
-    });
+    const socket = acquireSharedSocket();
+    const unjoin = joinRoomOnConnect(socket, `agent:${userId}:tasks`);
 
     const handleReminderDue = () => {
       void queryClient.invalidateQueries({ queryKey: tasksQueryKey });
@@ -46,8 +43,9 @@ export function useTaskReminders(userId: string | null): void {
     socket.on(TASK_REMINDER_DUE_EVENT, handleReminderDue);
 
     return () => {
+      unjoin();
       socket.off(TASK_REMINDER_DUE_EVENT, handleReminderDue);
-      socket.disconnect();
+      releaseSharedSocket();
     };
   }, [userId, queryClient]);
 }

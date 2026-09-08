@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
-import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
+import { acquireSharedSocket, releaseSharedSocket } from "@/lib/realtime-connection";
 
 const AGENT_PRESENCE_CHANGED_EVENT = "agent.presence.changed";
 
@@ -29,34 +29,38 @@ interface AgentPresenceChangedPayload {
  * stable array (e.g. `useMemo`'d off query data) so a parent re-render
  * with the same underlying user list doesn't tear down and reopen the
  * socket on every render; see `UserListView`'s own usage.
+ *
+ * Batch 7 (UX audit) — acquires the shared, pooled socket connection
+ * (`realtime-connection.ts`) instead of opening its own. Joins its own
+ * list of rooms directly (not `joinRoomOnConnect`, which only ever joins
+ * one) — same "join immediately if already connected, and again on every
+ * future connect" shape, just looped.
  */
 export function useAgentPresence(userIds: string[]): Record<string, PresenceStatus> {
   const [presence, setPresence] = useState<Record<string, PresenceStatus>>({});
 
   useEffect(() => {
-    if (userIds.length === 0) {
-      return;
-    }
-    const token = getAccessToken();
-    if (!token) {
+    if (userIds.length === 0 || !getAccessToken()) {
       return;
     }
 
-    const socket = io(getSocketBaseUrl(), {
-      auth: { token },
-      transports: ["websocket"],
-    });
+    const socket = acquireSharedSocket();
 
+    function joinAll() {
+      for (const userId of userIds) {
+        socket.emit("join", { room: `agent:${userId}:presence` });
+      }
+    }
     // `connect` fires on every (re)connection, including socket.io's own
     // automatic reconnects — re-joining every room here is what makes
     // reconnects safe without any extra bookkeeping, the same implicit
     // behavior `useTicketRealtime`/`useBranchNotifications` already rely
-    // on.
-    socket.on("connect", () => {
-      for (const userId of userIds) {
-        socket.emit("join", { room: `agent:${userId}:presence` });
-      }
-    });
+    // on. Joins immediately too, since the shared socket may already be
+    // connected by the time this hook acquires it.
+    if (socket.connected) {
+      joinAll();
+    }
+    socket.on("connect", joinAll);
 
     const handlePresenceChanged = (payload: AgentPresenceChangedPayload) => {
       setPresence((current) => ({ ...current, [payload.userId]: payload.status }));
@@ -64,8 +68,9 @@ export function useAgentPresence(userIds: string[]): Record<string, PresenceStat
     socket.on(AGENT_PRESENCE_CHANGED_EVENT, handlePresenceChanged);
 
     return () => {
+      socket.off("connect", joinAll);
       socket.off(AGENT_PRESENCE_CHANGED_EVENT, handlePresenceChanged);
-      socket.disconnect();
+      releaseSharedSocket();
     };
   }, [userIds]);
 

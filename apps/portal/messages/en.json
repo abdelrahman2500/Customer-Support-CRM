@@ -40,6 +40,7 @@
   "home": {
     "signedInAs": "Signed in as {name}",
     "signOut": "Sign out",
+    "realtimeReconnecting": "Live updates are disconnected. Reconnecting…",
     "myTicketsLink": "View my tickets",
     "placeholder": "This page confirms you're securely signed in.",
     "logoAlt": "Company logo",

@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { io } from "socket.io-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
+import {
+  acquireSharedSocket,
+  joinRoomOnConnect,
+  releaseSharedSocket,
+} from "@/lib/realtime-connection";
 import { mergeChannelMessage, myTicketMessagesQueryKey } from "./use-portal-tickets";
 import type { ChannelMessageSummary } from "@/lib/tickets-api";
 
@@ -24,24 +28,20 @@ const CHANNEL_MESSAGE_CREATED_EVENT = "channel.message.created";
  * cache via `mergeChannelMessage` rather than invalidating/re-fetching —
  * same reasoning as `apps/web`'s own realtime handling of this event.
  * Connects on mount, disconnects on unmount/id change.
+ *
+ * Batch 7 (UX audit) — acquires the shared, pooled socket connection
+ * (`realtime-connection.ts`) instead of opening its own.
  */
 export function usePortalTicketRealtime(ticketId: string): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) {
+    if (!getAccessToken()) {
       return;
     }
 
-    const socket = io(getSocketBaseUrl(), {
-      auth: { token },
-      transports: ["websocket"],
-    });
-
-    socket.on("connect", () => {
-      socket.emit("join", { room: `ticket:${ticketId}` });
-    });
+    const socket = acquireSharedSocket();
+    const unjoin = joinRoomOnConnect(socket, `ticket:${ticketId}`);
 
     const handleChannelMessage = (payload: { ticketId: string; message: ChannelMessageSummary }) => {
       if (payload.ticketId !== ticketId) {
@@ -55,8 +55,9 @@ export function usePortalTicketRealtime(ticketId: string): void {
     socket.on(CHANNEL_MESSAGE_CREATED_EVENT, handleChannelMessage);
 
     return () => {
+      unjoin();
       socket.off(CHANNEL_MESSAGE_CREATED_EVENT, handleChannelMessage);
-      socket.disconnect();
+      releaseSharedSocket();
     };
   }, [ticketId, queryClient]);
 }

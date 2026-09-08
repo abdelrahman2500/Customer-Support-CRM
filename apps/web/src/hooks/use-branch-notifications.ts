@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { io } from "socket.io-client";
-import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
+import {
+  acquireSharedSocket,
+  joinRoomOnConnect,
+  releaseSharedSocket,
+} from "@/lib/realtime-connection";
 import type { BranchNotificationEventType, BranchNotificationPayload } from "@/lib/notifications-store";
 
 const SLA_AT_RISK_EVENT = "sla.at_risk";
@@ -22,9 +26,15 @@ const TICKET_ESCALATED_EVENT = "ticket.escalated";
  * `onEvent` is read through a ref rather than being an effect dependency —
  * intentional: the caller (`BranchNotifications`) passes the Zustand
  * store's `add` action, which is already a stable reference, but this
- * hook must not create a second socket/connection/duplicate listener set
- * merely because a parent re-render produced a new inline callback. Only
- * `branchId` changing re-establishes the connection.
+ * hook must not tear down its room-join/listeners merely because a parent
+ * re-render produced a new inline callback. Only `branchId` changing
+ * re-establishes the room join.
+ *
+ * Batch 7 (UX audit) — acquires the shared, pooled socket connection
+ * (`realtime-connection.ts`) instead of opening its own: this hook is
+ * commonly mounted alongside `useAgentPresence`/`useMentionNotifications`/
+ * `useTaskReminders`, which previously meant up to 4 simultaneous,
+ * independent connections for one signed-in agent.
  */
 export function useBranchNotifications(
   branchId: string | null,
@@ -36,26 +46,12 @@ export function useBranchNotifications(
   }, [onEvent]);
 
   useEffect(() => {
-    if (!branchId) {
-      return;
-    }
-    const token = getAccessToken();
-    if (!token) {
+    if (!branchId || !getAccessToken()) {
       return;
     }
 
-    const socket = io(getSocketBaseUrl(), {
-      auth: { token },
-      transports: ["websocket"],
-    });
-
-    // `connect` fires on every (re)connection, including socket.io's own
-    // automatic reconnects — re-joining here is what makes reconnects safe
-    // without any extra bookkeeping, the same implicit behavior
-    // `useTicketRealtime` already relies on.
-    socket.on("connect", () => {
-      socket.emit("join", { room: `branch:${branchId}:notifications` });
-    });
+    const socket = acquireSharedSocket();
+    const unjoin = joinRoomOnConnect(socket, `branch:${branchId}:notifications`);
 
     const handleSlaAtRisk = (payload: BranchNotificationPayload) =>
       onEventRef.current(SLA_AT_RISK_EVENT, payload);
@@ -69,10 +65,11 @@ export function useBranchNotifications(
     socket.on(TICKET_ESCALATED_EVENT, handleTicketEscalated);
 
     return () => {
+      unjoin();
       socket.off(SLA_AT_RISK_EVENT, handleSlaAtRisk);
       socket.off(SLA_BREACHED_EVENT, handleSlaBreached);
       socket.off(TICKET_ESCALATED_EVENT, handleTicketEscalated);
-      socket.disconnect();
+      releaseSharedSocket();
     };
   }, [branchId]);
 }

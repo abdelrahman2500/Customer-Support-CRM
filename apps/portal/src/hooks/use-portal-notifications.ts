@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { io } from "socket.io-client";
-import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
+import {
+  acquireSharedSocket,
+  joinRoomOnConnect,
+  releaseSharedSocket,
+} from "@/lib/realtime-connection";
 import type {
   PortalNotificationEventType,
   PortalNotificationPayload,
@@ -28,7 +32,10 @@ const CHANNEL_MESSAGE_CREATED_EVENT = "channel.message.created";
  * passes the notifications store's `add` action (a stable reference), but
  * this hook must not re-establish the socket connection merely because a
  * parent re-render produced a new inline callback. Only `customerId`
- * changing re-establishes the connection.
+ * changing re-establishes the room join.
+ *
+ * Batch 7 (UX audit) — acquires the shared, pooled socket connection
+ * (`realtime-connection.ts`) instead of opening its own.
  */
 export function usePortalNotifications(
   customerId: string | null,
@@ -40,25 +47,12 @@ export function usePortalNotifications(
   }, [onEvent]);
 
   useEffect(() => {
-    if (!customerId) {
-      return;
-    }
-    const token = getAccessToken();
-    if (!token) {
+    if (!customerId || !getAccessToken()) {
       return;
     }
 
-    const socket = io(getSocketBaseUrl(), {
-      auth: { token },
-      transports: ["websocket"],
-    });
-
-    // `connect` fires on every (re)connection, including socket.io's own
-    // automatic reconnects — re-joining here is what makes reconnects safe
-    // without any extra bookkeeping, mirroring `useBranchNotifications`.
-    socket.on("connect", () => {
-      socket.emit("join", { room: `customer:${customerId}:notifications` });
-    });
+    const socket = acquireSharedSocket();
+    const unjoin = joinRoomOnConnect(socket, `customer:${customerId}:notifications`);
 
     const handleTicketUpdated = (payload: PortalNotificationPayload) =>
       onEventRef.current(TICKET_UPDATED_EVENT, payload);
@@ -69,9 +63,10 @@ export function usePortalNotifications(
     socket.on(CHANNEL_MESSAGE_CREATED_EVENT, handleChannelMessageCreated);
 
     return () => {
+      unjoin();
       socket.off(TICKET_UPDATED_EVENT, handleTicketUpdated);
       socket.off(CHANNEL_MESSAGE_CREATED_EVENT, handleChannelMessageCreated);
-      socket.disconnect();
+      releaseSharedSocket();
     };
   }, [customerId]);
 }

@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { io } from "socket.io-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
+import {
+  acquireSharedSocket,
+  joinRoomOnConnect,
+  releaseSharedSocket,
+} from "@/lib/realtime-connection";
 import { chatAiResultQueryKey, chatMessagesQueryKey } from "./use-chat";
 
 const AI_CHAT_MESSAGE_COMPLETED_EVENT = "ai.chat_message_completed";
@@ -17,27 +21,20 @@ const AI_CHAT_MESSAGE_COMPLETED_EVENT = "ai.chat_message_completed";
  * whole session's message list (a successful turn adds a new
  * `ChatMessage` row the list must pick up) — rather than merging, since
  * the event payload never carries the reply text itself.
+ *
+ * Batch 7 (UX audit) — acquires the shared, pooled socket connection
+ * (`realtime-connection.ts`) instead of opening its own.
  */
 export function useChatRealtime(sessionId: string | null): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!sessionId) {
-      return;
-    }
-    const token = getAccessToken();
-    if (!token) {
+    if (!sessionId || !getAccessToken()) {
       return;
     }
 
-    const socket = io(getSocketBaseUrl(), {
-      auth: { token },
-      transports: ["websocket"],
-    });
-
-    socket.on("connect", () => {
-      socket.emit("join", { room: `chat-session:${sessionId}` });
-    });
+    const socket = acquireSharedSocket();
+    const unjoin = joinRoomOnConnect(socket, `chat-session:${sessionId}`);
 
     const handleAiChatMessageCompleted = (payload: {
       aiPromptLogId: string;
@@ -55,8 +52,9 @@ export function useChatRealtime(sessionId: string | null): void {
     socket.on(AI_CHAT_MESSAGE_COMPLETED_EVENT, handleAiChatMessageCompleted);
 
     return () => {
+      unjoin();
       socket.off(AI_CHAT_MESSAGE_COMPLETED_EVENT, handleAiChatMessageCompleted);
-      socket.disconnect();
+      releaseSharedSocket();
     };
   }, [sessionId, queryClient]);
 }

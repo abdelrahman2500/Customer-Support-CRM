@@ -9,7 +9,9 @@ import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
 import { clearAccessToken, logout, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
+import { useRealtimeConnectionIssue } from "@/lib/realtime-connection";
 import {
+  Alert,
   Badge,
   Button,
   DropdownMenu,
@@ -82,6 +84,10 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const brandingQuery = useBrandingQuery();
   const unreadCountQuery = useUnreadNotificationCountQuery();
   const unreadCount = unreadCountQuery.data?.unreadCount ?? 0;
+  // Batch 7 (UX audit) — mirrors `WorkspaceNav`'s own connection banner;
+  // see `useRealtimeConnectionIssue`'s doc comment for exactly which case
+  // this is (an actual drop after being up, not routine idle/startup).
+  const connectionIssue = useRealtimeConnectionIssue();
 
   // Story 95 — also clears every cached query; see WorkspaceNav's own
   // handleSignOut doc comment for why.
@@ -153,84 +159,95 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   ];
 
   return (
-    <header
-      style={{ "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties}
-      className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
-    >
-      <div className="flex items-center gap-2">
-        {brandingQuery.data?.logoUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto" />
-        )}
-        <Link
-          href={`/${locale}/home`}
-          className="rounded-md px-2 py-1.5 font-semibold text-slate-900"
-        >
-          {t("signedInAs", { name: contact.fullName })}
-        </Link>
-        {/* RM-11 — the hamburger toggle only, below `sm`; the flat `<nav>`
-            below takes over at `sm` and up. */}
-        <div className="sm:hidden">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" aria-label={t("nav.menuLabel")}>
-                <MenuIcon className="h-4 w-4" aria-hidden />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {navItems.map((item) => (
-                <DropdownMenuItem key={item.href} asChild>
-                  <Link href={item.href} aria-current={isActiveHref(item.href) ? "page" : undefined}>
-                    {item.label}
-                    {item.badge && (
-                      <Badge variant="destructive" aria-label={item.badge.ariaLabel}>
-                        {item.badge.count}
-                      </Badge>
-                    )}
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <>
+      <header
+        style={{ "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties}
+        className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
+      >
+        <div className="flex items-center gap-2">
+          {brandingQuery.data?.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto" />
+          )}
+          <Link
+            href={`/${locale}/home`}
+            className="rounded-md px-2 py-1.5 font-semibold text-slate-900"
+          >
+            {t("signedInAs", { name: contact.fullName })}
+          </Link>
+          {/* RM-11 — the hamburger toggle only, below `sm`; the flat `<nav>`
+              below takes over at `sm` and up. */}
+          <div className="sm:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" aria-label={t("nav.menuLabel")}>
+                  <MenuIcon className="h-4 w-4" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {navItems.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href} aria-current={isActiveHref(item.href) ? "page" : undefined}>
+                      {item.label}
+                      {item.badge && (
+                        <Badge variant="destructive" aria-label={item.badge.ariaLabel}>
+                          {item.badge.count}
+                        </Badge>
+                      )}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <nav
+            aria-label={t("nav.label")}
+            className="hidden flex-wrap items-center gap-4 text-sm sm:flex"
+          >
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActiveHref(item.href) ? "page" : undefined}
+                className={linkClassName(item.href)}
+              >
+                {item.label}
+                {item.badge && (
+                  <Badge variant="destructive" aria-label={item.badge.ariaLabel}>
+                    {item.badge.count}
+                  </Badge>
+                )}
+              </Link>
+            ))}
+          </nav>
         </div>
-        <nav
-          aria-label={t("nav.label")}
-          className="hidden flex-wrap items-center gap-4 text-sm sm:flex"
-        >
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={isActiveHref(item.href) ? "page" : undefined}
-              className={linkClassName(item.href)}
-            >
-              {item.label}
-              {item.badge && (
-                <Badge variant="destructive" aria-label={item.badge.ariaLabel}>
-                  {item.badge.count}
-                </Badge>
-              )}
-            </Link>
-          ))}
-        </nav>
-      </div>
-      <div className="flex items-center gap-2">
-        <select
-          aria-label={t("languageSwitcher.label")}
-          className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
-          value={locale}
-          onChange={(event) => void handleSwitchLocale(event.target.value)}
-        >
-          {LOCALES.map((localeOption) => (
-            <option key={localeOption} value={localeOption}>
-              {t(`languageSwitcher.options.${localeOption}`)}
-            </option>
-          ))}
-        </select>
-        <Button type="button" onClick={handleSignOut} variant="outline" className="px-3">
-          {t("signOut")}
-        </Button>
-      </div>
-    </header>
+        <div className="flex items-center gap-2">
+          <select
+            aria-label={t("languageSwitcher.label")}
+            className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+            value={locale}
+            onChange={(event) => void handleSwitchLocale(event.target.value)}
+          >
+            {LOCALES.map((localeOption) => (
+              <option key={localeOption} value={localeOption}>
+                {t(`languageSwitcher.options.${localeOption}`)}
+              </option>
+            ))}
+          </select>
+          <Button type="button" onClick={handleSignOut} variant="outline" className="px-3">
+            {t("signOut")}
+          </Button>
+        </div>
+      </header>
+      {/* Batch 7 (UX audit) — mirrors `WorkspaceNav`'s own connection
+          banner. Non-destructive: live ticket updates/chat replies simply
+          aren't arriving right now; nothing here blocks the rest of the
+          page. */}
+      {connectionIssue && (
+        <Alert variant="default" className="rounded-none border-x-0 border-t-0 text-center text-xs">
+          {t("realtimeReconnecting")}
+        </Alert>
+      )}
+    </>
   );
 }

@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { io } from "socket.io-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
+import {
+  acquireSharedSocket,
+  joinRoomOnConnect,
+  releaseSharedSocket,
+} from "@/lib/realtime-connection";
 import { unreadNotificationCountQueryKey } from "./use-notifications";
 
 const TICKET_MENTIONED_EVENT = "ticket.mentioned";
@@ -23,27 +27,20 @@ const TICKET_MENTIONED_EVENT = "ticket.mentioned";
  * already rely on) and the unread-count key, so `WorkspaceNav`'s own
  * badge (its mount point — see that component) and the notification
  * history screen both pick up a new mention without a manual refresh.
+ *
+ * Batch 7 (UX audit) — acquires the shared, pooled socket connection
+ * (`realtime-connection.ts`) instead of opening its own.
  */
 export function useMentionNotifications(userId: string | null): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!userId) {
-      return;
-    }
-    const token = getAccessToken();
-    if (!token) {
+    if (!userId || !getAccessToken()) {
       return;
     }
 
-    const socket = io(getSocketBaseUrl(), {
-      auth: { token },
-      transports: ["websocket"],
-    });
-
-    socket.on("connect", () => {
-      socket.emit("join", { room: `agent:${userId}:notifications` });
-    });
+    const socket = acquireSharedSocket();
+    const unjoin = joinRoomOnConnect(socket, `agent:${userId}:notifications`);
 
     const handleMentioned = () => {
       void queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -52,8 +49,9 @@ export function useMentionNotifications(userId: string | null): void {
     socket.on(TICKET_MENTIONED_EVENT, handleMentioned);
 
     return () => {
+      unjoin();
       socket.off(TICKET_MENTIONED_EVENT, handleMentioned);
-      socket.disconnect();
+      releaseSharedSocket();
     };
   }, [userId, queryClient]);
 }

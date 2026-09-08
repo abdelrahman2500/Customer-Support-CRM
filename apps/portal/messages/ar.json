@@ -40,6 +40,7 @@
   "home": {
     "signedInAs": "مسجّل الدخول باسم {name}",
     "signOut": "تسجيل الخروج",
+    "realtimeReconnecting": "الاتصال اللحظي منقطع. جارٍ إعادة المحاولة…",
     "myTicketsLink": "عرض تذاكري",
     "placeholder": "هذه الصفحة تؤكد فقط أنك مسجّل الدخول بأمان.",
     "logoAlt": "شعار الشركة",

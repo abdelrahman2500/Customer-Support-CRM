@@ -6,6 +6,7 @@ import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
 import { clearAccessToken, logout, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
+import { useRealtimeConnectionIssue } from "@/lib/realtime-connection";
 
 const push = vi.fn();
 let pathname = "/en/home";
@@ -45,12 +46,20 @@ vi.mock("@/hooks/use-portal-notification-history", () => ({
   useUnreadNotificationCountQuery: vi.fn(),
 }));
 
+// Batch 7 (UX audit) — the shared connection's own behavior is covered by
+// its dedicated `realtime-connection.spec.ts`; this file only needs to
+// drive the banner's own on/off rendering.
+vi.mock("@/lib/realtime-connection", () => ({
+  useRealtimeConnectionIssue: vi.fn(() => false),
+}));
+
 const mockedLogout = vi.mocked(logout);
 const mockedClearAccessToken = vi.mocked(clearAccessToken);
 const mockedClearQueryCache = vi.mocked(clearQueryCache);
 const mockedUpdatePreferredLocale = vi.mocked(updatePreferredLocale);
 const mockedUseBrandingQuery = vi.mocked(useBrandingQuery);
 const mockedUseUnreadNotificationCountQuery = vi.mocked(useUnreadNotificationCountQuery);
+const mockedUseRealtimeConnectionIssue = vi.mocked(useRealtimeConnectionIssue);
 
 const contact = {
   id: "contact-1",
@@ -71,6 +80,7 @@ describe("PortalHeader", () => {
       isSuccess: false,
     } as never);
     mockedUpdatePreferredLocale.mockResolvedValue({ id: "contact-1" });
+    mockedUseRealtimeConnectionIssue.mockReturnValue(false);
   });
 
   it("renders the signed-in contact's name", () => {
@@ -365,6 +375,23 @@ describe("PortalHeader", () => {
       await Promise.resolve();
       expect(mockedUpdatePreferredLocale).not.toHaveBeenCalled();
       expect(push).not.toHaveBeenCalled();
+    });
+  });
+
+  // Batch 7 (UX audit) — mirrors `WorkspaceNav`'s own connection banner.
+  describe("realtime connection banner (Batch 7)", () => {
+    it("shows nothing while the shared connection is fine", () => {
+      render(<PortalHeader contact={contact} />);
+
+      expect(screen.queryByText("realtimeReconnecting")).not.toBeInTheDocument();
+    });
+
+    it("shows a non-destructive reconnecting banner once the shared connection reports an issue", () => {
+      mockedUseRealtimeConnectionIssue.mockReturnValue(true);
+
+      render(<PortalHeader contact={contact} />);
+
+      expect(screen.getByText("realtimeReconnecting")).toBeInTheDocument();
     });
   });
 });

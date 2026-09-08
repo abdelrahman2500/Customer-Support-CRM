@@ -8,6 +8,7 @@ import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import { useMentionNotifications } from "@/hooks/use-mention-notifications";
 import { ApiError, clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
+import { useRealtimeConnectionIssue } from "@/lib/realtime-connection";
 
 const push = vi.fn();
 const refresh = vi.fn();
@@ -68,6 +69,13 @@ vi.mock("@/hooks/use-mention-notifications", () => ({
   useMentionNotifications: vi.fn(),
 }));
 
+// Batch 7 (UX audit) — the shared connection's own behavior is covered by
+// its dedicated `realtime-connection.spec.ts`; this file only needs to
+// drive the banner's own on/off rendering.
+vi.mock("@/lib/realtime-connection", () => ({
+  useRealtimeConnectionIssue: vi.fn(() => false),
+}));
+
 const mockedLogout = vi.mocked(logout);
 const mockedClearAccessToken = vi.mocked(clearAccessToken);
 const mockedSwitchBranch = vi.mocked(switchBranch);
@@ -76,6 +84,7 @@ const mockedClearQueryCache = vi.mocked(clearQueryCache);
 const mockedUseBrandingQuery = vi.mocked(useBrandingQuery);
 const mockedUseUnreadNotificationCountQuery = vi.mocked(useUnreadNotificationCountQuery);
 const mockedUseMyBranchMembershipsQuery = vi.mocked(useMyBranchMembershipsQuery);
+const mockedUseRealtimeConnectionIssue = vi.mocked(useRealtimeConnectionIssue);
 
 const user = {
   id: "user-1",
@@ -114,6 +123,7 @@ describe("WorkspaceNav", () => {
       ],
     } as never);
     mockedUpdatePreferredLocale.mockResolvedValue({ id: "user-1" });
+    mockedUseRealtimeConnectionIssue.mockReturnValue(false);
   });
 
   it("renders the app name and the signed-in user's name", () => {
@@ -702,6 +712,24 @@ describe("WorkspaceNav", () => {
       });
 
       await waitFor(() => expect(push).toHaveBeenCalledWith("/ar/tickets/ticket-1"));
+    });
+  });
+
+  // Batch 7 (UX audit) — no realtime hook anywhere previously surfaced a
+  // dropped connection to the user at all.
+  describe("realtime connection banner (Batch 7)", () => {
+    it("shows nothing while the shared connection is fine", () => {
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.queryByText("realtimeReconnecting")).not.toBeInTheDocument();
+    });
+
+    it("shows a non-destructive reconnecting banner once the shared connection reports an issue", () => {
+      mockedUseRealtimeConnectionIssue.mockReturnValue(true);
+
+      render(<WorkspaceNav user={user} />);
+
+      expect(screen.getByText("realtimeReconnecting")).toBeInTheDocument();
     });
   });
 });

@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { io } from "socket.io-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getAccessToken, getSocketBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
+import {
+  acquireSharedSocket,
+  joinRoomOnConnect,
+  onReconnect,
+  releaseSharedSocket,
+} from "@/lib/realtime-connection";
 import { invalidateTicketQueries } from "./use-tickets";
 import { mergeChannelMessage, ticketMessagesQueryKey } from "./use-ticket-messages";
 import { ticketAiResultQueryKey } from "./use-ticket-ai";
@@ -45,24 +50,26 @@ const AI_PROMPT_COMPLETED_EVENT = "ai.prompt_completed";
  * handled with an exact-key invalidate of `["ticket", id, "ai", logId]`
  * (`ticketAiResultQueryKey`) — see the handler's own comment below for why
  * this is a cache-merge situation.
+ *
+ * Batch 7 (UX audit) — acquires the shared, pooled socket connection
+ * (`realtime-connection.ts`) instead of opening its own. Also registers an
+ * `onReconnect` handler: a disconnect while this ticket is open means any
+ * of the five events above could have fired and been missed entirely (the
+ * room-rejoin on reconnect only receives *future* events, same as before)
+ * — reconnecting now re-fetches this ticket's own data as a catch-up,
+ * closing the "permanently stale after a dropped connection" gap.
  */
 export function useTicketRealtime(ticketId: string): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) {
+    if (!getAccessToken()) {
       return;
     }
 
-    const socket = io(getSocketBaseUrl(), {
-      auth: { token },
-      transports: ["websocket"],
-    });
-
-    socket.on("connect", () => {
-      socket.emit("join", { room: `ticket:${ticketId}` });
-    });
+    const socket = acquireSharedSocket();
+    const unjoin = joinRoomOnConnect(socket, `ticket:${ticketId}`);
+    const unsubscribeReconnect = onReconnect(() => invalidateTicketQueries(queryClient, ticketId));
 
     const handleUpdate = () => invalidateTicketQueries(queryClient, ticketId);
     socket.on(TICKET_UPDATED_EVENT, handleUpdate);
@@ -101,12 +108,14 @@ export function useTicketRealtime(ticketId: string): void {
     socket.on(AI_PROMPT_COMPLETED_EVENT, handleAiPromptCompleted);
 
     return () => {
+      unjoin();
+      unsubscribeReconnect();
       socket.off(TICKET_UPDATED_EVENT, handleUpdate);
       socket.off(TICKET_ESCALATED_EVENT, handleUpdate);
       socket.off(TICKET_NOTE_ADDED_EVENT, handleUpdate);
       socket.off(CHANNEL_MESSAGE_CREATED_EVENT, handleChannelMessage);
       socket.off(AI_PROMPT_COMPLETED_EVENT, handleAiPromptCompleted);
-      socket.disconnect();
+      releaseSharedSocket();
     };
   }, [ticketId, queryClient]);
 }
