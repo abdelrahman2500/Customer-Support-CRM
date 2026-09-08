@@ -69,6 +69,32 @@ export {
   TriangleAlert as WarningIcon,
   CircleAlert as ErrorIcon,
   Info as InfoIcon,
+
+  // Workspace navigation (UX audit) — one glyph per top-level destination
+  // in `WorkspaceNav`'s `NAV_GROUPS`, named by the screen it leads to
+  // rather than by shape, for the same reason as every icon above. None
+  // are directional (no arrow/chevron among them), so none need an
+  // `rtl:` flip — a plain pictogram reads the same in both directions.
+  LayoutDashboard as DashboardIcon,
+  Ticket as TicketsIcon,
+  Contact as CustomersIcon,
+  BookOpen as KnowledgeBaseIcon,
+  Tags as KbCategoriesIcon,
+  Bell as NotificationsIcon,
+  Timer as SlaPoliciesIcon,
+  Tag as TicketCategoriesIcon,
+  Zap as AutomationRulesIcon,
+  MessageSquareText as QuickRepliesIcon,
+  BarChart3 as ReportsIcon,
+  History as AuditLogsIcon,
+  Building2 as BranchesIcon,
+  Users as UsersIcon,
+  ShieldCheck as RolesIcon,
+  Mail as NotificationTemplatesIcon,
+  Webhook as WebhookSubscriptionsIcon,
+  KeyRound as ApiKeysIcon,
+  Settings as SettingsIcon,
+  Monitor as MySessionsIcon,
 } from "lucide-react";
 
 /** The shape every icon above satisfies, for a component that accepts one. */

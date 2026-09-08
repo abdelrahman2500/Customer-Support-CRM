@@ -13,16 +13,37 @@ import { useRealtimeConnectionIssue } from "@/lib/realtime-connection";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
   Alert,
+  ApiKeysIcon,
+  AuditLogsIcon,
+  AutomationRulesIcon,
   Badge,
+  BranchesIcon,
   Button,
+  CustomersIcon,
+  DashboardIcon,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  KbCategoriesIcon,
+  KnowledgeBaseIcon,
   MenuIcon,
+  MySessionsIcon,
+  NotificationTemplatesIcon,
+  NotificationsIcon,
+  QuickRepliesIcon,
+  ReportsIcon,
+  RolesIcon,
+  SettingsIcon,
+  SlaPoliciesIcon,
+  TicketCategoriesIcon,
+  TicketsIcon,
+  UsersIcon,
+  WebhookSubscriptionsIcon,
 } from "@crm/ui";
+import type { LucideIcon } from "@crm/ui";
 import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
@@ -155,10 +176,45 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * actually removed those three from nav. Their routes are untouched and
  * still reachable by a direct link/bookmark; only the redundant top-level
  * nav entries are gone.
+ *
+ * Workspace Navigation UX audit — Batch 3 gave the six groups real
+ * boundaries but, on desktop, only a thin divider between them: the
+ * group's own name existed only in the mobile `DropdownMenuLabel`, so the
+ * desktop row read as one long, icon-less list of ~20 links rather than
+ * six sections. This pass keeps that IA and every href/label/active-route
+ * rule exactly as Batch 3 left them, and changes only presentation:
+ *
+ * - Every item gets a `LucideIcon` (see `packages/ui/src/lib/icons.ts`'s
+ *   own "Workspace navigation" section), rendered once in `NavItemLabel`
+ *   so desktop and mobile can never drift apart, same as the label/badge
+ *   already didn't.
+ * - The desktop `<nav>` renders one row per group — the same
+ *   `nav.groups.*` copy the mobile menu already had, styled exactly like
+ *   `DropdownMenuLabel` (`text-xs font-semibold text-ink-subtle`, no
+ *   `uppercase`/`tracking-wide`: Arabic has no case distinction, and
+ *   letter-spacing visibly breaks Arabic's connected letterforms, so a
+ *   treatment that reads as "just a label" in English would read as
+ *   broken in Arabic) — instead of the old single wrapped row with an
+ *   inert divider between groups.
+ * - The active item reserves a `border-s-2 border-transparent` on every
+ *   item (active or not), so becoming active only ever swaps that to
+ *   `border-accent` — a real, non-colour cue (position + weight + tint,
+ *   not tint alone) that never shifts the row's layout when it appears.
+ * - Raw `slate-*`/`white` utility classes throughout this file (both the
+ *   header and the nav) are replaced with the semantic tokens Story S-1
+ *   already defined for the rest of the app (`bg-surface`, `text-ink*`,
+ *   `border-rule*`, `bg-accent-surface`) — this file had never been
+ *   migrated off the pre-S-1 palette.
+ * - No sidebar, no collapse state, no second route-loading mechanism:
+ *   this stays the same in-flow, top-of-page `<nav>` it already was, so
+ *   the page's own normal scroll still handles a tall nav — there is
+ *   nothing here that needs its own scroll container. See this batch's
+ *   own final report for why a sidebar was considered and declined.
  */
 interface NavLinkItem {
   readonly href: string;
   readonly labelKey: string;
+  readonly icon: LucideIcon;
 }
 
 interface NavGroup {
@@ -170,58 +226,71 @@ const NAV_GROUPS: readonly NavGroup[] = [
   {
     groupKey: "workspace",
     items: [
-      { href: "dashboard", labelKey: "nav.dashboard" },
-      { href: "tickets", labelKey: "nav.tickets" },
-      { href: "customers", labelKey: "nav.customers" },
-      { href: "knowledge-base", labelKey: "nav.knowledgeBase" },
-      { href: "kb-categories", labelKey: "nav.kbCategories" },
-      { href: "notifications", labelKey: "nav.notifications" },
+      { href: "dashboard", labelKey: "nav.dashboard", icon: DashboardIcon },
+      { href: "tickets", labelKey: "nav.tickets", icon: TicketsIcon },
+      { href: "customers", labelKey: "nav.customers", icon: CustomersIcon },
+      { href: "knowledge-base", labelKey: "nav.knowledgeBase", icon: KnowledgeBaseIcon },
+      { href: "kb-categories", labelKey: "nav.kbCategories", icon: KbCategoriesIcon },
+      { href: "notifications", labelKey: "nav.notifications", icon: NotificationsIcon },
     ],
   },
   {
     groupKey: "ticketingConfig",
     items: [
-      { href: "sla-policies", labelKey: "nav.slaPolicies" },
-      { href: "ticket-categories", labelKey: "nav.ticketCategories" },
-      { href: "automation-rules", labelKey: "nav.automationRules" },
-      { href: "quick-replies", labelKey: "nav.quickReplies" },
+      { href: "sla-policies", labelKey: "nav.slaPolicies", icon: SlaPoliciesIcon },
+      { href: "ticket-categories", labelKey: "nav.ticketCategories", icon: TicketCategoriesIcon },
+      { href: "automation-rules", labelKey: "nav.automationRules", icon: AutomationRulesIcon },
+      { href: "quick-replies", labelKey: "nav.quickReplies", icon: QuickRepliesIcon },
     ],
   },
   {
     groupKey: "reporting",
     items: [
-      { href: "reports", labelKey: "nav.reports" },
-      { href: "audit-logs", labelKey: "nav.auditLogs" },
+      { href: "reports", labelKey: "nav.reports", icon: ReportsIcon },
+      { href: "audit-logs", labelKey: "nav.auditLogs", icon: AuditLogsIcon },
     ],
   },
   {
     groupKey: "administration",
     items: [
-      { href: "branches", labelKey: "nav.branches" },
-      { href: "users", labelKey: "nav.users" },
-      { href: "roles", labelKey: "nav.roles" },
+      { href: "branches", labelKey: "nav.branches", icon: BranchesIcon },
+      { href: "users", labelKey: "nav.users", icon: UsersIcon },
+      { href: "roles", labelKey: "nav.roles", icon: RolesIcon },
     ],
   },
   {
     groupKey: "system",
     items: [
-      { href: "notification-templates", labelKey: "nav.notificationTemplates" },
-      { href: "webhook-subscriptions", labelKey: "nav.webhookSubscriptions" },
-      { href: "api-keys", labelKey: "nav.apiKeys" },
+      {
+        href: "notification-templates",
+        labelKey: "nav.notificationTemplates",
+        icon: NotificationTemplatesIcon,
+      },
+      {
+        href: "webhook-subscriptions",
+        labelKey: "nav.webhookSubscriptions",
+        icon: WebhookSubscriptionsIcon,
+      },
+      { href: "api-keys", labelKey: "nav.apiKeys", icon: ApiKeysIcon },
     ],
   },
   {
     groupKey: "account",
     items: [
-      { href: "settings", labelKey: "nav.settings" },
-      { href: "my-sessions", labelKey: "nav.mySessions" },
+      { href: "settings", labelKey: "nav.settings", icon: SettingsIcon },
+      { href: "my-sessions", labelKey: "nav.mySessions", icon: MySessionsIcon },
     ],
   },
 ];
 
 /** RM-11 — the one shared render path for a nav item's visible label plus
  * its Story 92 unread-count badge, so the desktop `<nav>` and the mobile
- * `DropdownMenu` can never render different content for the same item. */
+ * `DropdownMenu` can never render different content for the same item.
+ *
+ * Workspace Navigation UX audit — also the one shared render path for the
+ * item's icon, for the same reason. `aria-hidden`: the icon sits beside
+ * the label it illustrates, so per `packages/ui`'s own icon convention
+ * the accessible name comes from the text alone. */
 function NavItemLabel({
   item,
   t,
@@ -233,8 +302,10 @@ function NavItemLabel({
   unreadCount: number;
   unreadCountKnown: boolean;
 }) {
+  const Icon = item.icon;
   return (
     <>
+      <Icon className="h-4 w-4 shrink-0" aria-hidden />
       {t(item.labelKey)}
       {item.href === "notifications" && unreadCountKnown && unreadCount > 0 && (
         <Badge
@@ -361,16 +432,16 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={brandingQuery.data.logoUrl} alt={t("appName")} className="h-8 w-auto" />
         ) : (
-          <Link href={`/${locale}/tickets`} className="text-sm font-semibold text-slate-900">
+          <Link href={`/${locale}/tickets`} className="text-sm font-semibold text-ink-strong">
             {t("appName")}
           </Link>
         )}
-        <div className="flex items-center gap-4 text-sm text-slate-600">
+        <div className="flex items-center gap-4 text-sm text-ink-muted">
           <span>{t("signedInAs", { name: user.fullName })}</span>
           {memberships.length > 1 && (
             <select
               aria-label={t("branchSwitcher.label")}
-              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm"
+              className="h-8 rounded-md border border-rule-strong bg-surface px-2 text-sm"
               value={`${memberships.find((m) => m.isActive)?.branchId ?? ""}::${
                 memberships.find((m) => m.isActive)?.departmentId ?? ""
               }`}
@@ -398,7 +469,7 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
           )}
           <select
             aria-label={t("languageSwitcher.label")}
-            className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm"
+            className="h-8 rounded-md border border-rule-strong bg-surface px-2 text-sm"
             value={locale}
             onChange={(event) => void handleSwitchLocale(event.target.value)}
           >
@@ -426,7 +497,7 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
       )}
       {/* RM-11 — the hamburger toggle only, below `sm`; the flat `<nav>`
           below takes over at `sm` and up. */}
-      <div className="border-b border-slate-200 bg-white px-6 py-2 sm:hidden">
+      <div className="border-b border-rule bg-surface px-6 py-2 sm:hidden">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" aria-label={t("nav.menuLabel")}>
@@ -461,43 +532,57 @@ export function WorkspaceNav({ user }: { user: AuthenticatedUser }) {
       </div>
       <nav
         aria-label={t("nav.label")}
-        className="hidden items-center gap-4 border-b border-slate-200 bg-white px-6 py-2 text-sm text-slate-600 sm:flex sm:flex-wrap"
+        className="hidden flex-col gap-2 border-b border-rule bg-surface px-6 py-3 sm:flex"
       >
-        {NAV_GROUPS.map((group, groupIndex) => (
-          <Fragment key={group.groupKey}>
-            {/* Batch 3 (UX audit) — an inert divider between sections; the
-                section's own name is carried by the mobile menu's
-                `DropdownMenuLabel` instead of repeating a text label in
-                this already-dense horizontal row. */}
-            {groupIndex > 0 && (
-              <span aria-hidden="true" className="h-5 w-px self-stretch bg-slate-200" />
-            )}
-            {group.items.map((item) => {
-              const href = `/${locale}/${item.href}`;
-              // Story 96 — Navigation & Route Robustness. A nested route
-              // (e.g. `/en/tickets/ticket-1`) still marks its own
-              // top-level `Tickets` link current, so it doesn't just match
-              // on exact equality.
-              const isActive = pathname === href || pathname?.startsWith(`${href}/`);
-              return (
-                <Link
-                  key={item.href}
-                  href={href}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-slate-100 hover:text-slate-900 focus-ring ${
-                    isActive ? "bg-slate-100 font-medium text-slate-900" : ""
-                  }`}
-                >
-                  <NavItemLabel
-                    item={item}
-                    t={t}
-                    unreadCount={unreadCount}
-                    unreadCountKnown={unreadCountQuery.isSuccess}
-                  />
-                </Link>
-              );
-            })}
-          </Fragment>
+        {/* Workspace Navigation UX audit — one row per group, replacing the
+            old single wrapped row + inert divider: each group's own name is
+            now visible on desktop too (previously only in the mobile
+            menu), and every group keeps its items on its own row even when
+            they wrap, so two groups can never visually run together at a
+            narrower desktop width. `items-start` (not `-center`): the
+            items column can itself wrap onto more than one line, and the
+            label should sit at the top of that block, not centred against
+            its full height. */}
+        {NAV_GROUPS.map((group) => (
+          <div key={group.groupKey} className="flex items-start gap-x-4 gap-y-1">
+            {/* Same treatment as `menuLabelClassName` (the mobile
+                `DropdownMenuLabel`) — visually subordinate to the items
+                beside it, but real text, not decoration: no `uppercase`/
+                `tracking-wide` (see this file's own doc comment for why
+                that matters for Arabic). */}
+            <span className="w-36 shrink-0 py-1.5 text-xs font-semibold text-ink-subtle">
+              {t(`nav.groups.${group.groupKey}`)}
+            </span>
+            <div className="flex flex-1 flex-wrap items-center gap-1">
+              {group.items.map((item) => {
+                const href = `/${locale}/${item.href}`;
+                // Story 96 — Navigation & Route Robustness. A nested route
+                // (e.g. `/en/tickets/ticket-1`) still marks its own
+                // top-level `Tickets` link current, so it doesn't just match
+                // on exact equality.
+                const isActive = pathname === href || pathname?.startsWith(`${href}/`);
+                return (
+                  <Link
+                    key={item.href}
+                    href={href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`flex items-center gap-1.5 rounded-md border-s-2 px-2 py-1.5 text-sm transition-colors focus-ring ${
+                      isActive
+                        ? "border-accent bg-accent-surface font-medium text-ink-strong"
+                        : "border-transparent text-ink-muted hover:bg-surface-muted hover:text-ink-strong"
+                    }`}
+                  >
+                    <NavItemLabel
+                      item={item}
+                      t={t}
+                      unreadCount={unreadCount}
+                      unreadCountKnown={unreadCountQuery.isSuccess}
+                    />
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         ))}
       </nav>
     </>

@@ -270,6 +270,29 @@ describe("WorkspaceNav", () => {
       }
     });
 
+    // Workspace Navigation UX audit — RTL regression guard. jsdom does not
+    // compute real box layout, so this cannot assert the nav actually
+    // mirrors visually; what it can and does assert is that the classes
+    // driving that layout are logical (`border-s-2`, `gap-x-*`, flex
+    // direction reversed by `dir="rtl"` for free) rather than physical
+    // ones that would stay pinned to one side under either direction.
+    it("uses only logical-direction classes on the active-state border, never a physical left/right one", () => {
+      pathname = "/en/tickets";
+      render(<WorkspaceNav user={user} />);
+
+      const desktopNav = screen.getByRole("navigation", { name: "nav.label" });
+      for (const link of within(desktopNav).getAllByRole("link")) {
+        const classes = link.className.split(/\s+/);
+        expect(classes.some((c) => c.startsWith("border-s-") || c === "border-transparent")).toBe(
+          true,
+        );
+        expect(classes.some((c) => /^border-[lr]-/.test(c))).toBe(false);
+        expect(classes.some((c) => /^(ml|mr|pl|pr|left|right|text-left|text-right)-/.test(c))).toBe(
+          false,
+        );
+      }
+    });
+
     it("labels the nav landmark with an accessible name", () => {
       render(<WorkspaceNav user={user} />);
 
@@ -408,6 +431,50 @@ describe("WorkspaceNav", () => {
           expect(link).not.toHaveAttribute("aria-current");
         }
       }
+    });
+
+    // Workspace Navigation UX audit — the active item must not rely on
+    // colour alone: it reserves a transparent start-border on every item
+    // (active or not, so becoming active never shifts the row) and swaps
+    // it to a real accent border exactly when active.
+    it("gives the active link a visible border accent that no inactive link has", () => {
+      pathname = "/en/tickets";
+      render(<WorkspaceNav user={user} />);
+
+      const active = screen.getByRole("link", { name: "nav.tickets" });
+      const inactive = screen.getByRole("link", { name: "nav.dashboard" });
+      expect(active).toHaveClass("border-accent");
+      expect(inactive).toHaveClass("border-transparent");
+      expect(inactive).not.toHaveClass("border-accent");
+    });
+  });
+
+  // Workspace Navigation UX audit.
+  describe("desktop group labels and icons (UX audit)", () => {
+    it("shows every group's own label on the desktop nav, not just inside the mobile menu", () => {
+      render(<WorkspaceNav user={user} />);
+
+      const desktopNav = screen.getByRole("navigation", { name: "nav.label" });
+      for (const groupKey of [
+        "workspace",
+        "ticketingConfig",
+        "reporting",
+        "administration",
+        "system",
+        "account",
+      ]) {
+        expect(within(desktopNav).getByText(`nav.groups.${groupKey}`)).toBeInTheDocument();
+      }
+    });
+
+    it("renders a decorative icon inside every top-level link", () => {
+      render(<WorkspaceNav user={user} />);
+
+      const desktopNav = screen.getByRole("navigation", { name: "nav.label" });
+      const ticketsLink = within(desktopNav).getByRole("link", { name: "nav.tickets" });
+      const icon = ticketsLink.querySelector("svg");
+      expect(icon).not.toBeNull();
+      expect(icon).toHaveAttribute("aria-hidden");
     });
   });
 
