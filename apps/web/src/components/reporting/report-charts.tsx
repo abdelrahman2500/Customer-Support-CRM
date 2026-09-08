@@ -78,7 +78,11 @@ export function BarChart({
                   }}
                 />
               </div>
-              <span className="w-8 shrink-0 text-right text-xs font-medium text-slate-900">
+              {/* Batch 8 (UX audit) — `text-end`, not `text-right`: the one
+                  hard-coded physical directional class found anywhere in
+                  this codebase (every other instance already uses the
+                  logical property). */}
+              <span className="w-8 shrink-0 text-end text-xs font-medium text-slate-900">
                 {segment.value}
               </span>
             </div>

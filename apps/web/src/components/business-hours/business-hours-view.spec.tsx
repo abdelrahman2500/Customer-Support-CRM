@@ -127,6 +127,36 @@ describe("BusinessHoursView", () => {
     });
   });
 
+  // Batch 8 (UX audit) — this catch block leaked a rejected mutation's raw
+  // `ApiError.message` unconditionally; now routed through the shared
+  // `useErrorMessage()`, matching every other form in this codebase.
+  it("shows the generic fallback, not the raw 500 body, when creating a calendar fails", async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500));
+    mockedUseCreateBusinessHoursCalendarMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+    mockedUseBusinessHoursCalendarQuery.mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,
+    );
+
+    render(<BusinessHoursView />);
+    fireEvent.click(screen.getByText("createButton"));
+
+    expect(await screen.findByText("createFailed")).toBeInTheDocument();
+    expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
+  });
+
+  it("shows the shared forbidden text for a 403 create-calendar failure", async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Forbidden", 403));
+    mockedUseCreateBusinessHoursCalendarMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+    mockedUseBusinessHoursCalendarQuery.mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,
+    );
+
+    render(<BusinessHoursView />);
+    fireEvent.click(screen.getByText("createButton"));
+
+    expect(await screen.findByText("actionForbidden")).toBeInTheDocument();
+  });
+
   describe("when a calendar already exists", () => {
     beforeEach(() => {
       mockedUseBusinessHoursCalendarQuery.mockReturnValue(
@@ -201,6 +231,36 @@ describe("BusinessHoursView", () => {
       await waitFor(() =>
         expect(mutateAsync).toHaveBeenCalledWith({ date: "2026-01-01", isClosed: true }),
       );
+    });
+
+    // Batch 8 (UX audit) — this catch block leaked a rejected mutation's
+    // raw `ApiError.message` unconditionally; now routed through the
+    // shared `useErrorMessage()`.
+    it("shows the generic fallback, not the raw 500 body, when adding an exception fails", async () => {
+      const mutateAsync = vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500));
+      mockedUseCreateBusinessHoursExceptionMutation.mockReturnValue(
+        idleMutation({ mutateAsync }) as never,
+      );
+
+      render(<BusinessHoursView />);
+      fireEvent.change(screen.getByLabelText("dateLabel"), { target: { value: "2026-01-01" } });
+      fireEvent.click(screen.getByText("exceptionAddSubmit"));
+
+      expect(await screen.findByText("exceptionAddFailed")).toBeInTheDocument();
+      expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
+    });
+
+    it("shows the shared forbidden text for a 403 add-exception failure", async () => {
+      const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Forbidden", 403));
+      mockedUseCreateBusinessHoursExceptionMutation.mockReturnValue(
+        idleMutation({ mutateAsync }) as never,
+      );
+
+      render(<BusinessHoursView />);
+      fireEvent.change(screen.getByLabelText("dateLabel"), { target: { value: "2026-01-01" } });
+      fireEvent.click(screen.getByText("exceptionAddSubmit"));
+
+      expect(await screen.findByText("actionForbidden")).toBeInTheDocument();
     });
   });
 });

@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useAiSettingsQuery, useUpdateAiSettingsMutation } from "@/hooks/use-ai-settings";
 import type { AiSettingsSummary } from "@/lib/ai-settings-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Skeleton } from "@crm/ui";
+import { Alert, Button, Checkbox, Label, Skeleton } from "@crm/ui";
 
 type ToggleKey = keyof AiSettingsSummary;
 
@@ -88,17 +88,21 @@ function AiSettingsForm({ initial }: { initial: AiSettingsSummary }) {
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4">
+      {/* Batch 8 (UX audit) — the shared `Checkbox`/`Label` pair, replacing
+          a raw `<input type="checkbox">` with no focus-ring/keyboard parity
+          with the rest of the app. */}
       {TOGGLES.map((toggle) => (
-        <label key={toggle.key} className="flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
+        <div key={toggle.key} className="flex items-center gap-2">
+          <Checkbox
+            id={`ai-settings-${toggle.key}`}
             checked={draft[toggle.key]}
             disabled={mutation.isPending}
-            onChange={(event) => void handleToggle(toggle.key, event.target.checked)}
-            className="h-4 w-4 rounded border-slate-300"
+            onCheckedChange={(checked) => void handleToggle(toggle.key, checked === true)}
           />
-          {t(toggle.labelKey)}
-        </label>
+          <Label htmlFor={`ai-settings-${toggle.key}`} className="text-sm font-normal text-slate-700">
+            {t(toggle.labelKey)}
+          </Label>
+        </div>
       ))}
       {error && <Alert variant="destructive">{error}</Alert>}
     </div>

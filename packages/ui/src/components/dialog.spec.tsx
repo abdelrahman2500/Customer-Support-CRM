@@ -119,6 +119,18 @@ describe("Dialog", () => {
     expect(container.contains(dialog)).toBe(false);
   });
 
+  // Batch 8 (UX audit) — below `max-w-md`, a bare `w-full` panel touches
+  // both screen edges on a very narrow viewport (~320px) with nothing but
+  // its own inner padding for a gutter.
+  it("keeps a gutter from the viewport edge instead of a bare full width", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.className).toContain("w-[calc(100%-2rem)]");
+  });
+
   it("does not render the close button without a label to name it", async () => {
     const user = userEvent.setup();
     render(

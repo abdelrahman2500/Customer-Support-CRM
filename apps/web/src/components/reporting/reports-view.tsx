@@ -668,14 +668,18 @@ export function ReportsView() {
               className="w-56"
             />
           </label>
-          <label className="flex items-center gap-2 text-xs text-slate-600">
-            <input
-              type="checkbox"
+          {/* Batch 8 (UX audit) — same shared `Checkbox`/`Label` swap as
+              this file's `crossBranch` one above. */}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="reports-new-dashboard-shared"
               checked={newDashboardShared}
-              onChange={(event) => setNewDashboardShared(event.target.checked)}
+              onCheckedChange={(checked) => setNewDashboardShared(checked === true)}
             />
-            {t("dashboards.shareLabel")}
-          </label>
+            <Label htmlFor="reports-new-dashboard-shared" className="text-xs font-normal text-slate-600">
+              {t("dashboards.shareLabel")}
+            </Label>
+          </div>
           <Button
             size="sm"
             onClick={() => void handleSaveCurrentView()}

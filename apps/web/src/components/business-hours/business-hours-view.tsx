@@ -16,7 +16,8 @@ import type {
   BusinessHoursException,
 } from "@/lib/business-hours-api";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { useErrorMessage } from "@/hooks/use-error-message";
+import { Alert, Badge, Button, Checkbox, Input, Label, Skeleton } from "@crm/ui";
 
 const WEEKDAY_KEYS = [
   "sunday",
@@ -90,12 +91,14 @@ function DaysGrid({
             <span className="w-24 text-sm font-medium text-slate-700">
               {t(`weekday.${WEEKDAY_KEYS[day.weekday]}`)}
             </span>
-            <label className="flex items-center gap-1 text-xs text-slate-600">
-              <input
-                type="checkbox"
+            {/* Batch 8 (UX audit) — the shared `Checkbox`/`Label` pair,
+                replacing a raw `<input type="checkbox">`. */}
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                id={`business-hours-open-${day.weekday}`}
                 checked={day.isOpen}
-                onChange={(event) => {
-                  const isOpen = event.target.checked;
+                onCheckedChange={(checked) => {
+                  const isOpen = checked === true;
                   onChange(
                     day.weekday,
                     isOpen
@@ -108,8 +111,10 @@ function DaysGrid({
                   );
                 }}
               />
-              {t("openLabel")}
-            </label>
+              <Label htmlFor={`business-hours-open-${day.weekday}`} className="text-xs font-normal text-slate-600">
+                {t("openLabel")}
+              </Label>
+            </div>
             {day.isOpen && (
               <>
                 <Input
@@ -143,6 +148,7 @@ function DaysGrid({
  * error. Pre-filled with an editable, non-submitted default. */
 function CreateCalendarForm() {
   const t = useTranslations("businessHours");
+  const errorMessage = useErrorMessage();
   const [days, setDays] = useState<BusinessHoursDay[]>(DEFAULT_DAYS);
   const [error, setError] = useState<string | null>(null);
   const mutation = useCreateBusinessHoursCalendarMutation();
@@ -159,7 +165,9 @@ function CreateCalendarForm() {
     try {
       await mutation.mutateAsync({ days: toDayInputs(days) });
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("createFailed"));
+      setError(
+        errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }),
+      );
     }
   }
 
@@ -310,6 +318,7 @@ function ExceptionRow({ exception }: { exception: BusinessHoursException }) {
 
 function AddExceptionForm() {
   const t = useTranslations("businessHours");
+  const errorMessage = useErrorMessage();
   const [date, setDate] = useState("");
   const [isClosed, setIsClosed] = useState(true);
   const [startTime, setStartTime] = useState("09:00");
@@ -334,7 +343,12 @@ function AddExceptionForm() {
       setDate("");
       setIsClosed(true);
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : t("exceptionAddFailed"));
+      setError(
+        errorMessage(submitError, {
+          forbidden: t("actionForbidden"),
+          generic: t("exceptionAddFailed"),
+        }),
+      );
     }
   }
 
@@ -350,14 +364,16 @@ function AddExceptionForm() {
           className="w-40"
         />
       </label>
-      <label className="flex items-center gap-1 text-xs text-slate-600">
-        <input
-          type="checkbox"
+      <div className="flex items-center gap-1.5">
+        <Checkbox
+          id="business-hours-exception-closed"
           checked={isClosed}
-          onChange={(event) => setIsClosed(event.target.checked)}
+          onCheckedChange={(checked) => setIsClosed(checked === true)}
         />
-        {t("closedLabel")}
-      </label>
+        <Label htmlFor="business-hours-exception-closed" className="text-xs font-normal text-slate-600">
+          {t("closedLabel")}
+        </Label>
+      </div>
       {!isClosed && (
         <>
           <label className="flex flex-col gap-1 text-xs text-slate-600">

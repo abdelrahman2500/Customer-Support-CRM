@@ -28,7 +28,12 @@ export const TabsList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
-    className={cn("flex items-center gap-1 border-b border-rule", className)}
+    // Batch 8 (UX audit) — `overflow-x-auto` mirrors `Table`'s own
+    // wide-content convention: every `TabsTrigger` is `whitespace-nowrap`
+    // already, so a list that outgrows its container (more tabs, longer
+    // Arabic labels) scrolls horizontally in its own box instead of
+    // silently clipping — the page itself never scrolls sideways.
+    className={cn("flex items-center gap-1 overflow-x-auto border-b border-rule", className)}
     {...props}
   />
 ));

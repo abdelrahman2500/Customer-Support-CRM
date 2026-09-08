@@ -24,6 +24,12 @@ export const overlayClassName = "fixed inset-0 z-50 bg-overlay/40";
  * there and the transform has to move the panel the other way. This is the
  * one place in the package where a physical-axis transform needs an explicit
  * RTL counterpart — logical utilities cannot express it.
+ *
+ * Batch 8 (UX audit) — `w-[calc(100%-2rem)]`, not a bare `w-full`: on a very
+ * narrow viewport (~320px) the panel otherwise touches both screen edges,
+ * relying on nothing but its own `p-6` for breathing room. This guarantees a
+ * 1rem gutter on each side below `max-w-md`; above it, `max-w-md` is
+ * reached first and this has no effect at all.
  */
 export const overlayPanelClassName =
-  "fixed start-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-md border border-rule bg-surface p-6 shadow-lg focus:outline-none rtl:translate-x-1/2";
+  "fixed start-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-md border border-rule bg-surface p-6 shadow-lg focus:outline-none rtl:translate-x-1/2";

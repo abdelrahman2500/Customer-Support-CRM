@@ -87,4 +87,13 @@ describe("Tabs", () => {
     await user.click(files);
     expect(screen.queryByText("Files panel")).not.toBeInTheDocument();
   });
+
+  // Batch 8 (UX audit) — every `TabsTrigger` is already `whitespace-nowrap`;
+  // without this the list silently clips instead of scrolling once it
+  // outgrows its container (more tabs, longer Arabic labels).
+  it("scrolls horizontally in its own box instead of clipping when it overflows", () => {
+    renderTabs();
+
+    expect(screen.getByRole("tablist")).toHaveClass("overflow-x-auto");
+  });
 });
