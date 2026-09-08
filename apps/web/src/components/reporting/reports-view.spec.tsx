@@ -742,6 +742,14 @@ describe("ReportsView", () => {
 
   // Story 110 — Saved Dashboards.
   describe("saved dashboards (Story 110)", () => {
+    // Batch 6 (UX audit) — the picker is now the shared `Select` (a
+    // trigger button + a lazily-mounted listbox), replacing a raw native
+    // `<select>` a plain `fireEvent.change` could drive directly.
+    async function selectDashboard(name: string) {
+      fireEvent.click(screen.getByRole("combobox", { name: "dashboards.pickerLabel" }));
+      fireEvent.click(await screen.findByRole("option", { name }));
+    }
+
     it("renders all seven report cards under the 'All reports' default, unaffected by an empty dashboard list", () => {
       render(<ReportsView />);
 
@@ -757,7 +765,7 @@ describe("ReportsView", () => {
       expect(screen.queryByText("dashboards.delete")).not.toBeInTheDocument();
     });
 
-    it("lists the caller's own and shared dashboards in the picker", () => {
+    it("lists the caller's own and shared dashboards in the picker", async () => {
       mockedUseDashboardsQuery.mockReturnValue(
         queryResult({
           data: [
@@ -769,12 +777,17 @@ describe("ReportsView", () => {
       );
 
       render(<ReportsView />);
+      fireEvent.click(screen.getByRole("combobox", { name: "dashboards.pickerLabel" }));
 
-      expect(screen.getByText("My Dashboard")).toBeInTheDocument();
-      expect(screen.getByText('dashboards.sharedOptionLabel:{"name":"Team Dashboard"}')).toBeInTheDocument();
+      expect(await screen.findByRole("option", { name: "My Dashboard" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", {
+          name: 'dashboards.sharedOptionLabel:{"name":"Team Dashboard"}',
+        }),
+      ).toBeInTheDocument();
     });
 
-    it("renders only a selected dashboard's saved widgets, in saved order", () => {
+    it("renders only a selected dashboard's saved widgets, in saved order", async () => {
       mockedUseDashboardsQuery.mockReturnValue(
         queryResult({
           data: [
@@ -794,9 +807,7 @@ describe("ReportsView", () => {
       );
 
       render(<ReportsView />);
-      fireEvent.change(screen.getByLabelText("dashboards.pickerLabel"), {
-        target: { value: "dash-1" },
-      });
+      await selectDashboard("Subset Dashboard");
 
       expect(screen.getByText("csat.heading")).toBeInTheDocument();
       expect(screen.getByText("ticketVolume.heading")).toBeInTheDocument();
@@ -807,7 +818,7 @@ describe("ReportsView", () => {
       expect(screen.queryByText("aiUsage.heading")).not.toBeInTheDocument();
     });
 
-    it("shows owner-only share/delete actions only for a dashboard the caller owns", () => {
+    it("shows owner-only share/delete actions only for a dashboard the caller owns", async () => {
       mockedUseDashboardsQuery.mockReturnValue(
         queryResult({
           data: [
@@ -819,13 +830,14 @@ describe("ReportsView", () => {
       );
 
       render(<ReportsView />);
-      const picker = screen.getByLabelText("dashboards.pickerLabel");
 
-      fireEvent.change(picker, { target: { value: "dash-2" } });
+      // "Not owned" is shared, so its option label wraps the shared-option
+      // format string rather than showing the plain name.
+      await selectDashboard('dashboards.sharedOptionLabel:{"name":"Not owned"}');
       expect(screen.queryByText("dashboards.share")).not.toBeInTheDocument();
       expect(screen.queryByText("dashboards.delete")).not.toBeInTheDocument();
 
-      fireEvent.change(picker, { target: { value: "dash-1" } });
+      await selectDashboard("Owned");
       expect(screen.getByText("dashboards.share")).toBeInTheDocument();
       expect(screen.getByText("dashboards.delete")).toBeInTheDocument();
     });
@@ -858,7 +870,7 @@ describe("ReportsView", () => {
       });
     });
 
-    it("toggles isShared for the owned, selected dashboard", () => {
+    it("toggles isShared for the owned, selected dashboard", async () => {
       const mutate = vi.fn();
       mockedUseUpdateDashboardMutation.mockReturnValue({ mutate, isPending: false } as never);
       mockedUseDashboardsQuery.mockReturnValue(
@@ -869,15 +881,13 @@ describe("ReportsView", () => {
       );
 
       render(<ReportsView />);
-      fireEvent.change(screen.getByLabelText("dashboards.pickerLabel"), {
-        target: { value: "dash-1" },
-      });
+      await selectDashboard("Owned");
       fireEvent.click(screen.getByText("dashboards.share"));
 
       expect(mutate).toHaveBeenCalledWith({ isShared: true });
     });
 
-    it("does not delete immediately — clicking delete opens a confirmation dialog first", () => {
+    it("does not delete immediately — clicking delete opens a confirmation dialog first", async () => {
       const mutateAsync = vi.fn().mockResolvedValue({ id: "dash-1" });
       mockedUseDeleteDashboardMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
       mockedUseDashboardsQuery.mockReturnValue(
@@ -888,9 +898,7 @@ describe("ReportsView", () => {
       );
 
       render(<ReportsView />);
-      fireEvent.change(screen.getByLabelText("dashboards.pickerLabel"), {
-        target: { value: "dash-1" },
-      });
+      await selectDashboard("Owned");
       fireEvent.click(screen.getByRole("button", { name: "dashboards.delete" }));
 
       expect(screen.getByRole("alertdialog")).toBeInTheDocument();
@@ -908,15 +916,17 @@ describe("ReportsView", () => {
       );
 
       render(<ReportsView />);
-      fireEvent.change(screen.getByLabelText("dashboards.pickerLabel"), {
-        target: { value: "dash-1" },
-      });
+      await selectDashboard("Owned");
       fireEvent.click(screen.getByRole("button", { name: "dashboards.delete" }));
       const dialog = screen.getByRole("alertdialog");
       fireEvent.click(within(dialog).getByRole("button", { name: "dashboards.delete" }));
 
       await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith("dash-1"));
-      expect(screen.getByLabelText("dashboards.pickerLabel")).toHaveValue("");
+      // Batch 6 (UX audit) — the shared `Select`'s trigger shows the
+      // placeholder text once reset, not an empty native `value`.
+      expect(screen.getByRole("combobox", { name: "dashboards.pickerLabel" })).toHaveTextContent(
+        "dashboards.allReports",
+      );
     });
   });
 

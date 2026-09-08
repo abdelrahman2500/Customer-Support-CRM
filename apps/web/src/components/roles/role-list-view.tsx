@@ -15,7 +15,10 @@ import {
   Alert,
   Badge,
   Button,
+  Checkbox,
   Input,
+  Label,
+  QueryStateCard,
   showSuccessToast,
   Skeleton,
   Table,
@@ -172,17 +175,23 @@ function RoleRow({
             ) : (
               <div className="mt-2 flex flex-wrap gap-3">
                 {allPermissions.map((permission) => (
-                  <label
-                    key={permission.id}
-                    className="flex items-center gap-1.5 text-sm text-slate-700"
-                  >
-                    <input
-                      type="checkbox"
+                  // Batch 6 (UX audit) — the shared `Checkbox`/`Label` pair
+                  // (mirrors `ChatComposer`'s "send by email" checkbox),
+                  // replacing a raw `<input type="checkbox">` with no
+                  // focus-ring/keyboard parity with the rest of the app.
+                  <div key={permission.id} className="flex items-center gap-1.5">
+                    <Checkbox
+                      id={`permission-${role.id}-${permission.id}`}
                       checked={role.permissions.includes(permission.key)}
-                      onChange={() => togglePermission(permission.key)}
+                      onCheckedChange={() => togglePermission(permission.key)}
                     />
-                    {permission.key}
-                  </label>
+                    <Label
+                      htmlFor={`permission-${role.id}-${permission.id}`}
+                      className="text-sm font-normal text-slate-700"
+                    >
+                      {permission.key}
+                    </Label>
+                  </div>
                 ))}
               </div>
             )}
@@ -262,6 +271,7 @@ function AddRoleForm() {
  */
 export function RoleListView() {
   const t = useTranslations("roles");
+  const tCommon = useTranslations("common");
   const rolesQuery = useManagedRolesQuery();
   const permissionsQuery = usePermissionsQuery();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -287,27 +297,29 @@ export function RoleListView() {
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("list.rolesHeading")}</h2>
 
-        {rolesQuery.isLoading && (
-          <div className="mt-2 flex flex-col gap-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        )}
-
-        {rolesQuery.isError && (
-          <Alert variant="destructive" className="mt-2 flex items-center justify-between">
-            <span>{t("list.error")}</span>
-            <Button variant="outline" size="sm" onClick={() => rolesQuery.refetch()}>
-              {t("list.retry")}
-            </Button>
-          </Alert>
-        )}
-
-        {rolesQuery.isSuccess && rolesQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">{t("list.empty")}</p>
-        )}
-
-        {rolesQuery.isSuccess && rolesQuery.data.length > 0 && (
+        {/* Batch 6 (UX audit) — the shared `QueryStateCard`, replacing a
+            hand-rolled loading/error/empty ladder whose empty branch was a
+            third, borderless variant distinct from both `EmptyState`'s
+            dashed block and every other hand-rolled one in this codebase. */}
+        <QueryStateCard
+          className="mt-2"
+          isLoading={rolesQuery.isLoading}
+          isError={rolesQuery.isError}
+          isEmpty={rolesQuery.isSuccess && rolesQuery.data.length === 0}
+          loadingLabel={tCommon("loading")}
+          loadingPlaceholder={
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          }
+          error={{
+            title: t("list.error"),
+            retryLabel: t("list.retry"),
+            onRetry: () => void rolesQuery.refetch(),
+          }}
+          empty={{ title: t("list.empty") }}
+        >
           <Table className="mt-2">
             <TableHeader>
               <TableRow>
@@ -318,7 +330,7 @@ export function RoleListView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rolesQuery.data.map((role) => (
+              {(rolesQuery.data ?? []).map((role) => (
                 <RoleRow
                   key={role.id}
                   role={role}
@@ -329,7 +341,7 @@ export function RoleListView() {
               ))}
             </TableBody>
           </Table>
-        )}
+        </QueryStateCard>
 
         <AddRoleForm />
       </div>
@@ -337,35 +349,33 @@ export function RoleListView() {
       <div className="rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900">{t("list.permissionsHeading")}</h2>
 
-        {permissionsQuery.isLoading && (
-          <div className="mt-2 flex flex-col gap-2">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-full" />
-          </div>
-        )}
-
-        {permissionsQuery.isError && (
-          <Alert variant="destructive" className="mt-2 flex items-center justify-between">
-            <span>{t("list.permissionsError")}</span>
-            <Button variant="outline" size="sm" onClick={() => permissionsQuery.refetch()}>
-              {t("list.retry")}
-            </Button>
-          </Alert>
-        )}
-
-        {permissionsQuery.isSuccess && permissionsQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">{t("list.permissionsEmpty")}</p>
-        )}
-
-        {permissionsQuery.isSuccess && permissionsQuery.data.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {permissionsQuery.data.map((permission) => (
+        <QueryStateCard
+          className="mt-2"
+          isLoading={permissionsQuery.isLoading}
+          isError={permissionsQuery.isError}
+          isEmpty={permissionsQuery.isSuccess && permissionsQuery.data.length === 0}
+          loadingLabel={tCommon("loading")}
+          loadingPlaceholder={
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+            </div>
+          }
+          error={{
+            title: t("list.permissionsError"),
+            retryLabel: t("list.retry"),
+            onRetry: () => void permissionsQuery.refetch(),
+          }}
+          empty={{ title: t("list.permissionsEmpty") }}
+        >
+          <div className="flex flex-wrap gap-1">
+            {(permissionsQuery.data ?? []).map((permission) => (
               <Badge key={permission.id} variant="outline">
                 {permission.key}
               </Badge>
             ))}
           </div>
-        )}
+        </QueryStateCard>
       </div>
     </section>
   );

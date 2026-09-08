@@ -23,7 +23,7 @@ import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { BarChart, DonutGauge, RatingBar, ticketStatusBarColor } from "./report-charts";
 import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
-import { Alert, Button, Input, Skeleton } from "@crm/ui";
+import { Alert, Button, Checkbox, Input, Label, Skeleton } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -588,35 +588,48 @@ export function ReportsView() {
           options={(categoriesQuery.data ?? []).map((category) => category.id)}
           renderLabel={(id) => categoriesQuery.data?.find((c) => c.id === id)?.name ?? id}
         />
-        <label className="flex items-center gap-2 text-xs text-slate-600">
-          <input
-            type="checkbox"
+        {/* Batch 6 (UX audit) — the shared `Checkbox`/`Label` pair,
+            replacing a raw `<input type="checkbox">`. */}
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="reports-cross-branch"
             checked={range.crossBranch ?? false}
-            onChange={(event) =>
-              setRange((prev) => ({ ...prev, crossBranch: event.target.checked }))
+            onCheckedChange={(checked) =>
+              setRange((prev) => ({ ...prev, crossBranch: checked === true }))
             }
           />
-          {t("filters.crossBranch")}
-        </label>
+          <Label htmlFor="reports-cross-branch" className="text-xs font-normal text-slate-600">
+            {t("filters.crossBranch")}
+          </Label>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-xs text-slate-600">
           {t("dashboards.pickerLabel")}
-          <select
-            className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
-            value={selectedDashboardId ?? ""}
-            onChange={(event) => setSelectedDashboardId(event.target.value || null)}
+          {/* Batch 6 (UX audit) — the shared `Select`, replacing a raw
+              native `<select>` with no matching focus ring/keyboard-ARIA
+              parity with the rest of the app. `ALL_VALUE` stands in for
+              the "no dashboard selected" empty string, mirroring every
+              other `Select` on this page. */}
+          <Select
+            value={selectedDashboardId ?? ALL_VALUE}
+            onValueChange={(value) => setSelectedDashboardId(value === ALL_VALUE ? null : value)}
           >
-            <option value="">{t("dashboards.allReports")}</option>
-            {dashboards.map((dashboard) => (
-              <option key={dashboard.id} value={dashboard.id}>
-                {dashboard.isShared
-                  ? t("dashboards.sharedOptionLabel", { name: dashboard.name })
-                  : dashboard.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full sm:w-auto sm:min-w-[10rem]" aria-label={t("dashboards.pickerLabel")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_VALUE}>{t("dashboards.allReports")}</SelectItem>
+              {dashboards.map((dashboard) => (
+                <SelectItem key={dashboard.id} value={dashboard.id}>
+                  {dashboard.isShared
+                    ? t("dashboards.sharedOptionLabel", { name: dashboard.name })
+                    : dashboard.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <Button variant="outline" size="sm" onClick={() => setShowSaveForm(true)}>
           {t("dashboards.saveCurrentView")}

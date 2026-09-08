@@ -20,7 +20,7 @@ import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { ApiError } from "@/lib/api";
 import type { ContactSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Input, Pagination, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Checkbox, Input, Label, Pagination, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
@@ -289,14 +289,22 @@ function AddContactForm({ customerId }: { customerId: string }) {
         {t("detail.contactPhoneLabel")}
         <Input className="w-32" value={phone} onChange={(event) => setPhone(event.target.value)} />
       </label>
-      <label className="flex items-center gap-1 text-xs text-slate-600">
-        <input
-          type="checkbox"
+      {/* Batch 6 (UX audit) — the shared `Checkbox`/`Label` pair, replacing
+          a raw `<input type="checkbox">` with no focus-ring/keyboard parity
+          with the rest of the app. */}
+      <div className="flex items-center gap-1.5">
+        <Checkbox
+          id={`add-contact-primary-${customerId}`}
           checked={isPrimary}
-          onChange={(event) => setIsPrimary(event.target.checked)}
+          onCheckedChange={(checked) => setIsPrimary(checked === true)}
         />
-        {t("detail.primaryContact")}
-      </label>
+        <Label
+          htmlFor={`add-contact-primary-${customerId}`}
+          className="text-xs font-normal text-slate-600"
+        >
+          {t("detail.primaryContact")}
+        </Label>
+      </div>
       <Button type="submit" size="sm" disabled={mutation.isPending}>
         {mutation.isPending ? t("detail.addContactSubmitting") : t("detail.addContactSubmit")}
       </Button>
