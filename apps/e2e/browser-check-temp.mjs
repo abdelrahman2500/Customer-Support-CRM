@@ -21,7 +21,9 @@ async function main() {
       let body = "";
       try {
         body = await res.text();
-      } catch {}
+      } catch (error) {
+        void error;
+      }
       log("[response]", res.status(), res.url(), body.slice(0, 300));
     }
   });
@@ -36,26 +38,34 @@ async function main() {
   // the form's onSubmit handler (confirmed: doing so falls through to a
   // native GET form-submit, silently reloading the page with empty
   // fields — a test-script timing bug, not an app bug).
-  await page.waitForFunction(() => {
-    const btn = document.querySelector('button[type="submit"]');
-    return btn && btn.onclick !== null || document.querySelector("form")?.onsubmit !== undefined;
-  }).catch(() => {});
+  await page
+    .waitForFunction(() => {
+      const btn = document.querySelector('button[type="submit"]');
+      return (
+        (btn && btn.onclick !== null) || document.querySelector("form")?.onsubmit !== undefined
+      );
+    })
+    .catch(() => {});
   await page.waitForTimeout(1000);
   await page.fill('input[type="email"]', EMAIL);
   await page.fill('input[type="password"]', PASSWORD);
-  await page.screenshot({ path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/00-login-filled.png" });
+  await page.screenshot({
+    path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/00-login-filled.png",
+  });
 
   // --- Check patch state BEFORE any navigation happens ---
   const prePatchState = await page.evaluate(() => ({
     pushStateSrc: window.history.pushState.toString().slice(0, 120),
-    hasMarker: Boolean((window.history.pushState).__navOverlay),
+    hasMarker: Boolean(window.history.pushState.__navOverlay),
   }));
   log("BEFORE login-submit pushState state:", JSON.stringify(prePatchState));
 
   await page.click('button[type="submit"]');
   await page.waitForTimeout(3000);
   log("3s after click, url:", page.url());
-  await page.screenshot({ path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/00b-after-click.png" });
+  await page.screenshot({
+    path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/00b-after-click.png",
+  });
   if (!/\/en\/tickets/.test(page.url())) {
     await page.waitForURL(/\/en\/tickets/, { timeout: 15000 });
   }
@@ -66,7 +76,7 @@ async function main() {
     const statusEls = Array.from(document.querySelectorAll('[role="status"]'));
     return {
       pushStateSrc: window.history.pushState.toString().slice(0, 200),
-      hasMarker: Boolean((window.history.pushState).__navOverlay),
+      hasMarker: Boolean(window.history.pushState.__navOverlay),
       statusElCount: statusEls.length,
       statusElsInfo: statusEls.map((el) => ({
         ariaBusy: el.getAttribute("aria-busy"),
@@ -78,7 +88,9 @@ async function main() {
   });
   log("AFTER login, mount/patch state:", JSON.stringify(postLoginState, null, 2));
 
-  await page.screenshot({ path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/01-tickets.png" });
+  await page.screenshot({
+    path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/01-tickets.png",
+  });
 
   // --- 2. Set up a rapid poller BEFORE clicking a nav link, then click ---
   async function clickAndObserve(label, action) {
@@ -87,14 +99,20 @@ async function main() {
     let stopped = false;
     const pollPromise = (async () => {
       while (!stopped && Date.now() - startedAt < 4000) {
-        const info = await page.evaluate(() => {
-          const el = Array.from(document.querySelectorAll('[role="status"]')).find((e) =>
-            e.querySelector(".fixed.inset-0") || e.getAttribute("aria-busy") !== null,
-          );
-          return el
-            ? { t: performance.now(), ariaBusy: el.getAttribute("aria-busy"), hasBackdrop: Boolean(el.querySelector(".fixed.inset-0")) }
-            : { t: performance.now(), ariaBusy: null, hasBackdrop: false };
-        }).catch(() => null);
+        const info = await page
+          .evaluate(() => {
+            const el = Array.from(document.querySelectorAll('[role="status"]')).find(
+              (e) => e.querySelector(".fixed.inset-0") || e.getAttribute("aria-busy") !== null,
+            );
+            return el
+              ? {
+                  t: performance.now(),
+                  ariaBusy: el.getAttribute("aria-busy"),
+                  hasBackdrop: Boolean(el.querySelector(".fixed.inset-0")),
+                }
+              : { t: performance.now(), ariaBusy: null, hasBackdrop: false };
+          })
+          .catch(() => null);
         if (info) samples.push({ elapsed: Date.now() - startedAt, ...info });
         await new Promise((r) => setTimeout(r, 15));
       }
@@ -121,7 +139,9 @@ async function main() {
   await clickAndObserve("Link: Tickets -> Customers", async () => {
     await page.click('nav a:has-text("Customers")');
   });
-  await page.screenshot({ path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/02-customers.png" });
+  await page.screenshot({
+    path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/02-customers.png",
+  });
 
   // --- B -> A via <Link> click ---
   await clickAndObserve("Link: Customers -> Tickets", async () => {
@@ -140,13 +160,18 @@ async function main() {
   // --- router.push via row click (dashboard -> ticket detail), if a ticket exists ---
   await page.goto(`${BASE}/en/tickets`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(500);
-  const rowCount = await page.locator("table tbody tr").count().catch(() => 0);
+  const rowCount = await page
+    .locator("table tbody tr")
+    .count()
+    .catch(() => 0);
   log("ticket rows found:", rowCount);
   if (rowCount > 0) {
     await clickAndObserve("router.push via ticket row click", async () => {
       await page.locator("table tbody tr").first().click();
     });
-    await page.screenshot({ path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/03-ticket-detail.png" });
+    await page.screenshot({
+      path: "C:/Users/USER/AppData/Local/Temp/claude/e--Algoriza-Customer-Support-CRM/806cf213-bf91-42ca-a5ca-c0f74b984be8/scratchpad/03-ticket-detail.png",
+    });
   }
 
   await browser.close();
