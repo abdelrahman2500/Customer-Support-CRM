@@ -197,7 +197,7 @@ function CsatSection({ ticketId }: { ticketId: string }) {
         </div>
       )}
 
-      {csatQuery.isSuccess && csatQuery.data === null && <CsatForm ticketId={ticketId} />}
+      {csatQuery.isSuccess && csatQuery.data == null && <CsatForm ticketId={ticketId} />}
     </div>
   );
 }

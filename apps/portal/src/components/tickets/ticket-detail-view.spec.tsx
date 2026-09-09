@@ -79,7 +79,7 @@ describe("TicketDetailView", () => {
       queryResult({ data: [], isSuccess: true }) as never,
     );
     vi.mocked(useMyTicketCsatQuery).mockReturnValue(
-      queryResult({ data: undefined, isSuccess: true }) as never,
+      queryResult({ data: null, isSuccess: true }) as never,
     );
     vi.mocked(useSubmitMyTicketCsatMutation).mockReturnValue({
       mutateAsync: vi.fn(),
