@@ -109,13 +109,15 @@ export function createMyTicket(input: CreatePortalTicketInput): Promise<PortalTi
 }
 
 /**
- * `undefined` (not `null`) means no feedback has been submitted yet — the
- * backend replies `204 No Content` for that case (never a literal JSON
- * `null` body, which every fetch client's `response.json()` would throw on)
- * and `apiFetch`'s shared `attempt()` already maps `204` to `undefined`.
+ * `null` means no feedback has been submitted yet — the backend replies
+ * `204 No Content` for that case, and React Query refuses to accept
+ * `undefined` from a query function. Keep the empty state explicit so the
+ * CSAT form can render correctly without tripping the query cache.
  */
-export function getMyTicketCsat(id: string): Promise<PortalTicketCsat | undefined> {
-  return apiFetch<PortalTicketCsat | undefined>(`/portal/tickets/${id}/csat`);
+export function getMyTicketCsat(id: string): Promise<PortalTicketCsat | null> {
+  return apiFetch<PortalTicketCsat | null>(`/portal/tickets/${id}/csat`).then(
+    (value) => value ?? null,
+  );
 }
 
 export function submitMyTicketCsat(id: string, input: SubmitCsatInput): Promise<{ id: string }> {

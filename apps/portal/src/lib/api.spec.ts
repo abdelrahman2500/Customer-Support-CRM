@@ -9,6 +9,7 @@ import {
   setAccessToken,
 } from "./api";
 import { emitAuthExpired } from "./auth-events";
+import { getMyTicketCsat } from "./tickets-api";
 
 /**
  * Story 95 — mirrors `apps/web/src/lib/api.spec.ts` exactly (retargeted to
@@ -44,9 +45,9 @@ describe("api.ts (portal) — silent refresh / logout", () => {
   describe("apiFetch", () => {
     it("attaches the Bearer token from the access-token cookie", async () => {
       setAccessToken("token-1");
-      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        jsonResponse(200, { ok: true }),
-      );
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(jsonResponse(200, { ok: true }));
 
       await apiFetch("/portal/tickets");
 
@@ -69,17 +70,19 @@ describe("api.ts (portal) — silent refresh / logout", () => {
     it("retries once after a successful silent refresh and resolves with the retried response", async () => {
       setAccessToken("expired-token");
       let ticketCallCount = 0;
-      const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.includes("/portal/auth/refresh")) {
-          return Promise.resolve(jsonResponse(200, { accessToken: "fresh-token" }));
-        }
-        ticketCallCount += 1;
-        if (ticketCallCount === 1) {
-          return Promise.resolve(jsonResponse(401, { message: "Unauthorized" }));
-        }
-        return Promise.resolve(jsonResponse(200, { id: "ticket-1" }));
-      });
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.includes("/portal/auth/refresh")) {
+            return Promise.resolve(jsonResponse(200, { accessToken: "fresh-token" }));
+          }
+          ticketCallCount += 1;
+          if (ticketCallCount === 1) {
+            return Promise.resolve(jsonResponse(401, { message: "Unauthorized" }));
+          }
+          return Promise.resolve(jsonResponse(200, { id: "ticket-1" }));
+        });
 
       const result = await apiFetch<{ id: string }>("/portal/tickets/ticket-1");
 
@@ -102,12 +105,20 @@ describe("api.ts (portal) — silent refresh / logout", () => {
       expect(mockedEmitAuthExpired).not.toHaveBeenCalled();
     });
 
+    it("returns null for a 204 CSAT response instead of undefined for React Query", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
+
+      await expect(getMyTicketCsat("ticket-1")).resolves.toBeNull();
+    });
+
     it("clears the access token, emits auth-expired, and throws the original 401 when refresh itself fails", async () => {
       setAccessToken("expired-token");
       vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/portal/auth/refresh")) {
-          return Promise.resolve(jsonResponse(401, { message: "Refresh token is invalid or expired" }));
+          return Promise.resolve(
+            jsonResponse(401, { message: "Refresh token is invalid or expired" }),
+          );
         }
         return Promise.resolve(jsonResponse(401, { message: "Unauthorized" }));
       });
@@ -121,14 +132,16 @@ describe("api.ts (portal) — silent refresh / logout", () => {
     it("clears the access token, emits auth-expired, and throws a 401 when the retried request still 401s after a successful refresh", async () => {
       setAccessToken("expired-token");
       let ticketCallCount = 0;
-      const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.includes("/portal/auth/refresh")) {
-          return Promise.resolve(jsonResponse(200, { accessToken: "fresh-token" }));
-        }
-        ticketCallCount += 1;
-        return Promise.resolve(jsonResponse(401, { message: "Unauthorized" }));
-      });
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.includes("/portal/auth/refresh")) {
+            return Promise.resolve(jsonResponse(200, { accessToken: "fresh-token" }));
+          }
+          ticketCallCount += 1;
+          return Promise.resolve(jsonResponse(401, { message: "Unauthorized" }));
+        });
 
       await expect(apiFetch("/portal/tickets")).rejects.toMatchObject({ status: 401 });
 
@@ -214,7 +227,9 @@ describe("api.ts (portal) — silent refresh / logout", () => {
 
   describe("logout", () => {
     it("calls the real POST /portal/auth/logout with credentials included", async () => {
-      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(null, { status: 204 }));
 
       await logout();
 
