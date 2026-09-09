@@ -12,6 +12,11 @@ vi.mock("./auth-recovery-listener", () => ({
   AuthRecoveryListener: () => null,
 }));
 
+// UX audit — same reasoning, for NavigationOverlayListener.
+vi.mock("./navigation-overlay-listener", () => ({
+  NavigationOverlayListener: () => null,
+}));
+
 describe("QueryProvider (portal)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

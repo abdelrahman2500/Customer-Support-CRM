@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useBranchesQuery, useCreateUserMutation, useDepartmentsQuery } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
 import { useErrorMessage } from "@/hooks/use-error-message";

@@ -2,8 +2,9 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import {
   useCreateContactMutation,
   useCreateCustomerNoteMutation,

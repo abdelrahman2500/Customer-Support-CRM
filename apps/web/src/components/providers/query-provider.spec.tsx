@@ -15,6 +15,13 @@ vi.mock("./auth-recovery-listener", () => ({
   AuthRecoveryListener: () => null,
 }));
 
+// UX audit — same reasoning: NavigationOverlayListener needs a real
+// pathname/next-intl context this test doesn't set up, and is covered by
+// its own dedicated spec.
+vi.mock("./navigation-overlay-listener", () => ({
+  NavigationOverlayListener: () => null,
+}));
+
 describe("QueryProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();

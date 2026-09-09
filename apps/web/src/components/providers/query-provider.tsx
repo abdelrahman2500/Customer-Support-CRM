@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { registerQueryClient } from "@/lib/query-client-registry";
 import { AuthRecoveryListener } from "./auth-recovery-listener";
+import { NavigationOverlayListener } from "./navigation-overlay-listener";
 
 export function QueryProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => {
@@ -21,6 +22,11 @@ export function QueryProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthRecoveryListener />
+      {/* UX audit — one global navigation overlay for the whole session,
+          same "mounted once, above every route group" placement as
+          AuthRecoveryListener above. See its own doc comment for the full
+          detection design. */}
+      <NavigationOverlayListener />
       {children}
     </QueryClientProvider>
   );

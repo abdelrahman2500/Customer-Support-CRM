@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { onAuthExpired } from "@/lib/auth-events";
 import { clearQueryCache } from "@/lib/query-client-registry";
+import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 
 /**
  * Story 95 — Authentication Recovery.

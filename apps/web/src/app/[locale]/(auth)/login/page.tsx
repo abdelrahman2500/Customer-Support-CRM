@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Alert, Button, Input } from "@crm/ui";
 import { getApiBaseUrl, setAccessToken } from "@/lib/api";
+import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 
 /**
  * Story 23 — the real agent sign-in screen, replacing the Story 02

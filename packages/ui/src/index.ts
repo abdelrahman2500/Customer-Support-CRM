@@ -104,6 +104,9 @@ export type { EmptyStateProps } from "./components/empty-state";
 export { FetchingIndicator } from "./components/fetching-indicator";
 export type { FetchingIndicatorProps } from "./components/fetching-indicator";
 
+export { NavigationOverlay } from "./components/navigation-overlay";
+export type { NavigationOverlayProps } from "./components/navigation-overlay";
+
 export { Pagination } from "./components/pagination";
 export type { PaginationProps } from "./components/pagination";
 
