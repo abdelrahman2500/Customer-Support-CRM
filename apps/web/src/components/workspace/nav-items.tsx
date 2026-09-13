@@ -24,6 +24,7 @@ import {
 } from "@crm/ui";
 import type { LucideIcon } from "@crm/ui";
 import type { NavigationLayout } from "@/lib/branding-api";
+import { useBrandingQuery } from "@/hooks/use-branding";
 
 /**
  * Story 129 — this module is the ONE source of truth for the Agent
@@ -301,9 +302,16 @@ export function NavItemLabel({
   labelClassName?: string;
 }) {
   const Icon = item.icon;
+  const brandingQuery = useBrandingQuery();
+  const navigationLayout = brandingQuery.data?.navigationLayout;
   return (
     <>
-      <Icon className="h-4 w-4 shrink-0" aria-hidden />
+      <Icon
+        className={
+          navigationLayout == "NAVBAR" ? "h-4 w-4 shrink-0 -ms-4 me-4" : "h-4 w-4 shrink-0"
+        }
+        aria-hidden
+      />
       <span className={labelClassName}>{t(item.labelKey)}</span>
       {item.href === "notifications" && unreadCountKnown && unreadCount > 0 && (
         <Badge
