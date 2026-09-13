@@ -218,13 +218,13 @@ the same contract, validated by its own
 
 ### `apps/worker`-only: outbound email (RM-15)
 
-| Variable        | Required   | Notes                                                                                                                                                                                                                              |
-| --------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SMTP_HOST`     | no         | With `SMTP_FROM`, both must be set for `EmailAdapter` to register at all — see below.                                                                                                                                             |
-| `SMTP_PORT`     | no (`587`) |                                                                                                                                                                                                                                     |
-| `SMTP_USER`     | no         | Omit for an unauthenticated relay (e.g. local Mailhog).                                                                                                                                                                           |
-| `SMTP_PASSWORD` | no         |                                                                                                                                                                                                                                     |
-| `SMTP_FROM`     | no         | The `From:` address every outbound email is sent as.                                                                                                                                                                              |
+| Variable        | Required   | Notes                                                                                 |
+| --------------- | ---------- | ------------------------------------------------------------------------------------- |
+| `SMTP_HOST`     | no         | With `SMTP_FROM`, both must be set for `EmailAdapter` to register at all — see below. |
+| `SMTP_PORT`     | no (`587`) |                                                                                       |
+| `SMTP_USER`     | no         | Omit for an unauthenticated relay (e.g. local Mailhog).                               |
+| `SMTP_PASSWORD` | no         |                                                                                       |
+| `SMTP_FROM`     | no         | The `From:` address every outbound email is sent as.                                  |
 
 Local dev/CI point these at the already-running Mailhog sandbox
 (`docker-compose.yml`: SMTP on `1025`, its own web UI/JSON API on `8025`) —
@@ -444,8 +444,48 @@ requires a decision or a credential from whoever operates the deployment.
   available (see `apps/api/prisma/schema.prisma`'s `extensions`), and the two
   roles described above.
 - A Redis 7 instance — used for both BullMQ and the Socket.IO adapter, so it
-  must be shared by every API replica.
+  must be shared by every API replica. **Authentication/TLS are the
+  deployment platform's responsibility, not something this codebase
+  configures or enforces**: `REDIS_URL` is passed straight to `ioredis`
+  unexamined, so a password/`rediss://` TLS connection works if your
+  `REDIS_URL` includes it (`redis://:<password>@host:6379` or
+  `rediss://...`), but nothing in `apps/api`/`apps/worker` requires one —
+  an unauthenticated, unencrypted local dev Redis (`docker-compose.yml`)
+  and a production Redis holding real BullMQ job payloads (which can
+  include ticket/customer content) are configured identically from this
+  repository's point of view. Treat a production Redis with no password
+  and no TLS as a real exposure, not a merely theoretical one, and set it
+  up the same way you would for `DATABASE_URL`.
 - An S3-compatible bucket, plus its endpoint and credentials.
+
+**API liveness/readiness**
+
+`apps/api` exposes two unversioned (not under `/api/v1`), unauthenticated
+routes — `apps/api/src/health/health.controller.ts` — for exactly this
+purpose: `GET /health` (liveness — always 200 once the process is up,
+checks nothing) and `GET /health/ready` (readiness — runs a real
+`SELECT 1` against Postgres and a real Redis `ping()`, returning 503 with
+which dependency failed if either is unreachable). Point an
+orchestrator's liveness probe at the first and its readiness probe at the
+second; see "Post-deploy verification" above for the `curl` form of both.
+
+**Worker liveness/health**
+
+`apps/worker` has no HTTP listener at all (`NestFactory.createApplicationContext`,
+not `createNestApplication`) — see `apps/worker/src/main.ts` — so there is no
+`/health`/`/health/ready`-style HTTP probe to point an orchestrator's
+liveness/readiness check at, unlike `apps/api` (above). Its only built-in
+Redis-connectivity signal is the BullMQ `health-check` queue's
+`HealthProcessor`, which proves the worker can still process a job, not an
+HTTP endpoint an external prober can call. In practice this means worker
+liveness today is process-level only: rely on your container runtime's own
+"is the process still running" restart policy
+(`docker-compose.prod.yml`'s `restart: unless-stopped`, or your
+orchestrator's process-exit-based liveness), not an HTTP health check. If a
+future deployment target requires an HTTP liveness probe for the worker
+specifically, that is unimplemented today, not merely undocumented — treat
+it as a real gap to close before relying on HTTP-based orchestration
+health checks for this container.
 
 **DNS / TLS**
 

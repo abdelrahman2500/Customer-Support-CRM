@@ -52,14 +52,20 @@ Branches, departments, users, roles/permissions (RBAC via a `Role` ↔
 that scopes a user to a branch/department/role. JWT access tokens plus
 rotating, hashed refresh tokens (cookie-based). A role's
 `ticketVisibilityScope` (`BRANCH` or `DEPARTMENT`) restricts what an agent
-in that role can see. Explicit audit logging of auth events (login,
-failed login, logout, password reset) and role/permission changes (with
-before/after diffs), in addition to the general mutation audit interceptor.
+in that role can see. Per-account login lockout after 5 failed attempts
+(15-minute lock, Story 122), enforced password complexity on account
+creation/reset (Story 123), and self-service session/device management —
+list and revoke active sessions (Story 124). Explicit audit logging of
+auth events (login, failed login, account lockout, logout, password
+reset) and role/permission changes (with before/after diffs), in addition
+to the general mutation audit interceptor.
 
 ### Customer Management — Partially implemented
 Branch-scoped customers and contacts, full CRUD except delete. Agents can
-set a contact's Customer Portal password. There is no search/filter on the
-customer list endpoint yet (a plain unfiltered list).
+set a contact's Customer Portal password. The customer list endpoint
+supports search (Story 101), an `isActive` filter, sorting by display
+name or creation date, and standard pagination. Delete is still not
+implemented.
 
 ### Ticket Management — Implemented
 Tickets with status/priority/category, department/assignee, append-only
@@ -86,27 +92,40 @@ branch-wide SLA/escalation broadcasts), `chat-session:{id}` (customer-only
 portal chat), and `agent:{id}:presence` (Redis-backed agent
 online/offline). In-app notifications are logged (`NotificationLog`),
 readable via a history endpoint, and gated by per-user, per-event-type
-preferences and branch-configurable message templates. There is no
-outbound email/SMS/push delivery — this is an in-app/Socket.IO mechanism.
+preferences and branch-configurable message templates. SLA-at-risk/breach
+and ticket-escalation notifications (RM-26), and Customer Portal
+notifications (RM-19), are also delivered by real outbound email via
+`apps/worker`'s `EmailAdapter` (skipped gracefully when no `SMTP_HOST` is
+configured), gated by the same in-app preference toggle — there is
+currently no independent email-only opt-out, and no SMS/push delivery.
 
 ### Agent Workspace — Implemented
 The Next.js app agents use day to day: authenticated ticket list/detail
 with live updates, ticket/customer creation, a real dashboard (own open
-tickets + unassigned/claimable tickets), customer/contact editing, live
-in-app toast notifications and a notification history view, user/role/
-permission administration, branch/department administration, business
-hours and SLA policy administration, automation rule administration,
-branch branding configuration, per-branch AI feature-flag configuration,
-audit log viewing, live chat with a portal customer, AI ticket-assist
-(summarize/suggest-reply/categorize) results on the ticket detail view, and
-reporting dashboards.
+tickets + unassigned/claimable tickets, plus a personal task/reminder
+panel), customer/contact editing, live in-app toast notifications and a
+notification history view, user/role/permission administration,
+branch/department administration, business hours and SLA policy
+administration, automation rule administration, branch branding
+configuration, per-branch AI feature-flag configuration, audit log
+viewing (with search), live chat with a portal customer, AI ticket-assist
+results on the ticket detail view, and reporting dashboards (with CSV
+export and saved dashboards).
 
-### Communication / Channels — Foundation only
+### Communication / Channels — Partially implemented
 The data model (`ChannelMessage`) supports five channel types (email,
-WhatsApp, SMS, live chat, web form), but only **live chat** has a working
-producer today, shared by the Agent Workspace and Customer Portal over the
-`ticket:{id}` realtime room. Email/WhatsApp/SMS/web-form ingestion is
-schema-only, awaiting a chosen external provider (see Roadmap).
+WhatsApp, SMS, live chat, web form). Three now have a real, working
+adapter/producer: **live chat** (shared by the Agent Workspace and
+Customer Portal over the `ticket:{id}` realtime room), **email** —
+outbound only, a real SMTP send via `apps/worker`'s `EmailAdapter` (RM-15,
+used both for an agent's "send as email" reply and for the automated
+notification emails described above); inbound email parsing is still a
+stub, deferred — and **web form** (RM-14/Story 87 — a public,
+unauthenticated ticket-intake endpoint that finds-or-creates a contact and
+files a ticket directly; no external provider needed). **WhatsApp and SMS
+remain schema-only**, awaiting a chosen external provider (see Roadmap).
+Outbound webhooks (notifying an org's own external systems of CRM events)
+are a separate, implemented capability — see Integrations below.
 
 ### Attachments — Implemented
 S3-compatible object storage (MinIO locally) for both ticket and customer
@@ -115,49 +134,74 @@ attachments: upload via multipart form data, download via short-lived
 
 ### Knowledge Base — Implemented
 Branch-scoped articles with draft/published status and immutable version
-snapshots taken on each publish. Search is a plain case-insensitive
-substring match (not full-text or vector search — see AI section). The
-Customer Portal browses published-only, branch-scoped articles.
+snapshots taken on each publish. Search is real PostgreSQL full-text
+search (Story 102) — a generated `tsvector` column, `websearch_to_tsquery`
+matching, `ts_rank`-ordered results — not a substring match, and not
+vector/embedding search (see AI section: the `pgvector` extension is
+declared in the schema but unused by any column). Articles support an
+optional per-locale (English/Arabic) title/body translation layered on
+top of the article's own default-locale content, never replacing it
+(Story 109/`kb-multi-locale`). The Customer Portal browses
+published-only, branch-scoped articles.
 
 ### AI-assisted Ticket Operations — Implemented
 A shared `AiProvider` abstraction (`packages/ai`) with a real Anthropic
 implementation and a "disabled" no-op implementation, selected by whether
 an API key is configured. Every AI call — ticket summarize/suggest-reply/
-categorize, and portal chat — is asynchronous: the API durably logs a
-`PENDING` `AiPromptLog` row and enqueues a BullMQ job; `apps/worker` makes
-the actual provider call and hands the result back over a second queue; the
-API relays completion over Socket.IO to the requesting agent or customer.
-Prompts are logged by hash reference, not raw text. Ticket-assist results
-are advisory only (never auto-applied to the ticket) and are polled/viewed
-on the ticket detail page. Per-branch feature flags let a branch admin
-disable any of the four AI operations independently. There is no
-retrieval-augmented generation, KB grounding, tool use, or multi-turn
-context beyond raw message history — this is a human-in-the-loop assist
-layer, not an autonomous agent.
+categorize/suggest-solutions, and portal chat — is asynchronous: the API
+durably logs a `PENDING` `AiPromptLog` row and enqueues a BullMQ job;
+`apps/worker` makes the actual provider call and hands the result back
+over a second queue; the API relays completion over Socket.IO to the
+requesting agent or customer. Prompts are logged by hash reference, not
+raw text. Ticket-assist results are advisory only (never auto-applied to
+the ticket) and are polled/viewed on the ticket detail page. Per-branch
+feature flags let a branch admin disable any of the five AI operations
+independently. There is no retrieval-augmented generation, KB grounding,
+tool use, or multi-turn context beyond raw message history — this is a
+human-in-the-loop assist layer, not an autonomous agent. (A KB-grounding
+story, `ai-chat-kb-grounding`/117, has a plan and intake document under
+`.squad/plans/` but no corresponding implementation commit — it remains
+planned, not built.)
 
 ### Customer Portal — Implemented
 A separate contact-authenticated Next.js app (its own JWT audience and
 refresh cookie, entirely separate from agent auth): submit and track own
-tickets (with history and CSAT feedback once resolved/closed), browse the
-published Knowledge Base, live chat with an agent, talk to the same AI
-chatbot pipeline described above (single-turn Q&A, no KB grounding), and
-see the branch's live branding (logo/colors).
+tickets (with history, attachments, and CSAT feedback once
+resolved/closed), browse the published Knowledge Base, live chat with an
+agent, talk to the same AI chatbot pipeline described above (single-turn
+Q&A, no KB grounding), see in-app and emailed notifications (one combined
+preference toggle — no independent email opt-out yet), and see the
+branch's live branding (logo/colors).
 
 ### Reporting & Administration — Implemented (foundation-depth)
-Five direct-query, branch-scoped reports: ticket volume by status, SLA
-compliance rate, average CSAT, agent performance (open/resolved counts),
-and ticket aging buckets. All are computed on demand from existing tables
-(no reporting schema or materialized views yet), and ticket
-resolution-time metrics aren't possible yet because `Ticket` has no
-`resolvedAt` column. Administration covers audit log viewing, branch
-branding, and per-branch AI feature flags; branch/department management
-lives under Identity & Access.
+Eight direct-query, branch-scoped reports: ticket volume by status,
+ticket volume by category, SLA compliance rate, average CSAT, agent
+performance (open/resolved counts), ticket aging buckets, ticket
+resolution time (using `Ticket.resolvedAt`, set when a ticket is
+resolved/closed — Story 99), and AI usage/cost (Story 121). Every report
+has a CSV export (Story 125), and agents can save a named set of report
+widgets as a dashboard (`reporting-saved-dashboards`). All are computed on
+demand from existing tables — no reporting schema or materialized views
+yet. Administration covers audit log viewing (with search), branch
+branding, per-branch AI feature flags, and agent task/reminder tracking;
+branch/department management lives under Identity & Access.
 
-### Integrations — Planned, not implemented
-`docs/architecture/09-integrations.md` describes a generic Integration Hub
-(inbound webhooks, an outbound sync queue, ERP/email adapter interfaces).
-None of this exists in code yet — it's blocked on choosing the external
-ERP/channel providers (see Roadmap).
+### Integrations — Partially implemented
+`docs/architecture/09-integrations.md` describes a generic Integration
+Hub. Three pieces of it are real, working code today: **API keys**
+(RM-22 — HMAC-hashed, scoped, tenant-bound; the guard itself is
+implemented and unit-tested, but no production endpoint currently accepts
+one — only an internal test fixture exercises it), **outbound webhook
+subscriptions** (RM-20 — an org registers a target URL + event types, CRM
+domain events are dispatched to it, with delivery-attempt logging), and an
+**inbound webhook receiver** (RM-21 — raw-body signature verification;
+every payload is logged whether verified or not) — this last one is a
+verification/logging framework only: it ships with zero registered
+provider verifiers, and even a verified payload is not yet translated
+into a ticket/`ChannelMessage` (explicitly deferred to whichever future
+provider-specific story registers a real verifier). **ERP adapters are
+not implemented** — blocked on choosing an external ERP/protocol (see
+Roadmap).
 
 ## Architecture
 
@@ -181,12 +225,14 @@ docs/
 
 The database is a single PostgreSQL instance (the `pgvector/pgvector:pg16`
 image — the `pgvector`/`pg_trgm` extensions are declared in the schema but
-not yet used by any column; search today is plain SQL `contains`, not
-vector or full-text search) with 37 Prisma models grouped into 9 logical
-schemas: `identity`, `admin`, `customers`, `ticketing`, `sla`,
-`notifications`, `knowledge_base`, `ai`, `channels`. Cross-module
-communication inside `apps/api` goes through typed domain events
-(`@nestjs/event-emitter`), not direct cross-module database writes.
+not yet used by any column; Knowledge Base search uses native PostgreSQL
+full-text search, `tsvector`/`ts_rank`, not the `pgvector` extension, so
+there is no vector/embedding-based search anywhere yet) with 52 Prisma
+models grouped into 12 logical schemas: `identity`, `admin`, `customers`,
+`ticketing`, `sla`, `notifications`, `knowledge_base`, `ai`, `channels`,
+`tasks`, `integrations`, `reporting`. Cross-module communication inside
+`apps/api` goes through typed domain events (`@nestjs/event-emitter`), not
+direct cross-module database writes.
 
 ## Technology Stack
 
@@ -459,19 +505,25 @@ a synchronous in-request call or an autonomous agent:
 The platform has grown well past ticketing basics into a broad,
 cross-domain product surface. At a high level:
 
-**Fully implemented:** Identity & Access (RBAC, audit logging), Ticket
-Management, SLA & Automation, Realtime (Socket.IO, presence, live chat),
-Notifications (in-app), Attachments, Knowledge Base, AI-assisted ticket
-operations and portal chat, Customer Portal, Agent Workspace, Reporting
-(foundation-depth), and Administration (audit logs, branding, AI feature
+**Fully implemented:** Identity & Access (RBAC, audit logging, account
+lockout, password complexity, session management), Ticket Management, SLA
+& Automation, Realtime (Socket.IO, presence, live chat), Notifications
+(in-app + email), Attachments, Knowledge Base (full-text search,
+multi-locale), Tasks & Reminders, AI-assisted ticket operations and
+portal chat, Customer Portal, Agent Workspace, Reporting (8 reports, CSV
+export, saved dashboards — still direct-query, no reporting schema or
+materialized views), and Administration (audit logs, branding, AI feature
 flags).
 
-**Partial / foundation-depth:** Customer Management (no search/delete
-yet), Communication/Channels (live chat only — email/WhatsApp/SMS/web-form
-are schema-only), Reporting (direct-query only, no resolution-time metrics
-since `Ticket` has no `resolvedAt`).
+**Partial / foundation-depth:** Customer Management (search/filter/sort
+implemented; delete still missing), Communication/Channels (live
+chat/email/web-form implemented; WhatsApp/SMS still schema-only),
+Integrations (API keys and outbound webhooks implemented and tested;
+inbound webhooks are a verification/logging framework only — no
+registered provider, no translation into domain events yet; no
+production endpoint currently accepts an API key).
 
-**Not implemented:** a generic Integration Hub / ERP adapters.
+**Not implemented:** ERP adapters; WhatsApp/SMS channel adapters.
 
 For the detailed, story-by-story implementation history, see
 `.squad/plans/00-index.md` and the individual plans/reports under
@@ -479,21 +531,23 @@ For the detailed, story-by-story implementation history, see
 
 ## Roadmap / Remaining Work
 
-- **Integration Hub** (`docs/architecture/09-integrations.md`): inbound
-  webhooks, outbound sync queue, and ERP/email adapter interfaces —
+- **Integration Hub completion** (`docs/architecture/09-integrations.md`):
+  registering a real inbound-webhook provider verifier and translating a
+  verified payload into a ticket/`ChannelMessage`; wiring the existing,
+  tested API-key guard to at least one real endpoint; ERP adapters —
   explicitly blocked pending a chosen external ERP/channel provider.
-- **Additional communication channels**: email, WhatsApp, SMS, and web-form
-  ingestion into the existing `ChannelMessage` model — same external
-  provider dependency as above.
-- **Customer search/filtering** and customer delete.
-- **Ticket resolution-time reporting**, which needs a `resolvedAt` column
-  first.
+- **WhatsApp and SMS channel adapters** into the existing `ChannelMessage`
+  model/`ChannelAdapterRegistry` — same external provider dependency as
+  above; inbound email parsing is also still a stub.
+- **Customer delete.**
 - **Production hosting decision** — the platform is cloud-agnostic through
   containers today, but no hosting target has been chosen
   (`docs/architecture/12-risks-tradeoffs-and-scope.md`).
-- **AI grounding**: Knowledge Base retrieval/RAG for both ticket-assist and
-  the portal chatbot are explicitly out of scope for the current
-  implementation.
+- **AI grounding**: Knowledge Base retrieval/RAG (vector-based) for both
+  ticket-assist and the portal chatbot are explicitly out of scope for the
+  current implementation — a KB-grounding story has a plan/intake
+  document (`.squad/plans/ai-chat-kb-grounding/`) but no implementation
+  commit yet.
 
 ## Documentation
 
@@ -511,6 +565,12 @@ For the detailed, story-by-story implementation history, see
 - [`.squad/stories/`](./.squad/stories/) — per-story intake documents.
 - `CLAUDE.md` (repository root) — the autonomous development-loop
   convention this repository's ongoing work follows.
+- [`docs/ASSESSMENT-EVIDENCE.md`](./docs/ASSESSMENT-EVIDENCE.md) — the
+  AI/SDD workflow used, verification strategy and actual test/lint/build
+  evidence (explicitly distinguishing verified-this-session from
+  previously-verified from blocked/deferred), ownership/decision-making
+  evidence, architectural trade-offs, and a factual productivity
+  narrative.
 
 ## Contributing
 

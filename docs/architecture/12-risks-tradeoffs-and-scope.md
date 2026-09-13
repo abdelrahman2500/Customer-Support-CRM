@@ -24,6 +24,22 @@
 
 ## Explicit non-goals of this foundation story
 
+> **Historical scope note (added during finalization documentation pass;
+> the original list below is preserved unedited).** This section records
+> Story 02's own explicit non-goals, as declared when only the
+> foundational `identity`-only schema and per-app scaffolding existed. It
+> is a historical snapshot, **not** a statement of current scope — every
+> domain named below except the last has since been implemented
+> (customer management, ticketing, SLA & automation, realtime, Knowledge
+> Base, AI-assisted operations, the Customer Portal, reporting, and
+> administration are all real, working domains today; a partial
+> Integration Hub — API keys and outbound webhooks — also exists). See
+> the root [`README.md`](../../README.md)'s "Current capabilities" and
+> "Project Status" sections for the current, evidence-based status of
+> each domain, and [`03-domain-boundaries.md`](./03-domain-boundaries.md)
+> for the current domain table. Of the six bullets below, only "No
+> production hosting platform decision" is still true today.
+
 - No customer, ticketing, channel, agent dashboard, SLA, automation, Knowledge Base, AI, portal, reporting, administration, or integration feature implementation.
 - No complete database schema; only minimal `identity` tables needed for scoping are created in Story 02.
 - No complete API endpoints beyond health checks and auth scaffolding.
