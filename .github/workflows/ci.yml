@@ -129,13 +129,14 @@ jobs:
         # apps/api/src/common/config/env.validation.ts) exactly like
         # docker-compose.yml's local dev `minio` service provides. GitHub
         # Actions' `services:` containers (postgres/redis above) can't take
-        # a custom command, and minio/minio requires one (`server /data`),
-        # so it's started as a plain step instead.
+        # a custom command, and MinIO requires one (`server /data`), so
+        # it's started as a plain step instead. Use the repository mirror
+        # that is available on Docker Hub's equivalent registry path.
         run: >-
           docker run -d --name minio -p 9000:9000
           -e MINIO_ROOT_USER=minioadmin
           -e MINIO_ROOT_PASSWORD=minioadmin
-          minio/minio:latest server /data
+          quay.io/minio/minio:latest server /data
 
       - name: Wait for MinIO
         run: |
@@ -291,7 +292,7 @@ jobs:
           docker run -d --name minio -p 9000:9000
           -e MINIO_ROOT_USER=minioadmin
           -e MINIO_ROOT_PASSWORD=minioadmin
-          minio/minio:latest server /data
+          quay.io/minio/minio:latest server /data
 
       - name: Wait for MinIO
         run: |
