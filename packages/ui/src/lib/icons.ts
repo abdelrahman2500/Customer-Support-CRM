@@ -95,6 +95,15 @@ export {
   KeyRound as ApiKeysIcon,
   Settings as SettingsIcon,
   Monitor as MySessionsIcon,
+
+  // Story 129 — the Agent Workspace sidebar's collapse-to-icons toggle.
+  // Named by its role (collapsing the rail) rather than by the glyph, per
+  // this file's own convention. `PanelLeftClose` IS directional — its
+  // chevron points at the start edge — so every caller must pair it with
+  // `rtl:rotate-180`, the flip prescribed under "Direction" above. The
+  // control's own `aria-expanded` carries the state; the glyph never
+  // changes, only its rotation.
+  PanelLeftClose as SidebarToggleIcon,
 } from "lucide-react";
 
 /** The shape every icon above satisfies, for a component that accepts one. */

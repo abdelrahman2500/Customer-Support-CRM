@@ -94,7 +94,10 @@
         "system": "النظام والتكاملات",
         "account": "الحساب"
       },
-      "unreadNotificationsLabel": "{count} إشعارات غير مقروءة"
+      "unreadNotificationsLabel": "{count} إشعارات غير مقروءة",
+      "groupMenuLabel": "قائمة {group}",
+      "collapseSidebar": "طي شريط التنقل الجانبي",
+      "expandSidebar": "توسيع شريط التنقل الجانبي"
     }
   },
   "tickets": {
@@ -1092,7 +1095,19 @@
     "invalidColor": "أدخل لونًا بصيغة ست عشرية، مثل #0f172a.",
     "previewHeading": "المعاينة",
     "logoPreviewAlt": "معاينة الشعار",
-    "noLogo": "لم يتم تعيين شعار"
+    "noLogo": "لم يتم تعيين شعار",
+    "appNameLabel": "اسم التطبيق",
+    "appNamePlaceholder": "نظام إدارة خدمة العملاء",
+    "appNameHelp": "يظهر في ترويسة مساحة العمل. اتركه فارغًا لاستخدام الاسم الافتراضي.",
+    "navigationLayoutLegend": "تخطيط التنقل في مساحة العمل",
+    "navigationLayoutHelp": "يُطبَّق على جميع أعضاء هذا الفرع وفي كل شاشات مساحة العمل. على الهواتف يبقى التنقل قائمة منسدلة في الحالتين.",
+    "navigationLayout": {
+      "navbar": "شريط علوي",
+      "navbarDescription": "شريط أعلى الصفحة، بقائمة واحدة لكل قسم.",
+      "sidebar": "شريط جانبي",
+      "sidebarDescription": "شريط بجانب الصفحة يمكن طيّه ليعرض الأيقونات فقط."
+    },
+    "previewBrandName": "نظام إدارة خدمة العملاء"
   },
   "aiSettings": {
     "title": "إعدادات الذكاء الاصطناعي",

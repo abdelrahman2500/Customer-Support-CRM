@@ -73,6 +73,7 @@ export {
   ApiKeysIcon,
   SettingsIcon,
   MySessionsIcon,
+  SidebarToggleIcon,
 } from "./lib/icons";
 export type { LucideIcon } from "./lib/icons";
 

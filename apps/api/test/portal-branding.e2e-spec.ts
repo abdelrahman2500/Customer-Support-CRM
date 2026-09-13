@@ -123,10 +123,57 @@ describe("Customer Portal — Branding (e2e)", () => {
       .set("Authorization", `Bearer ${portalAccessToken}`)
       .expect(200);
 
+    // Story 129 — the portal response carries the two new fields too.
+    // Neither is a secret and neither changes any portal rendering:
+    // `apps/portal/src/lib/branding-api.ts` declares its own narrower
+    // interface and simply ignores both.
+    //
+    // Their expected values are read back from the agent endpoint rather
+    // than hard-coded, for exactly the reason this suite's own doc comment
+    // gives: this branch is shared with `branding.e2e-spec.ts`, which runs
+    // first and leaves `appName`/`navigationLayout` populated. This PATCH
+    // never touches either field, so asserting a literal `null` here would
+    // be asserting something this test has no business knowing. The
+    // equality below is still exact — no extra key and no missing key can
+    // slip through.
+    const agentView = await request(app.getHttpServer())
+      .get("/api/v1/branding")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .expect(200);
+
     expect(response.body).toEqual({
       logoUrl,
       primaryColor: "#112233",
       secondaryColor: "#445566",
+      appName: agentView.body.appName,
+      navigationLayout: agentView.body.navigationLayout,
     });
+  });
+
+  // Story 129 — the guard against the portal surface breaking on the
+  // widened type. No file under `apps/portal` changed in that story; this
+  // asserts nothing needed to.
+  it("still returns 200 with its existing three fields intact after the agent sets the Story 129 fields", async () => {
+    const logoUrl = `https://example.com/logo-${randomUUID()}.png`;
+    await request(app.getHttpServer())
+      .patch("/api/v1/branding")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ logoUrl, primaryColor: "#112233", secondaryColor: "#445566" })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .patch("/api/v1/branding")
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ appName: "Acme Support", navigationLayout: "SIDEBAR" })
+      .expect(200);
+
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/portal/branding")
+      .set("Authorization", `Bearer ${portalAccessToken}`)
+      .expect(200);
+
+    expect(response.body.logoUrl).toBe(logoUrl);
+    expect(response.body.primaryColor).toBe("#112233");
+    expect(response.body.secondaryColor).toBe("#445566");
   });
 });

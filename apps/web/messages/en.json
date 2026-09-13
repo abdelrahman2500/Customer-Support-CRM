@@ -94,7 +94,10 @@
         "system": "System & Integrations",
         "account": "Account"
       },
-      "unreadNotificationsLabel": "{count} unread notifications"
+      "unreadNotificationsLabel": "{count} unread notifications",
+      "groupMenuLabel": "{group} menu",
+      "collapseSidebar": "Collapse the navigation sidebar",
+      "expandSidebar": "Expand the navigation sidebar"
     }
   },
   "tickets": {
@@ -1092,7 +1095,19 @@
     "invalidColor": "Enter a hex color, e.g. #0f172a.",
     "previewHeading": "Preview",
     "logoPreviewAlt": "Logo preview",
-    "noLogo": "No logo set"
+    "noLogo": "No logo set",
+    "appNameLabel": "Application name",
+    "appNamePlaceholder": "Customer Support CRM",
+    "appNameHelp": "Shown in the workspace header. Leave empty to use the default name.",
+    "navigationLayoutLegend": "Workspace navigation layout",
+    "navigationLayoutHelp": "Applies to everyone in this branch, on every workspace screen. On phones the navigation stays a menu in either case.",
+    "navigationLayout": {
+      "navbar": "Navbar",
+      "navbarDescription": "A bar across the top, one menu per section.",
+      "sidebar": "Sidebar",
+      "sidebarDescription": "A rail beside the page that can collapse to icons."
+    },
+    "previewBrandName": "Customer Support CRM"
   },
   "aiSettings": {
     "title": "AI Settings",

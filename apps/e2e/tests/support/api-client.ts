@@ -47,6 +47,28 @@ export async function loginAsAdmin(): Promise<string> {
   return accessToken;
 }
 
+/** Story 129 — sets branch branding as the admin. Used to restore
+ * `navigationLayout: "NAVBAR"` after `admin-navigation-layout.spec.ts`
+ * changes it: the seeded branch is shared with every other Playwright
+ * spec, and leaving it on `SIDEBAR` would silently change the workspace
+ * shell under a suite that never opted into it. */
+export async function setBrandingAsAdmin(
+  adminToken: string,
+  input: {
+    appName?: string;
+    logoUrl?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    navigationLayout?: "SIDEBAR" | "NAVBAR";
+  },
+): Promise<void> {
+  await apiFetch("/branding", {
+    method: "PATCH",
+    token: adminToken,
+    body: JSON.stringify(input),
+  });
+}
+
 /** Creates a ticket (with its own dedicated Customer) as the admin —
  * fixture data for the "an agent resolves a ticket" flow.
  *

@@ -1,18 +1,23 @@
 import { Injectable } from "@nestjs/common";
+import type { NavigationLayout } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { TenantContext } from "../../common/tenant/tenant-context";
 import type { UpdateBrandingDto } from "./dto/update-branding.dto";
 
 export interface BrandingSummary {
+  appName: string | null;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  navigationLayout: NavigationLayout | null;
 }
 
 const DEFAULT_BRANDING: BrandingSummary = {
+  appName: null,
   logoUrl: null,
   primaryColor: null,
   secondaryColor: null,
+  navigationLayout: null,
 };
 
 /**
@@ -32,6 +37,14 @@ const DEFAULT_BRANDING: BrandingSummary = {
  * `PortalKnowledgeBaseController`'s own precedent), so `getBranding()`'s
  * `TenantContext.requireBranchScope()` call is agent-only and stays
  * that way.
+ *
+ * Story 129 — `appName` and `navigationLayout` join the summary. Both are
+ * `null` when unconfigured and stay `null` all the way to the frontend,
+ * exactly like the other three fields: there is deliberately no
+ * fallback-to-`NAVBAR` here, because the single place that resolves
+ * "unconfigured" to a rendered presentation is the frontend's own
+ * `resolveNavigationLayout` (`apps/web/src/components/workspace/nav-items.tsx`).
+ * Two resolution points would be two chances to disagree.
  */
 @Injectable()
 export class BrandingService {
@@ -56,14 +69,18 @@ export class BrandingService {
       where: { branchId },
       create: {
         branchId,
+        appName: dto.appName ?? null,
         logoUrl: dto.logoUrl ?? null,
         primaryColor: dto.primaryColor ?? null,
         secondaryColor: dto.secondaryColor ?? null,
+        navigationLayout: dto.navigationLayout ?? null,
       },
       update: {
+        ...(dto.appName !== undefined ? { appName: dto.appName } : {}),
         ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl } : {}),
         ...(dto.primaryColor !== undefined ? { primaryColor: dto.primaryColor } : {}),
         ...(dto.secondaryColor !== undefined ? { secondaryColor: dto.secondaryColor } : {}),
+        ...(dto.navigationLayout !== undefined ? { navigationLayout: dto.navigationLayout } : {}),
       },
     });
     return toSummary(config);
@@ -71,13 +88,17 @@ export class BrandingService {
 }
 
 function toSummary(config: {
+  appName: string | null;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  navigationLayout: NavigationLayout | null;
 }): BrandingSummary {
   return {
+    appName: config.appName,
     logoUrl: config.logoUrl,
     primaryColor: config.primaryColor,
     secondaryColor: config.secondaryColor,
+    navigationLayout: config.navigationLayout,
   };
 }

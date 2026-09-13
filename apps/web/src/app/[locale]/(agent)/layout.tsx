@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { fetchCurrentUser } from "@/lib/auth-server";
-import { WorkspaceNav } from "@/components/workspace/workspace-nav";
+import { fetchBranding } from "@/lib/branding-server";
+import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { BranchNotifications } from "@/components/notifications/branch-notifications";
 import { SuccessToaster } from "@/components/ui/success-toaster";
 
@@ -19,6 +20,15 @@ import { SuccessToaster } from "@/components/ui/success-toaster";
  * resolve the same authenticated user server-side without a second,
  * independently-drifting "who am I" implementation. Behavior here is
  * unchanged.
+ *
+ * Story 129 — the branch's branding is now fetched here too, in the same
+ * request, and handed to `WorkspaceShell` as `initialBranding`. It has to
+ * be resolved server-side because it carries `navigationLayout`, which
+ * decides the shell's own structure: resolving it client-side would flash
+ * the navbar before swapping to the sidebar on every page load.
+ * `fetchBranding()` returns `null` on any failure, exactly as
+ * `fetchCurrentUser()` does, and `null` renders the pre-Story-129 navbar
+ * — a branding outage degrades the workspace, it never blanks it.
  */
 export default async function AgentWorkspaceLayout({
   children,
@@ -32,6 +42,7 @@ export default async function AgentWorkspaceLayout({
   if (!user) {
     redirect(`/${locale}/login`);
   }
+  const branding = await fetchBranding();
   const t = await getTranslations("common");
 
   return (
@@ -41,21 +52,21 @@ export default async function AgentWorkspaceLayout({
       <a href="#main-content" className="skip-link">
         {t("skipToMainContent")}
       </a>
-      <WorkspaceNav user={user} />
-      {/* NAV-2 — every route here used to stretch full-bleed with no width
-          ceiling, the one inconsistency left once auth/error pages'
-          existing `max-w-*`/`mx-auto` wrappers are accounted for. The
-          shared `Table` primitive already wraps every table in its own
+      {/* Story 129 — the header, the branch's chosen navigation
+          presentation, and `<main>` all live inside the shell now, because
+          each layout positions `<main>` differently relative to the
+          navigation. NAV-2's `<main id="main-content">` and its
+          `max-w-screen-2xl` wrapper moved there verbatim — every route
+          here used to stretch full-bleed with no width ceiling, the one
+          inconsistency left once auth/error pages' existing
+          `max-w-*`/`mx-auto` wrappers are accounted for. The shared
+          `Table` primitive already wraps every table in its own
           `overflow-x-auto` box (`packages/ui/src/components/table.tsx`),
           so a wide table scrolls inside that box rather than depending on
-          this `<main>` being edge-to-edge — capping the width here does
-          not newly clip anything. `max-w-screen-2xl` (96rem/1536px) is
-          generous enough for this app's widest tables while still reading
-          as an intentional page rather than raw viewport width on an
-          ultra-wide monitor. */}
-      <main id="main-content" className="flex-1 p-6">
-        <div className="mx-auto w-full max-w-screen-2xl">{children}</div>
-      </main>
+          that `<main>` being edge-to-edge. */}
+      <WorkspaceShell user={user} initialBranding={branding}>
+        {children}
+      </WorkspaceShell>
       {/* Story 24 — one branch-wide notification consumer for the whole
           authenticated session, not per-page (see BranchNotifications). */}
       <BranchNotifications branchId={user.branchId} />

@@ -297,16 +297,36 @@ model AuditLog {
 /// for now — not yet consumed by either frontend app's shared layout (see
 /// the plan's Design decisions for why).
 model BrandingConfig {
-  id             String   @id @default(uuid())
-  branchId       String   @unique @map("branch_id")
-  branch         Branch   @relation(fields: [branchId], references: [id])
-  logoUrl        String?  @map("logo_url")
-  primaryColor   String?  @map("primary_color")
-  secondaryColor String?  @map("secondary_color")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id               String            @id @default(uuid())
+  branchId         String            @unique @map("branch_id")
+  branch           Branch            @relation(fields: [branchId], references: [id])
+  /// Story 129 — replaces the hard-coded `workspace.appName` i18n string
+  /// everywhere the app prints its own name; `null` keeps that translated
+  /// default.
+  appName          String?           @map("app_name")
+  logoUrl          String?           @map("logo_url")
+  primaryColor     String?           @map("primary_color")
+  secondaryColor   String?           @map("secondary_color")
+  /// Story 129 — `null` means "not configured" and resolves to `NAVBAR`
+  /// in the frontend, exactly as the four fields above resolve to their
+  /// own defaults.
+  navigationLayout NavigationLayout? @map("navigation_layout")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
 
   @@map("branding_configs")
+  @@schema("admin")
+}
+
+/// Story 129 — the Agent Workspace's navigation presentation, chosen per
+/// branch by an admin from the existing Settings → Branding screen.
+/// `NAVBAR` is the presentation every branch already had before this
+/// story, so an unconfigured branch (`null` above) resolves to it and
+/// renders exactly as it did.
+enum NavigationLayout {
+  SIDEBAR
+  NAVBAR
+
   @@schema("admin")
 }
 
