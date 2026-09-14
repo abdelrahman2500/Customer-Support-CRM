@@ -284,6 +284,10 @@ export function WorkspaceHeader({
                           t={t}
                           unreadCount={unreadCount}
                           unreadCountKnown={unreadCountKnown}
+                          // A `DropdownMenuItem` in BOTH layouts — this
+                          // hamburger is the only navigation below `sm`
+                          // whether the branch chose navbar or sidebar.
+                          inMenu
                         />
                       </Link>
                     </DropdownMenuItem>

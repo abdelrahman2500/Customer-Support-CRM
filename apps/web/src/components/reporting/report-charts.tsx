@@ -39,6 +39,19 @@ export interface BarSegment {
 export interface BarChartRow {
   label: string;
   segments: BarSegment[];
+  /** A stable, unique identity for this row, when the caller has one.
+   *
+   * `label` is NOT safe to key on: `AGENT_PERFORMANCE` labels its rows
+   * with an agent's `fullName`, and two agents can genuinely share a name
+   * (confirmed against the live `/reports/agent-performance` response,
+   * which returned three separate pairs of same-named agents with distinct
+   * `userId`s). React then saw duplicate keys, warned, and — more
+   * importantly — could mis-associate one agent's bars with another's on
+   * re-render. Callers that have a real id (`userId`, a category id)
+   * should pass it; those whose labels are unique by construction (ticket
+   * statuses from a `GROUP BY`) may omit it and fall back to the
+   * positional key. */
+  id?: string;
 }
 
 /**
@@ -61,11 +74,16 @@ export function BarChart({
 
   return (
     <div role="img" aria-label={ariaLabel} className="flex flex-col gap-3">
-      {rows.map((row) => (
-        <div key={row.label} className="flex flex-col gap-1">
+      {rows.map((row, rowIndex) => (
+        // `row.id` when the caller has a real identity, else the position —
+        // never `row.label` alone, which is not unique (see `BarChartRow.id`).
+        <div key={row.id ?? `row-${rowIndex}`} className="flex flex-col gap-1">
           <span className="text-xs font-medium text-slate-700">{row.label}</span>
           {row.segments.map((segment, index) => (
-            <div key={`${row.label}-${index}`} className="flex items-center gap-2">
+            <div
+              key={`${row.id ?? `row-${rowIndex}`}-${index}`}
+              className="flex items-center gap-2"
+            >
               {row.segments.length > 1 && (
                 <span className="w-16 shrink-0 text-xs text-slate-500">{segment.label}</span>
               )}

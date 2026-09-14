@@ -118,7 +118,10 @@ describe("ReportsView", () => {
       }) as never,
     );
     mockedUseResolutionTimeQuery.mockReturnValue(
-      queryResult({ data: { resolvedCount: 0, averageResolutionMs: null }, isSuccess: true }) as never,
+      queryResult({
+        data: { resolvedCount: 0, averageResolutionMs: null },
+        isSuccess: true,
+      }) as never,
     );
     mockedUseAiUsageQuery.mockReturnValue(
       queryResult({
@@ -188,6 +191,33 @@ describe("ReportsView", () => {
 
     expect(screen.getByText("Billing")).toBeInTheDocument();
     expect(screen.getByText("ticketVolumeByCategory.uncategorized")).toBeInTheDocument();
+  });
+
+  /**
+   * Regression guard. A category name is free text an admin types, and a
+   * long one with no spaces cannot wrap on its own. A flex item's default
+   * `min-width: auto` then refuses to shrink below that unbreakable word,
+   * so the row — and the whole page — grew wider than the viewport
+   * (measured in a real browser: a 406px-wide name inside a 390px screen
+   * produced 66px of horizontal page overflow on /en/reports).
+   */
+  it("lets a long, unbreakable category name shrink and wrap instead of widening the row", () => {
+    const longName = "UniqueCategoryMarker86abbbc55b994d9c87b5";
+    mockedUseTicketVolumeByCategoryQuery.mockReturnValue(
+      queryResult({
+        data: [{ categoryId: "category-1", categoryName: longName, count: 1 }],
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<ReportsView />);
+
+    const label = screen.getByText(longName);
+    expect(label).toHaveClass("min-w-0");
+    expect(label).toHaveClass("break-words");
+    // The count must never be the element that gets squeezed instead.
+    const count = label.parentElement?.querySelector("span:last-child");
+    expect(count).toHaveClass("shrink-0");
   });
 
   it("renders the ticket-aging card's four buckets, even when all are zero", () => {
@@ -400,7 +430,10 @@ describe("ReportsView", () => {
 
   it("shows the invalid-range message, with no retry action, for a 400 failure", () => {
     mockedUseTicketVolumeQuery.mockReturnValue(
-      queryResult({ isError: true, error: new ApiError("from must not be after to", 400) }) as never,
+      queryResult({
+        isError: true,
+        error: new ApiError("from must not be after to", 400),
+      }) as never,
     );
 
     render(<ReportsView />);
@@ -685,7 +718,7 @@ describe("ReportsView", () => {
         screen.getByText('aiUsage.detail:{"calls":5,"inputTokens":1000,"outputTokens":500}'),
       ).toBeInTheDocument();
       expect(screen.getByText("SUMMARIZE")).toBeInTheDocument();
-      expect(screen.queryByText("aiUsage.unpricedWarning:{\"count\":0}")).not.toBeInTheDocument();
+      expect(screen.queryByText('aiUsage.unpricedWarning:{"count":0}')).not.toBeInTheDocument();
     });
 
     it("shows 'cost unknown' (not $0) for a feature whose calls are all unpriced, plus the unpriced-count caveat", () => {

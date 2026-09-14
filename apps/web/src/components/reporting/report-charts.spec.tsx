@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { BarChart, DonutGauge, RatingBar, ticketStatusBarColor } from "./report-charts";
 
@@ -33,7 +33,9 @@ describe("BarChart", () => {
     render(
       <BarChart
         ariaLabel="chart"
-        rows={[{ label: "OPEN", segments: [{ label: "Should not appear", value: 1, color: "red" }] }]}
+        rows={[
+          { label: "OPEN", segments: [{ label: "Should not appear", value: 1, color: "red" }] },
+        ]}
       />,
     );
 
@@ -89,8 +91,75 @@ describe("BarChart", () => {
     const bar = container.querySelector<HTMLElement>(".rounded-full[style*='width']");
     expect(bar?.style.width).toBe("0%");
   });
-});
 
+  /**
+   * Regression guard. `AGENT_PERFORMANCE` labels its rows with an agent's
+   * `fullName`, and two agents can genuinely share a name — the live
+   * `/reports/agent-performance` response returned three separate pairs of
+   * same-named agents with distinct `userId`s. Keying rows on `label`
+   * produced React's "Encountered two children with the same key" error and
+   * risked cross-associating one agent's bars with another's on re-render.
+   */
+  describe("rows with duplicate labels (regression guard)", () => {
+    const duplicateLabelRows = [
+      {
+        id: "user-a",
+        label: "Reporting E2E Agent",
+        segments: [{ label: "Open", value: 1, color: "red" }],
+      },
+      {
+        id: "user-b",
+        label: "Reporting E2E Agent",
+        segments: [{ label: "Open", value: 4, color: "red" }],
+      },
+    ];
+
+    it("renders every row even when two rows share the same label", () => {
+      render(<BarChart ariaLabel="chart" rows={duplicateLabelRows} />);
+
+      expect(screen.getAllByText("Reporting E2E Agent")).toHaveLength(2);
+      // Both rows' own values survive — the second must not replace the first.
+      expect(screen.getByText("1")).toBeInTheDocument();
+      expect(screen.getByText("4")).toBeInTheDocument();
+    });
+
+    it("logs no React duplicate-key error for same-label rows", () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      render(<BarChart ariaLabel="chart" rows={duplicateLabelRows} />);
+
+      const duplicateKeyWarning = consoleError.mock.calls.find((call) =>
+        call.some((arg) => typeof arg === "string" && arg.includes("same key")),
+      );
+      expect(duplicateKeyWarning).toBeUndefined();
+      consoleError.mockRestore();
+    });
+
+    // Callers whose labels are unique by construction (ticket statuses from
+    // a GROUP BY) may omit `id`; the positional fallback must still be
+    // collision-free.
+    it("stays collision-free for same-label rows even with no id supplied", () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      render(
+        <BarChart
+          ariaLabel="chart"
+          rows={[
+            { label: "Same", segments: [{ label: "", value: 1, color: "red" }] },
+            { label: "Same", segments: [{ label: "", value: 2, color: "red" }] },
+          ]}
+        />,
+      );
+
+      const duplicateKeyWarning = consoleError.mock.calls.find((call) =>
+        call.some((arg) => typeof arg === "string" && arg.includes("same key")),
+      );
+      expect(duplicateKeyWarning).toBeUndefined();
+      expect(screen.getAllByText("Same")).toHaveLength(2);
+      consoleError.mockRestore();
+    });
+  });
+});
 describe("DonutGauge", () => {
   it("renders as an accessible role=img with the given label", () => {
     render(<DonutGauge percent={72} color="green" ariaLabel="72%" />);

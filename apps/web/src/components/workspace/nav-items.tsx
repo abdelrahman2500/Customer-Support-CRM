@@ -24,7 +24,6 @@ import {
 } from "@crm/ui";
 import type { LucideIcon } from "@crm/ui";
 import type { NavigationLayout } from "@/lib/branding-api";
-import { useBrandingQuery } from "@/hooks/use-branding";
 
 /**
  * Story 129 — this module is the ONE source of truth for the Agent
@@ -294,22 +293,33 @@ export function NavItemLabel({
   unreadCount,
   unreadCountKnown,
   labelClassName,
+  inMenu = false,
 }: {
   item: NavLinkItem;
   t: ReturnType<typeof useTranslations>;
   unreadCount: number;
   unreadCountKnown: boolean;
   labelClassName?: string;
+  /** `true` when this item renders inside a Radix `DropdownMenuItem` (the
+   * header's hamburger menu and the navbar's group menus), `false` for the
+   * sidebar rail's plain rows. It exists purely to pull the icon back into
+   * the menu item's own padding (`-ms-4 me-4`), which the rail must not do.
+   *
+   * This replaces an earlier `useBrandingQuery()` call inside this
+   * component that derived the same thing from `navigationLayout`. That was
+   * wrong twice over: it opened one branding query per nav item (20 per
+   * render, defeating the single query `WorkspaceShell` owns on purpose),
+   * and it keyed menu spacing off the desktop layout, so the mobile
+   * hamburger — which is a menu in BOTH layouts — silently lost its spacing
+   * whenever a branch chose `SIDEBAR`. The caller always knows which of the
+   * two it is; branding never needed to. */
+  inMenu?: boolean;
 }) {
   const Icon = item.icon;
-  const brandingQuery = useBrandingQuery();
-  const navigationLayout = brandingQuery.data?.navigationLayout;
   return (
     <>
       <Icon
-        className={
-          navigationLayout == "NAVBAR" ? "h-4 w-4 shrink-0 -ms-4 me-4" : "h-4 w-4 shrink-0"
-        }
+        className={inMenu ? "h-4 w-4 shrink-0 -ms-4 me-4" : "h-4 w-4 shrink-0"}
         aria-hidden
       />
       <span className={labelClassName}>{t(item.labelKey)}</span>

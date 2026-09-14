@@ -353,6 +353,12 @@ export function ReportsView() {
                   )
                   .join("; ")}
                 rows={agentPerformanceQuery.data.map((row) => ({
+                  // `userId`, not `fullName`: two agents can share a name,
+                  // and this endpoint really does return same-named agents
+                  // with distinct ids. Keying a chart row on the display
+                  // label duplicated React keys and could cross-associate
+                  // one agent's bars with another's.
+                  id: row.userId,
                   label: row.fullName,
                   segments: [
                     {
@@ -507,10 +513,19 @@ export function ReportsView() {
                       key={row.categoryId ?? "uncategorized"}
                       className="flex items-center justify-between"
                     >
-                      <span className="text-slate-600">
+                      {/* `min-w-0 break-words`: a category name is free text
+                          an admin types, and a long one with no spaces
+                          cannot wrap on its own. A flex item's default
+                          `min-width: auto` then refuses to shrink below that
+                          unbreakable word, so the row — and the whole page —
+                          grew wider than the viewport (measured: a 406px
+                          name inside a 390px screen gave 66px of horizontal
+                          page overflow). The count stays `shrink-0` so it is
+                          never the thing squeezed instead. */}
+                      <span className="min-w-0 break-words text-slate-600">
                         {row.categoryName ?? t("ticketVolumeByCategory.uncategorized")}
                       </span>
-                      <span className="font-medium text-slate-900">{row.count}</span>
+                      <span className="shrink-0 font-medium text-slate-900">{row.count}</span>
                     </li>
                   ))}
                 </ul>

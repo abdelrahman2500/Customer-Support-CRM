@@ -108,6 +108,7 @@ export function WorkspaceNavbar({
                         t={t}
                         unreadCount={unreadCount}
                         unreadCountKnown={unreadCountKnown}
+                        inMenu
                       />
                     </Link>
                   </DropdownMenuItem>
