@@ -17,13 +17,13 @@ export default async function LocaleNotFound() {
   const locale = await getLocale();
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
-      <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-900">{t("notFound.title")}</h1>
-        <p className="mt-2 text-sm text-slate-600">{t("notFound.description")}</p>
+    <main className="flex min-h-screen items-center justify-center bg-surface-sunk p-8">
+      <div className="w-full max-w-sm rounded-lg border border-rule bg-surface p-8 text-center shadow-sm">
+        <h1 className="text-xl font-semibold text-ink">{t("notFound.title")}</h1>
+        <p className="mt-2 text-sm text-ink-muted">{t("notFound.description")}</p>
         <Link
           href={`/${locale}/tickets`}
-          className="mt-4 inline-block text-sm font-medium text-slate-900 hover:underline"
+          className="mt-4 inline-block text-sm font-medium text-ink hover:underline"
         >
           {t("backLinkLabel")}
         </Link>

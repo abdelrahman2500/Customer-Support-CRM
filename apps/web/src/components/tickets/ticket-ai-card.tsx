@@ -80,8 +80,8 @@ export function TicketAiCard({
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("detail.aiHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("detail.aiHeading")}</h2>
 
       <div className="mt-2 flex flex-wrap gap-2">
         {FEATURES.map((feature) => (
@@ -110,12 +110,12 @@ export function TicketAiCard({
           {resultQuery.isLoading && <Skeleton className="h-16 w-full" />}
 
           {resultQuery.isSuccess && resultQuery.data.outcome === "PENDING" && (
-            <p className="text-sm text-slate-500">{t("detail.aiPending")}</p>
+            <p className="text-sm text-ink-subtle">{t("detail.aiPending")}</p>
           )}
 
           {resultQuery.isSuccess && resultQuery.data.outcome === "SUCCESS" && (
             <div className="flex flex-col gap-2">
-              <p className="whitespace-pre-wrap text-sm text-slate-700">
+              <p className="whitespace-pre-wrap text-sm text-ink-strong">
                 {resultQuery.data.outputText}
               </p>
               {operation.feature === "CATEGORIZE" && resultQuery.data.outputText && (

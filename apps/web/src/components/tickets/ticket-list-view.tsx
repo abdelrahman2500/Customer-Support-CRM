@@ -106,7 +106,7 @@ function SlaCell({ ticket }: { ticket: TicketListItem }) {
     return <Badge variant="secondary">{t("sla.onHold")}</Badge>;
   }
   return (
-    <span className="text-slate-700">
+    <span className="text-ink-strong">
       {t("sla.remaining", { time: formatRemaining(status.remainingMs) })}
     </span>
   );
@@ -216,7 +216,7 @@ function TicketListViewContent() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
           {/* Story S-7 — the rows below stay on screen while a filter change
               resolves, so this is the only signal that anything is in
               flight. `isPlaceholderData` rather than `isFetching`: a plain
@@ -260,7 +260,7 @@ function TicketListViewContent() {
           options={(usersQuery.data ?? []).map((user) => user.id)}
           renderLabel={(id) => userNameById.get(id) ?? id}
         />
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("list.searchLabel")}
           <Input
             className="w-full sm:w-auto sm:min-w-[10rem]"
@@ -348,10 +348,10 @@ function TicketListViewContent() {
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
               >
-                <TableCell label={t("list.columns.id")} className="font-mono text-xs text-slate-500">
+                <TableCell label={t("list.columns.id")} className="font-mono text-xs text-ink-subtle">
                   {ticket.id.slice(0, 8)}
                 </TableCell>
-                <TableCell label={t("list.columns.subject")} className="font-medium text-slate-900">
+                <TableCell label={t("list.columns.subject")} className="font-medium text-ink">
                   <Link
                     href={`/${locale}/tickets/${ticket.id}`}
                     className="focus-ring rounded-sm hover:underline"
@@ -392,10 +392,10 @@ function TicketListViewContent() {
                 <TableCell label={t("list.columns.sla")}>
                   <SlaCell ticket={ticket} />
                 </TableCell>
-                <TableCell label={t("list.columns.createdAt")} className="text-slate-500">
+                <TableCell label={t("list.columns.createdAt")} className="text-ink-subtle">
                   {new Date(ticket.createdAt).toLocaleString(locale)}
                 </TableCell>
-                <TableCell label={t("list.columns.updatedAt")} className="text-slate-500">
+                <TableCell label={t("list.columns.updatedAt")} className="text-ink-subtle">
                   {new Date(ticket.updatedAt).toLocaleString(locale)}
                 </TableCell>
               </TableRow>
@@ -442,7 +442,7 @@ function FilterSelect({
 }) {
   const t = useTranslations("tickets");
   return (
-    <label className="flex flex-col gap-1 text-xs text-slate-600">
+    <label className="flex flex-col gap-1 text-xs text-ink-muted">
       {label}
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="w-full sm:w-auto sm:min-w-[10rem]" aria-label={label}>

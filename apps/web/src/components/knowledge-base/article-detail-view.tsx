@@ -113,7 +113,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
           since the adjacent label already names the action. */}
       <Link
         href={`/${locale}/knowledge-base`}
-        className="focus-ring self-start rounded-sm text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
+        className="focus-ring self-start rounded-sm text-sm font-medium text-ink-muted hover:text-ink hover:underline"
       >
         <span aria-hidden="true" className="inline-block rtl:rotate-180">
           &larr;
@@ -177,7 +177,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         </Alert>
       )}
 
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("detail.categoryLabel")}
         <Select
           value={article.categoryId ?? undefined}
@@ -204,10 +204,10 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         )}
       </label>
 
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("detail.bodyLabel")}
         <textarea
-          className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+          className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
           rows={10}
           // Batch 5 (UX audit) — controlled, same revert-on-error rationale
           // as the title field above.
@@ -251,15 +251,15 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
   const versionsQuery = useArticleVersionsQuery(articleId);
 
   return (
-    <section className="flex flex-col gap-2 border-t border-slate-200 pt-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("detail.versions.title")}</h2>
+    <section className="flex flex-col gap-2 border-t border-rule pt-4">
+      <h2 className="text-sm font-semibold text-ink">{t("detail.versions.title")}</h2>
 
       {versionsQuery.isLoading && <Skeleton className="h-10 w-full" />}
 
       {versionsQuery.isError && <Alert variant="destructive">{t("detail.versions.error")}</Alert>}
 
       {versionsQuery.isSuccess && versionsQuery.data.length === 0 && (
-        <p className="text-sm text-slate-500">{t("detail.versions.empty")}</p>
+        <p className="text-sm text-ink-subtle">{t("detail.versions.empty")}</p>
       )}
 
       {versionsQuery.isSuccess && versionsQuery.data.length > 0 && (

@@ -48,7 +48,7 @@ export function CreateCustomerView() {
 
   return (
     <section className="flex max-w-md flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("create.title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("create.title")}</h1>
 
       {created && (
         <Alert variant="success">
@@ -62,7 +62,7 @@ export function CreateCustomerView() {
       {error && <Alert variant="destructive">{error}</Alert>}
 
       <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.displayName")}
           <Input
             value={displayName}

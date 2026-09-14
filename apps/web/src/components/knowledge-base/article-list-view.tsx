@@ -121,7 +121,7 @@ function ArticleListViewContent() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
           {/* Story S-7 — this list's search is un-debounced, so every
               keystroke was previously a new query key and a full skeleton
               swap. Now the previous results stay and this is the signal. */}
@@ -140,7 +140,7 @@ function ArticleListViewContent() {
           onChange={(event) => updateSearch(event.target.value)}
           className="max-w-sm"
         />
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("list.filterCategory")}
           <Select value={categoryId ?? ALL_CATEGORIES} onValueChange={updateCategory}>
             <SelectTrigger
@@ -272,12 +272,12 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
       <TableCell>
         <Link
           href={`/${locale}/knowledge-base/${article.id}`}
-          className="focus-ring rounded-sm text-start font-medium text-slate-800 hover:underline"
+          className="focus-ring rounded-sm text-start font-medium text-ink-strong hover:underline"
         >
           {article.title}
         </Link>
       </TableCell>
-      <TableCell className="text-slate-500">{article.categoryName ?? t("list.noCategory")}</TableCell>
+      <TableCell className="text-ink-subtle">{article.categoryName ?? t("list.noCategory")}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Badge variant={article.status === "PUBLISHED" ? "success" : "secondary"}>

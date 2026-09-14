@@ -44,8 +44,8 @@ export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("detail.kbReferencesHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("detail.kbReferencesHeading")}</h2>
       {referencesQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
       {referencesQuery.isError && (
         <Alert variant="destructive" className="mt-2">
@@ -53,16 +53,16 @@ export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
         </Alert>
       )}
       {referencesQuery.isSuccess && referencesQuery.data.length === 0 && (
-        <p className="mt-2 text-sm text-slate-500">{t("detail.kbReferencesEmpty")}</p>
+        <p className="mt-2 text-sm text-ink-subtle">{t("detail.kbReferencesEmpty")}</p>
       )}
       {referencesQuery.isSuccess && referencesQuery.data.length > 0 && (
         <ul className="mt-2 flex flex-col gap-2 text-sm">
           {referencesQuery.data.map((reference) => (
             <li
               key={reference.id}
-              className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2"
+              className="flex items-center justify-between gap-2 border-b border-rule-subtle pb-2"
             >
-              <span className="font-medium text-slate-800">{reference.articleTitle}</span>
+              <span className="font-medium text-ink-strong">{reference.articleTitle}</span>
               <Button
                 type="button"
                 variant="outline"
@@ -111,7 +111,7 @@ function AttachArticleForm({ ticketId }: { ticketId: string }) {
 
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("detail.kbReferencesSearchLabel")}
         <Input
           value={search}
@@ -121,13 +121,13 @@ function AttachArticleForm({ ticketId }: { ticketId: string }) {
       </label>
       {searchQuery.isLoading && <Skeleton className="h-8 w-full" />}
       {searchQuery.isSuccess && search.trim().length > 0 && searchQuery.data.items.length === 0 && (
-        <p className="text-sm text-slate-500">{t("detail.kbReferencesSearchEmpty")}</p>
+        <p className="text-sm text-ink-subtle">{t("detail.kbReferencesSearchEmpty")}</p>
       )}
       {searchQuery.isSuccess && searchQuery.data.items.length > 0 && (
         <ul className="flex flex-col gap-1 text-sm">
           {searchQuery.data.items.map((article) => (
             <li key={article.id} className="flex items-center justify-between gap-2">
-              <span className="truncate text-slate-800">{article.title}</span>
+              <span className="truncate text-ink-strong">{article.title}</span>
               <Button
                 type="button"
                 size="sm"

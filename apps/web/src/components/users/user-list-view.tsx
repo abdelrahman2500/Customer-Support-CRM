@@ -159,7 +159,7 @@ function UserListViewContent() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
           <FetchingIndicator active={usersQuery.isPlaceholderData} label={tCommon("updating")} />
         </div>
         <Button size="sm" asChild>
@@ -328,8 +328,8 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
             </p>
           )}
 
-          <div className="flex flex-col gap-1 border-t border-slate-200 pt-2">
-            <span className="text-xs text-slate-500">{t("list.passwordResetLabel")}</span>
+          <div className="flex flex-col gap-1 border-t border-rule pt-2">
+            <span className="text-xs text-ink-subtle">{t("list.passwordResetLabel")}</span>
             <Input
               className="min-w-[10rem]"
               type="password"
@@ -398,7 +398,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
       <TableCell label={t("list.columns.roles")}>
         <div className="flex flex-col gap-2">
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-slate-500">{t("list.roleLabel")}</span>
+            <span className="text-xs text-ink-subtle">{t("list.roleLabel")}</span>
             <Select
               value={user.roleId}
               disabled={assignmentMutation.isPending || rolesQuery.isLoading}
@@ -416,7 +416,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
               </SelectContent>
             </Select>
             {rolesQuery.isLoading && (
-              <span className="text-xs text-slate-500">{t("list.optionsLoading")}</span>
+              <span className="text-xs text-ink-subtle">{t("list.optionsLoading")}</span>
             )}
             {rolesQuery.isError && (
               <span className="text-xs text-red-600">{t("list.roleLoadError")}</span>
@@ -424,7 +424,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-slate-500">{t("list.departmentLabel")}</span>
+            <span className="text-xs text-ink-subtle">{t("list.departmentLabel")}</span>
             <Select
               value={user.departmentId ?? UNSET_DEPARTMENT}
               disabled={assignmentMutation.isPending || departmentsQuery.isLoading}
@@ -447,7 +447,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
               </SelectContent>
             </Select>
             {departmentsQuery.isLoading && (
-              <span className="text-xs text-slate-500">{t("list.optionsLoading")}</span>
+              <span className="text-xs text-ink-subtle">{t("list.optionsLoading")}</span>
             )}
             {departmentsQuery.isError && (
               <span className="text-xs text-red-600">{t("list.departmentLoadError")}</span>

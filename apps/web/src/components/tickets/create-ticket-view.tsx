@@ -126,12 +126,12 @@ export function CreateTicketView() {
 
   return (
     <section className="flex max-w-md flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("create.title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("create.title")}</h1>
 
       {error && <Alert variant="destructive">{error}</Alert>}
 
       <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.customer")}
           <Select
             value={customerId}
@@ -153,13 +153,13 @@ export function CreateTicketView() {
               ))}
             </SelectContent>
           </Select>
-          <Link className="text-xs text-slate-500 underline" href={`/${locale}/customers/new`}>
+          <Link className="text-xs text-ink-subtle underline" href={`/${locale}/customers/new`}>
             {t("create.createCustomerLink")}
           </Link>
         </label>
 
         {customerId && (
-          <label className="flex flex-col gap-1 text-sm text-slate-700">
+          <label className="flex flex-col gap-1 text-sm text-ink-strong">
             {t("create.contact")}
             <Select
               value={contactId}
@@ -179,7 +179,7 @@ export function CreateTicketView() {
               </SelectContent>
             </Select>
             {customerDetailQuery.isLoading && (
-              <span className="text-xs text-slate-500">{t("create.optionsLoading")}</span>
+              <span className="text-xs text-ink-subtle">{t("create.optionsLoading")}</span>
             )}
             {customerDetailQuery.isError && (
               <span className="text-xs text-red-600">{t("create.contactsLoadError")}</span>
@@ -187,7 +187,7 @@ export function CreateTicketView() {
           </label>
         )}
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.subject")}
           <Input
             value={subject}
@@ -197,7 +197,7 @@ export function CreateTicketView() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.category")}
           <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger aria-label={t("create.category")}>
@@ -214,7 +214,7 @@ export function CreateTicketView() {
           </Select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.priority")}
           <Select value={priority} onValueChange={setPriority}>
             <SelectTrigger aria-label={t("create.priority")}>
@@ -231,7 +231,7 @@ export function CreateTicketView() {
           </Select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.department")}
           <Select
             value={departmentId}
@@ -251,14 +251,14 @@ export function CreateTicketView() {
             </SelectContent>
           </Select>
           {departmentsQuery.isLoading && (
-            <span className="text-xs text-slate-500">{t("create.optionsLoading")}</span>
+            <span className="text-xs text-ink-subtle">{t("create.optionsLoading")}</span>
           )}
           {departmentsQuery.isError && (
             <span className="text-xs text-red-600">{t("create.departmentLoadError")}</span>
           )}
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.assignedAgent")}
           <Select
             value={assignedToUserId}
@@ -278,7 +278,7 @@ export function CreateTicketView() {
             </SelectContent>
           </Select>
           {usersQuery.isLoading && (
-            <span className="text-xs text-slate-500">{t("create.optionsLoading")}</span>
+            <span className="text-xs text-ink-subtle">{t("create.optionsLoading")}</span>
           )}
           {usersQuery.isError && (
             <span className="text-xs text-red-600">{t("create.assignedAgentLoadError")}</span>

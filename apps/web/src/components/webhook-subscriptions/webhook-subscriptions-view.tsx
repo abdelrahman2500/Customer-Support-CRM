@@ -45,7 +45,7 @@ export function WebhookSubscriptionsView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
 
       {subscriptionsQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -111,7 +111,7 @@ function InboundWebhookLog() {
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold text-slate-900">{t("inboundLogHeading")}</h2>
+      <h2 className="text-sm font-semibold text-ink">{t("inboundLogHeading")}</h2>
 
       {logsQuery.isLoading && <Skeleton className="h-16 w-full" />}
 
@@ -143,13 +143,13 @@ function InboundWebhookLog() {
             <TableBody>
               {logsQuery.data.items.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell className="font-mono text-xs text-slate-800">{log.providerKey}</TableCell>
+                  <TableCell className="font-mono text-xs text-ink-strong">{log.providerKey}</TableCell>
                   <TableCell>
                     <Badge variant={log.verified ? "success" : "destructive"}>
                       {log.verified ? t("inboundVerified") : (log.rejectReason ?? t("inboundRejected"))}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-slate-500">
+                  <TableCell className="text-ink-subtle">
                     {new Date(log.receivedAt).toLocaleString()}
                   </TableCell>
                 </TableRow>
@@ -207,7 +207,7 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
   return (
     <>
       <TableRow>
-        <TableCell className="max-w-xs truncate font-mono text-xs text-slate-800" title={subscription.targetUrl}>
+        <TableCell className="max-w-xs truncate font-mono text-xs text-ink-strong" title={subscription.targetUrl}>
           {subscription.targetUrl}
         </TableCell>
         <TableCell>
@@ -271,7 +271,7 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
       </TableRow>
       {deliveriesExpanded && (
         <TableRow>
-          <TableCell colSpan={4} className="bg-slate-50">
+          <TableCell colSpan={4} className="bg-surface-sunk">
             <DeliveryAttemptsLog subscriptionId={subscription.id} />
           </TableCell>
         </TableRow>
@@ -323,7 +323,7 @@ function DeliveryAttemptsLog({ subscriptionId }: { subscriptionId: string }) {
                     : (attempt.errorMessage ?? t("deliveryFailed"))}
                 </Badge>
               </TableCell>
-              <TableCell className="text-slate-500">
+              <TableCell className="text-ink-subtle">
                 {new Date(attempt.attemptedAt).toLocaleString()}
               </TableCell>
             </TableRow>
@@ -388,10 +388,10 @@ function AddWebhookSubscriptionForm() {
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("createHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("targetUrlLabel")}
           <Input
             type="url"
@@ -403,7 +403,7 @@ function AddWebhookSubscriptionForm() {
           />
         </label>
         <fieldset className="flex flex-col gap-1">
-          <legend className="text-xs text-slate-600">{t("eventTypesLabel")}</legend>
+          <legend className="text-xs text-ink-muted">{t("eventTypesLabel")}</legend>
           <div className="flex flex-wrap gap-3">
             {WEBHOOK_EVENT_TYPES.map((eventType) => (
               <div key={eventType} className="flex items-center gap-2">
@@ -433,7 +433,7 @@ function AddWebhookSubscriptionForm() {
           <Alert>
             <p className="font-medium">{t("secretRevealedTitle")}</p>
             <p className="mt-1 text-xs">{t("secretRevealedDescription")}</p>
-            <code className="mt-2 block break-all rounded bg-slate-100 p-2 text-xs">{revealedSecret}</code>
+            <code className="mt-2 block break-all rounded bg-surface-muted p-2 text-xs">{revealedSecret}</code>
           </Alert>
         )}
       </form>

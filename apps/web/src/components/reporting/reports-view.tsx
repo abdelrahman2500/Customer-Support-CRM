@@ -245,7 +245,7 @@ export function ReportsView() {
             range={range}
           >
             {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length === 0 && (
-              <p className="text-sm text-slate-500">{t("ticketVolume.empty")}</p>
+              <p className="text-sm text-ink-subtle">{t("ticketVolume.empty")}</p>
             )}
             {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length > 0 && (
               <BarChart
@@ -272,7 +272,7 @@ export function ReportsView() {
             range={range}
           >
             {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget === 0 && (
-              <p className="text-sm text-slate-500">{t("slaCompliance.empty")}</p>
+              <p className="text-sm text-ink-subtle">{t("slaCompliance.empty")}</p>
             )}
             {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget > 0 && (
               <div className="flex flex-col items-center gap-1 text-sm">
@@ -281,7 +281,7 @@ export function ReportsView() {
                   color="rgb(var(--success-solid))"
                   ariaLabel={`${Math.round((slaComplianceQuery.data.complianceRate ?? 0) * 100)}%`}
                 />
-                <span className="text-slate-500">
+                <span className="text-ink-subtle">
                   {t("slaCompliance.detail", {
                     compliant: slaComplianceQuery.data.compliantCount,
                     total: slaComplianceQuery.data.totalWithTarget,
@@ -303,7 +303,7 @@ export function ReportsView() {
             range={range}
           >
             {csatQuery.isSuccess && csatQuery.data.responseCount === 0 && (
-              <p className="text-sm text-slate-500">{t("csat.empty")}</p>
+              <p className="text-sm text-ink-subtle">{t("csat.empty")}</p>
             )}
             {csatQuery.isSuccess && csatQuery.data.responseCount > 0 && (
               <div className="flex flex-col gap-2 text-sm">
@@ -311,7 +311,7 @@ export function ReportsView() {
                   rating={csatQuery.data.averageRating ?? 0}
                   ariaLabel={`${(csatQuery.data.averageRating ?? 0).toFixed(1)}/5`}
                 />
-                <span className="text-slate-500">
+                <span className="text-ink-subtle">
                   {t("csat.detail", { count: csatQuery.data.responseCount })}
                 </span>
               </div>
@@ -336,13 +336,13 @@ export function ReportsView() {
                 created-in-range outcome breakdown. Surfaced explicitly so
                 the two meanings are never ambiguous to whoever is reading
                 it. */}
-            <p className="mb-2 text-xs text-slate-500">
+            <p className="mb-2 text-xs text-ink-subtle">
               {range.from || range.to
                 ? t("agentPerformance.modeCreatedInRange")
                 : t("agentPerformance.modeLiveSnapshot")}
             </p>
             {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length === 0 && (
-              <p className="text-sm text-slate-500">{t("agentPerformance.empty")}</p>
+              <p className="text-sm text-ink-subtle">{t("agentPerformance.empty")}</p>
             )}
             {agentPerformanceQuery.isSuccess && agentPerformanceQuery.data.length > 0 && (
               <BarChart
@@ -392,8 +392,8 @@ export function ReportsView() {
               <ul className="flex flex-col gap-1 text-sm">
                 {ticketAgingQuery.data.map((row) => (
                   <li key={row.bucket} className="flex items-center justify-between">
-                    <span className="text-slate-600">{row.bucket}</span>
-                    <span className="font-medium text-slate-900">{row.count}</span>
+                    <span className="text-ink-muted">{row.bucket}</span>
+                    <span className="font-medium text-ink">{row.count}</span>
                   </li>
                 ))}
               </ul>
@@ -420,14 +420,14 @@ export function ReportsView() {
             range={range}
           >
             {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount === 0 && (
-              <p className="text-sm text-slate-500">{t("resolutionTime.empty")}</p>
+              <p className="text-sm text-ink-subtle">{t("resolutionTime.empty")}</p>
             )}
             {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount > 0 && (
               <div className="flex flex-col gap-1 text-sm">
-                <span className="text-2xl font-semibold text-slate-900">
+                <span className="text-2xl font-semibold text-ink">
                   {formatRemaining(resolutionTimeQuery.data.averageResolutionMs ?? 0)}
                 </span>
-                <span className="text-slate-500">
+                <span className="text-ink-subtle">
                   {t("resolutionTime.detail", { count: resolutionTimeQuery.data.resolvedCount })}
                 </span>
               </div>
@@ -451,17 +451,17 @@ export function ReportsView() {
             range={range}
           >
             {aiUsageQuery.isSuccess && aiUsageQuery.data.totalCalls === 0 && (
-              <p className="text-sm text-slate-500">{t("aiUsage.empty")}</p>
+              <p className="text-sm text-ink-subtle">{t("aiUsage.empty")}</p>
             )}
             {aiUsageQuery.isSuccess && aiUsageQuery.data.totalCalls > 0 && (
               <div className="flex flex-col gap-2 text-sm">
                 <div className="flex flex-col gap-1">
-                  <span className="text-2xl font-semibold text-slate-900">
+                  <span className="text-2xl font-semibold text-ink">
                     {aiUsageQuery.data.totalCostUsd !== null
                       ? formatUsd(aiUsageQuery.data.totalCostUsd)
                       : t("aiUsage.costUnknown")}
                   </span>
-                  <span className="text-slate-500">
+                  <span className="text-ink-subtle">
                     {t("aiUsage.detail", {
                       calls: aiUsageQuery.data.totalCalls,
                       inputTokens: aiUsageQuery.data.totalInputTokens,
@@ -469,11 +469,11 @@ export function ReportsView() {
                     })}
                   </span>
                 </div>
-                <ul className="flex flex-col gap-1 border-t border-slate-100 pt-2">
+                <ul className="flex flex-col gap-1 border-t border-rule-subtle pt-2">
                   {aiUsageQuery.data.byFeature.map((row) => (
                     <li key={row.feature} className="flex items-center justify-between">
-                      <span className="text-slate-600">{row.feature}</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="text-ink-muted">{row.feature}</span>
+                      <span className="font-medium text-ink">
                         {row.totalCostUsd !== null
                           ? formatUsd(row.totalCostUsd)
                           : t("aiUsage.costUnknown")}
@@ -503,7 +503,7 @@ export function ReportsView() {
           >
             {ticketVolumeByCategoryQuery.isSuccess &&
               ticketVolumeByCategoryQuery.data.length === 0 && (
-                <p className="text-sm text-slate-500">{t("ticketVolumeByCategory.empty")}</p>
+                <p className="text-sm text-ink-subtle">{t("ticketVolumeByCategory.empty")}</p>
               )}
             {ticketVolumeByCategoryQuery.isSuccess &&
               ticketVolumeByCategoryQuery.data.length > 0 && (
@@ -522,10 +522,10 @@ export function ReportsView() {
                           name inside a 390px screen gave 66px of horizontal
                           page overflow). The count stays `shrink-0` so it is
                           never the thing squeezed instead. */}
-                      <span className="min-w-0 break-words text-slate-600">
+                      <span className="min-w-0 break-words text-ink-muted">
                         {row.categoryName ?? t("ticketVolumeByCategory.uncategorized")}
                       </span>
-                      <span className="shrink-0 font-medium text-slate-900">{row.count}</span>
+                      <span className="shrink-0 font-medium text-ink">{row.count}</span>
                     </li>
                   ))}
                 </ul>
@@ -537,10 +537,10 @@ export function ReportsView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
 
       <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("dateRange.fromLabel")}
           <Input
             type="date"
@@ -551,7 +551,7 @@ export function ReportsView() {
             className="w-40"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("dateRange.toLabel")}
           <Input
             type="date"
@@ -613,14 +613,14 @@ export function ReportsView() {
               setRange((prev) => ({ ...prev, crossBranch: checked === true }))
             }
           />
-          <Label htmlFor="reports-cross-branch" className="text-xs font-normal text-slate-600">
+          <Label htmlFor="reports-cross-branch" className="text-xs font-normal text-ink-muted">
             {t("filters.crossBranch")}
           </Label>
         </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("dashboards.pickerLabel")}
           {/* Batch 6 (UX audit) — the shared `Select`, replacing a raw
               native `<select>` with no matching focus ring/keyboard-ARIA
@@ -674,8 +674,8 @@ export function ReportsView() {
       )}
 
       {showSaveForm && (
-        <div className="flex flex-wrap items-end gap-2 rounded-md border border-slate-200 bg-white p-3">
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <div className="flex flex-wrap items-end gap-2 rounded-md border border-rule bg-surface p-3">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("dashboards.nameLabel")}
             <Input
               value={newDashboardName}
@@ -691,7 +691,7 @@ export function ReportsView() {
               checked={newDashboardShared}
               onCheckedChange={(checked) => setNewDashboardShared(checked === true)}
             />
-            <Label htmlFor="reports-new-dashboard-shared" className="text-xs font-normal text-slate-600">
+            <Label htmlFor="reports-new-dashboard-shared" className="text-xs font-normal text-ink-muted">
               {t("dashboards.shareLabel")}
             </Label>
           </div>
@@ -736,7 +736,7 @@ function FilterSelect({
 }) {
   const t = useTranslations("reporting");
   return (
-    <label className="flex flex-col gap-1 text-xs text-slate-600">
+    <label className="flex flex-col gap-1 text-xs text-ink-muted">
       {label}
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="min-w-[10rem]" aria-label={label}>
@@ -859,13 +859,13 @@ function ReportCard({
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
+    <div className="rounded-md border border-rule bg-surface p-4">
       {/* `<header>`, not another `<div>` — several existing tests locate
           this card via `heading.closest("div")` to reach the OUTER card
           shell (skeleton/content included); a nested `<div>` here would
           make `closest("div")` resolve to this row instead. */}
       <header className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900">{heading}</h2>
+        <h2 className="text-sm font-semibold text-ink">{heading}</h2>
         {exportPath && query.isSuccess && (
           <Button
             variant="outline"

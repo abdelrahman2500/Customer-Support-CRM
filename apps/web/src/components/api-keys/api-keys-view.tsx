@@ -49,7 +49,7 @@ export function ApiKeysView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
 
       {apiKeysQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -115,8 +115,8 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
 
   return (
     <TableRow>
-      <TableCell className="font-medium text-slate-800">{apiKey.label}</TableCell>
-      <TableCell className="font-mono text-xs text-slate-500">{apiKey.keyPrefix}…</TableCell>
+      <TableCell className="font-medium text-ink-strong">{apiKey.label}</TableCell>
+      <TableCell className="font-mono text-xs text-ink-subtle">{apiKey.keyPrefix}…</TableCell>
       <TableCell>
         <div className="flex flex-wrap gap-1">
           {apiKey.scopes.map((scope) => (
@@ -131,7 +131,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
           {t(`status.${status}`)}
         </Badge>
       </TableCell>
-      <TableCell className="text-slate-500">
+      <TableCell className="text-ink-subtle">
         {apiKey.lastUsedAt ? new Date(apiKey.lastUsedAt).toLocaleString() : t("neverUsed")}
       </TableCell>
       <TableCell>
@@ -193,10 +193,10 @@ function AddApiKeyForm() {
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("createHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("labelLabel")}
           <Input
             value={label}
@@ -208,7 +208,7 @@ function AddApiKeyForm() {
           />
         </label>
         <fieldset className="flex flex-col gap-1">
-          <legend className="text-xs text-slate-600">{t("scopesLabel")}</legend>
+          <legend className="text-xs text-ink-muted">{t("scopesLabel")}</legend>
           <div className="flex flex-wrap gap-3">
             {API_KEY_SCOPES.map((scope) => (
               <div key={scope} className="flex items-center gap-2">
@@ -238,7 +238,7 @@ function AddApiKeyForm() {
           <Alert>
             <p className="font-medium">{t("keyRevealedTitle")}</p>
             <p className="mt-1 text-xs">{t("keyRevealedDescription")}</p>
-            <code className="mt-2 block break-all rounded bg-slate-100 p-2 text-xs">{revealedKey}</code>
+            <code className="mt-2 block break-all rounded bg-surface-muted p-2 text-xs">{revealedKey}</code>
           </Alert>
         )}
       </form>

@@ -73,12 +73,12 @@ function MyBranchSection() {
   const branch = branchQuery.data;
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("myBranch.heading")}</h1>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h1 className="text-lg font-semibold text-ink">{t("myBranch.heading")}</h1>
       {branch ? (
         <MyBranchFields branch={branch} />
       ) : (
-        <p className="mt-2 text-sm text-slate-500">{t("myBranch.loadError")}</p>
+        <p className="mt-2 text-sm text-ink-subtle">{t("myBranch.loadError")}</p>
       )}
     </div>
   );
@@ -121,7 +121,7 @@ function MyBranchFields({ branch }: { branch: ManagedBranch }) {
 
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <label className="flex max-w-sm flex-col gap-1 text-sm text-slate-700">
+      <label className="flex max-w-sm flex-col gap-1 text-sm text-ink-strong">
         {t("myBranch.nameLabel")}
         <Input
           value={nameDraft}
@@ -168,8 +168,8 @@ function DepartmentsSection() {
   const departmentsQuery = useManagedDepartmentsQuery();
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("departments.heading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("departments.heading")}</h2>
 
       {departmentsQuery.isLoading && (
         <div className="mt-2 flex flex-col gap-2">
@@ -327,7 +327,7 @@ function AddDepartmentForm() {
 
   return (
     <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={handleSubmit}>
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("departments.nameLabel")}
         <Input
           value={name}

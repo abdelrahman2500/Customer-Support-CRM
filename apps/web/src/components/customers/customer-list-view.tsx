@@ -147,7 +147,7 @@ function CustomerListViewContent() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
           <FetchingIndicator
             active={customersQuery.isPlaceholderData}
             label={tCommon("updating")}
@@ -162,7 +162,7 @@ function CustomerListViewContent() {
           own exact class change; unchanged, wrapped inline row at `sm`
           and up. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("list.searchLabel")}
           <Input
             className="w-full sm:w-auto sm:min-w-[10rem]"
@@ -171,7 +171,7 @@ function CustomerListViewContent() {
             onBlur={(event) => updateFilter("search", event.target.value.trim() || ALL_VALUE)}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("list.filterStatus")}
           <Select
             value={filters.isActive ?? ALL_VALUE}
@@ -260,7 +260,7 @@ function CustomerListViewContent() {
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/customers/${customer.id}`)}
               >
-                <TableCell label={t("list.columns.name")} className="font-medium text-slate-900">
+                <TableCell label={t("list.columns.name")} className="font-medium text-ink">
                   <Link
                     href={`/${locale}/customers/${customer.id}`}
                     className="focus-ring rounded-sm hover:underline"
@@ -274,7 +274,7 @@ function CustomerListViewContent() {
                     {customer.isActive ? t("list.active") : t("list.inactive")}
                   </Badge>
                 </TableCell>
-                <TableCell label={t("list.columns.createdAt")} className="text-slate-500">
+                <TableCell label={t("list.columns.createdAt")} className="text-ink-subtle">
                   {new Date(customer.createdAt).toLocaleString(locale)}
                 </TableCell>
               </TableRow>

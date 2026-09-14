@@ -88,7 +88,7 @@ function DaysGrid({
         .sort((a, b) => a.weekday - b.weekday)
         .map((day) => (
           <div key={day.weekday} className="flex flex-wrap items-center gap-3">
-            <span className="w-24 text-sm font-medium text-slate-700">
+            <span className="w-24 text-sm font-medium text-ink-strong">
               {t(`weekday.${WEEKDAY_KEYS[day.weekday]}`)}
             </span>
             {/* Batch 8 (UX audit) — the shared `Checkbox`/`Label` pair,
@@ -111,7 +111,7 @@ function DaysGrid({
                   );
                 }}
               />
-              <Label htmlFor={`business-hours-open-${day.weekday}`} className="text-xs font-normal text-slate-600">
+              <Label htmlFor={`business-hours-open-${day.weekday}`} className="text-xs font-normal text-ink-muted">
                 {t("openLabel")}
               </Label>
             </div>
@@ -172,9 +172,9 @@ function CreateCalendarForm() {
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("createHeading")}</h2>
-      <p className="mt-1 text-sm text-slate-500">{t("createPrompt")}</p>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
+      <p className="mt-1 text-sm text-ink-subtle">{t("createPrompt")}</p>
       {error && (
         <Alert variant="destructive" className="mt-2">
           {error}
@@ -208,8 +208,8 @@ function WeeklyScheduleEditor({ calendar }: { calendar: BusinessHoursCalendar })
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("scheduleHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("scheduleHeading")}</h2>
       <DaysGrid days={days} onChange={updateDay} />
       <Button
         type="button"
@@ -269,8 +269,8 @@ function ExceptionRow({ exception }: { exception: BusinessHoursException }) {
   }
 
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
-      <span className="font-medium text-slate-800">{exception.date}</span>
+    <li className="flex flex-wrap items-center justify-between gap-2 border-b border-rule-subtle pb-2">
+      <span className="font-medium text-ink-strong">{exception.date}</span>
       <span className="flex items-center gap-2">
         <Badge variant={exception.isClosed ? "secondary" : "outline"}>
           {exception.isClosed ? t("closedLabel") : t("overriddenLabel")}
@@ -354,7 +354,7 @@ function AddExceptionForm() {
 
   return (
     <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={handleSubmit}>
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("dateLabel")}
         <Input
           type="date"
@@ -370,13 +370,13 @@ function AddExceptionForm() {
           checked={isClosed}
           onCheckedChange={(checked) => setIsClosed(checked === true)}
         />
-        <Label htmlFor="business-hours-exception-closed" className="text-xs font-normal text-slate-600">
+        <Label htmlFor="business-hours-exception-closed" className="text-xs font-normal text-ink-muted">
           {t("closedLabel")}
         </Label>
       </div>
       {!isClosed && (
         <>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("overrideStartLabel")}
             <Input
               type="time"
@@ -385,7 +385,7 @@ function AddExceptionForm() {
               onChange={(event) => setStartTime(event.target.value)}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("overrideEndLabel")}
             <Input
               type="time"
@@ -411,10 +411,10 @@ function AddExceptionForm() {
 function ExceptionsSection({ calendar }: { calendar: BusinessHoursCalendar }) {
   const t = useTranslations("businessHours");
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("exceptionsHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("exceptionsHeading")}</h2>
       {calendar.exceptions.length === 0 && (
-        <p className="mt-2 text-sm text-slate-500">{t("exceptionsEmpty")}</p>
+        <p className="mt-2 text-sm text-ink-subtle">{t("exceptionsEmpty")}</p>
       )}
       {calendar.exceptions.length > 0 && (
         <ul className="mt-2 flex flex-col gap-2 text-sm">
@@ -463,7 +463,7 @@ export function BusinessHoursView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
       {!calendar ? (
         <CreateCalendarForm />
       ) : (

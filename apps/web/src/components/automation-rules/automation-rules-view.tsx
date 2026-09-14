@@ -103,7 +103,7 @@ export function AutomationRulesView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
 
       {rulesQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -193,13 +193,13 @@ function AutomationRuleRow({
 
   return (
     <TableRow>
-      <TableCell className="font-medium text-slate-800">{rule.name}</TableCell>
-      <TableCell className="text-slate-500">
+      <TableCell className="font-medium text-ink-strong">{rule.name}</TableCell>
+      <TableCell className="text-ink-subtle">
         {rule.conditionCategoryId
           ? (categoryNameById.get(rule.conditionCategoryId) ?? rule.conditionCategoryId)
           : t("anyCategory")}
       </TableCell>
-      <TableCell className="text-slate-500">
+      <TableCell className="text-ink-subtle">
         {rule.actionAssignmentMode === "LEAST_LOADED" ? (
           <span>
             {t("leastLoaded")}
@@ -210,17 +210,17 @@ function AutomationRuleRow({
           userNameById.get(rule.actionAssignToUserId) ?? rule.actionAssignToUserId
         )}
       </TableCell>
-      <TableCell className="text-slate-500">
+      <TableCell className="text-ink-subtle">
         {rule.actionSetCategoryId
           ? (categoryNameById.get(rule.actionSetCategoryId) ?? rule.actionSetCategoryId)
           : t("noAction")}
       </TableCell>
-      <TableCell className="text-slate-500">
+      <TableCell className="text-ink-subtle">
         {rule.actionSetDepartmentId
           ? (departmentNameById.get(rule.actionSetDepartmentId) ?? rule.actionSetDepartmentId)
           : t("noAction")}
       </TableCell>
-      <TableCell className="text-slate-500">{rule.actionSetPriority ?? t("noAction")}</TableCell>
+      <TableCell className="text-ink-subtle">{rule.actionSetPriority ?? t("noAction")}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Badge variant={rule.isActive ? "success" : "secondary"}>
@@ -319,11 +319,11 @@ function AddAutomationRuleForm() {
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("createHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <div className="flex flex-wrap items-end gap-2">
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("nameLabel")}
             <Input
               value={name}
@@ -333,7 +333,7 @@ function AddAutomationRuleForm() {
               className="w-56"
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("conditionCategoryLabel")}
             <Select value={conditionCategoryId} onValueChange={setConditionCategoryId}>
               <SelectTrigger className="w-40" aria-label={t("conditionCategoryLabel")}>
@@ -348,7 +348,7 @@ function AddAutomationRuleForm() {
               </SelectContent>
             </Select>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("assignmentModeLabel")}
             <Select
               value={actionAssignmentMode}
@@ -366,7 +366,7 @@ function AddAutomationRuleForm() {
               </SelectContent>
             </Select>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {actionAssignmentMode === "LEAST_LOADED" ? t("fallbackAssignToLabel") : t("actionAssignToLabel")}
             <Select value={actionAssignToUserId} onValueChange={setActionAssignToUserId}>
               <SelectTrigger
@@ -388,7 +388,7 @@ function AddAutomationRuleForm() {
               </SelectContent>
             </Select>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("actionSetCategoryLabel")}
             <Select value={actionSetCategoryId} onValueChange={setActionSetCategoryId}>
               <SelectTrigger className="w-40" aria-label={t("actionSetCategoryLabel")}>
@@ -403,7 +403,7 @@ function AddAutomationRuleForm() {
               </SelectContent>
             </Select>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("actionSetDepartmentLabel")}
             <Select value={actionSetDepartmentId} onValueChange={setActionSetDepartmentId}>
               <SelectTrigger className="w-56" aria-label={t("actionSetDepartmentLabel")}>
@@ -418,7 +418,7 @@ function AddAutomationRuleForm() {
               </SelectContent>
             </Select>
           </label>
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("actionSetPriorityLabel")}
             <Select value={actionSetPriority} onValueChange={setActionSetPriority}>
               <SelectTrigger className="w-40" aria-label={t("actionSetPriorityLabel")}>
@@ -445,7 +445,7 @@ function AddAutomationRuleForm() {
 
         {actionAssignmentMode === "LEAST_LOADED" && (
           <fieldset className="flex flex-col gap-1">
-            <legend className="text-xs text-slate-600">{t("eligibleAgentPoolLabel")}</legend>
+            <legend className="text-xs text-ink-muted">{t("eligibleAgentPoolLabel")}</legend>
             <div className="flex flex-wrap gap-3">
               {(usersQuery.data ?? []).map((user) => (
                 <div key={user.id} className="flex items-center gap-2">

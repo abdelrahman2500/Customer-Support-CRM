@@ -80,12 +80,12 @@ export function CreateSlaPolicyView() {
 
   return (
     <section className="flex max-w-md flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("create.title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("create.title")}</h1>
 
       {error && <Alert variant="destructive">{error}</Alert>}
 
       <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.department")}
           <Input
             value={departmentId}
@@ -94,7 +94,7 @@ export function CreateSlaPolicyView() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.category")}
           <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger aria-label={t("create.category")}>
@@ -111,7 +111,7 @@ export function CreateSlaPolicyView() {
           </Select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.priority")}
           <Select value={priority} onValueChange={setPriority}>
             <SelectTrigger aria-label={t("create.priority")}>
@@ -128,7 +128,7 @@ export function CreateSlaPolicyView() {
           </Select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.responseTarget")}
           <Input
             type="number"
@@ -138,7 +138,7 @@ export function CreateSlaPolicyView() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.resolutionTarget")}
           <Input
             type="number"

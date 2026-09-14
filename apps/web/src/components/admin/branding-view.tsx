@@ -36,8 +36,8 @@ export function BrandingView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
-      <p className="text-sm text-slate-500">{t("description")}</p>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <p className="text-sm text-ink-subtle">{t("description")}</p>
 
       {brandingQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -137,14 +137,14 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <form
-        className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4"
+        className="flex flex-col gap-3 rounded-md border border-rule bg-surface p-4"
         onSubmit={handleSubmit}
       >
         {/* The help text sits outside the `<label>`, tied to the input with
             `aria-describedby` instead: inside it, it would become part of
             the field's own accessible name rather than its description. */}
         <div className="flex flex-col gap-1">
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("appNameLabel")}
             <Input
               value={appName}
@@ -158,7 +158,7 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
             {t("appNameHelp")}
           </span>
         </div>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("logoUrlLabel")}
           <Input
             value={logoUrl}
@@ -166,7 +166,7 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
             onChange={(event) => setLogoUrl(event.target.value)}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("primaryColorLabel")}
           <Input
             value={primaryColor}
@@ -176,7 +176,7 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
           />
           {invalidPrimary && <span className="text-red-600">{t("invalidColor")}</span>}
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("secondaryColorLabel")}
           <Input
             value={secondaryColor}
@@ -192,7 +192,7 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
             adding one: a native radio group is already keyboard-accessible
             (arrow keys, one roving tab stop) and needs no JavaScript. */}
         <fieldset className="flex flex-col gap-1">
-          <legend className="text-xs text-slate-600">{t("navigationLayoutLegend")}</legend>
+          <legend className="text-xs text-ink-muted">{t("navigationLayoutLegend")}</legend>
           <span className="text-xs text-ink-subtle">{t("navigationLayoutHelp")}</span>
           <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {(["NAVBAR", "SIDEBAR"] as const).map((option) => {
@@ -242,8 +242,8 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
         {error && <Alert variant="destructive">{error}</Alert>}
       </form>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("previewHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("previewHeading")}</h2>
         <div className="mt-3 flex flex-col gap-3">
           <p className="truncate text-sm font-semibold text-ink-strong">{previewBrandName}</p>
           {logoUrl.trim() ? (
@@ -258,19 +258,19 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
           )}
           <div className="flex items-center gap-2 text-sm">
             <span
-              className="h-6 w-6 rounded-full border border-slate-300"
+              className="h-6 w-6 rounded-full border border-rule-strong"
               style={{ backgroundColor: validPrimary ? primaryColor : undefined }}
               aria-hidden="true"
             />
-            <span className="text-slate-600">{t("primaryColorLabel")}</span>
+            <span className="text-ink-muted">{t("primaryColorLabel")}</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span
-              className="h-6 w-6 rounded-full border border-slate-300"
+              className="h-6 w-6 rounded-full border border-rule-strong"
               style={{ backgroundColor: validSecondary ? secondaryColor : undefined }}
               aria-hidden="true"
             />
-            <span className="text-slate-600">{t("secondaryColorLabel")}</span>
+            <span className="text-ink-muted">{t("secondaryColorLabel")}</span>
           </div>
         </div>
       </div>

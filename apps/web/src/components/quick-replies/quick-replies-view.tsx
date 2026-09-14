@@ -25,7 +25,7 @@ export function QuickRepliesView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
 
       {quickRepliesQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -95,8 +95,8 @@ function QuickReplyRow({ quickReply }: { quickReply: QuickReplySummary }) {
 
   return (
     <TableRow>
-      <TableCell className="font-medium text-slate-800">{quickReply.title}</TableCell>
-      <TableCell className="max-w-md truncate text-slate-500">{quickReply.body}</TableCell>
+      <TableCell className="font-medium text-ink-strong">{quickReply.title}</TableCell>
+      <TableCell className="max-w-md truncate text-ink-subtle">{quickReply.body}</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Badge variant={quickReply.isActive ? "success" : "secondary"}>
@@ -158,10 +158,10 @@ function AddQuickReplyForm() {
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("createHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("titleLabel")}
           <Input
             value={title}
@@ -171,10 +171,10 @@ function AddQuickReplyForm() {
             className="w-72"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("bodyLabel")}
           <textarea
-            className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+            className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
             rows={3}
             value={body}
             onChange={(event) => setBody(event.target.value)}

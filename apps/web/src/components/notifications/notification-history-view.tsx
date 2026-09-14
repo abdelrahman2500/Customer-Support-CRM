@@ -96,10 +96,10 @@ function NotificationRow({
           {ticketSubject ?? notification.ticketId}
         </Link>
       </TableCell>
-      <TableCell className="text-slate-500">
+      <TableCell className="text-ink-subtle">
         {customerName ?? <span className="text-ink-subtle">{t("unknownCustomer")}</span>}
       </TableCell>
-      <TableCell className="text-slate-500">
+      <TableCell className="text-ink-subtle">
         {notification.targetType && notification.targetAt ? (
           <>
             {targetTypeLabelKey ? t(targetTypeLabelKey) : notification.targetType}
@@ -110,7 +110,7 @@ function NotificationRow({
           <span className="text-ink-subtle">{t("noTarget")}</span>
         )}
       </TableCell>
-      <TableCell className="text-slate-500">
+      <TableCell className="text-ink-subtle">
         {new Date(notification.loggedAt).toLocaleString(locale)}
       </TableCell>
     </TableRow>
@@ -226,7 +226,7 @@ export function NotificationHistoryView() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+        <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
         {/* Story S-8b/S-7 — the page being left stays on screen while the
             next one loads, so this is the only signal a page change is in
             flight. In the heading's own row, so it adds no height and

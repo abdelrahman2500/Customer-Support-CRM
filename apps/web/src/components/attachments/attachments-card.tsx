@@ -57,8 +57,8 @@ export function AttachmentsCard({
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{strings.heading}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{strings.heading}</h2>
       {attachmentsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
       {attachmentsQuery.isError && (
         <Alert variant="destructive" className="mt-2">
@@ -66,23 +66,23 @@ export function AttachmentsCard({
         </Alert>
       )}
       {attachmentsQuery.isSuccess && attachmentsQuery.data.length === 0 && (
-        <p className="mt-2 text-sm text-slate-500">{strings.empty}</p>
+        <p className="mt-2 text-sm text-ink-subtle">{strings.empty}</p>
       )}
       {attachmentsQuery.isSuccess && attachmentsQuery.data.length > 0 && (
         <ol className="mt-2 flex flex-col gap-2 text-sm">
           {attachmentsQuery.data.map((attachment) => (
             <li
               key={attachment.id}
-              className="flex items-center justify-between border-b border-slate-100 pb-2"
+              className="flex items-center justify-between border-b border-rule-subtle pb-2"
             >
               <button
                 type="button"
-                className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-ring"
+                className="rounded-sm text-start font-medium text-ink-strong hover:underline focus-ring"
                 onClick={() => void handleDownload(attachment.id)}
               >
                 {attachment.filename}
               </button>
-              <span className="text-slate-500">
+              <span className="text-ink-subtle">
                 {formatFileSize(attachment.size)} ·{" "}
                 {new Date(attachment.createdAt).toLocaleString(locale)}
               </span>
@@ -126,15 +126,15 @@ function AddAttachmentForm({
 
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         <input
           type="file"
           disabled={mutation.isPending}
           onChange={(event) => void handleFileChange(event)}
-          className="text-sm text-slate-700"
+          className="text-sm text-ink-strong"
         />
       </label>
-      {mutation.isPending && <p className="text-xs text-slate-500">{strings.uploading}</p>}
+      {mutation.isPending && <p className="text-xs text-ink-subtle">{strings.uploading}</p>}
       {error && <Alert variant="destructive">{error}</Alert>}
     </div>
   );

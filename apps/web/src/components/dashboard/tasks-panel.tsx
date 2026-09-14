@@ -60,8 +60,8 @@ export function TasksPanel({ userId }: { userId: string }) {
   const tasks = tasksQuery.data?.items ?? [];
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("tasks.heading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("tasks.heading")}</h2>
 
       {tasksQuery.isLoading && (
         <div className="mt-2 flex flex-col gap-2">
@@ -116,9 +116,9 @@ function TaskRow({ task }: { task: TaskSummary }) {
   const now = new Date();
 
   return (
-    <li className="flex flex-col gap-1 border-b border-slate-100 pb-2 sm:flex-row sm:items-center sm:justify-between">
+    <li className="flex flex-col gap-1 border-b border-rule-subtle pb-2 sm:flex-row sm:items-center sm:justify-between">
       <span className="flex flex-col">
-        <span className="font-medium text-slate-800">{task.title}</span>
+        <span className="font-medium text-ink-strong">{task.title}</span>
         {task.dueAt && (
           <span className={isOverdue(task, now) ? "text-xs text-red-600" : "text-xs text-ink-subtle"}>
             {new Date(task.dueAt).toLocaleString()}
@@ -204,8 +204,8 @@ function AddTaskForm() {
   }
 
   return (
-    <form className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:flex-wrap sm:items-end" onSubmit={handleSubmit}>
-      <label className="flex flex-1 flex-col gap-1 text-xs text-slate-600">
+    <form className="mt-3 flex flex-col gap-2 border-t border-rule-subtle pt-3 sm:flex-row sm:flex-wrap sm:items-end" onSubmit={handleSubmit}>
+      <label className="flex flex-1 flex-col gap-1 text-xs text-ink-muted">
         {t("tasks.titleLabel")}
         <Input
           value={title}
@@ -214,16 +214,16 @@ function AddTaskForm() {
           minLength={1}
         />
       </label>
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("tasks.dueLabel")}
         <input
           type="datetime-local"
           value={dueAt}
           onChange={(event) => setDueAt(event.target.value)}
-          className="flex h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-ring"
+          className="flex h-9 rounded-md border border-rule-strong bg-surface px-3 py-1 text-sm shadow-sm transition-colors focus-ring"
         />
       </label>
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("tasks.priorityLabel")}
         <Select value={priority} onValueChange={(value) => setPriority(value as TaskPriority)}>
           <SelectTrigger className="w-32" aria-label={t("tasks.priorityLabel")}>

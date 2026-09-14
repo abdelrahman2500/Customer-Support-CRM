@@ -37,9 +37,9 @@ export function KbCategoriesView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h1 className="text-lg font-semibold text-slate-900">{t("heading")}</h1>
-        <p className="mt-1 text-sm text-slate-500">{t("description")}</p>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h1 className="text-lg font-semibold text-ink">{t("heading")}</h1>
+        <p className="mt-1 text-sm text-ink-subtle">{t("description")}</p>
 
         {categoriesQuery.isLoading && (
           <div className="mt-4 flex flex-col gap-2">
@@ -197,7 +197,7 @@ function AddKbCategoryForm() {
 
   return (
     <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={handleSubmit}>
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("nameLabel")}
         <Input
           value={name}

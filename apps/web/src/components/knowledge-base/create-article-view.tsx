@@ -64,17 +64,17 @@ export function CreateArticleView() {
 
   return (
     <section className="flex max-w-md flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("create.title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("create.title")}</h1>
 
       {error && <Alert variant="destructive">{error}</Alert>}
 
       <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.articleTitle")}
           <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.category")}
           <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger aria-label={t("create.category")}>
@@ -91,10 +91,10 @@ export function CreateArticleView() {
           </Select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.body")}
           <textarea
-            className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+            className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
             rows={6}
             value={body}
             onChange={(event) => setBody(event.target.value)}

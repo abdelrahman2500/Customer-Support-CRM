@@ -51,7 +51,7 @@ function SlaPresentation({ ticket, now }: { ticket: TicketListItem; now: Date })
     return <Badge variant="secondary">{t("sla.onHold")}</Badge>;
   }
   return (
-    <span className="text-slate-700">
+    <span className="text-ink-strong">
       {t("sla.remaining", { time: formatRemaining(status.remainingMs) })}
     </span>
   );
@@ -87,14 +87,14 @@ function UnclaimedTicketRow({
   const mutation = useUpdateTicketMutation(ticket.id);
 
   return (
-    <li className="flex flex-col gap-1 border-b border-slate-100 pb-2 sm:flex-row sm:items-center sm:justify-between">
+    <li className="flex flex-col gap-1 border-b border-rule-subtle pb-2 sm:flex-row sm:items-center sm:justify-between">
       <span
         className="flex cursor-pointer flex-col"
         onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
       >
         <Link
           href={`/${locale}/tickets/${ticket.id}`}
-          className="focus-ring w-fit rounded-sm font-medium text-slate-800 hover:underline"
+          className="focus-ring w-fit rounded-sm font-medium text-ink-strong hover:underline"
           onClick={(event) => event.stopPropagation()}
         >
           {ticket.subject}
@@ -235,10 +235,10 @@ export function DashboardView({ userId }: { userId: string }) {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("heading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>
 
         {myTicketsQuery.isLoading && (
           <div className="mt-2 flex flex-col gap-2">
@@ -265,7 +265,7 @@ export function DashboardView({ userId }: { userId: string }) {
             <p>{t("empty")}</p>
             <Link
               href={`/${locale}/tickets`}
-              className="focus-ring rounded-sm font-medium text-slate-700 hover:underline"
+              className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
             >
               {t("browseAllTicketsLink")}
             </Link>
@@ -277,13 +277,13 @@ export function DashboardView({ userId }: { userId: string }) {
             {openTickets.map((ticket) => (
               <li
                 key={ticket.id}
-                className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2"
+                className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
               >
                 <span className="flex flex-col">
                   <Link
                     href={`/${locale}/tickets/${ticket.id}`}
-                    className="focus-ring w-fit rounded-sm font-medium text-slate-800 hover:underline"
+                    className="focus-ring w-fit rounded-sm font-medium text-ink-strong hover:underline"
                     onClick={(event) => event.stopPropagation()}
                   >
                     {ticket.subject}
@@ -312,8 +312,8 @@ export function DashboardView({ userId }: { userId: string }) {
 
       <TasksPanel userId={userId} />
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("unassignedHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("unassignedHeading")}</h2>
 
         {unclaimedTicketsQuery.isLoading && (
           <div className="mt-2 flex flex-col gap-2">

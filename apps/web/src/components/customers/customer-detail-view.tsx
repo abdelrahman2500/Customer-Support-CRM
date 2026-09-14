@@ -80,7 +80,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
   }
 
   return (
-    <li className="flex flex-col gap-1 border-b border-slate-100 pb-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <li className="flex flex-col gap-1 border-b border-rule-subtle pb-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div className="flex flex-1 flex-wrap items-center gap-2">
         <Input
           className="w-36"
@@ -139,8 +139,8 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
         </span>
       )}
 
-      <div className="flex flex-col gap-1 border-t border-slate-200 pt-2 sm:w-full">
-        <span className="text-xs text-slate-500">{t("detail.portalPasswordLabel")}</span>
+      <div className="flex flex-col gap-1 border-t border-rule pt-2 sm:w-full">
+        <span className="text-xs text-ink-subtle">{t("detail.portalPasswordLabel")}</span>
         <div className="flex flex-wrap items-center gap-2">
           <Input
             className="w-40"
@@ -272,7 +272,7 @@ function AddContactForm({ customerId }: { customerId: string }) {
 
   return (
     <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={handleSubmit}>
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("detail.contactFullNameLabel")}
         <Input
           className="w-36"
@@ -282,11 +282,11 @@ function AddContactForm({ customerId }: { customerId: string }) {
           minLength={1}
         />
       </label>
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("detail.contactEmailLabel")}
         <Input className="w-40" value={email} onChange={(event) => setEmail(event.target.value)} />
       </label>
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("detail.contactPhoneLabel")}
         <Input className="w-32" value={phone} onChange={(event) => setPhone(event.target.value)} />
       </label>
@@ -301,7 +301,7 @@ function AddContactForm({ customerId }: { customerId: string }) {
         />
         <Label
           htmlFor={`add-contact-primary-${customerId}`}
-          className="text-xs font-normal text-slate-600"
+          className="text-xs font-normal text-ink-muted"
         >
           {t("detail.primaryContact")}
         </Label>
@@ -355,7 +355,7 @@ function AddCustomerNoteForm({ customerId }: { customerId: string }) {
       </label>
       <textarea
         id="customer-note-body"
-        className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+        className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
         rows={3}
         value={body}
         placeholder={t("detail.notesPlaceholder")}
@@ -423,7 +423,7 @@ export function CustomerDetailSkeleton() {
       </div>
 
       {["contacts", "tickets", "notes", "attachments"].map((section) => (
-        <div key={section} className="rounded-md border border-slate-200 bg-white p-4">
+        <div key={section} className="rounded-md border border-rule bg-surface p-4">
           <Skeleton className="h-4 w-32" />
           <div className="mt-2 flex flex-col gap-2">
             <Skeleton className="h-8 w-full" />
@@ -493,7 +493,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           since the adjacent label already names the action. */}
       <Link
         href={`/${locale}/customers`}
-        className="focus-ring self-start rounded-sm text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
+        className="focus-ring self-start rounded-sm text-sm font-medium text-ink-muted hover:text-ink hover:underline"
       >
         <span aria-hidden="true" className="inline-block rtl:rotate-180">
           &larr;
@@ -560,10 +560,10 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         </Alert>
       )}
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("detail.contactsHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.contactsHeading")}</h2>
         {customer.contacts.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">{t("detail.contactsEmpty")}</p>
+          <p className="mt-2 text-sm text-ink-subtle">{t("detail.contactsEmpty")}</p>
         )}
         {customer.contacts.length > 0 && (
           <ul className="mt-2 flex flex-col gap-2 text-sm">
@@ -575,8 +575,8 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         <AddContactForm customerId={customerId} />
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("detail.ticketsHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.ticketsHeading")}</h2>
         {ticketsQuery.isLoading && (
           <div className="mt-2 flex flex-col gap-2">
             <Skeleton className="h-8 w-full" />
@@ -589,19 +589,19 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           </Alert>
         )}
         {ticketsQuery.isSuccess && relatedTickets.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">{t("detail.ticketsEmpty")}</p>
+          <p className="mt-2 text-sm text-ink-subtle">{t("detail.ticketsEmpty")}</p>
         )}
         {ticketsQuery.isSuccess && relatedTickets.length > 0 && (
           <ul className="mt-2 flex flex-col gap-2 text-sm">
             {relatedTickets.map((ticket) => (
               <li
                 key={ticket.id}
-                className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2"
+                className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
               >
                 <Link
                   href={`/${locale}/tickets/${ticket.id}`}
-                  className="focus-ring rounded-sm font-medium text-slate-800 hover:underline"
+                  className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
                   onClick={(event) => event.stopPropagation()}
                 >
                   {ticket.subject}
@@ -611,7 +611,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
                   <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
                     {ticket.priority}
                   </Badge>
-                  <span className="text-slate-500">
+                  <span className="text-ink-subtle">
                     {new Date(ticket.createdAt).toLocaleDateString(locale)}
                   </span>
                 </span>
@@ -639,8 +639,8 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         )}
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("detail.notesHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.notesHeading")}</h2>
         {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {notesQuery.isError && (
           <Alert variant="destructive" className="mt-2">
@@ -648,21 +648,21 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           </Alert>
         )}
         {notesQuery.isSuccess && notesQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">{t("detail.notesEmpty")}</p>
+          <p className="mt-2 text-sm text-ink-subtle">{t("detail.notesEmpty")}</p>
         )}
         {notesQuery.isSuccess && notesQuery.data.length > 0 && (
           <ol className="mt-2 flex flex-col gap-2 text-sm">
             {notesQuery.data.map((note) => (
-              <li key={note.id} className="border-b border-slate-100 pb-2">
+              <li key={note.id} className="border-b border-rule-subtle pb-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-slate-800">
+                  <span className="font-medium text-ink-strong">
                     {userNameById.get(note.authorUserId) ?? note.authorUserId}
                   </span>
-                  <span className="text-slate-500">
+                  <span className="text-ink-subtle">
                     {new Date(note.createdAt).toLocaleString(locale)}
                   </span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-slate-700">{note.body}</p>
+                <p className="mt-1 whitespace-pre-wrap text-ink-strong">{note.body}</p>
               </li>
             ))}
           </ol>

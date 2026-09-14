@@ -96,7 +96,7 @@ function RoleRow({
   return (
     <>
       <TableRow>
-        <TableCell className="font-medium text-slate-900">
+        <TableCell className="font-medium text-ink">
           {isProtected ? (
             <div className="flex items-center gap-2">
               <span>{role.name}</span>
@@ -111,7 +111,7 @@ function RoleRow({
             />
           )}
         </TableCell>
-        <TableCell className="text-slate-500">{role.permissions.length}</TableCell>
+        <TableCell className="text-ink-subtle">{role.permissions.length}</TableCell>
         <TableCell>
           <Select value={role.ticketVisibilityScope} onValueChange={changeVisibilityScope}>
             <SelectTrigger className="w-40" aria-label={t("list.columns.visibility")}>
@@ -167,11 +167,11 @@ function RoleRow({
       {expanded && (
         <TableRow>
           <TableCell colSpan={4}>
-            <h3 className="text-xs font-semibold text-slate-700">
+            <h3 className="text-xs font-semibold text-ink-strong">
               {t("list.permissionsAssignHeading")}
             </h3>
             {allPermissions.length === 0 ? (
-              <p className="mt-1 text-sm text-slate-500">{t("list.noPermissions")}</p>
+              <p className="mt-1 text-sm text-ink-subtle">{t("list.noPermissions")}</p>
             ) : (
               <div className="mt-2 flex flex-wrap gap-3">
                 {allPermissions.map((permission) => (
@@ -187,7 +187,7 @@ function RoleRow({
                     />
                     <Label
                       htmlFor={`permission-${role.id}-${permission.id}`}
-                      className="text-sm font-normal text-slate-700"
+                      className="text-sm font-normal text-ink-strong"
                     >
                       {permission.key}
                     </Label>
@@ -233,7 +233,7 @@ function AddRoleForm() {
 
   return (
     <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={handleSubmit}>
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("list.createHeading")}
         <Input
           value={name}
@@ -292,10 +292,10 @@ export function RoleListView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("list.rolesHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("list.rolesHeading")}</h2>
 
         {/* Batch 6 (UX audit) — the shared `QueryStateCard`, replacing a
             hand-rolled loading/error/empty ladder whose empty branch was a
@@ -346,8 +346,8 @@ export function RoleListView() {
         <AddRoleForm />
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("list.permissionsHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("list.permissionsHeading")}</h2>
 
         <QueryStateCard
           className="mt-2"

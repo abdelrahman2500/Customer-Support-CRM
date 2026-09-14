@@ -76,12 +76,12 @@ export function CreateUserView() {
 
   return (
     <section className="flex max-w-md flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("create.title")}</h1>
+      <h1 className="text-lg font-semibold text-ink">{t("create.title")}</h1>
 
       {error && <Alert variant="destructive">{error}</Alert>}
 
       <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.email")}
           <Input
             type="email"
@@ -91,7 +91,7 @@ export function CreateUserView() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.password")}
           <Input
             type="password"
@@ -100,10 +100,10 @@ export function CreateUserView() {
             required
             minLength={8}
           />
-          <span className="text-xs text-slate-500">{t("create.passwordHint")}</span>
+          <span className="text-xs text-ink-subtle">{t("create.passwordHint")}</span>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.fullName")}
           <Input
             value={fullName}
@@ -113,7 +113,7 @@ export function CreateUserView() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.branch")}
           <Select value={branchId} onValueChange={setBranchId}>
             <SelectTrigger aria-label={t("create.branch")}>
@@ -132,7 +132,7 @@ export function CreateUserView() {
           )}
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.department")}
           <Select value={departmentId} onValueChange={setDepartmentId}>
             <SelectTrigger aria-label={t("create.department")}>
@@ -152,7 +152,7 @@ export function CreateUserView() {
           )}
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.role")}
           <Select value={roleId} onValueChange={setRoleId}>
             <SelectTrigger aria-label={t("create.role")}>

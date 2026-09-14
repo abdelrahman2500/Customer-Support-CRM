@@ -58,8 +58,8 @@ export function NotificationTemplatesView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
-      <p className="text-sm text-slate-500">{t("description")}</p>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <p className="text-sm text-ink-subtle">{t("description")}</p>
 
       {templatesQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -131,10 +131,10 @@ function TemplateForm({
   const labelKey = EVENT_LABEL_KEYS[eventType];
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{labelKey ? t(labelKey) : eventType}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{labelKey ? t(labelKey) : eventType}</h2>
       <form className="mt-2 flex flex-col gap-2" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("localeLabel")}
           <Select value={locale} onValueChange={handleLocaleChange}>
             <SelectTrigger className="w-48" aria-label={t("localeLabel")}>
@@ -147,10 +147,10 @@ function TemplateForm({
             </SelectContent>
           </Select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("templateLabel")}
           <textarea
-            className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+            className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
             rows={2}
             value={text}
             placeholder={t("templatePlaceholder")}

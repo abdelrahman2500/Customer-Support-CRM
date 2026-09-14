@@ -63,17 +63,17 @@ export function CustomerContextPanel({
   );
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("detail.contextPanelHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("detail.contextPanelHeading")}</h2>
 
       <div className="mt-3 flex flex-col gap-1">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
             {t("detail.contextPanelTicketsHeading")}
           </h3>
           <Link
             href={`/${locale}/customers/${customerId}`}
-            className="focus-ring rounded-sm text-xs text-slate-500 hover:underline"
+            className="focus-ring rounded-sm text-xs text-ink-subtle hover:underline"
           >
             {t("detail.contextPanelViewAll")}
           </Link>
@@ -85,7 +85,7 @@ export function CustomerContextPanel({
           </Alert>
         )}
         {ticketsQuery.isSuccess && otherTickets.length === 0 && (
-          <p className="mt-1 text-sm text-slate-500">{t("detail.contextPanelTicketsEmpty")}</p>
+          <p className="mt-1 text-sm text-ink-subtle">{t("detail.contextPanelTicketsEmpty")}</p>
         )}
         {ticketsQuery.isSuccess && otherTickets.length > 0 && (
           <ul className="mt-1 flex flex-col gap-1 text-sm">
@@ -93,7 +93,7 @@ export function CustomerContextPanel({
               <li key={ticket.id} className="flex items-center justify-between gap-2">
                 <Link
                   href={`/${locale}/tickets/${ticket.id}`}
-                  className="focus-ring truncate rounded-sm font-medium text-slate-800 hover:underline"
+                  className="focus-ring truncate rounded-sm font-medium text-ink-strong hover:underline"
                 >
                   {ticket.subject}
                 </Link>
@@ -109,8 +109,8 @@ export function CustomerContextPanel({
         )}
       </div>
 
-      <div className="mt-3 flex flex-col gap-1 border-t border-slate-100 pt-3">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
+      <div className="mt-3 flex flex-col gap-1 border-t border-rule-subtle pt-3">
+        <h3 className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
           {t("detail.contextPanelContactsHeading")}
         </h3>
         {customerQuery.isLoading && <Skeleton className="mt-1 h-8 w-full" />}
@@ -120,15 +120,15 @@ export function CustomerContextPanel({
           </Alert>
         )}
         {customerQuery.isSuccess && primaryContacts.length === 0 && (
-          <p className="mt-1 text-sm text-slate-500">{t("detail.contextPanelContactsEmpty")}</p>
+          <p className="mt-1 text-sm text-ink-subtle">{t("detail.contextPanelContactsEmpty")}</p>
         )}
         {customerQuery.isSuccess && primaryContacts.length > 0 && (
           <ul className="mt-1 flex flex-col gap-1 text-sm">
             {primaryContacts.map((contact) => (
               <li key={contact.id} className="flex flex-wrap items-baseline gap-x-2">
-                <span className="font-medium text-slate-800">{contact.fullName}</span>
-                {contact.email && <span className="text-slate-500">{contact.email}</span>}
-                {contact.phone && <span className="text-slate-500">{contact.phone}</span>}
+                <span className="font-medium text-ink-strong">{contact.fullName}</span>
+                {contact.email && <span className="text-ink-subtle">{contact.email}</span>}
+                {contact.phone && <span className="text-ink-subtle">{contact.phone}</span>}
               </li>
             ))}
           </ul>

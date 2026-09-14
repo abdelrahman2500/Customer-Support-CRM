@@ -34,8 +34,8 @@ export function AiSettingsView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
-      <p className="text-sm text-slate-500">{t("description")}</p>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <p className="text-sm text-ink-subtle">{t("description")}</p>
 
       {settingsQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -87,7 +87,7 @@ function AiSettingsForm({ initial }: { initial: AiSettingsSummary }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4">
+    <div className="flex flex-col gap-3 rounded-md border border-rule bg-surface p-4">
       {/* Batch 8 (UX audit) — the shared `Checkbox`/`Label` pair, replacing
           a raw `<input type="checkbox">` with no focus-ring/keyboard parity
           with the rest of the app. */}
@@ -99,7 +99,7 @@ function AiSettingsForm({ initial }: { initial: AiSettingsSummary }) {
             disabled={mutation.isPending}
             onCheckedChange={(checked) => void handleToggle(toggle.key, checked === true)}
           />
-          <Label htmlFor={`ai-settings-${toggle.key}`} className="text-sm font-normal text-slate-700">
+          <Label htmlFor={`ai-settings-${toggle.key}`} className="text-sm font-normal text-ink-strong">
             {t(toggle.labelKey)}
           </Label>
         </div>

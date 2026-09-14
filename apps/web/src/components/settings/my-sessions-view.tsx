@@ -24,8 +24,8 @@ export function MySessionsView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
-      <p className="text-sm text-slate-500">{t("description")}</p>
+      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <p className="text-sm text-ink-subtle">{t("description")}</p>
 
       {sessionsQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -45,7 +45,7 @@ export function MySessionsView() {
       )}
 
       {sessionsQuery.isSuccess && sessionsQuery.data.length === 0 && (
-        <p className="text-sm text-slate-500">{t("empty")}</p>
+        <p className="text-sm text-ink-subtle">{t("empty")}</p>
       )}
 
       {sessionsQuery.isSuccess && sessionsQuery.data.length > 0 && (
@@ -88,7 +88,7 @@ function SessionRow({ session }: { session: SessionSummary }) {
           {session.isCurrent && <Badge variant="secondary">{t("thisDevice")}</Badge>}
         </div>
       </TableCell>
-      <TableCell className="font-mono text-xs text-slate-500">{session.ipAddress ?? "—"}</TableCell>
+      <TableCell className="font-mono text-xs text-ink-subtle">{session.ipAddress ?? "—"}</TableCell>
       <TableCell>{new Date(session.lastActiveAt).toLocaleString(locale)}</TableCell>
       <TableCell>{new Date(session.sessionCreatedAt).toLocaleString(locale)}</TableCell>
       <TableCell>

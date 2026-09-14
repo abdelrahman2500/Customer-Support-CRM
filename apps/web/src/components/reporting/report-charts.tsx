@@ -78,16 +78,16 @@ export function BarChart({
         // `row.id` when the caller has a real identity, else the position —
         // never `row.label` alone, which is not unique (see `BarChartRow.id`).
         <div key={row.id ?? `row-${rowIndex}`} className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-700">{row.label}</span>
+          <span className="text-xs font-medium text-ink-strong">{row.label}</span>
           {row.segments.map((segment, index) => (
             <div
               key={`${row.id ?? `row-${rowIndex}`}-${index}`}
               className="flex items-center gap-2"
             >
               {row.segments.length > 1 && (
-                <span className="w-16 shrink-0 text-xs text-slate-500">{segment.label}</span>
+                <span className="w-16 shrink-0 text-xs text-ink-subtle">{segment.label}</span>
               )}
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-muted">
                 <div
                   className="h-full rounded-full"
                   style={{
@@ -100,7 +100,7 @@ export function BarChart({
                   hard-coded physical directional class found anywhere in
                   this codebase (every other instance already uses the
                   logical property). */}
-              <span className="w-8 shrink-0 text-end text-xs font-medium text-slate-900">
+              <span className="w-8 shrink-0 text-end text-xs font-medium text-ink">
                 {segment.value}
               </span>
             </div>
@@ -153,7 +153,7 @@ export function DonutGauge({
         y="50"
         textAnchor="middle"
         dominantBaseline="central"
-        className="fill-slate-900 text-[22px] font-semibold"
+        className="fill-ink text-[22px] font-semibold"
       >
         {Math.round(clamped)}%
       </text>
@@ -168,13 +168,13 @@ export function RatingBar({ rating, ariaLabel }: { rating: number; ariaLabel: st
   const clamped = Math.max(0, Math.min(5, rating));
   return (
     <div role="img" aria-label={ariaLabel} className="flex items-center gap-2">
-      <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
+      <div className="h-3 flex-1 overflow-hidden rounded-full bg-surface-muted">
         <div
           className="h-full rounded-full"
           style={{ width: `${(clamped / 5) * 100}%`, backgroundColor: "rgb(var(--warning-solid))" }}
         />
       </div>
-      <span className="text-sm font-medium text-slate-900">{clamped.toFixed(1)}/5</span>
+      <span className="text-sm font-medium text-ink">{clamped.toFixed(1)}/5</span>
     </div>
   );
 }

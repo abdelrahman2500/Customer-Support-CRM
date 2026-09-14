@@ -17,7 +17,7 @@ function DiffCell({ diff }: { diff: unknown }) {
   }
   return (
     <div className="max-w-xs overflow-x-auto">
-      <pre className="whitespace-pre text-xs text-slate-600">{JSON.stringify(diff, null, 2)}</pre>
+      <pre className="whitespace-pre text-xs text-ink-muted">{JSON.stringify(diff, null, 2)}</pre>
     </div>
   );
 }
@@ -113,7 +113,7 @@ export function AuditLogView() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-slate-900">{t("title")}</h1>
+        <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
         {/* Story S-8a/S-7 — the rows of the page being left stay on screen
             while the next page loads, so this is the only signal that a
             page change is in flight. In the heading's own row, so it adds
@@ -122,7 +122,7 @@ export function AuditLogView() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("filterAction")}
           <Input
             className="min-w-[10rem]"
@@ -131,7 +131,7 @@ export function AuditLogView() {
             onBlur={(event) => updateFilter("action", event.target.value.trim())}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("filterEntityType")}
           <Input
             className="min-w-[10rem]"
@@ -140,7 +140,7 @@ export function AuditLogView() {
             onBlur={(event) => updateFilter("entityType", event.target.value.trim())}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("filterFrom")}
           <Input
             type="date"
@@ -149,7 +149,7 @@ export function AuditLogView() {
             onChange={(event) => updateFilter("from", event.target.value)}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
+        <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("filterTo")}
           <Input
             type="date"
@@ -215,7 +215,7 @@ export function AuditLogView() {
             <TableBody>
               {logs.map((log: AuditLogSummary) => (
                 <TableRow key={log.id}>
-                  <TableCell className="text-slate-500">
+                  <TableCell className="text-ink-subtle">
                     {new Date(log.createdAt).toLocaleString(locale)}
                   </TableCell>
                   <TableCell>
@@ -225,13 +225,13 @@ export function AuditLogView() {
                     <Badge variant="outline">{log.action}</Badge>
                   </TableCell>
                   <TableCell>{log.entityType}</TableCell>
-                  <TableCell className="text-slate-500">
+                  <TableCell className="text-ink-subtle">
                     {log.entityId ?? <span className="text-ink-subtle">{t("noEntityId")}</span>}
                   </TableCell>
-                  <TableCell className="text-slate-500">
+                  <TableCell className="text-ink-subtle">
                     {log.branchId ?? <span className="text-ink-subtle">{t("noBranch")}</span>}
                   </TableCell>
-                  <TableCell className="text-slate-500">
+                  <TableCell className="text-ink-subtle">
                     {log.ipAddress ?? <span className="text-ink-subtle">{t("noIpAddress")}</span>}
                   </TableCell>
                   <TableCell>

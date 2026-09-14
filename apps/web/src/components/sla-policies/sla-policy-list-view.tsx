@@ -42,7 +42,7 @@ export function SlaPolicyListView() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+        <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
         <Button size="sm" asChild>
           <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
         </Button>
@@ -163,10 +163,10 @@ function SlaPolicyRow({
 
   return (
     <TableRow>
-      <TableCell className="text-slate-500">
+      <TableCell className="text-ink-subtle">
         {policy.departmentId ?? t("list.noDepartment")}
       </TableCell>
-      <TableCell className="text-slate-500">
+      <TableCell className="text-ink-subtle">
         {policy.categoryId
           ? (categoryNameById.get(policy.categoryId) ?? policy.categoryId)
           : t("list.noCategory")}

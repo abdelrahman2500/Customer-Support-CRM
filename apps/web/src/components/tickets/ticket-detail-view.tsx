@@ -164,12 +164,12 @@ export function TicketDetailSkeleton() {
       </div>
 
       {/* RM-04 — the customer context panel. */}
-      <div className="rounded-md border border-slate-200 bg-white p-4">
+      <div className="rounded-md border border-rule bg-surface p-4">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-2 h-16 w-full" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 rounded-md border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 rounded-md border border-rule bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 5 }).map((_, index) => (
           <div key={index} className="flex flex-col gap-1">
             <Skeleton className="h-3 w-16" />
@@ -181,7 +181,7 @@ export function TicketDetailSkeleton() {
       <Skeleton className="h-40 w-full rounded-md" />
 
       {Array.from({ length: 7 }).map((_, index) => (
-        <div key={index} className="rounded-md border border-slate-200 bg-white p-4">
+        <div key={index} className="rounded-md border border-rule bg-surface p-4">
           <Skeleton className="h-4 w-32" />
           <Skeleton className="mt-2 h-16 w-full" />
         </div>
@@ -253,7 +253,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           since the adjacent label already names the action. */}
       <Link
         href={`/${locale}/tickets`}
-        className="focus-ring self-start rounded-sm text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
+        className="focus-ring self-start rounded-sm text-sm font-medium text-ink-muted hover:text-ink hover:underline"
       >
         <span aria-hidden="true" className="inline-block rtl:rotate-180">
           &larr;
@@ -290,7 +290,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             }
           }}
         />
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-ink-subtle">
           {t("detail.customer")}:{" "}
           <Link
             href={`/${locale}/customers/${ticket.customerId}`}
@@ -313,7 +313,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 gap-4 rounded-md border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 rounded-md border border-rule bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field label={t("detail.status")}>
           <Select
             value={ticket.status}
@@ -519,11 +519,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         </Alert>
       )}
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("detail.slaHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.slaHeading")}</h2>
         {slaTargetQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
         {slaTargetQuery.isSuccess && slaStatus.kind === "none" && (
-          <p className="mt-1 text-sm text-slate-500">{t("sla.none")}</p>
+          <p className="mt-1 text-sm text-ink-subtle">{t("sla.none")}</p>
         )}
         {slaTargetQuery.isSuccess && slaStatus.kind === "breached" && (
           <Badge variant="destructive" className="mt-2">
@@ -531,7 +531,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </Badge>
         )}
         {slaTargetQuery.isSuccess && slaStatus.kind === "on-track" && (
-          <p className="mt-1 text-sm text-slate-700">
+          <p className="mt-1 text-sm text-ink-strong">
             {t("sla.remaining", { time: formatRemaining(slaStatus.remainingMs) })}
           </p>
         )}
@@ -585,8 +585,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         )}
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("detail.escalationsHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.escalationsHeading")}</h2>
         {escalationsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {escalationsQuery.isError && (
           <Alert variant="destructive" className="mt-2">
@@ -594,7 +594,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </Alert>
         )}
         {escalationsQuery.isSuccess && escalationsQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">{t("detail.escalationsEmpty")}</p>
+          <p className="mt-2 text-sm text-ink-subtle">{t("detail.escalationsEmpty")}</p>
         )}
         {escalationsQuery.isSuccess && escalationsQuery.data.length > 0 && (
           <ol className="mt-2 flex flex-col gap-2 text-sm">
@@ -603,12 +603,12 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               return (
                 <li
                   key={escalation.id}
-                  className="flex items-center justify-between border-b border-slate-100 pb-2"
+                  className="flex items-center justify-between border-b border-rule-subtle pb-2"
                 >
-                  <span className="font-medium text-slate-800">
+                  <span className="font-medium text-ink-strong">
                     {targetTypeLabelKey ? t(targetTypeLabelKey) : escalation.targetType}
                   </span>
-                  <span className="text-slate-500">
+                  <span className="text-ink-subtle">
                     {new Date(escalation.escalatedAt).toLocaleString(locale)}
                   </span>
                 </li>
@@ -618,8 +618,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         )}
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("detail.historyHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.historyHeading")}</h2>
         {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {historyQuery.isError && (
           <Alert variant="destructive" className="mt-2">
@@ -627,17 +627,17 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </Alert>
         )}
         {historyQuery.isSuccess && historyQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">{t("detail.historyEmpty")}</p>
+          <p className="mt-2 text-sm text-ink-subtle">{t("detail.historyEmpty")}</p>
         )}
         {historyQuery.isSuccess && historyQuery.data.length > 0 && (
           <ol className="mt-2 flex flex-col gap-2 text-sm">
             {historyQuery.data.map((entry) => (
               <li
                 key={entry.id}
-                className="flex items-center justify-between border-b border-slate-100 pb-2"
+                className="flex items-center justify-between border-b border-rule-subtle pb-2"
               >
-                <span className="font-medium text-slate-800">{entry.eventType}</span>
-                <span className="text-slate-500">
+                <span className="font-medium text-ink-strong">{entry.eventType}</span>
+                <span className="text-ink-subtle">
                   {new Date(entry.createdAt).toLocaleString(locale)}
                 </span>
               </li>
@@ -646,8 +646,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         )}
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("detail.csatHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.csatHeading")}</h2>
         {csatQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
         {csatQuery.isError && (
           <Alert variant="destructive" className="mt-2">
@@ -655,20 +655,20 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </Alert>
         )}
         {csatQuery.isSuccess && !csatQuery.data && (
-          <p className="mt-2 text-sm text-slate-500">{t("detail.csatEmpty")}</p>
+          <p className="mt-2 text-sm text-ink-subtle">{t("detail.csatEmpty")}</p>
         )}
         {csatQuery.isSuccess && csatQuery.data && (
           <div className="mt-2 flex flex-col gap-1 text-sm">
-            <span className="font-medium text-slate-800">
+            <span className="font-medium text-ink-strong">
               {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
             </span>
-            {csatQuery.data.comment && <p className="text-slate-700">{csatQuery.data.comment}</p>}
+            {csatQuery.data.comment && <p className="text-ink-strong">{csatQuery.data.comment}</p>}
           </div>
         )}
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("detail.notesHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.notesHeading")}</h2>
         {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {notesQuery.isError && (
           <Alert variant="destructive" className="mt-2">
@@ -676,21 +676,21 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </Alert>
         )}
         {notesQuery.isSuccess && notesQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">{t("detail.notesEmpty")}</p>
+          <p className="mt-2 text-sm text-ink-subtle">{t("detail.notesEmpty")}</p>
         )}
         {notesQuery.isSuccess && notesQuery.data.length > 0 && (
           <ol className="mt-2 flex flex-col gap-2 text-sm">
             {notesQuery.data.map((note) => (
-              <li key={note.id} className="border-b border-slate-100 pb-2">
+              <li key={note.id} className="border-b border-rule-subtle pb-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-slate-800">
+                  <span className="font-medium text-ink-strong">
                     {userNameById.get(note.authorUserId) ?? note.authorUserId}
                   </span>
-                  <span className="text-slate-500">
+                  <span className="text-ink-subtle">
                     {new Date(note.createdAt).toLocaleString(locale)}
                   </span>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-slate-700">{note.body}</p>
+                <p className="mt-1 whitespace-pre-wrap text-ink-strong">{note.body}</p>
               </li>
             ))}
           </ol>
@@ -791,7 +791,7 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
   return (
     <form className="relative mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
       <textarea
-        className="flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+        className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
         rows={3}
         value={body}
         placeholder={t("detail.notesPlaceholder")}
@@ -806,12 +806,12 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
         }}
       />
       {mentionMatches.length > 0 && (
-        <ul className="absolute top-full z-10 mt-1 w-56 rounded-md border border-slate-200 bg-white py-1 text-sm shadow-md">
+        <ul className="absolute top-full z-10 mt-1 w-56 rounded-md border border-rule bg-surface py-1 text-sm shadow-md">
           {mentionMatches.map((user) => (
             <li key={user.id}>
               <button
                 type="button"
-                className="block w-full px-3 py-1.5 text-start hover:bg-slate-50 focus-ring"
+                className="block w-full px-3 py-1.5 text-start hover:bg-surface-sunk focus-ring"
                 onClick={() => selectMention(user.fullName)}
               >
                 {user.fullName}
@@ -832,7 +832,7 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1 text-xs text-slate-600">
+    <label className="flex flex-col gap-1 text-xs text-ink-muted">
       {label}
       {children}
     </label>
