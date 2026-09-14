@@ -111,17 +111,29 @@ export function ArticleListView() {
           {articles.map((article) => (
             <li
               key={article.id}
-              className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
+              className="flex cursor-pointer items-center justify-between gap-2 border-b border-rule-subtle pb-2"
               onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
             >
+              {/* `min-w-0 break-words`: an article title is author-written
+                  free text, and a flex item's default `min-width: auto`
+                  refuses to shrink below it, so a long title pushed the
+                  category beside it past the viewport edge (measured: 9px of
+                  horizontal page overflow at 390px). The category keeps
+                  `shrink-0` so it is never the thing squeezed instead, and
+                  the row gains `gap-2` so the two can no longer touch once
+                  the title is allowed to fill the space — the same shape as
+                  `apps/web`'s own knowledge-base row, which already pairs
+                  `justify-between` with a gap. */}
               <Link
                 href={`/${locale}/knowledge-base/${article.id}`}
-                className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
+                className="focus-ring min-w-0 break-words rounded-sm font-medium text-ink-strong hover:underline"
                 onClick={(event) => event.stopPropagation()}
               >
                 {article.title}
               </Link>
-              <span className="text-ink-subtle">{article.categoryName ?? t("list.noCategory")}</span>
+              <span className="shrink-0 text-ink-subtle">
+                {article.categoryName ?? t("list.noCategory")}
+              </span>
             </li>
           ))}
         </ol>

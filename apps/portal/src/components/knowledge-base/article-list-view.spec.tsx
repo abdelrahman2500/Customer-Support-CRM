@@ -113,6 +113,43 @@ describe("ArticleListView", () => {
     expect(link).toHaveAttribute("href", "/en/knowledge-base/article-1");
   });
 
+  /**
+   * Regression guard. An article title is author-written free text sitting
+   * in a `flex justify-between` row; a flex item's default
+   * `min-width: auto` refuses to shrink below it, so a long title pushed
+   * the category label beside it past the viewport edge — measured in a
+   * real browser as 9px of horizontal page overflow on the portal's
+   * knowledge-base list at 390px.
+   *
+   * jsdom computes no real box layout, so this asserts the classes that
+   * govern it rather than a pixel width: the title side must be allowed to
+   * shrink and wrap, and the category must never be the element squeezed
+   * instead.
+   */
+  it("lets a long article title shrink and wrap instead of pushing the category out of the row", () => {
+    const longTitle =
+      "How to reset your password when single sign-on is enabled and the directory is unavailable";
+    mockedUsePublishedArticlesQuery.mockReturnValue(
+      queryResult({
+        data: page([{ ...baseArticle, title: longTitle, categoryId: null, categoryName: null }]),
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<ArticleListView />);
+
+    const link = screen.getByRole("link", { name: longTitle });
+    expect(link).toHaveClass("min-w-0");
+    expect(link).toHaveClass("break-words");
+
+    const category = screen.getByText("list.noCategory");
+    expect(category).toHaveClass("shrink-0");
+
+    // The row separates the two, so they cannot collide once the title is
+    // free to fill the available space.
+    expect(link.closest("li")).toHaveClass("gap-2");
+  });
+
   it("falls back to the placeholder label for an unscoped category", () => {
     mockedUsePublishedArticlesQuery.mockReturnValue(
       queryResult({
