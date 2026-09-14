@@ -122,7 +122,7 @@ export function NotificationHistoryView() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-slate-900">{t("history.title")}</h1>
+        <h1 className="text-lg font-semibold text-ink">{t("history.title")}</h1>
         {/* In the heading's own row, so it adds no height and cannot shift
             the table below it — mirrors TicketListView exactly. */}
         <FetchingIndicator
@@ -175,7 +175,7 @@ export function NotificationHistoryView() {
           <button
             type="button"
             onClick={() => notificationsQuery.refetch()}
-            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
+            className="rounded-md border border-red-300 bg-surface px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
           >
             {t("history.retry")}
           </button>
@@ -202,7 +202,7 @@ export function NotificationHistoryView() {
               {notifications.map((notification: PortalNotificationSummary) => (
                 <TableRow key={notification.id}>
                   <TableCell>
-                    <span className="rounded-full border border-slate-300 px-2 py-0.5 text-xs">
+                    <span className="rounded-full border border-rule-strong px-2 py-0.5 text-xs">
                       {t(eventLabelKeyFor(notification.eventType))}
                     </span>
                   </TableCell>
@@ -214,7 +214,7 @@ export function NotificationHistoryView() {
                       {ticketSubjectById.get(notification.ticketId) ?? notification.ticketId}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-slate-500">
+                  <TableCell className="text-ink-subtle">
                     {new Date(notification.loggedAt).toLocaleString(locale)}
                   </TableCell>
                 </TableRow>

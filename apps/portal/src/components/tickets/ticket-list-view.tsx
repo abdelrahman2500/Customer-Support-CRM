@@ -46,9 +46,9 @@ export function TicketListView() {
     <section className="flex flex-col gap-6">
       {/* Story 98 — p-4, not p-6: matches apps/web's own dominant card
           padding convention (see that app's data cards throughout). */}
-      <div className="rounded-md border border-slate-200 bg-white p-4">
+      <div className="rounded-md border border-rule bg-surface p-4">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
           {/* In the heading's own row, so it adds no height and cannot
               shift the list below it — mirrors ArticleListView exactly. */}
           <FetchingIndicator active={ticketsQuery.isPlaceholderData} label={tCommon("updating")} />
@@ -68,7 +68,7 @@ export function TicketListView() {
             <button
               type="button"
               onClick={() => ticketsQuery.refetch()}
-              className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
+              className="rounded-md border border-red-300 bg-surface px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
             >
               {t("list.retry")}
             </button>
@@ -76,7 +76,7 @@ export function TicketListView() {
         )}
 
         {tickets !== undefined && tickets.length === 0 && (
-          <p className="mt-3 text-sm text-slate-500">{t("list.empty")}</p>
+          <p className="mt-3 text-sm text-ink-subtle">{t("list.empty")}</p>
         )}
 
         {tickets !== undefined && tickets.length > 0 && (
@@ -84,17 +84,17 @@ export function TicketListView() {
             {tickets.map((ticket) => (
               <li
                 key={ticket.id}
-                className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2"
+                className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
               >
                 <Link
                   href={`/${locale}/tickets/${ticket.id}`}
-                  className="focus-ring rounded-sm font-medium text-slate-800 hover:underline"
+                  className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
                   onClick={(event) => event.stopPropagation()}
                 >
                   {ticket.subject}
                 </Link>
-                <span className="flex items-center gap-2 text-slate-500">
+                <span className="flex items-center gap-2 text-ink-subtle">
                   <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
                   <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
                 </span>
@@ -160,10 +160,10 @@ function CreateTicketForm() {
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("list.createHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("list.createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("list.createSubjectLabel")}
           <Input
             className="max-w-md"
@@ -172,7 +172,7 @@ function CreateTicketForm() {
             required
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("list.createCategoryLabel")}
           <Input
             className="max-w-md"

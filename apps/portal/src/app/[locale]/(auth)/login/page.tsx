@@ -73,16 +73,16 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
-      <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-900">{t("title")}</h1>
+    <main className="flex min-h-screen items-center justify-center bg-surface-sunk p-8">
+      <div className="w-full max-w-sm rounded-lg border border-rule bg-surface p-8 shadow-sm">
+        <h1 className="text-xl font-semibold text-ink">{t("title")}</h1>
         {sessionExpired && !error && (
-          <p className="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <p className="mt-4 rounded-md border border-rule bg-surface-sunk px-3 py-2 text-sm text-ink-strong">
             {tCommon("errors.unauthorized")}
           </p>
         )}
         <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
-          <label className="flex flex-col gap-1 text-sm text-slate-700">
+          <label className="flex flex-col gap-1 text-sm text-ink-strong">
             {t("email")}
             <Input
               type="email"
@@ -92,7 +92,7 @@ export default function LoginPage() {
               autoComplete="email"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm text-slate-700">
+          <label className="flex flex-col gap-1 text-sm text-ink-strong">
             {t("password")}
             <Input
               type="password"

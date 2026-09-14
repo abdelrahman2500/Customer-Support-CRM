@@ -130,8 +130,8 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const chatHref = `/${locale}/chat`;
   const notificationsHref = `/${locale}/notifications`;
   const linkClassName = (href: string) =>
-    `flex items-center gap-1.5 rounded-md px-2 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-ring ${
-      isActiveHref(href) ? "bg-slate-100 font-medium text-slate-900" : ""
+    `flex items-center gap-1.5 rounded-md px-2 py-1.5 text-ink-muted hover:bg-surface-muted hover:text-ink focus-ring ${
+      isActiveHref(href) ? "bg-surface-muted font-medium text-ink" : ""
     }`;
 
   /** RM-11 — the one shared source for the nav's 4 links, so the desktop
@@ -171,7 +171,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
           )}
           <Link
             href={`/${locale}/home`}
-            className="rounded-md px-2 py-1.5 font-semibold text-slate-900"
+            className="rounded-md px-2 py-1.5 font-semibold text-ink"
           >
             {t("signedInAs", { name: contact.fullName })}
           </Link>
@@ -224,7 +224,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         <div className="flex items-center gap-2">
           <select
             aria-label={t("languageSwitcher.label")}
-            className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+            className="h-9 rounded-md border border-rule-strong bg-surface px-2 text-sm"
             value={locale}
             onChange={(event) => void handleSwitchLocale(event.target.value)}
           >

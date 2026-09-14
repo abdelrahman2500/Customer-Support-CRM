@@ -60,9 +60,9 @@ export function ArticleListView() {
   const articles = articlePage?.items;
 
   return (
-    <section className="rounded-md border border-slate-200 bg-white p-4">
+    <section className="rounded-md border border-rule bg-surface p-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold text-slate-900">{t("list.title")}</h1>
+        <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
         {/* In the heading's own row, so it adds no height and cannot shift
             the list below it. */}
         <FetchingIndicator active={articlesQuery.isPlaceholderData} label={tCommon("updating")} />
@@ -91,7 +91,7 @@ export function ArticleListView() {
           <button
             type="button"
             onClick={() => articlesQuery.refetch()}
-            className="rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
+            className="rounded-md border border-red-300 bg-surface px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
           >
             {t("list.retry")}
           </button>
@@ -99,11 +99,11 @@ export function ArticleListView() {
       )}
 
       {articles !== undefined && articles.length === 0 && search !== "" && (
-        <p className="mt-3 text-sm text-slate-500">{t("list.noResults")}</p>
+        <p className="mt-3 text-sm text-ink-subtle">{t("list.noResults")}</p>
       )}
 
       {articles !== undefined && articles.length === 0 && search === "" && (
-        <p className="mt-3 text-sm text-slate-500">{t("list.empty")}</p>
+        <p className="mt-3 text-sm text-ink-subtle">{t("list.empty")}</p>
       )}
 
       {articles !== undefined && articles.length > 0 && (
@@ -111,17 +111,17 @@ export function ArticleListView() {
           {articles.map((article) => (
             <li
               key={article.id}
-              className="flex cursor-pointer items-center justify-between border-b border-slate-100 pb-2"
+              className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
               onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
             >
               <Link
                 href={`/${locale}/knowledge-base/${article.id}`}
-                className="focus-ring rounded-sm font-medium text-slate-800 hover:underline"
+                className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
                 onClick={(event) => event.stopPropagation()}
               >
                 {article.title}
               </Link>
-              <span className="text-slate-500">{article.categoryName ?? t("list.noCategory")}</span>
+              <span className="text-ink-subtle">{article.categoryName ?? t("list.noCategory")}</span>
             </li>
           ))}
         </ol>

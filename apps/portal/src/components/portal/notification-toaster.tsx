@@ -67,10 +67,10 @@ export function NotificationToaster() {
             key={notification.id}
             role="status"
             aria-live="polite"
-            className="pointer-events-auto flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-md"
+            className="pointer-events-auto flex flex-col gap-2 rounded-md border border-rule bg-surface p-3 shadow-md"
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="text-sm font-semibold text-slate-900">
+              <span className="text-sm font-semibold text-ink">
                 {t(
                   `eventLabel.${notification.eventType === "ticket.updated" ? "ticketUpdated" : "newReply"}`,
                 )}
@@ -87,7 +87,7 @@ export function NotificationToaster() {
                 <CloseIcon className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
-            <p className="text-sm text-slate-800">{messageFor(notification, t)}</p>
+            <p className="text-sm text-ink-strong">{messageFor(notification, t)}</p>
             <Button
               type="button"
               onClick={() => {

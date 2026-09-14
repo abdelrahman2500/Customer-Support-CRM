@@ -53,7 +53,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
     <section className="flex flex-col gap-6">
       <Link
         href={`/${locale}/knowledge-base`}
-        className="text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
+        className="text-sm font-medium text-ink-muted hover:text-ink hover:underline"
       >
         {/* `rtl:rotate-180` so "back" points the way back in both
             directions — a bare `&larr;` points *forward* in Arabic.
@@ -64,10 +64,10 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         {t("detail.backToList")}
       </Link>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h1 className="text-lg font-semibold text-slate-900">{article.title}</h1>
-        {article.categoryName && <p className="mt-1 text-xs text-slate-500">{article.categoryName}</p>}
-        <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{article.body}</p>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h1 className="text-lg font-semibold text-ink">{article.title}</h1>
+        {article.categoryName && <p className="mt-1 text-xs text-ink-subtle">{article.categoryName}</p>}
+        <p className="mt-3 whitespace-pre-wrap text-sm text-ink-strong">{article.body}</p>
       </div>
     </section>
   );

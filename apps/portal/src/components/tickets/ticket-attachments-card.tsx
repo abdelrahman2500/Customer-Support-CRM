@@ -36,8 +36,8 @@ export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
   }
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("detail.attachmentsHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("detail.attachmentsHeading")}</h2>
       {attachmentsQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
       {attachmentsQuery.isError && (
         <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -45,23 +45,23 @@ export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
         </div>
       )}
       {attachmentsQuery.isSuccess && attachmentsQuery.data.length === 0 && (
-        <p className="mt-2 text-sm text-slate-500">{t("detail.attachmentsEmpty")}</p>
+        <p className="mt-2 text-sm text-ink-subtle">{t("detail.attachmentsEmpty")}</p>
       )}
       {attachmentsQuery.isSuccess && attachmentsQuery.data.length > 0 && (
         <ol className="mt-2 flex flex-col gap-2 text-sm">
           {attachmentsQuery.data.map((attachment) => (
             <li
               key={attachment.id}
-              className="flex items-center justify-between border-b border-slate-100 pb-2"
+              className="flex items-center justify-between border-b border-rule-subtle pb-2"
             >
               <button
                 type="button"
-                className="rounded-sm text-start font-medium text-slate-800 hover:underline focus-ring"
+                className="rounded-sm text-start font-medium text-ink-strong hover:underline focus-ring"
                 onClick={() => void handleDownload(attachment.id)}
               >
                 {attachment.filename}
               </button>
-              <span className="text-slate-500">
+              <span className="text-ink-subtle">
                 {formatFileSize(attachment.size)} ·{" "}
                 {new Date(attachment.createdAt).toLocaleString(locale)}
               </span>
@@ -100,16 +100,16 @@ function AddAttachmentForm({ ticketId }: { ticketId: string }) {
 
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
         <input
           type="file"
           disabled={mutation.isPending}
           onChange={(event) => void handleFileChange(event)}
-          className="text-sm text-slate-700"
+          className="text-sm text-ink-strong"
         />
       </label>
       {mutation.isPending && (
-        <p className="text-xs text-slate-500">{t("detail.attachmentsUploading")}</p>
+        <p className="text-xs text-ink-subtle">{t("detail.attachmentsUploading")}</p>
       )}
       {error && (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -30,14 +30,14 @@ export default function LocaleError({
   }, [error]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
-      <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-900">{t("errorBoundary.title")}</h1>
-        <p className="mt-2 text-sm text-slate-600">{t("errorBoundary.description")}</p>
+    <main className="flex min-h-screen items-center justify-center bg-surface-sunk p-8">
+      <div className="w-full max-w-sm rounded-lg border border-rule bg-surface p-8 text-center shadow-sm">
+        <h1 className="text-xl font-semibold text-ink">{t("errorBoundary.title")}</h1>
+        <p className="mt-2 text-sm text-ink-muted">{t("errorBoundary.description")}</p>
         <button
           type="button"
           onClick={reset}
-          className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 focus-ring"
+          className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground hover:bg-accent-hover focus-ring"
         >
           {t("errorBoundary.retry")}
         </button>

@@ -45,7 +45,7 @@ export function TicketDetailSkeleton() {
     <section className="flex flex-col gap-6" aria-hidden="true">
       <Skeleton className="h-4 w-32" />
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
+      <div className="rounded-md border border-rule bg-surface p-4">
         <Skeleton className="h-6 w-1/2" />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -59,7 +59,7 @@ export function TicketDetailSkeleton() {
 
       <Skeleton className="h-40 w-full" />
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
+      <div className="rounded-md border border-rule bg-surface p-4">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-2 h-24 w-full" />
       </div>
@@ -96,7 +96,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
     <section className="flex flex-col gap-6">
       <Link
         href={`/${locale}/tickets`}
-        className="text-sm font-medium text-slate-600 hover:text-slate-900 hover:underline"
+        className="text-sm font-medium text-ink-muted hover:text-ink hover:underline"
       >
         {/* `rtl:rotate-180` so "back" points the way back in both
             directions — a bare `&larr;` points *forward* in Arabic.
@@ -107,22 +107,22 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         {t("detail.backToList")}
       </Link>
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h1 className="text-lg font-semibold text-slate-900">{ticket.subject}</h1>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h1 className="text-lg font-semibold text-ink">{ticket.subject}</h1>
         <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-xs text-slate-500">{t("detail.status")}</dt>
+            <dt className="text-xs text-ink-subtle">{t("detail.status")}</dt>
             <dd>
               <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">{t("detail.priority")}</dt>
-            <dd className="font-medium text-slate-800">{ticket.priority}</dd>
+            <dt className="text-xs text-ink-subtle">{t("detail.priority")}</dt>
+            <dd className="font-medium text-ink-strong">{ticket.priority}</dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">{t("detail.category")}</dt>
-            <dd className="font-medium text-slate-800">
+            <dt className="text-xs text-ink-subtle">{t("detail.category")}</dt>
+            <dd className="font-medium text-ink-strong">
               {ticket.categoryName ?? t("list.noCategory")}
             </dd>
           </div>
@@ -133,8 +133,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
       <TicketAttachmentsCard ticketId={ticketId} />
 
-      <div className="rounded-md border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("detail.historyHeading")}</h2>
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.historyHeading")}</h2>
         {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {historyQuery.isError && (
           <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -142,17 +142,17 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </div>
         )}
         {historyQuery.isSuccess && historyQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-slate-500">{t("detail.historyEmpty")}</p>
+          <p className="mt-2 text-sm text-ink-subtle">{t("detail.historyEmpty")}</p>
         )}
         {historyQuery.isSuccess && historyQuery.data.length > 0 && (
           <ol className="mt-2 flex flex-col gap-2 text-sm">
             {historyQuery.data.map((entry) => (
               <li
                 key={entry.id}
-                className="flex items-center justify-between border-b border-slate-100 pb-2"
+                className="flex items-center justify-between border-b border-rule-subtle pb-2"
               >
-                <span className="font-medium text-slate-800">{entry.eventType}</span>
-                <span className="text-slate-500">
+                <span className="font-medium text-ink-strong">{entry.eventType}</span>
+                <span className="text-ink-subtle">
                   {new Date(entry.createdAt).toLocaleString(locale)}
                 </span>
               </li>
@@ -176,8 +176,8 @@ function CsatSection({ ticketId }: { ticketId: string }) {
   const csatQuery = useMyTicketCsatQuery(ticketId);
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <h2 className="text-sm font-semibold text-slate-900">{t("detail.csatHeading")}</h2>
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("detail.csatHeading")}</h2>
 
       {csatQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
 
@@ -189,11 +189,11 @@ function CsatSection({ ticketId }: { ticketId: string }) {
 
       {csatQuery.isSuccess && csatQuery.data && (
         <div className="mt-2 flex flex-col gap-1 text-sm">
-          <span className="font-medium text-slate-800">
+          <span className="font-medium text-ink-strong">
             {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
           </span>
-          {csatQuery.data.comment && <p className="text-slate-600">{csatQuery.data.comment}</p>}
-          <p className="text-slate-500">{t("detail.csatSubmitted")}</p>
+          {csatQuery.data.comment && <p className="text-ink-muted">{csatQuery.data.comment}</p>}
+          <p className="text-ink-subtle">{t("detail.csatSubmitted")}</p>
         </div>
       )}
 
@@ -233,7 +233,7 @@ function CsatForm({ ticketId }: { ticketId: string }) {
 
   return (
     <form className="mt-2 flex flex-col gap-3" onSubmit={handleSubmit}>
-      <p className="text-sm text-slate-700">{t("detail.csatPrompt")}</p>
+      <p className="text-sm text-ink-strong">{t("detail.csatPrompt")}</p>
       <div role="radiogroup" aria-label={t("detail.csatRatingSelectLabel")} className="flex gap-2">
         {[1, 2, 3, 4, 5].map((value) => (
           <button
@@ -244,18 +244,18 @@ function CsatForm({ ticketId }: { ticketId: string }) {
             onClick={() => setRating(value)}
             className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm font-medium focus-ring ${
               rating === value
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                ? "border-accent bg-accent text-accent-foreground"
+                : "border-rule-strong bg-surface text-ink-strong hover:bg-surface-sunk"
             }`}
           >
             {value}
           </button>
         ))}
       </div>
-      <label className="flex flex-col gap-1 text-sm text-slate-700">
+      <label className="flex flex-col gap-1 text-sm text-ink-strong">
         {t("detail.csatCommentLabel")}
         <textarea
-          className="w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus-ring"
+          className="w-full max-w-md rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm focus-ring"
           value={comment}
           onChange={(event) => setComment(event.target.value)}
           rows={3}
