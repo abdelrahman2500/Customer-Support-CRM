@@ -3,7 +3,7 @@
 ## Knowledge Base (high level)
 
 - `knowledge_base.articles` has categories/tags, draft/published workflow, and versioning; publishing creates a new version rather than mutating published content.
-- Postgres `tsvector` provides initial search, with `pgvector` embeddings alongside articles for semantic retrieval.
+- Postgres `tsvector` provides article search, for both agents and the AI layer. Storing `pgvector` embeddings alongside articles for semantic retrieval remains a future option, not something implemented today — it is deferred pending an external embeddings-provider decision (see `.squad/plans/ai-chat-kb-grounding/`).
 - Articles are consumed by the agent app, customer portal, and AI layer.
 
 ## Customer Portal (high level)

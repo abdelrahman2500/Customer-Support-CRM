@@ -16,4 +16,4 @@ These are foundation-level designs; concrete rule sets and UX belong to future s
 - Non-interactive AI work uses `ai-processing`; interactive chatbot turns use the asynchronous provider client through the API.
 - Every call logs prompt reference, model, token usage, latency, and outcome. Features are flaggable per branch.
 - Human review is the default for agent-facing output. Autonomous responses are limited to portal self-service in this foundation phase.
-- AI retrieval uses Knowledge Base embeddings stored with `pgvector`.
+- AI retrieval grounds on the Knowledge Base through Postgres `tsvector` full-text search, not embeddings. The `pgvector` extension is installed but unused: embeddings-based semantic retrieval is deferred pending an external embeddings-provider decision (Anthropic exposes no embeddings endpoint). See `.squad/plans/ai-chat-kb-grounding/117-story-ai-chat-kb-grounding.md` for the rationale and the upgrade path.

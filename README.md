@@ -156,20 +156,25 @@ requesting agent or customer. Prompts are logged by hash reference, not
 raw text. Ticket-assist results are advisory only (never auto-applied to
 the ticket) and are polled/viewed on the ticket detail page. Per-branch
 feature flags let a branch admin disable any of the five AI operations
-independently. There is no retrieval-augmented generation, KB grounding,
-tool use, or multi-turn context beyond raw message history — this is a
-human-in-the-loop assist layer, not an autonomous agent. (A KB-grounding
-story, `ai-chat-kb-grounding`/117, has a plan and intake document under
-`.squad/plans/` but no corresponding implementation commit — it remains
-planned, not built.)
+independently. Portal chat and Suggested Solutions are grounded in the
+Knowledge Base: the worker retrieves up to three published, branch-scoped
+articles via the same PostgreSQL `tsvector` full-text search the KB itself
+uses and passes them to the provider as context (Story 117/`f4af9dc` for
+the portal chatbot, RM-00/`50bdf22` for ticket-assist). That retrieval is
+lexical — no embeddings and no `pgvector` similarity search, both deferred
+pending an external embeddings-provider decision (Anthropic exposes no
+embeddings endpoint). There is no tool use, and agent-facing output stays
+advisory — this is a human-in-the-loop assist layer, not an autonomous
+agent.
 
 ### Customer Portal — Implemented
 A separate contact-authenticated Next.js app (its own JWT audience and
 refresh cookie, entirely separate from agent auth): submit and track own
 tickets (with history, attachments, and CSAT feedback once
 resolved/closed), browse the published Knowledge Base, live chat with an
-agent, talk to the same AI chatbot pipeline described above (single-turn
-Q&A, no KB grounding), see in-app and emailed notifications (one combined
+agent, talk to the same AI chatbot pipeline described above (grounded in
+the published Knowledge Base via `tsvector` full-text search, not
+embeddings), see in-app and emailed notifications (one combined
 preference toggle — no independent email opt-out yet), and see the
 branch's live branding (logo/colors).
 
@@ -492,9 +497,11 @@ a synchronous in-request call or an autonomous agent:
   human-reviewed suggestion.
 - **Portal AI chatbot**: a real, working single-turn Q&A chatbot for
   authenticated Customer Portal users, built on the identical async
-  pipeline above. It has no Knowledge Base grounding/retrieval, no tool
-  use, and no multi-turn context beyond the raw message history sent to
-  the model — a deliberate, disclosed scope limit, not a bug.
+  pipeline above. It is grounded in the published Knowledge Base through
+  `tsvector` full-text search (Story 117, `f4af9dc`) — but that retrieval
+  is lexical, not embeddings/`pgvector` similarity. It has no tool use,
+  and no multi-turn context beyond the raw message history sent to the
+  model — deliberate, disclosed scope limits, not bugs.
 - **Per-branch feature flags**: a branch admin can independently disable
   summarize/suggest-reply/categorize/chat; a disabled call still logs a
   `DISABLED`-outcome row (for traceability) but never reaches the queue or
@@ -543,11 +550,13 @@ For the detailed, story-by-story implementation history, see
 - **Production hosting decision** — the platform is cloud-agnostic through
   containers today, but no hosting target has been chosen
   (`docs/architecture/12-risks-tradeoffs-and-scope.md`).
-- **AI grounding**: Knowledge Base retrieval/RAG (vector-based) for both
-  ticket-assist and the portal chatbot are explicitly out of scope for the
-  current implementation — a KB-grounding story has a plan/intake
-  document (`.squad/plans/ai-chat-kb-grounding/`) but no implementation
-  commit yet.
+- **Vector-based AI grounding**: Knowledge Base grounding itself is
+  implemented for both the portal chatbot (Story 117, `f4af9dc`) and
+  ticket-assist Suggested Solutions (RM-00, `50bdf22`), using PostgreSQL
+  `tsvector` full-text search. Replacing that lexical retrieval with
+  embeddings/`pgvector` semantic retrieval is what remains deferred — it
+  requires an external embeddings-provider decision, and Anthropic exposes
+  no embeddings endpoint (`.squad/plans/ai-chat-kb-grounding/`).
 
 ## Documentation
 

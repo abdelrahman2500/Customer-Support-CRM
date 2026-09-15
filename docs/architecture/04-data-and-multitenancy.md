@@ -5,7 +5,7 @@
 - Use a **single PostgreSQL 16 database**, one Prisma schema file (`apps/api/prisma/schema.prisma`), and one Postgres logical schema per domain module via Prisma `@@schema(...)` multi-schema support.
 - Prisma Migrate owns one migration history for the whole database. Feature stories add migrations for their domain; this story creates no feature tables.
 - Attachment binaries live in S3-compatible object storage; Postgres stores key, filename, size, MIME type, and owning entity metadata.
-- Postgres `tsvector`/`tsquery` provides initial Knowledge Base and ticket search. The `pgvector` extension is enabled for embeddings and AI retrieval.
+- Postgres `tsvector`/`tsquery` provides Knowledge Base and ticket search, and is also what AI retrieval grounds on today. The `pgvector` extension is installed but currently unused — it remains a future option for embeddings-based retrieval, deferred pending an external embeddings-provider decision (see `.squad/plans/ai-chat-kb-grounding/`).
 
 ## Multi-branch / multi-department model
 
