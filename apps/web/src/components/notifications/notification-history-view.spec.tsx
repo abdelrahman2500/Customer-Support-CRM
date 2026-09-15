@@ -291,7 +291,7 @@ describe("NotificationHistoryView", () => {
     mockedUseNotificationTemplatesQuery.mockReturnValue(
       queryResult({
         data: [
-          { id: "t-1", eventType: "sla.at_risk", template: "Watch ticket {ticketId} closely" },
+          { id: "t-1", eventType: "sla.at_risk", template: "Watch ticket {ticketId} closely", isActive: true },
         ],
         isSuccess: true,
       }) as never,
@@ -301,6 +301,136 @@ describe("NotificationHistoryView", () => {
 
     expect(screen.getByText("Watch ticket ticket-1 closely")).toBeInTheDocument();
     expect(screen.queryByText("eventLabel.slaAtRisk")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Story 131 — Story 130 shipped the `isActive` flag and the admin
+   * activate/deactivate control, but resolution never consulted it, so a
+   * deactivated template kept rendering here: the badge said "Inactive"
+   * while the template was demonstrably still in use.
+   *
+   * An inactive template must behave exactly like an unconfigured one —
+   * which is why the filter lives in the map builder rather than at the
+   * lookup: the existing locale-then-default `??` chain then handles it
+   * with no second resolution rule.
+   */
+  describe("inactive templates (Story 131)", () => {
+    it("falls back to the built-in label when the only template is inactive", () => {
+      mockedUseNotificationsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
+      );
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [
+            {
+              id: "t-1",
+              eventType: "sla.at_risk",
+              locale: null,
+              template: "Watch ticket {ticketId} closely",
+              isActive: false,
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByText("eventLabel.slaAtRisk")).toBeInTheDocument();
+      expect(screen.queryByText("Watch ticket ticket-1 closely")).not.toBeInTheDocument();
+    });
+
+    it("falls back to the active branch default when the locale override is inactive", () => {
+      mockedUseNotificationsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
+      );
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [
+            {
+              id: "t-1",
+              eventType: "sla.at_risk",
+              locale: null,
+              template: "Default text",
+              isActive: true,
+            },
+            {
+              id: "t-2",
+              eventType: "sla.at_risk",
+              locale: "en",
+              template: "English override",
+              isActive: false,
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      // The locale-specific row is retired, so the chain continues to the
+      // branch default rather than skipping straight to the built-in label.
+      expect(screen.getByText("Default text")).toBeInTheDocument();
+      expect(screen.queryByText("English override")).not.toBeInTheDocument();
+    });
+
+    it("falls back to the built-in label when both the override and the default are inactive", () => {
+      mockedUseNotificationsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
+      );
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [
+            {
+              id: "t-1",
+              eventType: "sla.at_risk",
+              locale: null,
+              template: "Default text",
+              isActive: false,
+            },
+            {
+              id: "t-2",
+              eventType: "sla.at_risk",
+              locale: "en",
+              template: "English override",
+              isActive: false,
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByText("eventLabel.slaAtRisk")).toBeInTheDocument();
+      expect(screen.queryByText("Default text")).not.toBeInTheDocument();
+      expect(screen.queryByText("English override")).not.toBeInTheDocument();
+    });
+
+    it("still renders an active template exactly as before", () => {
+      mockedUseNotificationsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
+      );
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({
+          data: [
+            {
+              id: "t-1",
+              eventType: "sla.at_risk",
+              locale: null,
+              template: "Watch ticket {ticketId} closely",
+              isActive: true,
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<NotificationHistoryView />);
+
+      expect(screen.getByText("Watch ticket ticket-1 closely")).toBeInTheDocument();
+      expect(screen.queryByText("eventLabel.slaAtRisk")).not.toBeInTheDocument();
+    });
   });
 
   // RM-30 — Notification Templates: locale-aware content. `useParams` is
@@ -314,8 +444,8 @@ describe("NotificationHistoryView", () => {
       mockedUseNotificationTemplatesQuery.mockReturnValue(
         queryResult({
           data: [
-            { id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" },
-            { id: "t-2", eventType: "sla.at_risk", locale: "en", template: "English override" },
+            { id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text", isActive: true },
+            { id: "t-2", eventType: "sla.at_risk", locale: "en", template: "English override", isActive: true },
           ],
           isSuccess: true,
         }) as never,
@@ -333,7 +463,7 @@ describe("NotificationHistoryView", () => {
       );
       mockedUseNotificationTemplatesQuery.mockReturnValue(
         queryResult({
-          data: [{ id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" }],
+          data: [{ id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text", isActive: true }],
           isSuccess: true,
         }) as never,
       );
@@ -349,7 +479,7 @@ describe("NotificationHistoryView", () => {
       );
       mockedUseNotificationTemplatesQuery.mockReturnValue(
         queryResult({
-          data: [{ id: "t-1", eventType: "sla.at_risk", locale: "ar", template: "نص عربي" }],
+          data: [{ id: "t-1", eventType: "sla.at_risk", locale: "ar", template: "نص عربي", isActive: true }],
           isSuccess: true,
         }) as never,
       );
@@ -367,7 +497,7 @@ describe("NotificationHistoryView", () => {
     );
     mockedUseNotificationTemplatesQuery.mockReturnValue(
       queryResult({
-        data: [{ id: "t-1", eventType: "ticket.escalated", template: "Should not apply here" }],
+        data: [{ id: "t-1", eventType: "ticket.escalated", template: "Should not apply here", isActive: true }],
         isSuccess: true,
       }) as never,
     );
@@ -383,7 +513,7 @@ describe("NotificationHistoryView", () => {
     );
     mockedUseNotificationTemplatesQuery.mockReturnValue(
       queryResult({
-        data: [{ id: "t-1", eventType: "sla.at_risk", template: "{targetType} at risk" }],
+        data: [{ id: "t-1", eventType: "sla.at_risk", template: "{targetType} at risk", isActive: true }],
         isSuccess: true,
       }) as never,
     );

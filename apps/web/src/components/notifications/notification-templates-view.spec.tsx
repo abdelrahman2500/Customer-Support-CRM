@@ -93,7 +93,7 @@ describe("NotificationTemplatesView", () => {
   it("pre-fills an existing template's text", () => {
     mockedUseNotificationTemplatesQuery.mockReturnValue(
       queryResult({
-        data: [{ id: "t-1", eventType: "sla.at_risk", template: "Ticket {ticketId} is at risk" }],
+        data: [{ id: "t-1", eventType: "sla.at_risk", template: "Ticket {ticketId} is at risk", isActive: true }],
         isSuccess: true,
       }) as never,
     );
@@ -166,8 +166,8 @@ describe("NotificationTemplatesView", () => {
       mockedUseNotificationTemplatesQuery.mockReturnValue(
         queryResult({
           data: [
-            { id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" },
-            { id: "t-2", eventType: "sla.at_risk", locale: "ar", template: "نص عربي" },
+            { id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text", isActive: true },
+            { id: "t-2", eventType: "sla.at_risk", locale: "ar", template: "نص عربي", isActive: true },
           ],
           isSuccess: true,
         }) as never,
@@ -182,8 +182,8 @@ describe("NotificationTemplatesView", () => {
       mockedUseNotificationTemplatesQuery.mockReturnValue(
         queryResult({
           data: [
-            { id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" },
-            { id: "t-2", eventType: "sla.at_risk", locale: "ar", template: "نص عربي" },
+            { id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text", isActive: true },
+            { id: "t-2", eventType: "sla.at_risk", locale: "ar", template: "نص عربي", isActive: true },
           ],
           isSuccess: true,
         }) as never,
@@ -202,7 +202,7 @@ describe("NotificationTemplatesView", () => {
     it("shows a blank textarea when switching to a locale with no saved text yet", async () => {
       mockedUseNotificationTemplatesQuery.mockReturnValue(
         queryResult({
-          data: [{ id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text" }],
+          data: [{ id: "t-1", eventType: "sla.at_risk", locale: null, template: "Default text", isActive: true }],
           isSuccess: true,
         }) as never,
       );

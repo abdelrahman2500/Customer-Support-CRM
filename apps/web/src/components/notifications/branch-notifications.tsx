@@ -34,9 +34,18 @@ export function BranchNotifications({ branchId }: { branchId: string | null }) {
   const preferencesQuery = useNotificationPreferencesQuery();
   const templatesQuery = useNotificationTemplatesQuery();
 
+  // Story 131 — an inactive template is skipped here, while the map is
+  // being built, so it never reaches `NotificationToaster` at all. That
+  // component already treats a missing entry as "no custom template" and
+  // renders its own built-in message (`messageFor`'s `if (template)`
+  // guard), so it needs no change of its own: omitting the entry is the
+  // whole fix, and there is no second copy of the rule to drift.
   const templateByEventType = useMemo(() => {
     const map = new Map<string, string>();
     for (const template of templatesQuery.data ?? []) {
+      if (!template.isActive) {
+        continue;
+      }
       map.set(template.eventType, template.template);
     }
     return map;

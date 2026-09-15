@@ -206,9 +206,21 @@ export function NotificationHistoryView() {
   // default, `locale: null` row) rather than a flat `eventType` map, so a
   // locale-specific override and the branch's own default can coexist
   // without one clobbering the other.
+  //
+  // Story 131 — an inactive template is skipped while the map is being
+  // built, never at the lookup below. Leaving it out of the map is what
+  // makes "inactive" mean exactly "unconfigured": the existing
+  // locale-then-default `??` chain in `resolveTemplate` already handles a
+  // missing key, so a deactivated locale override falls through to the
+  // branch default, and a deactivated default falls through to
+  // `EVENT_LABEL_KEYS`'s built-in label — with no second resolution rule
+  // to keep in sync.
   const templateByKey = useMemo(() => {
     const map = new Map<string, string>();
     for (const template of templatesQuery.data ?? []) {
+      if (!template.isActive) {
+        continue;
+      }
       map.set(`${template.eventType}:${template.locale ?? ""}`, template.template);
     }
     return map;

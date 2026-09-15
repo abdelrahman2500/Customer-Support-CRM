@@ -176,4 +176,88 @@ describe("BranchNotifications", () => {
 
     expect(screen.getByText("SLA at risk")).toBeInTheDocument();
   });
+
+  /**
+   * Story 131 — the live-toast half of the same defect. Story 130 shipped
+   * `isActive` and the admin toggle, but `templateByEventType` was built
+   * from every row, so a deactivated template kept rendering in the toast.
+   *
+   * `NotificationToaster` needs no change of its own: it already treats a
+   * missing map entry as "no custom template" (`messageFor`'s
+   * `if (template)` guard), so omitting the entry here is the entire fix.
+   * These tests drive the real toaster through `BranchNotifications` to
+   * prove that contract end to end.
+   */
+  describe("inactive templates (Story 131)", () => {
+    function triggerBreach() {
+      const socket = buildSocketMock();
+      vi.mocked(io).mockReturnValue(socket as never);
+
+      render(
+        <NextIntlClientProvider locale="en" messages={enMessages}>
+          <BranchNotifications branchId="branch-1" />
+        </NextIntlClientProvider>,
+      );
+
+      act(() => {
+        socket._trigger("sla.breached", {
+          ticketId: "ticket-1",
+          branchId: "branch-1",
+          targetType: "response",
+          targetAt: "2024-01-01T00:00:00.000Z",
+        });
+      });
+    }
+
+    it("renders an active template's text in the toast", () => {
+      mockedUseNotificationTemplatesQuery.mockReturnValue({
+        data: [
+          {
+            id: "t-1",
+            eventType: "sla.breached",
+            locale: null,
+            template: "Custom breach copy for {ticketId}",
+            isActive: true,
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+        error: null,
+        refetch: vi.fn(),
+      } as never);
+
+      triggerBreach();
+
+      expect(screen.getByText("Custom breach copy for ticket-1")).toBeInTheDocument();
+      // The built-in BODY is replaced. The Badge keeps showing the plain
+      // event-type label either way — Story 63, Design decision 2 — so the
+      // body, not the badge, is what discriminates here.
+      expect(screen.queryByText("The response target for ticket ticket-1 has been breached.")).not.toBeInTheDocument();
+    });
+
+    it("falls back to the built-in toast message when the template is inactive", () => {
+      mockedUseNotificationTemplatesQuery.mockReturnValue({
+        data: [
+          {
+            id: "t-1",
+            eventType: "sla.breached",
+            locale: null,
+            template: "Custom breach copy for {ticketId}",
+            isActive: false,
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        isSuccess: true,
+        error: null,
+        refetch: vi.fn(),
+      } as never);
+
+      triggerBreach();
+
+      expect(screen.getByText("The response target for ticket ticket-1 has been breached.")).toBeInTheDocument();
+      expect(screen.queryByText("Custom breach copy for ticket-1")).not.toBeInTheDocument();
+    });
+  });
 });
