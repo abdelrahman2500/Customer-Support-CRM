@@ -99,12 +99,18 @@ export async function createTicketAsAdmin(
 
 /** Creates a portal-enabled Contact (with its own dedicated Customer) as
  * the admin — fixture data for the "a customer submits a ticket through
- * the portal" flow. */
+ * the portal" flow.
+ *
+ * P1-2 J2 — now returns the two ids it creates. Purely additive: the
+ * existing callers (`customer-submits-ticket.spec.ts`,
+ * `kb-publish-portal-visibility.spec.ts`) ignore the return value and are
+ * unchanged. `createPortalContactWithTicketAsAdmin` below needs
+ * `customerId` to open a ticket that this very Contact owns. */
 export async function createPortalContactAsAdmin(
   adminToken: string,
   email: string,
   password: string,
-): Promise<void> {
+): Promise<{ customerId: string; contactId: string }> {
   const customer = await apiFetch<{ id: string }>("/customers", {
     method: "POST",
     token: adminToken,
@@ -120,4 +126,37 @@ export async function createPortalContactAsAdmin(
     token: adminToken,
     body: JSON.stringify({ newPassword: password }),
   });
+  return { customerId: customer.id, contactId: contact.id };
+}
+
+/**
+ * P1-2 J2 — a portal-enabled Contact plus a ticket belonging to that same
+ * Contact's Customer, which is what the Live Chat journey needs and what
+ * neither existing helper produces: `createPortalContactAsAdmin` creates a
+ * Customer with no ticket, and `createTicketAsAdmin` creates a ticket under
+ * its *own* dedicated Customer that no Contact can sign in as.
+ *
+ * Shared ownership is not cosmetic here — it is the precondition both
+ * portal authorization rules check. `PortalTicketsService` scopes every
+ * read/write to the caller's Contact's `customerId`, and
+ * `RealtimeGateway.authorizeRoom` resolves the same Contact -> Customer
+ * link before letting a customer-audience socket into `ticket:{id}`. A
+ * ticket under a different Customer would be rejected by both, so the
+ * customer would never reach the conversation at all.
+ */
+export async function createPortalContactWithTicketAsAdmin(
+  adminToken: string,
+  input: { email: string; password: string; subject: string },
+): Promise<{ customerId: string; contactId: string; ticketId: string }> {
+  const { customerId, contactId } = await createPortalContactAsAdmin(
+    adminToken,
+    input.email,
+    input.password,
+  );
+  const ticket = await apiFetch<{ id: string }>("/tickets", {
+    method: "POST",
+    token: adminToken,
+    body: JSON.stringify({ customerId, subject: input.subject }),
+  });
+  return { customerId, contactId, ticketId: ticket.id };
 }
