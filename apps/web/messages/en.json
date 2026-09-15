@@ -1076,7 +1076,13 @@
       "slaAtRisk": "SLA at risk",
       "slaBreached": "SLA breached",
       "ticketEscalated": "Ticket escalated"
-    }
+    },
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "deactivateConfirmTitle": "Deactivate this template?",
+    "deactivateConfirmDescription": "The branch default will be used for this event instead. You can reactivate it at any time — nothing is deleted."
   },
   "branding": {
     "title": "Branding",

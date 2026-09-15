@@ -275,4 +275,106 @@ describe("Notification Templates (e2e)", () => {
       expect(arabicRows[0].template).toBe(second);
     });
   });
+
+  // Story 130 — Notification Template Lifecycle.
+  describe("isActive lifecycle (Story 130)", () => {
+    it("defaults a newly created template to active", async () => {
+      const created = await request(app.getHttpServer())
+        .post("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ eventType: "sla.at_risk", template: `Lifecycle default (${randomUUID()})` })
+        .expect(201);
+
+      expect(created.body.isActive).toBe(true);
+    });
+
+    it("round-trips a deactivation through PATCH and the next GET", async () => {
+      const created = await request(app.getHttpServer())
+        .post("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ eventType: "sla.breached", template: `Lifecycle patch (${randomUUID()})` })
+        .expect(201);
+      const templateId = created.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/notification-templates/${templateId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ isActive: false })
+        .expect(200);
+
+      const afterDeactivate = await request(app.getHttpServer())
+        .get("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const deactivated = afterDeactivate.body.find(
+        (item: { id: string }) => item.id === templateId,
+      );
+      expect(deactivated.isActive).toBe(false);
+      // Retired, not emptied — the authored copy must survive so that
+      // reactivating restores it rather than resurrecting a blank row.
+      expect(deactivated.template).toBe(created.body.template);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/notification-templates/${templateId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ isActive: true })
+        .expect(200);
+
+      const afterReactivate = await request(app.getHttpServer())
+        .get("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const reactivated = afterReactivate.body.find(
+        (item: { id: string }) => item.id === templateId,
+      );
+      expect(reactivated.isActive).toBe(true);
+      expect(reactivated.template).toBe(created.body.template);
+    });
+
+    it("leaves isActive untouched when a PATCH only changes the text", async () => {
+      const created = await request(app.getHttpServer())
+        .post("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ eventType: "ticket.escalated", template: `Lifecycle keep (${randomUUID()})` })
+        .expect(201);
+      const templateId = created.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/notification-templates/${templateId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ isActive: false })
+        .expect(200);
+
+      const newText = `Lifecycle keep updated (${randomUUID()})`;
+      await request(app.getHttpServer())
+        .patch(`/api/v1/notification-templates/${templateId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ template: newText })
+        .expect(200);
+
+      const listResponse = await request(app.getHttpServer())
+        .get("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const row = listResponse.body.find((item: { id: string }) => item.id === templateId);
+      expect(row.template).toBe(newText);
+      // Editing the copy of a retired template must not quietly put it
+      // back into service.
+      expect(row.isActive).toBe(false);
+    });
+
+    it("rejects a non-boolean isActive with a validation error", async () => {
+      const created = await request(app.getHttpServer())
+        .post("/api/v1/notification-templates")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ eventType: "sla.at_risk", template: `Lifecycle validation (${randomUUID()})` })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/notification-templates/${created.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ isActive: "no" })
+        .expect(400);
+    });
+  });
 });

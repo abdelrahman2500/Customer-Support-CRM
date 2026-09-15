@@ -1194,6 +1194,26 @@ model NotificationTemplate {
   eventType String   @map("event_type")
   locale    String?
   template  String
+  /// Story 130 — the lifecycle flag every other admin-authored resource in
+  /// this schema already has (`AutomationRule`, `SlaPolicy`, `QuickReply`,
+  /// `TicketCategory`, `KnowledgeBaseCategory`, `Customer`). This model was
+  /// the sole exception: a template created for the wrong `eventType` or
+  /// the wrong `locale` could never be removed or disabled, and this
+  /// codebase deliberately has no hard `DELETE` on admin-authored rows
+  /// (referential integrity + the audit trail), so deactivation is the
+  /// lifecycle.
+  ///
+  /// `@default(true)` so every row that predates this story stays active
+  /// and nothing changes behaviourally on migration.
+  ///
+  /// INVARIANT for whoever writes the first consumer: this model has no
+  /// reader anywhere in the repository today (see
+  /// `apps/worker/src/queues/portal-notification-email.processor.ts`'s own
+  /// comment saying exactly that). When template resolution is finally
+  /// wired up, it MUST filter `isActive: true` and fall through to the
+  /// branch default — an inactive row must behave as though it were not
+  /// configured at all.
+  isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

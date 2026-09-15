@@ -1076,7 +1076,13 @@
       "slaAtRisk": "اتفاقية الخدمة في خطر",
       "slaBreached": "تم خرق اتفاقية الخدمة",
       "ticketEscalated": "تم تصعيد التذكرة"
-    }
+    },
+    "active": "مفعّل",
+    "inactive": "غير مفعّل",
+    "activate": "تفعيل",
+    "deactivate": "إلغاء التفعيل",
+    "deactivateConfirmTitle": "إلغاء تفعيل هذا القالب؟",
+    "deactivateConfirmDescription": "سيتم استخدام القالب الافتراضي للفرع لهذا الحدث بدلاً منه. يمكنك إعادة تفعيله في أي وقت — لا يتم حذف أي شيء."
   },
   "branding": {
     "title": "الهوية البصرية",

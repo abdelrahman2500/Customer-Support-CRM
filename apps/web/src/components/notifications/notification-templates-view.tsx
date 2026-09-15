@@ -5,9 +5,22 @@ import { useTranslations } from "next-intl";
 import {
   useCreateNotificationTemplateMutation,
   useNotificationTemplatesQuery,
+  useUpdateNotificationTemplateMutation,
 } from "@/hooks/use-notification-templates";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from "@crm/ui";
+import type { NotificationTemplateSummary } from "@/lib/notification-templates-api";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import {
+  Alert,
+  Badge,
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+} from "@crm/ui";
 
 /** RM-30 — the same sentinel-for-"no locale" convention
  * `AutomationRulesView`'s `UNSET_PRIORITY`/`CreateTicketView`'s
@@ -48,10 +61,14 @@ export function NotificationTemplatesView() {
   // RM-30 — keyed by `eventType:locale` (`UNSET_LOCALE` standing in for
   // the default, `locale: null` row), mirroring
   // `NotificationHistoryView`'s own `templateByKey` shape.
+  //
+  // Story 130 — holds the whole row rather than just its text: the
+  // lifecycle toggle needs the row's own `id` to PATCH and its `isActive`
+  // to render, and both were being discarded here.
   const templateByKey = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, NotificationTemplateSummary>();
     for (const template of templatesQuery.data ?? []) {
-      map.set(`${template.eventType}:${template.locale ?? UNSET_LOCALE}`, template.template);
+      map.set(`${template.eventType}:${template.locale ?? UNSET_LOCALE}`, template);
     }
     return map;
   }, [templatesQuery.data]);
@@ -98,18 +115,25 @@ function TemplateForm({
   templateByKey,
 }: {
   eventType: string;
-  templateByKey: Map<string, string>;
+  templateByKey: Map<string, NotificationTemplateSummary>;
 }) {
   const t = useTranslations("notificationTemplates");
   const errorMessage = useErrorMessage();
   const mutation = useCreateNotificationTemplateMutation();
   const [locale, setLocale] = useState(UNSET_LOCALE);
-  const [text, setText] = useState(templateByKey.get(`${eventType}:${UNSET_LOCALE}`) ?? "");
+  const [text, setText] = useState(
+    templateByKey.get(`${eventType}:${UNSET_LOCALE}`)?.template ?? "",
+  );
   const [error, setError] = useState<string | null>(null);
+
+  /** Story 130 — the saved row for whichever locale the form is currently
+   * editing, or `undefined` when nothing has been authored for it yet.
+   * The lifecycle toggle only exists once there is a row to retire. */
+  const savedTemplate = templateByKey.get(`${eventType}:${locale}`);
 
   function handleLocaleChange(nextLocale: string): void {
     setLocale(nextLocale);
-    setText(templateByKey.get(`${eventType}:${nextLocale}`) ?? "");
+    setText(templateByKey.get(`${eventType}:${nextLocale}`)?.template ?? "");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -132,7 +156,10 @@ function TemplateForm({
 
   return (
     <div className="rounded-md border border-rule bg-surface p-4">
-      <h2 className="text-sm font-semibold text-ink">{labelKey ? t(labelKey) : eventType}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-ink">{labelKey ? t(labelKey) : eventType}</h2>
+        {savedTemplate && <TemplateLifecycleToggle template={savedTemplate} />}
+      </div>
       <form className="mt-2 flex flex-col gap-2" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("localeLabel")}
@@ -165,6 +192,71 @@ function TemplateForm({
         </div>
         {error && <Alert variant="destructive">{error}</Alert>}
       </form>
+    </div>
+  );
+}
+
+/**
+ * Story 130 — the lifecycle control, mirroring `AutomationRulesView`'s own
+ * toggle exactly: a state `Badge`, a `Button` whose variant and label flip
+ * with that state, and a `ConfirmDialog` guarding only the destructive
+ * direction (deactivating). Reactivating is a single click, since it
+ * restores rather than removes.
+ *
+ * There is no delete: this resource has no hard `DELETE` route, by design
+ * (see `NotificationTemplate`'s own schema doc comment). Deactivating is
+ * how a template authored for the wrong event type or locale is retired.
+ */
+function TemplateLifecycleToggle({ template }: { template: NotificationTemplateSummary }) {
+  const t = useTranslations("notificationTemplates");
+  const errorMessage = useErrorMessage();
+  const mutation = useUpdateNotificationTemplateMutation(template.id);
+  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
+
+  function handleToggleActiveClick(): void {
+    if (template.isActive) {
+      setConfirmDeactivateOpen(true);
+      return;
+    }
+    mutation.mutate({ isActive: true });
+  }
+
+  function confirmDeactivate(): void {
+    mutation.mutate({ isActive: false }, { onSuccess: () => setConfirmDeactivateOpen(false) });
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-2">
+        <Badge variant={template.isActive ? "success" : "secondary"}>
+          {template.isActive ? t("active") : t("inactive")}
+        </Badge>
+        <Button
+          variant={template.isActive ? "destructive" : "outline"}
+          size="sm"
+          disabled={mutation.isPending}
+          onClick={handleToggleActiveClick}
+        >
+          {template.isActive ? t("deactivate") : t("activate")}
+        </Button>
+        <ConfirmDialog
+          open={confirmDeactivateOpen}
+          onOpenChange={setConfirmDeactivateOpen}
+          title={t("deactivateConfirmTitle")}
+          description={t("deactivateConfirmDescription")}
+          confirmLabel={t("deactivate")}
+          onConfirm={confirmDeactivate}
+          isPending={mutation.isPending}
+        />
+      </div>
+      {mutation.isError && (
+        <p className="text-xs text-danger-solid">
+          {errorMessage(mutation.error, {
+            forbidden: t("saveForbidden"),
+            generic: t("saveFailed"),
+          })}
+        </p>
+      )}
     </div>
   );
 }

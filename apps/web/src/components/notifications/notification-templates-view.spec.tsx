@@ -4,6 +4,7 @@ import { NotificationTemplatesView } from "./notification-templates-view";
 import {
   useCreateNotificationTemplateMutation,
   useNotificationTemplatesQuery,
+  useUpdateNotificationTemplateMutation,
 } from "@/hooks/use-notification-templates";
 import { ApiError } from "@/lib/api";
 
@@ -14,11 +15,16 @@ vi.mock("next-intl", () => ({
 vi.mock("@/hooks/use-notification-templates", () => ({
   useNotificationTemplatesQuery: vi.fn(),
   useCreateNotificationTemplateMutation: vi.fn(),
+  // Story 130 — the lifecycle toggle's own mutation.
+  useUpdateNotificationTemplateMutation: vi.fn(),
 }));
 
 const mockedUseNotificationTemplatesQuery = vi.mocked(useNotificationTemplatesQuery);
 const mockedUseCreateNotificationTemplateMutation = vi.mocked(
   useCreateNotificationTemplateMutation,
+);
+const mockedUseUpdateNotificationTemplateMutation = vi.mocked(
+  useUpdateNotificationTemplateMutation,
 );
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -48,6 +54,7 @@ describe("NotificationTemplatesView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedUseCreateNotificationTemplateMutation.mockReturnValue(mutationResult() as never);
+    mockedUseUpdateNotificationTemplateMutation.mockReturnValue(mutationResult() as never);
   });
 
   it("shows a loading state while the templates query is pending", () => {
@@ -234,6 +241,96 @@ describe("NotificationTemplatesView", () => {
         locale: "ar",
         template: "نص جديد",
       });
+    });
+  });
+
+  // Story 130 — Notification Template Lifecycle.
+  describe("lifecycle toggle (Story 130)", () => {
+    function activeTemplate(overrides: Record<string, unknown> = {}) {
+      return {
+        id: "t-1",
+        eventType: "sla.at_risk",
+        locale: null,
+        template: "Ticket {ticketId} is at risk",
+        isActive: true,
+        ...overrides,
+      };
+    }
+
+    it("renders no toggle for an event type that has no saved template yet", () => {
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+
+      // Nothing authored means nothing to retire.
+      expect(screen.queryByText("deactivate")).not.toBeInTheDocument();
+      expect(screen.queryByText("activate")).not.toBeInTheDocument();
+    });
+
+    it("shows an Active badge and a Deactivate action for a saved, active template", () => {
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({ data: [activeTemplate()], isSuccess: true }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+
+      expect(screen.getByText("active")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "deactivate" })).toBeInTheDocument();
+    });
+
+    it("shows an Inactive badge and an Activate action for a retired template", () => {
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({ data: [activeTemplate({ isActive: false })], isSuccess: true }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+
+      expect(screen.getByText("inactive")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "activate" })).toBeInTheDocument();
+    });
+
+    it("reactivates immediately, without a confirmation step", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateNotificationTemplateMutation.mockReturnValue(
+        mutationResult({ mutate }) as never,
+      );
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({ data: [activeTemplate({ isActive: false })], isSuccess: true }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+      fireEvent.click(screen.getByRole("button", { name: "activate" }));
+
+      // Restoring is not destructive, so it needs no guard.
+      expect(mutate).toHaveBeenCalledWith({ isActive: true });
+    });
+
+    it("asks for confirmation before deactivating, and does not mutate until confirmed", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateNotificationTemplateMutation.mockReturnValue(
+        mutationResult({ mutate }) as never,
+      );
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({ data: [activeTemplate()], isSuccess: true }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+      fireEvent.click(screen.getByRole("button", { name: "deactivate" }));
+
+      expect(mutate).not.toHaveBeenCalled();
+      expect(screen.getByText("deactivateConfirmTitle")).toBeInTheDocument();
+    });
+
+    it("targets the mutation at the saved template's own id", () => {
+      mockedUseNotificationTemplatesQuery.mockReturnValue(
+        queryResult({ data: [activeTemplate({ id: "t-99" })], isSuccess: true }) as never,
+      );
+
+      render(<NotificationTemplatesView />);
+
+      expect(mockedUseUpdateNotificationTemplateMutation).toHaveBeenCalledWith("t-99");
     });
   });
 });

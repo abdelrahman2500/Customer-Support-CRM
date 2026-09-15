@@ -18,6 +18,9 @@ export interface NotificationTemplateSummary {
   eventType: string;
   locale: string | null;
   template: string;
+  /** Story 130 — the lifecycle flag. An inactive template is retired but
+   * kept: this resource has no hard `DELETE`. */
+  isActive: boolean;
 }
 
 export interface CreateNotificationTemplateInput {
@@ -27,7 +30,9 @@ export interface CreateNotificationTemplateInput {
 }
 
 export interface UpdateNotificationTemplateInput {
-  template: string;
+  /** Story 130 — optional, so the lifecycle toggle can be sent on its own. */
+  template?: string;
+  isActive?: boolean;
 }
 
 export function listNotificationTemplates(): Promise<NotificationTemplateSummary[]> {

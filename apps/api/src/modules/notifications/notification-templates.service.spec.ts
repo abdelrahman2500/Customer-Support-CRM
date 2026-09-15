@@ -222,4 +222,98 @@ describe("NotificationTemplatesService", () => {
       expect(result).toEqual({ id: "template-1" });
     });
   });
+
+  // Story 130 — Notification Template Lifecycle.
+  describe("isActive lifecycle (Story 130)", () => {
+    it("sends only isActive when that is all the caller patched, leaving the text untouched", async () => {
+      prisma.notificationTemplate.findFirst.mockResolvedValue({ id: "template-1" });
+      prisma.notificationTemplate.update.mockResolvedValue({ id: "template-1" });
+
+      await service.updateTemplate("template-1", { isActive: false });
+
+      // Deactivating must never blank the authored copy: an inactive
+      // template is retired, not emptied, and reactivating restores it.
+      expect(prisma.notificationTemplate.update).toHaveBeenCalledWith({
+        where: { id: "template-1" },
+        data: { isActive: false },
+      });
+    });
+
+    it("sends only template when that is all the caller patched, never silently reactivating", async () => {
+      prisma.notificationTemplate.findFirst.mockResolvedValue({ id: "template-1" });
+      prisma.notificationTemplate.update.mockResolvedValue({ id: "template-1" });
+
+      await service.updateTemplate("template-1", { template: "New text" });
+
+      expect(prisma.notificationTemplate.update).toHaveBeenCalledWith({
+        where: { id: "template-1" },
+        data: { template: "New text" },
+      });
+    });
+
+    it("sends both when both are patched", async () => {
+      prisma.notificationTemplate.findFirst.mockResolvedValue({ id: "template-1" });
+      prisma.notificationTemplate.update.mockResolvedValue({ id: "template-1" });
+
+      await service.updateTemplate("template-1", { template: "New text", isActive: true });
+
+      expect(prisma.notificationTemplate.update).toHaveBeenCalledWith({
+        where: { id: "template-1" },
+        data: { template: "New text", isActive: true },
+      });
+    });
+
+    it("still refuses an out-of-scope id before touching isActive", async () => {
+      prisma.notificationTemplate.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateTemplate("template-1", { isActive: false }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.notificationTemplate.update).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The admin list deliberately returns inactive templates too — the
+     * screen has to show a retired row in order to offer reactivating it.
+     * Filtering belongs to the future *resolver*, not to this list; see
+     * `NotificationTemplate`'s own schema doc comment for that invariant.
+     */
+    it("surfaces isActive on every listed template, inactive rows included", async () => {
+      prisma.notificationTemplate.findMany.mockResolvedValue([
+        {
+          id: "template-1",
+          eventType: "sla.breached",
+          locale: null,
+          template: "Default copy",
+          isActive: true,
+        },
+        {
+          id: "template-2",
+          eventType: "sla.breached",
+          locale: "ar",
+          template: "Retired override",
+          isActive: false,
+        },
+      ]);
+
+      const result = await service.listTemplates();
+
+      expect(result).toEqual([
+        {
+          id: "template-1",
+          eventType: "sla.breached",
+          locale: null,
+          template: "Default copy",
+          isActive: true,
+        },
+        {
+          id: "template-2",
+          eventType: "sla.breached",
+          locale: "ar",
+          template: "Retired override",
+          isActive: false,
+        },
+      ]);
+    });
+  });
 });

@@ -10,6 +10,9 @@ export interface NotificationTemplateSummary {
   /** RM-30 — `null` means "shown to every viewer regardless of locale". */
   locale: string | null;
   template: string;
+  /** Story 130 — the lifecycle flag. `false` retires a template without
+   * deleting it; this model deliberately has no hard `DELETE`. */
+  isActive: boolean;
 }
 
 /**
@@ -78,7 +81,13 @@ export class NotificationTemplatesService {
     }
     await this.prisma.notificationTemplate.update({
       where: { id },
-      data: { template: dto.template },
+      // Story 130 — conditional spreads, mirroring `AutomationRulesService`'s
+      // own update: `PATCH { isActive: false }` must not blank the template,
+      // and `PATCH { template }` must not silently reactivate a retired row.
+      data: {
+        ...(dto.template !== undefined ? { template: dto.template } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
     });
     return { id };
   }
@@ -89,11 +98,13 @@ function toSummary(template: {
   eventType: string;
   locale: string | null;
   template: string;
+  isActive: boolean;
 }): NotificationTemplateSummary {
   return {
     id: template.id,
     eventType: template.eventType,
     locale: template.locale,
     template: template.template,
+    isActive: template.isActive,
   };
 }
