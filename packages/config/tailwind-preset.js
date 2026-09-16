@@ -145,6 +145,59 @@ const sharedThemeExtend = {
     heading: ["1.125rem", { lineHeight: "1.4", letterSpacing: "-0.005em", fontWeight: "600" }],
     title: ["1.5rem", { lineHeight: "1.25", letterSpacing: "-0.015em", fontWeight: "600" }],
   },
+
+  /**
+   * Story 134 — semantic spacing names, additive to Tailwind's own numeric
+   * scale.
+   *
+   * Every key here is a NON-NUMERIC name on purpose. `theme.extend.spacing`
+   * merges by key, so defining `"4"` would override Tailwind's own `4` and
+   * silently change every `p-4`/`gap-4`/`mt-4` in both apps at once. Using
+   * words instead means `p-4` keeps resolving exactly as it does today and
+   * `p-surface` is simply a new utility alongside it.
+   *
+   * Values are the ones the codebase already uses — see the measured counts
+   * in `tailwind-tokens.css`'s own spacing block. Nothing is re-spaced by
+   * this file: applying these is a later story's job, exactly as the type
+   * scale above is still waiting on its own adoption story.
+   */
+  spacing: {
+    tight: "var(--space-tight)",
+    inline: "var(--space-inline)",
+    stack: "var(--space-stack)",
+    surface: "var(--space-surface)",
+    shell: "var(--space-shell)",
+    "field-x": "var(--space-field-x)",
+    "field-y": "var(--space-field-y)",
+  },
+
+  /**
+   * Story 134 — semantic corner names, additive.
+   *
+   * Deliberately does NOT define `sm`/`md`/`lg`/`full`: those are Tailwind's
+   * own keys, and redefining `md` would change all 150 existing
+   * `rounded-md` usages in one edit — the exact silent-visual-change hazard
+   * `tailwind-tokens.css`'s radius comment warns about.
+   */
+  borderRadius: {
+    surface: "var(--radius-surface)",
+    inner: "var(--radius-inner)",
+    pill: "var(--radius-pill)",
+  },
+
+  /**
+   * Story 134 — semantic elevation names, additive.
+   *
+   * Not `sm`/`md`: those are Tailwind's own keys, and the 27 existing
+   * `shadow-sm` and 5 `shadow-md` usages must keep resolving unchanged.
+   * `overlay` is the level `packages/ui/src/lib/menu.ts`'s
+   * `menuContentClassName` already ends with, shared by every floating
+   * surface.
+   */
+  boxShadow: {
+    resting: "var(--elevation-resting)",
+    overlay: "var(--elevation-overlay)",
+  },
 };
 
 module.exports = sharedThemeExtend;

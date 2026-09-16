@@ -31,6 +31,47 @@
  * this story; the point of putting the palette behind tokens now is that
  * adding it later is a second `:root` block rather than a sweep through
  * every component. See the recon's §11.
+ *
+ * ---------------------------------------------------------------------
+ * THE WHOLE VOCABULARY, IN ONE PLACE (Story 134)
+ * ---------------------------------------------------------------------
+ * Until Story 134 colour was the only tokenised dimension, which is why
+ * padding, corners and elevation were re-decided per file — the literal
+ * string "rounded-md border border-rule bg-surface p-4" had accumulated 24
+ * verbatim copies. The four scales below are the complete design
+ * vocabulary; reach for a name here before writing a raw utility.
+ *
+ *   COLOUR      this file, the blocks below. Surfaces, ink, rules, accent,
+ *               focus, overlay, and the four status families.
+ *
+ *   SPACING     this file, `--space-*`. Exposed as `p-surface`,
+ *               `gap-inline`, `px-field-x`, ... via
+ *               `@crm/config/tailwind-preset.js`.
+ *
+ *   RADIUS      this file, `--radius-*` (plus the original `--radius`).
+ *               Exposed as `rounded-surface` / `-inner` / `-pill`.
+ *
+ *   TYPE        NOT here — it already lives in
+ *               `@crm/config/tailwind-preset.js`'s `fontSize` key as a
+ *               named 7-step scale: caption, label, body-sm, body,
+ *               subhead, heading, title. It predates Story 134 and is
+ *               deliberately left exactly as it was.
+ *
+ *   ELEVATION   this file, `--elevation-*`. Exposed as `shadow-resting`
+ *               and `shadow-overlay`.
+ *
+ * Every one of these scales is currently DEFINED BUT UNADOPTED, on
+ * purpose. Story 134 is a vocabulary story: it names the values the code
+ * already uses so a later story can migrate components to them without
+ * also having to invent the scale. Adding a name here changes nothing
+ * about how the app renders, and it must stay that way — a token whose
+ * value does not match the utility it replaces would turn a migration
+ * into a silent redesign.
+ *
+ * Adding to a scale: put the custom property here, map it in the preset
+ * under a NON-NUMERIC, non-Tailwind key (see that file's own comments for
+ * why `spacing.4`, `borderRadius.md` and `boxShadow.sm` must never be
+ * defined), and record what existing pattern it names.
  */
 @layer base {
   :root {
@@ -134,6 +175,71 @@
      * have been a silent visual change across the whole app for no gain.
      * ------------------------------------------------------------- */
     --radius: 0.375rem;
+
+    /* ---------------------------------------------------------------
+     * Story 134 — Radius, continued: semantic names for the corner roles
+     * already in use. ADDITIVE ONLY. `--radius` above keeps its value and
+     * its meaning (it is the shadcn compatibility anchor the aliases
+     * below depend on), and Tailwind's own `rounded-md`/`rounded-sm`
+     * scale is still deliberately left alone for the reason the block
+     * above records.
+     *
+     * Measured across apps/web/src, apps/portal/src and packages/ui/src:
+     * rounded-md 150, rounded-sm 34, rounded-full 14, rounded-lg 8.
+     * These name the first three; `lg` has no distinct role yet.
+     * ------------------------------------------------------------- */
+    --radius-surface: 0.375rem; /* cards, panels, inputs — matches rounded-md (150) */
+    --radius-inner: 0.125rem; /* nested items inside a surface — matches rounded-sm (34) */
+    --radius-pill: 9999px; /* badges, avatars — matches rounded-full (14) */
+
+    /* ---------------------------------------------------------------
+     * Story 134 — Spacing. Semantic names for the recurring surface
+     * rhythms, NOT a replacement ramp: Tailwind's own numeric spacing
+     * scale still resolves unchanged, and these are added alongside it.
+     *
+     * Every value is the one the codebase already uses, measured across
+     * apps/web/src and apps/portal/src (excluding specs):
+     *   p-4    58  -> --space-surface     the card/panel padding shared by
+     *                                     the 24 verbatim
+     *                                     "rounded-md border border-rule
+     *                                     bg-surface p-4" card surfaces
+     *   p-8    32  -> --space-shell       the page/auth shell padding
+     *   px-3   40  -> --space-field-x     the input rhythm, paired below
+     *   py-2   38  -> --space-field-y     (7 verbatim textarea surfaces)
+     *   gap-2  145 -> --space-inline      the default gap between controls
+     *   gap-1  128 -> --space-tight       label-to-value, icon-to-text
+     *   gap-3  49  -> --space-stack       the looser vertical stack gap
+     *
+     * Naming the value does not apply it: no component is migrated by
+     * this story. Adoption is a later story's job.
+     * ------------------------------------------------------------- */
+    --space-tight: 0.25rem;
+    --space-inline: 0.5rem;
+    --space-stack: 0.75rem;
+    --space-surface: 1rem;
+    --space-shell: 2rem;
+    --space-field-x: 0.75rem;
+    --space-field-y: 0.5rem;
+
+    /* ---------------------------------------------------------------
+     * Story 134 — Elevation. Two levels, because two is what the app
+     * actually uses. Measured: shadow-sm 27, shadow-md 5.
+     *
+     * `--elevation-resting` is the shadow already on inputs and card
+     * surfaces. `--elevation-overlay` is the one floating surfaces
+     * already carry — `packages/ui/src/lib/menu.ts`'s
+     * `menuContentClassName` ends in `shadow-md`, and `Tooltip` uses the
+     * same — so a dropdown, popover, select panel and tooltip all sit at
+     * one named level instead of a repeated literal.
+     *
+     * Values are Tailwind's own `shadow-sm`/`shadow-md` verbatim, read
+     * from `tailwindcss/defaultTheme`, so naming them changes nothing.
+     * Plain box-shadow strings, deliberately NOT channel triples: the
+     * `token()` helper in tailwind-preset.js wraps colour channels as
+     * `rgb(... / <alpha-value>)` and must not be used for these.
+     * ------------------------------------------------------------- */
+    --elevation-resting: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --elevation-overlay: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 
     /* ---------------------------------------------------------------
      * shadcn/ui compatibility aliases. `components.json` now declares
