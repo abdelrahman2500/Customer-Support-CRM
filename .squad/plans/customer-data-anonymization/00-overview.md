@@ -1,0 +1,25 @@
+# customer-data-anonymization — plan overview
+
+Entry point for the **customer-data-anonymization** feature. Stories execute in order by their `NN` prefix.
+
+## Stories
+
+| NN  | File                                                                                   | Title                                       | Tracker id | Depends on                                                                                                                                              |
+| --- | -------------------------------------------------------------------------------------- | ------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 132 | [132-story-customer-data-anonymization.md](./132-story-customer-data-anonymization.md) | Customer Data Anonymization / Right-to-Erasure | _(none — intake entered manually, not linked)_ | Story 06 ([customer-management](../customer-management/06-story-customer-and-contact-foundation.md)), Story 52, Story 100, Story 03 (identity/permissions), Story 114 / P1-2 |
+
+## Dependency notes
+
+- **This story adds a data lifecycle to a domain that only has an access lifecycle.** Story 06 created `Customer`/`Contact`; Story 52 added portal credentials and `ContactRefreshToken`; Story 100 made `Customer.isActive` actually gate portal login and refresh. Everything so far controls *whether a customer can get in* — nothing controls *whether their personal data is still stored*. Story 132 adds only the second half, and reuses Story 100's enforcement rather than introducing a parallel one.
+
+- **Anonymization, not deletion — and the schema is the reason, not a preference.** Verified against the live database via `pg_constraint` at commit `cdf9063`: `ticketing.tickets.customer_id` is `RESTRICT NOT NULL`, and `ticketing.ticket_csat_responses.submitted_by_contact_id` is `RESTRICT NOT NULL`. A customer who has ever had a ticket — which is every real customer — simply cannot be deleted; PostgreSQL refuses. Meanwhile six relations are `CASCADE` (`customer_notes`, `customer_attachments`, `notification_logs`, `contact_refresh_tokens`, `portal_notification_preferences`, `ai.chat_sessions`), so forcing a delete would silently destroy records nothing asked to lose. **No story in this feature should propose hard deletion, or change any referential action to enable it.**
+
+- **The schema already anticipates detachment.** `Ticket.contactId`, `ChannelMessage.senderContactId` and `TicketAttachment.uploadedByContactId` are all nullable with `SET NULL` — history surviving a departed contact is an existing design property, not something this story invents. `Contact.email` is nullable and `@@unique([customerId, email])` tolerates multiple NULLs in PostgreSQL, which is what makes clearing emails across several contacts of one customer safe. Substituting a placeholder *string* there would collide on the second contact.
+
+- **`customer:update` is deliberately not reused.** Agents hold `customer:update` today (`seed.ts` `ROLE_GRANTS.Agent`) because they correct phone numbers and display names day to day. An irreversible erasure must not ride on that grant. `customer:anonymize` is a new key granted to `SuperAdmin` only.
+
+- **Retained data is a first-class part of this story, not an omission.** Free-text bodies (`ChannelMessage.body`, `ChatMessage.body`, `CustomerNote.body`, `TicketCsatResponse.comment`), stored S3 objects, and the immutable `admin.audit_logs` are all explicitly retained. The story and any resulting documentation must say so plainly rather than implying complete erasure. `audit_logs` in particular is protected by DB-role grants (`docs/architecture/05-auth-and-security.md:17,19`, pinned by `apps/api/test/audit-log-db-grants.e2e-spec.ts:74`) — it is immutable on purpose and must stay that way.
+
+- **One pre-existing inconsistency is surfaced but deliberately not bundled.** `PortalService.getAuthenticatedContact` (`portal.service.ts:113–116`) checks `passwordHash` but not `customer.isActive`, while `login` (`:55`) and `refresh` (`:90`) both check it. Anonymization nulls `passwordHash`, so this story's own erasure path is fully covered by the existing check. The residual case — a plain deactivation leaving an already-issued access token usable for ≤15 minutes — is recorded as an Open Question for the reviewer, not silently fixed inside this story.
+
+- **No client-side permission gating is introduced.** `AuthenticatedUser` (`packages/shared/src/auth.ts:5–15`) and the JWT claims carry `roles`, never `permissions`; the web app has no caller-permission signal at all. `workspace-nav.tsx`'s own doc comment and Story 129 both record the standing convention: the UI does not gate on permissions, and a forbidden action surfaces its real 403 through `useErrorMessage()`. Story 132 follows that convention. Changing it would be a new authorization model and belongs to its own story.

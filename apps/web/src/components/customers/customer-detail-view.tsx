@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import {
+  useAnonymizeCustomerMutation,
   useCreateContactMutation,
   useCreateCustomerNoteMutation,
   useCustomerNotesQuery,
@@ -682,6 +683,94 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           uploadForbidden: t("detail.actionForbidden"),
         }}
       />
+
+      <AnonymizeCustomerCard customerId={customerId} anonymizedAt={customer.anonymizedAt} />
     </section>
+  );
+}
+
+/**
+ * Story 132 — Customer Data Anonymization / Right-to-Erasure.
+ *
+ * Deliberately its own card at the very end of the screen, not another
+ * control in the header row beside the display-name input and the
+ * active/inactive `Select`. Those two are ordinary, reversible edits; this
+ * is irreversible, and placing it next to them would invite exactly the
+ * misclick it must not allow.
+ *
+ * Mirrors the revoke-portal-access control's shape (destructive `Button` +
+ * shared `ConfirmDialog` + inline `useErrorMessage` alert), which is this
+ * codebase's established pattern for a guarded, consequential action.
+ *
+ * No client-side permission gating: `AuthenticatedUser`/the JWT claims
+ * carry `roles`, never `permissions`, and this app has never gated UI on
+ * permissions (see `nav-items.tsx`'s own doc comment, and Story 129). A
+ * caller without `customer:anonymize` sees the button, and the real 403
+ * from the API surfaces through `errorMessage(..., { forbidden })` below.
+ * The API is the authoritative boundary.
+ */
+function AnonymizeCustomerCard({
+  customerId,
+  anonymizedAt,
+}: {
+  customerId: string;
+  anonymizedAt: string | null;
+}) {
+  const t = useTranslations("customers");
+  const { locale } = useParams<{ locale: string }>();
+  const errorMessage = useErrorMessage();
+  const mutation = useAnonymizeCustomerMutation(customerId);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Already anonymized: show the durable record, and withhold the action
+  // entirely. There is no un-anonymize, so re-offering it would only ever
+  // be a no-op the user could misread as a second, different operation.
+  if (anonymizedAt) {
+    return (
+      <div className="rounded-md border border-rule bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("detail.anonymizeHeading")}</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+          <Badge variant="secondary">{t("detail.anonymizedBadge")}</Badge>
+          <span className="text-ink-subtle">
+            {new Date(anonymizedAt).toLocaleString(locale)}
+          </span>
+        </div>
+        <p className="mt-2 text-sm text-ink-subtle">{t("detail.anonymizedRetentionNote")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-rule bg-surface p-4">
+      <h2 className="text-sm font-semibold text-ink">{t("detail.anonymizeHeading")}</h2>
+      <p className="mt-2 text-sm text-ink-subtle">{t("detail.anonymizeDescription")}</p>
+      <div className="mt-3">
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={mutation.isPending}
+          onClick={() => setConfirmOpen(true)}
+        >
+          {mutation.isPending ? t("detail.anonymizeSubmitting") : t("detail.anonymizeSubmit")}
+        </Button>
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title={t("detail.anonymizeConfirmTitle")}
+          description={t("detail.anonymizeConfirmDescription")}
+          confirmLabel={t("detail.anonymizeSubmit")}
+          onConfirm={() => mutation.mutate(undefined, { onSuccess: () => setConfirmOpen(false) })}
+          isPending={mutation.isPending}
+        />
+      </div>
+      {mutation.isError && (
+        <Alert variant="destructive" className="mt-2">
+          {errorMessage(mutation.error, {
+            forbidden: t("detail.anonymizeForbidden"),
+            generic: t("detail.anonymizeFailed"),
+          })}
+        </Alert>
+      )}
+    </div>
   );
 }

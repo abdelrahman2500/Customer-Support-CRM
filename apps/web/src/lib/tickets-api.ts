@@ -83,6 +83,10 @@ export interface CustomerSummary {
   isActive: boolean;
   /** Story 101 — mirrors `TicketListItem.createdAt`'s own shape. */
   createdAt: string;
+  /** Story 132 — ISO timestamp, or `null` when the customer has never
+   * been anonymized. Drives the detail screen's anonymized state and
+   * withholds the (irreversible) action once it is set. */
+  anonymizedAt: string | null;
 }
 
 /** Story 101 — mirrors `ListTicketsFilters`'s own shape/`toQueryString`
@@ -407,6 +411,20 @@ export function revokeContactPortalAccess(
     `/customers/${customerId}/contacts/${contactId}/portal-access/revoke`,
     { method: "PATCH" },
   );
+}
+
+/**
+ * Story 132 — Customer Data Anonymization / Right-to-Erasure.
+ *
+ * `POST`, not `DELETE`: nothing is deleted. Guarded server-side by its own
+ * `customer:anonymize` permission (never `customer:update`), so a caller
+ * without the grant gets a real 403 here — the API is the authoritative
+ * boundary, since this app has no client-side permission signal.
+ */
+export function anonymizeCustomer(id: string): Promise<{ id: string; anonymizedAt: string }> {
+  return apiFetch<{ id: string; anonymizedAt: string }>(`/customers/${id}/anonymize`, {
+    method: "POST",
+  });
 }
 
 /** RM-02 — mirrors the backend's `CustomerNoteSummary` exactly

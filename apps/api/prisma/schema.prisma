@@ -355,6 +355,20 @@ model Customer {
   tasks            Task[]
   /// RM-02 — free-text, agent-only notes on this customer.
   notes            CustomerNote[]
+  /// Story 132 — set once, when an admin anonymizes this customer
+  /// (`CustomersService.anonymizeCustomer`). `null` means "never
+  /// anonymized", which every pre-Story-132 row correctly is. Never
+  /// cleared: anonymization is irreversible by design, so this is the
+  /// durable, queryable record that the erasure happened and when.
+  ///
+  /// INVARIANT: this story anonymizes *structured identity data only* —
+  /// `displayName` here, and `fullName`/`email`/`phone`/`preferredLocale`/
+  /// `passwordHash` on every owned `Contact`. Free-text bodies
+  /// (`ChannelMessage.body`, `ChatMessage.body`, `CustomerNote.body`,
+  /// `TicketCsatResponse.comment`), stored S3 objects, and the immutable
+  /// `admin.audit_logs` are deliberately RETAINED. Do not describe this
+  /// field as "fully erased" anywhere.
+  anonymizedAt     DateTime?            @map("anonymized_at")
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
@@ -406,6 +420,11 @@ model Contact {
   /// exactly: docs/architecture/10-i18n-and-rtl.md's "portal customers
   /// choose their locale independently."
   preferredLocale         String?                        @map("preferred_locale")
+  /// Story 132 — stamped with the SAME timestamp as this Contact's own
+  /// `Customer.anonymizedAt`, inside the same transaction. See that
+  /// field's doc comment for the full invariant, including what this
+  /// story deliberately does not scrub.
+  anonymizedAt            DateTime?                      @map("anonymized_at")
   createdAt               DateTime                       @default(now()) @map("created_at")
 
   @@unique([customerId, email])

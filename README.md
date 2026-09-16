@@ -546,7 +546,16 @@ For the detailed, story-by-story implementation history, see
 - **WhatsApp and SMS channel adapters** into the existing `ChannelMessage`
   model/`ChannelAdapterRegistry` — same external provider dependency as
   above; inbound email parsing is also still a stub.
-- **Customer delete.**
+- **Customer hard delete.** Customer **anonymization** is implemented
+  instead (Story 132): `POST /customers/:id/anonymize`, behind its own
+  `customer:anonymize` permission, clears the customer's and every
+  contact's name/email/phone/portal access in one transaction and
+  deactivates them. Hard deletion is deliberately not offered — the
+  database forbids it (`tickets.customer_id` is `RESTRICT NOT NULL`) and
+  six related relations are `CASCADE`, so ticket/SLA/reporting history is
+  preserved rather than destroyed. Free-text message bodies, customer
+  notes, survey comments, uploaded files and the immutable audit log are
+  retained by design, not erased.
 - **Production hosting decision** — the platform is cloud-agnostic through
   containers today, but no hosting target has been chosen
   (`docs/architecture/12-risks-tradeoffs-and-scope.md`).

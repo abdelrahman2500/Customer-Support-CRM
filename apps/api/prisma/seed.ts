@@ -36,6 +36,12 @@ const PERMISSION_CATALOG = [
   "customer:create",
   "customer:read",
   "customer:update",
+  // Story 132 — deliberately its OWN key rather than folded into
+  // `customer:update`: agents hold `customer:update` below for routine
+  // edits (correcting a phone number, a display name), and an
+  // irreversible erasure must not ride on that grant. Granted to
+  // SuperAdmin only, via `ROLE_GRANTS.SuperAdmin: PERMISSION_CATALOG`.
+  "customer:anonymize",
   "ticket:create",
   "ticket:read",
   "ticket:update",

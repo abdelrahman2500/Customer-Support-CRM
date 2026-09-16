@@ -27,6 +27,7 @@ import {
   listUsers,
   listUsersPaged,
   resetPassword,
+  anonymizeCustomer,
   revokeContactPortalAccess,
   setContactPortalPassword,
   unlockUser,
@@ -362,6 +363,23 @@ export function useRevokeContactPortalAccessMutation(customerId: string, contact
     mutationFn: () => revokeContactPortalAccess(customerId, contactId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
+    },
+  });
+}
+
+/**
+ * Story 132 — Customer Data Anonymization. Invalidates both the customer
+ * detail query (which renders the new anonymized state) and the customer
+ * list (whose display name and active badge both change), since a single
+ * anonymization alters what every customer surface shows.
+ */
+export function useAnonymizeCustomerMutation(customerId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => anonymizeCustomer(customerId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["customer", customerId] });
+      void queryClient.invalidateQueries({ queryKey: ["customers"] });
     },
   });
 }

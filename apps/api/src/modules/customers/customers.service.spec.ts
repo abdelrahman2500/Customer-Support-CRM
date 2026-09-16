@@ -15,6 +15,9 @@ function buildPrismaMock() {
       create: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
+      // Story 132 — `anonymizeCustomer` reads the current `anonymizedAt`
+      // by id (after `requireCustomerInScope` has already proved scope).
+      findUnique: vi.fn(),
       update: vi.fn(),
       // Story S-8e — see the matching note in `tickets.service.spec.ts`.
       count: vi.fn().mockResolvedValue(0),
@@ -24,6 +27,9 @@ function buildPrismaMock() {
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
+      // Story 132 — every contact of a customer is anonymized in one
+      // statement, so zero and many contacts need no separate code path.
+      updateMany: vi.fn(),
     },
     contactRefreshToken: {
       updateMany: vi.fn(),
@@ -754,6 +760,168 @@ describe("CustomersService", () => {
         where: { contactId: "contact-1", revokedAt: null },
         data: { revokedAt: expect.any(Date) },
       });
+    });
+  });
+
+  // Story 132 — Customer Data Anonymization / Right-to-Erasure. Mirrors
+  // `revokeContactPortalAccess`'s test shape above: assert the exact
+  // `$transaction` payload rather than a post-hoc read, since the whole
+  // point is that these writes happen together or not at all.
+  describe("anonymizeCustomer", () => {
+    function arrangeNotYetAnonymized() {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customer.findUnique.mockResolvedValue({ id: "customer-1", anonymizedAt: null });
+      prisma.customer.update.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.updateMany.mockResolvedValue({ count: 1 });
+      prisma.contactRefreshToken.updateMany.mockResolvedValue({ count: 1 });
+    }
+
+    it("throws NotFoundException when the customer isn't in the caller's branch scope", async () => {
+      prisma.customer.findFirst.mockResolvedValue(null);
+
+      await expect(service.anonymizeCustomer("missing-customer")).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.customer.update).not.toHaveBeenCalled();
+      expect(prisma.contact.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("renames and deactivates the customer, and stamps anonymizedAt", async () => {
+      arrangeNotYetAnonymized();
+
+      const result = await service.anonymizeCustomer("customer-1");
+
+      expect(result.id).toBe("customer-1");
+      expect(result.anonymizedAt).toBeInstanceOf(Date);
+      expect(prisma.customer.update).toHaveBeenCalledWith({
+        where: { id: "customer-1" },
+        data: {
+          displayName: "Anonymized customer",
+          isActive: false,
+          anonymizedAt: result.anonymizedAt,
+        },
+      });
+    });
+
+    it("clears every contact's identity fields and portal password", async () => {
+      arrangeNotYetAnonymized();
+
+      const result = await service.anonymizeCustomer("customer-1");
+
+      expect(prisma.contact.updateMany).toHaveBeenCalledWith({
+        where: { customerId: "customer-1" },
+        data: {
+          fullName: "Anonymized contact",
+          email: null,
+          phone: null,
+          preferredLocale: null,
+          passwordHash: null,
+          anonymizedAt: result.anonymizedAt,
+        },
+      });
+    });
+
+    it("clears email to null rather than a placeholder, so multiple contacts cannot collide on @@unique([customerId, email])", async () => {
+      arrangeNotYetAnonymized();
+
+      await service.anonymizeCustomer("customer-1");
+
+      const { data } = prisma.contact.updateMany.mock.calls[0]![0] as {
+        data: { email: unknown };
+      };
+      expect(data.email).toBeNull();
+      expect(typeof data.email).not.toBe("string");
+    });
+
+    it("revokes only the still-live refresh tokens, and revokes rather than deletes them", async () => {
+      arrangeNotYetAnonymized();
+
+      const result = await service.anonymizeCustomer("customer-1");
+
+      expect(prisma.contactRefreshToken.updateMany).toHaveBeenCalledWith({
+        where: { contact: { customerId: "customer-1" }, revokedAt: null },
+        data: { revokedAt: result.anonymizedAt },
+      });
+    });
+
+    it("stamps the customer and its contacts with the SAME timestamp", async () => {
+      arrangeNotYetAnonymized();
+
+      await service.anonymizeCustomer("customer-1");
+
+      const customerData = (
+        prisma.customer.update.mock.calls[0]![0] as { data: { anonymizedAt: Date } }
+      ).data;
+      const contactData = (
+        prisma.contact.updateMany.mock.calls[0]![0] as { data: { anonymizedAt: Date } }
+      ).data;
+      const tokenData = (
+        prisma.contactRefreshToken.updateMany.mock.calls[0]![0] as {
+          data: { revokedAt: Date };
+        }
+      ).data;
+      expect(contactData.anonymizedAt).toEqual(customerData.anonymizedAt);
+      expect(tokenData.revokedAt).toEqual(customerData.anonymizedAt);
+    });
+
+    it("performs all three writes inside a single transaction", async () => {
+      arrangeNotYetAnonymized();
+
+      await service.anonymizeCustomer("customer-1");
+
+      expect(prisma.$transaction).toHaveBeenCalledOnce();
+      expect(prisma.$transaction.mock.calls[0]![0]).toHaveLength(3);
+    });
+
+    it("succeeds for a customer with zero contacts", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customer.findUnique.mockResolvedValue({ id: "customer-1", anonymizedAt: null });
+      prisma.customer.update.mockResolvedValue({ id: "customer-1" });
+      // `updateMany` matching no rows is a success, not an error.
+      prisma.contact.updateMany.mockResolvedValue({ count: 0 });
+      prisma.contactRefreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await service.anonymizeCustomer("customer-1");
+
+      expect(result.anonymizedAt).toBeInstanceOf(Date);
+      expect(prisma.customer.update).toHaveBeenCalledOnce();
+    });
+
+    it("anonymizes many contacts in one statement, with no per-contact loop", async () => {
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customer.findUnique.mockResolvedValue({ id: "customer-1", anonymizedAt: null });
+      prisma.customer.update.mockResolvedValue({ id: "customer-1" });
+      prisma.contact.updateMany.mockResolvedValue({ count: 3 });
+      prisma.contactRefreshToken.updateMany.mockResolvedValue({ count: 2 });
+
+      await service.anonymizeCustomer("customer-1");
+
+      expect(prisma.contact.updateMany).toHaveBeenCalledOnce();
+      expect(prisma.contact.update).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op for an already-anonymized customer, preserving the original timestamp", async () => {
+      const originalAnonymizedAt = new Date("2026-01-01T00:00:00.000Z");
+      prisma.customer.findFirst.mockResolvedValue({ id: "customer-1" });
+      prisma.customer.findUnique.mockResolvedValue({
+        id: "customer-1",
+        anonymizedAt: originalAnonymizedAt,
+      });
+
+      const result = await service.anonymizeCustomer("customer-1");
+
+      expect(result).toEqual({ id: "customer-1", anonymizedAt: originalAnonymizedAt });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.customer.update).not.toHaveBeenCalled();
+      expect(prisma.contact.updateMany).not.toHaveBeenCalled();
+      expect(prisma.contactRefreshToken.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("leaves nothing written when the transaction rejects", async () => {
+      arrangeNotYetAnonymized();
+      prisma.$transaction.mockRejectedValueOnce(new Error("transaction failed"));
+
+      await expect(service.anonymizeCustomer("customer-1")).rejects.toThrow("transaction failed");
     });
   });
 

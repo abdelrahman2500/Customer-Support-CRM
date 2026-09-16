@@ -709,4 +709,195 @@ describe("Customer Management (e2e)", () => {
         .expect(404);
     });
   });
+
+  /**
+   * Story 132 — Customer Data Anonymization / Right-to-Erasure.
+   *
+   * Each test seeds its own Customer so anonymization (which is
+   * irreversible and deactivates the row) never leaks into another test's
+   * fixture — the same per-test-fixture discipline the Notes block above
+   * already uses.
+   */
+  describe("POST /customers/:id/anonymize (Story 132)", () => {
+    async function createCustomerWithContacts(contactCount: number): Promise<string> {
+      const customer = await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName: `Anonymize fixture ${randomUUID()}` })
+        .expect(201);
+      for (let index = 0; index < contactCount; index += 1) {
+        await request(app.getHttpServer())
+          .post(`/api/v1/customers/${customer.body.id}/contacts`)
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .send({
+            fullName: `Anonymize Contact ${index}`,
+            email: `anon-${randomUUID()}@example.com`,
+            phone: "+1000000000",
+          })
+          .expect(201);
+      }
+      return customer.body.id as string;
+    }
+
+    it("anonymizes the customer and every contact, and deactivates it", async () => {
+      const id = await createCustomerWithContacts(1);
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${id}/anonymize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+      expect(response.body.id).toBe(id);
+      expect(response.body.anonymizedAt).toEqual(expect.any(String));
+
+      const after = await request(app.getHttpServer())
+        .get(`/api/v1/customers/${id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(after.body.displayName).toBe("Anonymized customer");
+      expect(after.body.isActive).toBe(false);
+      expect(after.body.anonymizedAt).toEqual(expect.any(String));
+      expect(after.body.contacts).toHaveLength(1);
+      expect(after.body.contacts[0].fullName).toBe("Anonymized contact");
+      expect(after.body.contacts[0].email).toBeNull();
+      expect(after.body.contacts[0].phone).toBeNull();
+    });
+
+    // The test that pins the `null`-not-placeholder decision: a placeholder
+    // string would violate the existing `@@unique([customerId, email])` on
+    // the second contact, while PostgreSQL permits multiple NULLs.
+    it("anonymizes two contacts on one customer without violating the unique email constraint", async () => {
+      const id = await createCustomerWithContacts(2);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${id}/anonymize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      const after = await request(app.getHttpServer())
+        .get(`/api/v1/customers/${id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(after.body.contacts).toHaveLength(2);
+      for (const contact of after.body.contacts) {
+        expect(contact.email).toBeNull();
+        expect(contact.fullName).toBe("Anonymized contact");
+      }
+    });
+
+    it("succeeds for a customer with zero contacts", async () => {
+      const id = await createCustomerWithContacts(0);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${id}/anonymize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      const after = await request(app.getHttpServer())
+        .get(`/api/v1/customers/${id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(after.body.isActive).toBe(false);
+      expect(after.body.contacts).toHaveLength(0);
+    });
+
+    it("is idempotent: a repeated request succeeds and keeps the original timestamp", async () => {
+      const id = await createCustomerWithContacts(1);
+
+      const first = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${id}/anonymize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+      const second = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${id}/anonymize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      expect(second.body.anonymizedAt).toBe(first.body.anonymizedAt);
+    });
+
+    it("leaves the customer's ticket history intact and readable", async () => {
+      const id = await createCustomerWithContacts(1);
+      const subject = `Anonymization history check ${randomUUID()}`;
+      const ticket = await request(app.getHttpServer())
+        .post("/api/v1/tickets")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ customerId: id, subject })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${id}/anonymize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      // The ticket still exists, still carries its own subject and status,
+      // and is still linked to the (now anonymized) customer by id. Nothing
+      // was cascaded away.
+      const after = await request(app.getHttpServer())
+        .get(`/api/v1/tickets/${ticket.body.id}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(after.body.subject).toBe(subject);
+      expect(after.body.customerId).toBe(id);
+    });
+
+    it("rejects an Agent-role caller holding customer:update but not customer:anonymize with 403", async () => {
+      const id = await createCustomerWithContacts(1);
+
+      const roles = await request(app.getHttpServer())
+        .get("/api/v1/identity/roles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      const agentRole = roles.body.find((role: { name: string }) => role.name === "Agent");
+      const me = await request(app.getHttpServer())
+        .get("/api/v1/auth/me")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const agentEmail = `agent-anon-${randomUUID()}@example.com`;
+      const agentPassword = "agent-test-password-123";
+      await request(app.getHttpServer())
+        .post("/api/v1/identity/users")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          email: agentEmail,
+          password: agentPassword,
+          fullName: "Test Agent Anonymize",
+          branchId: me.body.branchId,
+          departmentId: me.body.departmentId ?? undefined,
+          roleId: agentRole.id,
+        })
+        .expect(201);
+      const agentLogin = await request(app.getHttpServer())
+        .post("/api/v1/auth/login")
+        .send({ email: agentEmail, password: agentPassword })
+        .expect(200);
+      const agentAccessToken = agentLogin.body.accessToken as string;
+
+      // The same caller CAN still do an ordinary update — proving the 403
+      // below is specifically the missing `customer:anonymize` grant, not a
+      // broken agent fixture.
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${id}`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .send({ displayName: "Agent may still rename" })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${id}/anonymize`)
+        .set("Authorization", `Bearer ${agentAccessToken}`)
+        .expect(403);
+    });
+
+    it("rejects an unauthenticated request with 401", async () => {
+      const id = await createCustomerWithContacts(0);
+      await request(app.getHttpServer()).post(`/api/v1/customers/${id}/anonymize`).expect(401);
+    });
+
+    it("returns 404 for an unknown customer id", async () => {
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${randomUUID()}/anonymize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(404);
+    });
+  });
 });

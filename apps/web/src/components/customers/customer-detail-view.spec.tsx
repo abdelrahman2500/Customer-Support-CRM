@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { CustomerDetailView } from "./customer-detail-view";
 import {
+  useAnonymizeCustomerMutation,
   useCreateContactMutation,
   useCreateCustomerNoteMutation,
   useCustomerNotesQuery,
@@ -29,6 +30,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/hooks/use-tickets", () => ({
+  useAnonymizeCustomerMutation: vi.fn(),
   useCustomerQuery: vi.fn(),
   useTicketsQuery: vi.fn(),
   useUpdateCustomerMutation: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock("@/hooks/use-attachments", () => ({
   useUploadAttachmentMutation: vi.fn(),
 }));
 
+const mockedUseAnonymizeCustomerMutation = vi.mocked(useAnonymizeCustomerMutation);
 const mockedUseCustomerQuery = vi.mocked(useCustomerQuery);
 const mockedUseTicketsQuery = vi.mocked(useTicketsQuery);
 const mockedUseUpdateCustomerMutation = vi.mocked(useUpdateCustomerMutation);
@@ -124,6 +127,10 @@ describe("CustomerDetailView", () => {
     mockedUseCustomerNotesQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
     mockedUseUsersQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
     mockedUseCreateCustomerNoteMutation.mockReturnValue(idleMutation() as never);
+    // Story 132 - every render path also calls `useAnonymizeCustomerMutation`
+    // (the new Anonymize card); default to an idle mutation so pre-existing
+    // tests are unaffected.
+    mockedUseAnonymizeCustomerMutation.mockReturnValue(idleMutation() as never);
   });
 
   it("shows a loading state while the customer query is pending", () => {
@@ -1039,6 +1046,119 @@ describe("CustomerDetailView", () => {
       const { container } = render(<CustomerDetailView customerId="customer-1" />);
 
       expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(3);
+    });
+  });
+
+  // Story 132 — Customer Data Anonymization / Right-to-Erasure.
+  describe("anonymize customer (Story 132)", () => {
+    function customerWith(anonymizedAt: string | null) {
+      return queryResult({
+        isSuccess: true,
+        data: {
+          id: "customer-1",
+          displayName: "Acme Inc.",
+          isActive: true,
+          anonymizedAt,
+          contacts: [],
+        },
+      }) as never;
+    }
+
+    it("offers the action for a customer that has never been anonymized", () => {
+      mockedUseCustomerQuery.mockReturnValue(customerWith(null));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(
+        screen.getByRole("button", { name: "detail.anonymizeSubmit" }),
+      ).toBeInTheDocument();
+    });
+
+    it("renders the action as destructive, distinguishing it from ordinary edits", () => {
+      mockedUseCustomerQuery.mockReturnValue(customerWith(null));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByRole("button", { name: "detail.anonymizeSubmit" })).toHaveClass(
+        "bg-danger-solid",
+      );
+    });
+
+    it("clicking it opens a confirmation dialog rather than committing immediately", () => {
+      const mutate = vi.fn();
+      mockedUseAnonymizeCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
+      mockedUseCustomerQuery.mockReturnValue(customerWith(null));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByRole("button", { name: "detail.anonymizeSubmit" }));
+
+      expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+      expect(mutate).not.toHaveBeenCalled();
+    });
+
+    it("commits only once the confirmation dialog's own submit button is clicked", () => {
+      const mutate = vi.fn();
+      mockedUseAnonymizeCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
+      mockedUseCustomerQuery.mockReturnValue(customerWith(null));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByRole("button", { name: "detail.anonymizeSubmit" }));
+      const dialog = screen.getByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "detail.anonymizeSubmit" }));
+
+      expect(mutate).toHaveBeenCalledTimes(1);
+    });
+
+    it("disables the control while the mutation is pending, so it cannot be double-submitted", () => {
+      mockedUseAnonymizeCustomerMutation.mockReturnValue(
+        idleMutation({ isPending: true }) as never,
+      );
+      mockedUseCustomerQuery.mockReturnValue(customerWith(null));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByRole("button", { name: "detail.anonymizeSubmitting" })).toBeDisabled();
+    });
+
+    it("surfaces the real 403 as a permission message — the API is the authoritative boundary", () => {
+      mockedUseAnonymizeCustomerMutation.mockReturnValue(
+        idleMutation({ isError: true, error: new ApiError("Forbidden", 403) }) as never,
+      );
+      mockedUseCustomerQuery.mockReturnValue(customerWith(null));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.anonymizeForbidden")).toBeInTheDocument();
+    });
+
+    it("shows a generic failure message for a non-403 error", () => {
+      mockedUseAnonymizeCustomerMutation.mockReturnValue(
+        idleMutation({ isError: true, error: new ApiError("Boom", 500) }) as never,
+      );
+      mockedUseCustomerQuery.mockReturnValue(customerWith(null));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.anonymizeFailed")).toBeInTheDocument();
+    });
+
+    it("shows the anonymized state and withholds the action once anonymizedAt is set", () => {
+      mockedUseCustomerQuery.mockReturnValue(customerWith("2026-09-16T10:00:00.000Z"));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.anonymizedBadge")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "detail.anonymizeSubmit" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("states plainly that history is retained, so the action is not mistaken for full deletion", () => {
+      mockedUseCustomerQuery.mockReturnValue(customerWith("2026-09-16T10:00:00.000Z"));
+
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("detail.anonymizedRetentionNote")).toBeInTheDocument();
     });
   });
 });

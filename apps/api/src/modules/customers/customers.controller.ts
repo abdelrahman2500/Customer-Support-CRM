@@ -43,6 +43,25 @@ export class CustomersController {
     return this.customersService.getCustomer(id);
   }
 
+  /**
+   * Story 132 — `POST`, not `DELETE`: nothing is deleted. A `DELETE` verb
+   * would misdescribe the operation to every reader and API consumer, and
+   * hard deletion is impossible here anyway (`tickets.customer_id` is
+   * `RESTRICT NOT NULL`). No request body — the resource id is the whole
+   * input.
+   *
+   * Guarded by its own `customer:anonymize`, never the `customer:update`
+   * that agents already hold for routine edits. The API is the
+   * authoritative boundary: the web UI does not gate on permissions (this
+   * codebase has no client-side permission signal), so a caller without
+   * the grant reaches this guard and receives a real 403.
+   */
+  @Post(":id/anonymize")
+  @RequirePermissions("customer:anonymize")
+  anonymize(@Param("id") id: string): Promise<{ id: string; anonymizedAt: Date }> {
+    return this.customersService.anonymizeCustomer(id);
+  }
+
   @Patch(":id")
   @RequirePermissions("customer:update")
   update(@Param("id") id: string, @Body() dto: UpdateCustomerDto): Promise<{ id: string }> {

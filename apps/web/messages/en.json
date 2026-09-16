@@ -339,7 +339,17 @@
       "revokePortalAccessSubmit": "Revoke portal access",
       "revokePortalAccessSubmitting": "Revoking...",
       "revokePortalAccessConfirmTitle": "Revoke this contact's portal access?",
-      "revokePortalAccessConfirmDescription": "They will be signed out of the Customer Portal immediately and will no longer be able to log in until a new password is set."
+      "revokePortalAccessConfirmDescription": "They will be signed out of the Customer Portal immediately and will no longer be able to log in until a new password is set.",
+      "anonymizeHeading": "Anonymize customer",
+      "anonymizeDescription": "Permanently replaces this customer's and every contact's name, email, phone and portal access with anonymized values. Tickets, SLA records and reporting history are kept.",
+      "anonymizeSubmit": "Anonymize customer",
+      "anonymizeSubmitting": "Anonymizing...",
+      "anonymizeConfirmTitle": "Anonymize this customer?",
+      "anonymizeConfirmDescription": "This cannot be undone. The customer's and every contact's name, email, phone and portal access are permanently removed, and the customer is deactivated. Tickets, SLA records and reporting history are kept, and message text, notes, survey comments and uploaded files are not erased.",
+      "anonymizedBadge": "Anonymized",
+      "anonymizedRetentionNote": "Identifying details and portal access were removed. Tickets, SLA records and reporting history were kept, and message text, notes, survey comments and uploaded files were not erased.",
+      "anonymizeForbidden": "You don't have permission to anonymize a customer.",
+      "anonymizeFailed": "Couldn't anonymize this customer. Please try again."
     },
     "create": {
       "title": "New customer",

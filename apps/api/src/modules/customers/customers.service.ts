@@ -27,6 +27,16 @@ const BCRYPT_ROUNDS = 12;
  * id and a label, so sending `isActive`/`createdAt` for every row would be
  * payload the caller throws away.
  */
+/**
+ * Story 132 — the stable, non-identifying replacements written by
+ * `anonymizeCustomer`. Deliberately NOT suffixed with the row's id, email
+ * or any other per-record value: two anonymized customers should be
+ * indistinguishable, and appending an identifier would re-introduce
+ * exactly the kind of per-row signal the erasure exists to remove.
+ */
+const ANONYMIZED_CUSTOMER_NAME = "Anonymized customer";
+const ANONYMIZED_CONTACT_NAME = "Anonymized contact";
+
 export interface CustomerOption {
   id: string;
   displayName: string;
@@ -39,6 +49,10 @@ export interface CustomerSummary {
   /** Story 101 — exposed so `CustomerListView`'s new sortable "Created"
    * column has a real value to render, mirroring `TicketListItem.createdAt`. */
   createdAt: Date;
+  /** Story 132 — `null` until an admin anonymizes this customer. The UI
+   * reads it to render the anonymized state and withhold the action, and
+   * it is the durable record that the erasure happened. */
+  anonymizedAt: Date | null;
 }
 
 export interface ContactSummary {
@@ -368,6 +382,86 @@ export class CustomersService {
     return { id: contactId };
   }
 
+  /**
+   * Story 132 — Customer Data Anonymization / Right-to-Erasure.
+   *
+   * Anonymizes in place; nothing is ever deleted. That is not a
+   * preference, it is what the schema permits: `tickets.customer_id` is
+   * `RESTRICT NOT NULL`, so a customer who has ever had a ticket — every
+   * real customer — cannot be deleted at all, and six further relations
+   * are `CASCADE`, so forcing it would silently destroy customer notes,
+   * attachments, notification logs, portal preferences and whole AI chat
+   * histories. Overwriting the structured identity fields instead keeps
+   * ticket/SLA/reporting history complete and still attributable by id.
+   *
+   * SCOPE — this clears *structured identity data only*. Free-text bodies
+   * (`ChannelMessage.body`, `ChatMessage.body`, `CustomerNote.body`,
+   * `TicketCsatResponse.comment`), stored S3 objects, and the immutable
+   * `admin.audit_logs` are deliberately RETAINED and documented as such.
+   * Do not describe this operation as complete erasure.
+   *
+   * Mirrors `revokeContactPortalAccess` below: one `$transaction`, and
+   * refresh tokens are *revoked* (`revokedAt` stamped) rather than
+   * deleted, so the token trail survives.
+   *
+   * Idempotent: a repeat call is a success that changes nothing further,
+   * and `anonymizedAt` is never re-stamped — the first erasure is the real
+   * event.
+   */
+  async anonymizeCustomer(customerId: string): Promise<{ id: string; anonymizedAt: Date }> {
+    await this.requireCustomerInScope(customerId);
+    const existing = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, anonymizedAt: true },
+    });
+    if (!existing) {
+      throw new NotFoundException("Customer not found");
+    }
+
+    // Already anonymized: the end state is already the desired one, so
+    // this is a 200 no-op rather than a conflict. Returning the ORIGINAL
+    // timestamp keeps the record of when the erasure actually happened.
+    if (existing.anonymizedAt) {
+      return { id: existing.id, anonymizedAt: existing.anonymizedAt };
+    }
+
+    const anonymizedAt = new Date();
+    await this.prisma.$transaction([
+      this.prisma.customer.update({
+        where: { id: customerId },
+        data: {
+          displayName: ANONYMIZED_CUSTOMER_NAME,
+          isActive: false,
+          anonymizedAt,
+        },
+      }),
+      // `updateMany` covers zero contacts (affects 0 rows, no error) and
+      // many contacts in one statement — no loop, no branching. `email` is
+      // cleared to `null`, never to a placeholder string: the existing
+      // `@@unique([customerId, email])` would reject a second contact
+      // receiving the same placeholder, while PostgreSQL permits multiple
+      // NULLs. Contacts already holding null email/phone or a null
+      // passwordHash are simply re-set to the same value.
+      this.prisma.contact.updateMany({
+        where: { customerId },
+        data: {
+          fullName: ANONYMIZED_CONTACT_NAME,
+          email: null,
+          phone: null,
+          preferredLocale: null,
+          passwordHash: null,
+          anonymizedAt,
+        },
+      }),
+      this.prisma.contactRefreshToken.updateMany({
+        where: { contact: { customerId }, revokedAt: null },
+        data: { revokedAt: anonymizedAt },
+      }),
+    ]);
+
+    return { id: customerId, anonymizedAt };
+  }
+
   /** RM-02 — mirrors `TicketsService.getTicketNotes` exactly: oldest-first,
    * append-only, so the list itself is the note's own complete history —
    * no separate audit/history entry is written for a note, the same way
@@ -408,6 +502,7 @@ export class CustomersService {
     displayName: string;
     isActive: boolean;
     createdAt: Date;
+    anonymizedAt: Date | null;
     contacts: Array<{
       id: string;
       fullName: string;
@@ -469,12 +564,14 @@ function toCustomerSummary(customer: {
   displayName: string;
   isActive: boolean;
   createdAt: Date;
+  anonymizedAt: Date | null;
 }): CustomerSummary {
   return {
     id: customer.id,
     displayName: customer.displayName,
     isActive: customer.isActive,
     createdAt: customer.createdAt,
+    anonymizedAt: customer.anonymizedAt,
   };
 }
 

@@ -449,4 +449,92 @@ describe("Customer Portal (e2e)", () => {
         .expect(401);
     });
   });
+
+  /**
+   * Story 132 — Customer Data Anonymization, portal-side regression.
+   *
+   * The security claim this story makes is that anonymization cuts portal
+   * access off *immediately*, not merely at the next login. That holds
+   * without any change to `PortalService`: anonymization nulls
+   * `passwordHash`, and `getAuthenticatedContact` (which every portal data
+   * route composes) already rejects a contact with no password hash. This
+   * block asserts that rather than assuming it.
+   *
+   * Deliberately NOT covered here: the separate, pre-existing case where an
+   * ordinary `isActive: false` deactivation leaves an already-issued access
+   * token usable until it expires (`getAuthenticatedContact` does not check
+   * `isActive`). That is Story 100 behaviour and an explicit Story 132
+   * non-goal — see the plan's Open Questions.
+   */
+  describe("Story 132 — portal access after customer anonymization", () => {
+    let anonCustomerId: string;
+    let anonContactId: string;
+    const anonContactEmail = `portal-anon-${randomUUID()}@example.com`;
+    const anonPassword = "anonymized-customer-password-123";
+
+    beforeAll(async () => {
+      const customer = await request(app.getHttpServer())
+        .post("/api/v1/customers")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ displayName: `Anonymize Portal Fixture Customer ${randomUUID()}` })
+        .expect(201);
+      anonCustomerId = customer.body.id;
+
+      const contact = await request(app.getHttpServer())
+        .post(`/api/v1/customers/${anonCustomerId}/contacts`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ fullName: "Anonymize Portal Contact", email: anonContactEmail })
+        .expect(201);
+      anonContactId = contact.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/customers/${anonCustomerId}/contacts/${anonContactId}/portal-password`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ newPassword: anonPassword })
+        .expect(200);
+    });
+
+    it("blocks login, refresh, AND an already-issued access token once the customer is anonymized", async () => {
+      // Sign in first, so we hold a genuinely valid, unexpired access token
+      // and refresh cookie from *before* the anonymization.
+      const loginResponse = await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/login")
+        .send({ email: anonContactEmail, password: anonPassword })
+        .expect(200);
+      const portalAccessToken = loginResponse.body.accessToken as string;
+      const rawRefreshCookie = extractPortalRefreshCookie(loginResponse);
+
+      // That token works right now — otherwise the assertions below would
+      // prove nothing.
+      await request(app.getHttpServer())
+        .get("/api/v1/portal/tickets")
+        .set("Authorization", `Bearer ${portalAccessToken}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post(`/api/v1/customers/${anonCustomerId}/anonymize`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(201);
+
+      // 1. The old credentials no longer authenticate (password hash gone).
+      await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/login")
+        .send({ email: anonContactEmail, password: anonPassword })
+        .expect(401);
+
+      // 2. The refresh token issued before anonymization is rejected.
+      await request(app.getHttpServer())
+        .post("/api/v1/portal/auth/refresh")
+        .set("Cookie", rawRefreshCookie)
+        .expect(401);
+
+      // 3. The already-issued ACCESS token — still cryptographically valid
+      //    and unexpired — can no longer read portal data. This is the
+      //    assertion the story's security claim rests on.
+      await request(app.getHttpServer())
+        .get("/api/v1/portal/tickets")
+        .set("Authorization", `Bearer ${portalAccessToken}`)
+        .expect(401);
+    });
+  });
 });
