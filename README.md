@@ -540,9 +540,13 @@ For the detailed, story-by-story implementation history, see
 
 - **Integration Hub completion** (`docs/architecture/09-integrations.md`):
   registering a real inbound-webhook provider verifier and translating a
-  verified payload into a ticket/`ChannelMessage`; wiring the existing,
-  tested API-key guard to at least one real endpoint; ERP adapters —
-  explicitly blocked pending a chosen external ERP/channel provider.
+  verified payload into a ticket/`ChannelMessage`; ERP adapters — both
+  explicitly blocked pending a chosen external ERP/channel provider. The
+  API-key guard is now wired to a real endpoint (Story 133):
+  `GET /api/v1/integrations/reports/ticket-volume`, read-only JSON, scoped
+  by `integration:read` and confined to the key's own branch. Widening that
+  machine surface to further report families or the CSV exports is a
+  separate, deliberate decision.
 - **WhatsApp and SMS channel adapters** into the existing `ChannelMessage`
   model/`ChannelAdapterRegistry` — same external provider dependency as
   above; inbound email parsing is also still a stub.

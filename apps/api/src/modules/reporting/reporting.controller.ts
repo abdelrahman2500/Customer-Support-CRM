@@ -24,8 +24,14 @@ import { ReportingService } from "./reporting.service";
  * `IdentityController.listBranches`'s own `includeInactive === "true"`
  * precedent — every one of the 16 routes below builds its `ReportFilters`
  * through this, so the conversion happens exactly once per request, not
- * duplicated at each call site. */
-function toFilters(dto: ReportDateRangeQueryDto): ReportFilters {
+ * duplicated at each call site.
+ *
+ * Story 133 — `export`ed so `MachineReportingController` reuses this exact
+ * mapper rather than keeping a private copy that could drift from it. That
+ * export is the ONLY change this story makes to this file: no route, no
+ * decorator, and no behaviour here changes, and in particular every route
+ * below keeps its `@RequirePermissions("report:read")`. */
+export function toFilters(dto: ReportDateRangeQueryDto): ReportFilters {
   return {
     from: dto.from,
     to: dto.to,

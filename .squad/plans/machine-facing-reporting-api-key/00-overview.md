@@ -1,0 +1,23 @@
+# machine-facing-reporting-api-key — plan overview
+
+Entry point for the **machine-facing-reporting-api-key** feature. Stories execute in order by their `NN` prefix.
+
+## Stories
+
+| NN  | File                                                                                             | Title                                              | Tracker id | Depends on                                                                                                                  |
+| --- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 133 | [133-story-machine-facing-reporting-api-key.md](./133-story-machine-facing-reporting-api-key.md) | Machine-facing reporting endpoint authenticated by API key | _(none — intake entered manually, not linked)_ | RM-22 ([core-completion-roadmap/RM-22-api-key-auth.md](../core-completion-roadmap/RM-22-api-key-auth.md)), Story 56 / RM-07 (Reporting), Story 03 (identity/guards) |
+
+## Dependency notes
+
+- **This story registers RM-22's first real route; it does not extend RM-22's mechanism.** RM-22 (`bafc128`) shipped the whole API-key stack — model, hashing, issue/revoke, scope vocabulary, global guard — and deliberately shipped it with zero real registrations, mirroring RM-14's and RM-21's own "ship the framework, register nothing" precedent. The only `@AllowApiKey()` in the repository today is `src/test-fixtures/test-machine-route.controller.ts:35`, a fixture registered solely by `test/api-keys.e2e-spec.ts`. Story 133 adds the first production route. **No part of the RM-22 mechanism may change to accommodate it** — not the guard, not the scope catalogue, not the decorators.
+
+- **The separate route exists because of a real guard-composition constraint, not as a stylistic preference.** `app.module.ts` registers `AuthGuard → AudienceGuard → PermissionsGuard → ApiKeyGuard`, in that order. `PermissionsGuard` therefore runs *before* any API key has been authenticated, and with no `request.user` it returns `false` (`permissions.guard.ts:37-39`). Any route carrying both `@RequirePermissions(...)` and `@AllowApiKey()` is consequently unreachable by key — which `ApiKeyGuard`'s own doc comment already records as a rule. Every `/reports/*` route carries `@RequirePermissions("report:read")`. A new route that simply omits that decorator is the only resolution that changes no existing route, no guard, and no ordering.
+
+- **The obvious alternative was rejected on evidence.** Decorating the web-form intake route (`POST /channels/web-form`) fails twice over: `ApiKeyGuard` does not check `IS_PUBLIC_KEY`, so pairing `@AllowApiKey()` with the route's existing `@Public()` would make the guard demand a bearer token from anonymous callers and break Story 87's shipped contract; and that route takes `branchId` from the request body rather than `TenantContext`, so an API key would add no tenant isolation there at all.
+
+- **Tenant isolation is inherited, never re-implemented.** `ApiKeyGuard` resolves `branchId` once, from the durable `ApiKey` row, and writes it to `request.tenantClaims`. `TenantContext` is `Scope.REQUEST` and reads that lazily through getters, so a value written by a guard (after `TenantMiddleware`, before the handler) is visible when `ReportingService.resolveBranchFilter` calls `requireBranchScope()`. `ApiKey.branchId` is non-nullable in the schema, so that call cannot throw for a valid key. Story 133 adds no scoping code of its own — if it needed to, the integration would be wrong.
+
+- **`crossBranch` is safe by construction, and stays that way deliberately.** The machine route reuses `ReportDateRangeQueryDto` unchanged, so `crossBranch=true` validates and reaches `resolveBranchFilter`, which checks `report:read-cross-branch` against `tenantContext.roles`. `ApiKeyGuard` sets `roles: []` on purpose, so the lookup finds nothing and throws `ForbiddenException` → 403. No new code produces that outcome; a test pins it so a future change to either side cannot silently widen a key's reach across branches.
+
+- **Surface stays deliberately narrow.** One report family, JSON only, read-only. `ticket-volume` was chosen because its payload is a pure aggregate with **no PII** — unlike `agent-performance` (agent identities) or `csat` (free-text comments), which should not be the first thing reachable by a credential stored in an external system. Widening to more report families or to CSV export is a later story's decision, made once this one has proven the pattern in production.
