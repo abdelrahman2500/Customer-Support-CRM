@@ -7,7 +7,7 @@ import {
 } from "@/hooks/use-portal-notification-preferences";
 import type { PortalNotificationPreferenceSummary } from "@/lib/notification-preferences-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Button, Skeleton } from "@crm/ui";
+import { Alert, Button, Skeleton } from "@crm/ui";
 
 /** The same two event-type strings `PORTAL_NOTIFICATION_EVENT_TYPES` names
  * on the backend (`apps/api/src/modules/notifications/
@@ -45,16 +45,12 @@ export function NotificationPreferencesSection() {
       )}
 
       {preferencesQuery.isError && (
-        <div className="mt-2 flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive" className="mt-2 flex items-center justify-between">
           <span>{t("preferences.error")}</span>
-          <button
-            type="button"
-            onClick={() => preferencesQuery.refetch()}
-            className="rounded-md border border-red-300 bg-surface px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
-          >
+          <Button variant="outline" size="sm" onClick={() => preferencesQuery.refetch()}>
             {t("preferences.retry")}
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
       {preferencesQuery.isSuccess && (

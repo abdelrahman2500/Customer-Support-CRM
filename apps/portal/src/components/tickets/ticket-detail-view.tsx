@@ -17,7 +17,7 @@ import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
-import { Badge, Button, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Skeleton, Textarea } from "@crm/ui";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
@@ -81,9 +81,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   if (ticketQuery.isError) {
     const notFound = ticketQuery.error instanceof ApiError && ticketQuery.error.status === 404;
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <Alert variant="destructive">
         {notFound ? t("detail.notFound") : t("detail.loadError")}
-      </div>
+      </Alert>
     );
   }
 
@@ -137,9 +137,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         <h2 className="text-sm font-semibold text-ink">{t("detail.historyHeading")}</h2>
         {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {historyQuery.isError && (
-          <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <Alert variant="destructive" className="mt-2">
             {t("detail.historyError")}
-          </div>
+          </Alert>
         )}
         {historyQuery.isSuccess && historyQuery.data.length === 0 && (
           <p className="mt-2 text-sm text-ink-subtle">{t("detail.historyEmpty")}</p>
@@ -182,9 +182,9 @@ function CsatSection({ ticketId }: { ticketId: string }) {
       {csatQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
 
       {csatQuery.isError && (
-        <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive" className="mt-2">
           {t("detail.csatError")}
-        </div>
+        </Alert>
       )}
 
       {csatQuery.isSuccess && csatQuery.data && (
@@ -254,17 +254,17 @@ function CsatForm({ ticketId }: { ticketId: string }) {
       </div>
       <label className="flex flex-col gap-1 text-sm text-ink-strong">
         {t("detail.csatCommentLabel")}
-        <textarea
-          className="w-full max-w-md rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm focus-ring"
+        <Textarea
+          className="max-w-md"
           value={comment}
           onChange={(event) => setComment(event.target.value)}
           rows={3}
         />
       </label>
       {error && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive">
           {error}
-        </p>
+        </Alert>
       )}
       <Button type="submit" disabled={mutation.isPending || !rating} className="w-fit">
         {mutation.isPending ? t("detail.csatSubmitting") : t("detail.csatSubmit")}

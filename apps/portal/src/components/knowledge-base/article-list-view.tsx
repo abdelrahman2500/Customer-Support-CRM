@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { FetchingIndicator, Input, Pagination, Skeleton } from "@crm/ui";
+import { Alert, Button, FetchingIndicator, Input, Pagination, Skeleton } from "@crm/ui";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 
@@ -86,16 +86,12 @@ export function ArticleListView() {
       )}
 
       {articlesQuery.isError && (
-        <div className="mt-3 flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive" className="mt-3 flex items-center justify-between">
           <span>{t("list.error")}</span>
-          <button
-            type="button"
-            onClick={() => articlesQuery.refetch()}
-            className="rounded-md border border-red-300 bg-surface px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
-          >
+          <Button variant="outline" size="sm" onClick={() => articlesQuery.refetch()}>
             {t("list.retry")}
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
       {articles !== undefined && articles.length === 0 && search !== "" && (

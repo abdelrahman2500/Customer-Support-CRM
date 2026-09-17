@@ -13,7 +13,7 @@ import {
 } from "@/hooks/use-chat";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Button, Skeleton } from "@crm/ui";
+import { Alert, Button, Skeleton, Textarea } from "@crm/ui";
 
 /**
  * Story 80 — AI Portal Chatbot (Foundation). Crosses
@@ -97,16 +97,16 @@ export function ChatWidget() {
       <h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>
 
       {startSession.isError && (
-        <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive" className="mt-2">
           {t("startFailed")}
-        </p>
+        </Alert>
       )}
 
       {messagesQuery.isLoading && <Skeleton className="mt-2 h-40 w-full" />}
       {messagesQuery.isError && (
-        <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive" className="mt-2">
           {t("loadError")}
-        </p>
+        </Alert>
       )}
       {messagesQuery.isSuccess && messagesQuery.data.length === 0 && (
         <p className="mt-2 text-sm text-ink-subtle">{t("empty")}</p>
@@ -144,9 +144,9 @@ export function ChatWidget() {
         <p className="mt-2 text-sm text-ink-subtle">{t("typing")}</p>
       )}
       {pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "ERROR" && (
-        <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive" className="mt-2">
           {resultQuery.data.errorMessage ?? t("replyFailed")}
-        </p>
+        </Alert>
       )}
       {pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "DISABLED" && (
         <p className="mt-2 rounded-md border border-rule bg-surface-sunk px-3 py-2 text-sm text-ink-muted">
@@ -166,9 +166,9 @@ export function ChatWidget() {
             {escalate.isPending ? t("escalating") : t("escalate")}
           </Button>
           {escalateError && (
-            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <Alert variant="destructive">
               {escalateError}
-            </p>
+            </Alert>
           )}
         </div>
       )}
@@ -225,8 +225,7 @@ function ChatComposer({
 
   return (
     <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
-      <textarea
-        className="w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm focus-ring"
+      <Textarea
         rows={2}
         value={body}
         placeholder={t("placeholder")}
@@ -245,9 +244,9 @@ function ChatComposer({
         </Button>
       </div>
       {error && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive">
           {error}
-        </p>
+        </Alert>
       )}
     </form>
   );

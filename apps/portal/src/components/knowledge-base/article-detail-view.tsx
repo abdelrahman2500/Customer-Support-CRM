@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Skeleton } from "@crm/ui";
+import { Alert, Skeleton } from "@crm/ui";
 import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
 import type { KbLocale } from "@/lib/knowledge-base-api";
@@ -38,9 +38,9 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
   if (articleQuery.isError) {
     const notFound = articleQuery.error instanceof ApiError && articleQuery.error.status === 404;
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <Alert variant="destructive">
         {notFound ? t("detail.notFound") : t("detail.loadError")}
-      </div>
+      </Alert>
     );
   }
 

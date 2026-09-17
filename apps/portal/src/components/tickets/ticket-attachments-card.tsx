@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-portal-attachments";
 import { getMyTicketAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Skeleton } from "@crm/ui";
+import { Alert, Skeleton } from "@crm/ui";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -40,9 +40,9 @@ export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
       <h2 className="text-sm font-semibold text-ink">{t("detail.attachmentsHeading")}</h2>
       {attachmentsQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
       {attachmentsQuery.isError && (
-        <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive" className="mt-2">
           {t("detail.attachmentsError")}
-        </div>
+        </Alert>
       )}
       {attachmentsQuery.isSuccess && attachmentsQuery.data.length === 0 && (
         <p className="mt-2 text-sm text-ink-subtle">{t("detail.attachmentsEmpty")}</p>
@@ -112,9 +112,9 @@ function AddAttachmentForm({ ticketId }: { ticketId: string }) {
         <p className="text-xs text-ink-subtle">{t("detail.attachmentsUploading")}</p>
       )}
       {error && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive">
           {error}
-        </p>
+        </Alert>
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import { useCreateMyTicketMutation, useMyTicketsQuery } from "@/hooks/use-portal
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import {
+  Alert,
   Badge,
   Button,
   FetchingIndicator,
@@ -63,16 +64,12 @@ export function TicketListView() {
         )}
 
         {ticketsQuery.isError && (
-          <div className="mt-3 flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <Alert variant="destructive" className="mt-3 flex items-center justify-between">
             <span>{t("list.error")}</span>
-            <button
-              type="button"
-              onClick={() => ticketsQuery.refetch()}
-              className="rounded-md border border-red-300 bg-surface px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
-            >
+            <Button variant="outline" size="sm" onClick={() => ticketsQuery.refetch()}>
               {t("list.retry")}
-            </button>
-          </div>
+            </Button>
+          </Alert>
         )}
 
         {tickets !== undefined && tickets.length === 0 && (
@@ -181,9 +178,9 @@ function CreateTicketForm() {
           />
         </label>
         {error && (
-          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <Alert variant="destructive">
             {error}
-          </p>
+          </Alert>
         )}
         <Button type="submit" disabled={mutation.isPending || !subject.trim()} className="w-fit">
           {mutation.isPending ? t("list.createSubmitting") : t("list.createSubmit")}

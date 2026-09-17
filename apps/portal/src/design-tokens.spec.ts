@@ -85,4 +85,48 @@ describe("S-1 design tokens (portal)", () => {
 
     expect(offenders, `Use the S-1 semantic tokens instead:\n${offenders.join("\n")}`).toEqual([]);
   });
+
+  /**
+   * Story 135 — the portal's hand-rolled error box.
+   *
+   * The status families (amber/red/emerald) stay exempt from `FORBIDDEN`
+   * above for the reason the doc comment gives: a raw status colour is a
+   * design question, not a mechanical rename. But *this specific* pattern is
+   * not a design question — it was the portal rendering "an error" as a
+   * visibly different object from the one `apps/web` renders for the same
+   * meaning, bypassing the `--danger-*` tokens that `Alert`'s `destructive`
+   * variant already resolves. Story 135 migrated all 20 occurrences (across
+   * 10 files) to `<Alert variant="destructive">`; this keeps them there.
+   *
+   * Narrow on purpose: it matches the error-box class pair, not every use of
+   * red. `ticket-chat-card.tsx`'s delivery-status `text-red-700` is a
+   * legitimate inline status colour, is asserted on by that component's own
+   * spec, and is deliberately not caught here.
+   */
+  const RAW_ERROR_BOX = /border-red-200\s+bg-red-50|bg-red-50\s+border-red-200/;
+
+  it("renders errors through the shared Alert, not a hand-rolled red box", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const lines = readFileSync(file, "utf8").split("\n");
+      lines.forEach((line, index) => {
+        // Same comment skip as above, and for the same reason — this repo's
+        // own plan documents and doc comments quote the pre-migration class
+        // string as historical context.
+        const trimmed = line.trim();
+        if (trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+          return;
+        }
+        if (RAW_ERROR_BOX.test(line)) {
+          offenders.push(`${file.slice(SRC.length + 1)}:${index + 1}`);
+        }
+      });
+    }
+
+    expect(
+      offenders,
+      `Use <Alert variant="destructive"> instead:\n${offenders.join("\n")}`,
+    ).toEqual([]);
+  });
 });

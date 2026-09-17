@@ -12,6 +12,8 @@ import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import type { PortalNotificationSummary } from "@/lib/notifications-api";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
 import {
+  Alert,
+  Button,
   FetchingIndicator,
   Pagination,
   Skeleton,
@@ -170,16 +172,12 @@ export function NotificationHistoryView() {
       )}
 
       {notificationsQuery.isError && (
-        <div className="flex items-center justify-between rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert variant="destructive" className="flex items-center justify-between">
           <span>{t("history.error")}</span>
-          <button
-            type="button"
-            onClick={() => notificationsQuery.refetch()}
-            className="rounded-md border border-red-300 bg-surface px-2 py-1 text-xs font-medium hover:bg-red-50 focus-ring"
-          >
+          <Button variant="outline" size="sm" onClick={() => notificationsQuery.refetch()}>
             {t("history.retry")}
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
       {notifications !== undefined && notifications.length === 0 && (
