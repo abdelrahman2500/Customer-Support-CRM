@@ -68,29 +68,51 @@ export interface SubmitCsatInput {
 }
 
 /**
+ * Story 148 — the query this list accepts. Mirrors the backend's
+ * `ListPortalTicketsQueryDto` field-for-field: the portal filters by free
+ * text and one status, and by nothing else.
+ */
+export interface ListMyTicketsQuery {
+  page?: number;
+  pageSize?: number;
+  /** Matches the subject or the category name, case-insensitively. */
+  search?: string;
+  status?: PortalTicketStatus;
+}
+
+/**
  * PORTAL-1 — Portal My Tickets Pagination. Mirrors
  * `knowledge-base-api.ts`'s own `toQueryString` convention: an omitted
  * `page`/`pageSize` produces the exact same request every existing caller
  * already sends.
+ *
+ * Story 148 — `search`/`status` join it under the same rule. An empty
+ * `search` is omitted rather than sent as `search=`, so clearing the box
+ * produces the byte-identical request an untouched list already makes
+ * (and therefore hits the same cache entry).
  */
-function toQueryString(pagination: { page?: number; pageSize?: number } = {}): string {
+function toQueryString(query: ListMyTicketsQuery = {}): string {
   const params = new URLSearchParams();
-  if (pagination.page !== undefined) {
-    params.set("page", String(pagination.page));
+  if (query.page !== undefined) {
+    params.set("page", String(query.page));
   }
-  if (pagination.pageSize !== undefined) {
-    params.set("pageSize", String(pagination.pageSize));
+  if (query.pageSize !== undefined) {
+    params.set("pageSize", String(query.pageSize));
   }
-  const query = params.toString();
-  return query ? `?${query}` : "";
+  if (query.search) {
+    params.set("search", query.search);
+  }
+  if (query.status !== undefined) {
+    params.set("status", query.status);
+  }
+  const queryString = params.toString();
+  return queryString ? `?${queryString}` : "";
 }
 
 export function listMyTickets(
-  pagination: { page?: number; pageSize?: number } = {},
+  query: ListMyTicketsQuery = {},
 ): Promise<PaginatedResponse<PortalTicketSummary>> {
-  return apiFetch<PaginatedResponse<PortalTicketSummary>>(
-    `/portal/tickets${toQueryString(pagination)}`,
-  );
+  return apiFetch<PaginatedResponse<PortalTicketSummary>>(`/portal/tickets${toQueryString(query)}`);
 }
 
 export function getMyTicket(id: string): Promise<PortalTicketSummary> {

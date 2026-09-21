@@ -146,7 +146,10 @@ describe("TicketDetailView", () => {
     render(<TicketDetailView ticketId="ticket-1" />);
 
     expect(screen.getByText("Cannot log in")).toBeInTheDocument();
-    expect(screen.getByText("OPEN")).toBeInTheDocument();
+    // Story 148 — the translated label, sharing `tickets.status.*` with
+    // the list and its status filter. This file stubs `useTranslations`
+    // to echo the key, so the key is what renders here.
+    expect(screen.getByText("status.OPEN")).toBeInTheDocument();
     expect(screen.getByText("MEDIUM")).toBeInTheDocument();
     expect(screen.getByText("account")).toBeInTheDocument();
   });
@@ -159,7 +162,7 @@ describe("TicketDetailView", () => {
 
     render(<TicketDetailView ticketId="ticket-1" />);
 
-    expect(screen.getByText("OPEN")).toHaveClass("bg-warning-surface");
+    expect(screen.getByText("status.OPEN")).toHaveClass("bg-warning-surface");
   });
 
   it("renders the empty history message when there are no entries", () => {

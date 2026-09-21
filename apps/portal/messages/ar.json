@@ -84,7 +84,14 @@
       "createSubmitting": "جارٍ الإرسال...",
       "createFailed": "تعذّر إرسال التذكرة. حاول مرة أخرى.",
       "createSuccess": "تم إرسال التذكرة.",
-      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء."
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "searchLabel": "بحث",
+      "searchPlaceholder": "الموضوع أو الفئة",
+      "filterStatus": "الحالة",
+      "filterAll": "كل الحالات",
+      "clearFilters": "مسح عوامل التصفية",
+      "noResults": "لا توجد تذاكر مطابقة لبحثك.",
+      "resultCount": "{count, plural, =0 {لا توجد تذاكر مطابقة} zero {# تذكرة مطابقة} one {تذكرة واحدة مطابقة} two {تذكرتان مطابقتان} few {# تذاكر مطابقة} many {# تذكرة مطابقة} other {# تذكرة مطابقة}}"
     },
     "detail": {
       "notFound": "تعذّر العثور على هذه التذكرة.",
@@ -126,6 +133,12 @@
       "attachmentsEmpty": "لا توجد مرفقات حتى الآن.",
       "attachmentsUploading": "جارٍ الرفع...",
       "attachmentsUploadFailed": "تعذّر رفع الملف. حاول مرة أخرى."
+    },
+    "status": {
+      "OPEN": "مفتوحة",
+      "IN_PROGRESS": "قيد المعالجة",
+      "RESOLVED": "تم الحل",
+      "CLOSED": "مغلقة"
     }
   },
   "knowledgeBase": {

@@ -216,7 +216,7 @@ describe("TicketListView", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
 
-      expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith(3);
+      expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith({ page: 3 });
     });
 
     it("requests the previous page", () => {
@@ -224,7 +224,7 @@ describe("TicketListView", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "pagination.previous" }));
 
-      expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith(1);
+      expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith({ page: 1 });
     });
 
     it("disables previous on the first page", () => {
@@ -302,6 +302,149 @@ describe("TicketListView", () => {
     });
   });
 
+  /**
+   * Story 148 — Portal Ticket Search & Filtering.
+   *
+   * These assert what the screen ASKS FOR, not what comes back: the query
+   * hook is mocked, so the meaningful observable is the argument object
+   * `useMyTicketsQuery` is called with. The server's side of the same
+   * behaviour is covered end-to-end in `portal-tickets.e2e-spec.ts`.
+   */
+  describe("search and status filtering", () => {
+    beforeEach(() => {
+      mockedUseMyTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: ticketPage([baseTicket]) }) as never,
+      );
+    });
+
+    it("asks for nothing but the page until a filter is touched", () => {
+      render(<TicketListView />);
+
+      // The byte-identical request the list made before this story.
+      expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith({ page: undefined });
+    });
+
+    it("sends the typed text as a search term", async () => {
+      render(<TicketListView />);
+
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "printer" },
+      });
+
+      await waitFor(() =>
+        expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith({
+          page: undefined,
+          search: "printer",
+        }),
+      );
+    });
+
+    it("omits an emptied search term rather than sending a blank one", async () => {
+      render(<TicketListView />);
+      const input = screen.getByLabelText("list.searchLabel");
+
+      fireEvent.change(input, { target: { value: "printer" } });
+      fireEvent.change(input, { target: { value: "" } });
+
+      await waitFor(() =>
+        expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith({ page: undefined }),
+      );
+    });
+
+    it("resets to page 1 when the search changes, so it cannot ask for page 3 of a new search", async () => {
+      mockedUseMyTicketsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: ticketPage([baseTicket], { total: 60, page: 2, pageSize: 25, totalPages: 3 }),
+        }) as never,
+      );
+      render(<TicketListView />);
+
+      fireEvent.click(screen.getByRole("button", { name: "pagination.next" }));
+      expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith({ page: 3 });
+
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "printer" },
+      });
+
+      await waitFor(() =>
+        expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith({
+          page: undefined,
+          search: "printer",
+        }),
+      );
+    });
+
+    it("shows the match count and a clear control only once a filter is active", async () => {
+      render(<TicketListView />);
+
+      expect(screen.queryByRole("button", { name: "list.clearFilters" })).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "printer" },
+      });
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "list.clearFilters" })).toBeInTheDocument(),
+      );
+      expect(screen.getByText("list.resultCount")).toBeInTheDocument();
+    });
+
+    it("clearing the filters restores the unfiltered request and hides the clear control", async () => {
+      render(<TicketListView />);
+
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "printer" },
+      });
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "list.clearFilters" })).toBeInTheDocument(),
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "list.clearFilters" }));
+
+      await waitFor(() =>
+        expect(mockedUseMyTicketsQuery).toHaveBeenLastCalledWith({ page: undefined }),
+      );
+      expect(screen.queryByRole("button", { name: "list.clearFilters" })).not.toBeInTheDocument();
+      expect(screen.getByLabelText("list.searchLabel")).toHaveValue("");
+    });
+
+    it("distinguishes an empty account from a search that matched nothing", async () => {
+      mockedUseMyTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: ticketPage([]) }) as never,
+      );
+      render(<TicketListView />);
+
+      // Nothing filtered: this customer genuinely has no tickets.
+      expect(screen.getByText("list.empty")).toBeInTheDocument();
+      expect(screen.queryByText("list.noResults")).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText("list.searchLabel"), {
+        target: { value: "printer" },
+      });
+
+      // Filtered: they may have plenty, just none matching.
+      await waitFor(() => expect(screen.getByText("list.noResults")).toBeInTheDocument());
+      expect(screen.queryByText("list.empty")).not.toBeInTheDocument();
+      // Exactly one clear control, even though the active-filter row and
+      // the no-results message are both on screen at once.
+      expect(screen.getAllByRole("button", { name: "list.clearFilters" })).toHaveLength(1);
+    });
+
+    it("offers every real TicketStatus, plus an any-status option", async () => {
+      render(<TicketListView />);
+
+      fireEvent.click(screen.getByRole("combobox", { name: "list.filterStatus" }));
+
+      await waitFor(() =>
+        expect(screen.getByRole("option", { name: "list.filterAll" })).toBeInTheDocument(),
+      );
+      for (const status of ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]) {
+        expect(screen.getByRole("option", { name: `status.${status}` })).toBeInTheDocument();
+      }
+    });
+  });
+
   // Story 98 — Design System & Visual Polish.
   it("gives each status a visually distinct pill, mirroring apps/web's own status color semantics", () => {
     mockedUseMyTicketsQuery.mockReturnValue(
@@ -316,7 +459,12 @@ describe("TicketListView", () => {
 
     render(<TicketListView />);
 
-    expect(screen.getByText("OPEN")).toHaveClass("bg-warning-surface");
-    expect(screen.getByText("RESOLVED")).toHaveClass("bg-success-surface");
+    // Story 148 — the badge renders the translated label rather than the
+    // raw enum; this file stubs `useTranslations` to echo the key, so the
+    // key is what appears here. `fetch-state-messages.spec.ts` is where
+    // the real copy is asserted to exist in both locales. Same two
+    // statuses, same two variants as before.
+    expect(screen.getByText("status.OPEN")).toHaveClass("bg-warning-surface");
+    expect(screen.getByText("status.RESOLVED")).toHaveClass("bg-success-surface");
   });
 });

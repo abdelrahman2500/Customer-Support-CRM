@@ -1,3 +1,4 @@
+import type { TicketStatus } from "@prisma/client";
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { TicketsService } from "../tickets/tickets.service";
 import type {
@@ -58,10 +59,18 @@ export class PortalTicketsService {
    * `customerId` and nothing else. */
   async listTickets(
     contactId: string,
-    pagination: { page?: number; pageSize?: number } = {},
+    query: {
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      status?: TicketStatus;
+    } = {},
   ): Promise<Paginated<TicketSummary>> {
     const { customerId } = await this.portalService.getAuthenticatedContact(contactId);
-    return this.ticketsService.listTicketsForCustomer(customerId, pagination);
+    // Story 148 — `search`/`status` are passed straight through. This
+    // method still resolves `customerId` and nothing else: the filters
+    // narrow within that scope and can never widen it.
+    return this.ticketsService.listTicketsForCustomer(customerId, query);
   }
 
   async getTicket(contactId: string, ticketId: string): Promise<TicketSummary> {

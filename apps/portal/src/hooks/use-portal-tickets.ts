@@ -14,6 +14,7 @@ import type {
   ChannelMessageSummary,
   CreateChannelMessageInput,
   CreatePortalTicketInput,
+  ListMyTicketsQuery,
   SubmitCsatInput,
 } from "@/lib/tickets-api";
 
@@ -22,23 +23,46 @@ import type {
  * convention exactly: a mutation only ever invalidates the query cache on a
  * real, successful response — the UI always renders the re-fetched,
  * authoritative state, never an assumed one.
- *
- * PORTAL-1 — `myTicketsQueryKey` becomes a function of `page`, mirroring
- * `usePublishedArticlesQuery`'s own `publishedArticlesQueryKey(search, ...,
- * page)` convention: paging is a key change like any other, so it inherits
- * Story S-7's row preservation for free.
  */
-export const myTicketsQueryKey = (page?: number) => ["portal-tickets", page ?? 1] as const;
+
+/**
+ * PORTAL-1 — keyed by page, mirroring `usePublishedArticlesQuery`'s own
+ * `publishedArticlesQueryKey(search, ..., page)` convention: paging is a
+ * key change like any other, so it inherits Story S-7's row preservation
+ * for free.
+ *
+ * Story 148 — the search term and status filter join it, for the same
+ * reason and with the same effect: changing either is a new query, and
+ * `preservePreviousResults` keeps the previous rows on screen while it
+ * resolves instead of flashing a skeleton on every keystroke.
+ *
+ * The literal `"list"` segment is new. Without it this key was
+ * `["portal-tickets", page]` while `myTicketQueryKey` is
+ * `["portal-tickets", id]` — distinguishable only because a page is a
+ * number, which stops being obvious once two more variable segments sit
+ * alongside it. The broad `["portal-tickets"]` invalidation in
+ * `useCreateMyTicketMutation` still matches both, unchanged.
+ */
+export const myTicketsQueryKey = (query: ListMyTicketsQuery = {}) =>
+  ["portal-tickets", "list", query.search ?? "", query.status ?? null, query.page ?? 1] as const;
 export const myTicketQueryKey = (id: string) => ["portal-tickets", id] as const;
 export const myTicketHistoryQueryKey = (id: string) => ["portal-tickets", id, "history"] as const;
 export const myTicketCsatQueryKey = (id: string) => ["portal-tickets", id, "csat"] as const;
 
-/** PORTAL-1 — 1-based; `undefined` until the reader pages, mirroring
- * `usePublishedArticlesQuery`'s own convention exactly. */
-export function useMyTicketsQuery(page?: number) {
+/**
+ * PORTAL-1 — `page` is 1-based and `undefined` until the reader pages,
+ * mirroring `usePublishedArticlesQuery`'s own convention exactly.
+ *
+ * Story 148 — takes an options object rather than positional arguments, so
+ * the two callers that want the plain unfiltered list
+ * (`PortalHomeView`, `NotificationHistoryView`) keep calling
+ * `useMyTicketsQuery()` with no arguments and send exactly the request
+ * they always have.
+ */
+export function useMyTicketsQuery(query: ListMyTicketsQuery = {}) {
   return useQuery({
-    queryKey: myTicketsQueryKey(page),
-    queryFn: () => listMyTickets({ page }),
+    queryKey: myTicketsQueryKey(query),
+    queryFn: () => listMyTickets(query),
     ...preservePreviousResults,
   });
 }

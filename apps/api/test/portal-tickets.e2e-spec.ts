@@ -561,4 +561,179 @@ describe("Customer Portal — Tickets (e2e)", () => {
         .expect(404);
     });
   });
+
+  /**
+   * Story 148 — Portal ticket search and filtering.
+   *
+   * Runs last and creates its own tickets, tagged with a per-run `marker`,
+   * so none of the counts the pagination tests above assert are disturbed
+   * and every assertion here can scope itself to this run's own rows.
+   */
+  describe("search and status filtering", () => {
+    const marker = randomUUID().slice(0, 8);
+    let printerTicketId: string;
+    let resolvedTicketId: string;
+
+    beforeAll(async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const printer = await request(app.getHttpServer())
+        .post("/api/v1/portal/tickets")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ subject: `Printer jam ${marker}` })
+        .expect(201);
+      printerTicketId = printer.body.id;
+
+      const resolved = await request(app.getHttpServer())
+        .post("/api/v1/portal/tickets")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ subject: `Monitor flicker ${marker}` })
+        .expect(201);
+      resolvedTicketId = resolved.body.id;
+
+      // Moved through the real agent transition endpoint rather than a
+      // direct DB write, so the status filter is exercised against a
+      // status the domain actually produces.
+      await request(app.getHttpServer())
+        .patch(`/api/v1/tickets/${resolvedTicketId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status: "IN_PROGRESS" })
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch(`/api/v1/tickets/${resolvedTicketId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status: "RESOLVED" })
+        .expect(200);
+    });
+
+    it("matches a ticket by a substring of its subject, case-insensitively", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets?search=${encodeURIComponent(`PRINTER JAM ${marker}`)}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+
+      const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
+      expect(ids).toEqual([printerTicketId]);
+      expect(response.body.total).toBe(1);
+    });
+
+    it("matches a ticket by its category name, not only its subject", async () => {
+      const categoryName = `portal-search-cat-${marker}`;
+      await request(app.getHttpServer())
+        .post("/api/v1/ticket-categories")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ name: categoryName })
+        .expect(201);
+
+      const token = await loginAsPortalContact(contactEmail);
+      const categorised = await request(app.getHttpServer())
+        .post("/api/v1/portal/tickets")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ subject: `Unrelated subject ${marker}`, category: categoryName })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets?search=${encodeURIComponent(categoryName)}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+
+      const ids = response.body.items.map((ticket: { id: string }) => ticket.id);
+      expect(ids).toEqual([categorised.body.id]);
+    });
+
+    it("returns an empty envelope, not an error, when nothing matches", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets?search=${encodeURIComponent(`no-such-${randomUUID()}`)}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+
+      expect(response.body.items).toEqual([]);
+      expect(response.body.total).toBe(0);
+      // The envelope shape is unchanged for a no-match search.
+      expect(response.body.page).toBe(1);
+      expect(response.body.totalPages).toBe(1);
+    });
+
+    it("filters by status", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      const resolvedOnly = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets?status=RESOLVED&search=${encodeURIComponent(marker)}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      expect(resolvedOnly.body.items.map((item: { id: string }) => item.id)).toEqual([
+        resolvedTicketId,
+      ]);
+
+      const openOnly = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets?status=OPEN&search=${encodeURIComponent(marker)}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+      const openIds = openOnly.body.items.map((item: { id: string }) => item.id);
+      expect(openIds).toContain(printerTicketId);
+      expect(openIds).not.toContain(resolvedTicketId);
+    });
+
+    it("combines search and status with pagination, preserving the envelope", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+      const base = `/api/v1/portal/tickets?search=${encodeURIComponent(marker)}&status=OPEN`;
+
+      const page1 = await request(app.getHttpServer())
+        .get(`${base}&page=1&pageSize=1`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+
+      expect(page1.body.items).toHaveLength(1);
+      expect(page1.body.pageSize).toBe(1);
+      // `total`/`totalPages` describe the FILTERED set, not the whole list:
+      // the two still-OPEN tickets this block created (the printer one and
+      // the categorised one), never the resolved one.
+      expect(page1.body.total).toBe(2);
+      expect(page1.body.totalPages).toBe(2);
+
+      const page2 = await request(app.getHttpServer())
+        .get(`${base}&page=2&pageSize=1`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+
+      expect(page2.body.items).toHaveLength(1);
+      expect(page2.body.items[0].id).not.toBe(page1.body.items[0].id);
+    });
+
+    it("rejects a status that is not a real TicketStatus", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      await request(app.getHttpServer())
+        .get("/api/v1/portal/tickets?status=NOT_A_STATUS")
+        .set("Authorization", `Bearer ${token}`)
+        .expect(400);
+    });
+
+    it("rejects an unknown filter rather than silently ignoring it", async () => {
+      const token = await loginAsPortalContact(contactEmail);
+
+      // `forbidNonWhitelisted` — a customer must not be able to reach the
+      // agent list's filters through this endpoint.
+      await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets?assignedToUserId=${randomUUID()}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(400);
+    });
+
+    it("never widens scope: a filter cannot reach another customer's tickets", async () => {
+      const otherToken = await loginAsPortalContact(otherContactEmail);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/portal/tickets?search=${encodeURIComponent(marker)}`)
+        .set("Authorization", `Bearer ${otherToken}`)
+        .expect(200);
+
+      expect(response.body.items).toEqual([]);
+      expect(response.body.total).toBe(0);
+    });
+  });
 });

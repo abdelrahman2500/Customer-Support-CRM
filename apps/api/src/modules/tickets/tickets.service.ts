@@ -698,6 +698,12 @@ export class TicketsService {
    * contact at a Customer sees that Customer's tickets, not only ones they
    * personally opened).
    *
+   * Story 148 — optionally narrowed by `search` (subject or category
+   * name) and `status`. `search` reuses this file's own
+   * `searchWhereClause`, the exact helper the agent list uses, so the two
+   * lists can never disagree about what "matching" means. Both filters are
+   * composed INSIDE the `customerId` scope, never alongside it.
+   *
    * PORTAL-1 — paginated via the same `paginate()` helper and `id`
    * tie-breaker every other list endpoint already uses (Story S-8a-e); no
    * `sortBy`/filter params are added, mirroring `ListNotificationsQueryDto`'s
@@ -708,7 +714,12 @@ export class TicketsService {
    */
   async listTicketsForCustomer(
     customerId: string,
-    pagination: { page?: number; pageSize?: number } = {},
+    query: {
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      status?: TicketStatus;
+    } = {},
   ): Promise<Paginated<TicketSummary>> {
     // The delegate is wrapped rather than passed directly for the same
     // reason `listTickets` above wraps it: `paginate`'s `PaginatableDelegate`
@@ -725,10 +736,22 @@ export class TicketsService {
         }) => this.prisma.ticket.findMany({ ...args, include: CATEGORY_NAME_INCLUDE }),
       },
       {
-        where: { customerId },
+        // Story 148 — `customerId` stays the first and unconditional key.
+        // `searchWhereClause` contributes only a top-level `OR`, and
+        // `status` only a scalar, so neither can overwrite it and a flat
+        // spread is safe here — unlike the agent path, which needs an
+        // explicit `AND` because its department-visibility fragment also
+        // carries an `OR` (see `resolveSearchAndVisibilityFilter`). There
+        // is no department-visibility arm on this path at all: a portal
+        // caller holds no roles, and its scope is the Customer.
+        where: {
+          customerId,
+          ...searchWhereClause(query.search),
+          ...(query.status !== undefined ? { status: query.status } : {}),
+        },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        page: pagination.page,
-        pageSize: pagination.pageSize,
+        page: query.page,
+        pageSize: query.pageSize,
       },
     );
     return { ...page, items: tickets.map(toTicketSummary) };

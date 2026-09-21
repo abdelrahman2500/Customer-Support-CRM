@@ -53,9 +53,11 @@ export class PortalTicketsController {
   }
 
   /** PORTAL-1 — paginated, mirroring every other list endpoint's
-   * `page`/`pageSize` query params (Story S-8a-e's own precedent); no other
-   * filters exist for this list (see `ListPortalTicketsQueryDto`'s own doc
-   * comment). */
+   * `page`/`pageSize` query params (Story S-8a-e's own precedent).
+   *
+   * Story 148 — also narrowable by `search`/`status`. The response
+   * envelope, the ordering and the Customer scoping are all unchanged:
+   * scope still comes from `contact.sub`, never from the query. */
   @PortalRoute()
   @Get()
   list(
@@ -66,6 +68,8 @@ export class PortalTicketsController {
     return this.portalTicketsService.listTickets(contact.sub, {
       page: query.page,
       pageSize: query.pageSize,
+      search: query.search,
+      status: query.status,
     });
   }
 

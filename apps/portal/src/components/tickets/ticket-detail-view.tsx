@@ -111,7 +111,12 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <div>
             <dt className="text-xs text-ink-subtle">{t("detail.status")}</dt>
             <dd>
-              <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+              {/* Story 148 — the same `status.*` keys the list and its
+                  status filter read from, so the three can never disagree
+                  about what a status is called. */}
+              <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
+                {t(`status.${ticket.status}` as Parameters<typeof t>[0])}
+              </Badge>
             </dd>
           </div>
           <div>

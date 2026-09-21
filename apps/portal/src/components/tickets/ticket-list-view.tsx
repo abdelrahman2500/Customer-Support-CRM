@@ -7,18 +7,32 @@ import { useTranslations } from "next-intl";
 import { useCreateMyTicketMutation, useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
+import type { PortalTicketStatus } from "@/lib/tickets-api";
 import {
   Alert,
   Badge,
   Button,
   Card,
   FetchingIndicator,
+  FilterBar,
+  FilterSelect,
+  FormField,
   Input,
   PageHeader,
   Pagination,
   showSuccessToast,
   Skeleton,
 } from "@crm/ui";
+
+/** Story 148 — the four statuses a customer can filter by, in the order
+ * a ticket actually moves through them. `TicketStatus` has exactly these
+ * four (`apps/api/prisma/schema.prisma`). */
+const STATUSES: readonly PortalTicketStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
+
+/** Radix `Select` cannot represent an empty-string option value, which is
+ * why `FilterSelect` takes a caller-supplied sentinel — see its own doc
+ * comment. */
+const ALL_STATUSES = "ALL";
 
 /**
  * Story 53 — Customer Portal — Submit & Track Own Tickets. Mirrors
@@ -30,18 +44,69 @@ import {
  * PORTAL-1 — Portal My Tickets Pagination. `useMyTicketsQuery`'s response is
  * now a `Paginated<PortalTicketSummary>` envelope instead of a flat array,
  * mirroring the portal's own `ArticleListView`'s page state/`Pagination`/
- * `FetchingIndicator` usage exactly (Story S-8c). No filtering/search/sort
- * is added — this list has none of those, unlike the agent workspace's own
- * ticket list.
+ * `FetchingIndicator` usage exactly (Story S-8c).
+ *
+ * Story 148 — Portal Ticket Search & Filtering. Closes the gap the comment
+ * that used to sit here disclosed ("No filtering/search/sort is added").
+ *
+ * Two controls, not the agent list's seven. A customer asks "where's the
+ * one about the printer?" and "what's still open?"; they never ask about an
+ * assignee, a department or a triage priority, and the portal deliberately
+ * shows none of those. Search follows this app's own established pattern
+ * exactly — `ArticleListView`'s un-debounced input, with typing resetting to
+ * page 1 in the same update — rather than importing the agent workspace's.
+ *
+ * `FilterBar`/`FilterSelect` are shared primitives, not the agent screen's
+ * composition: `FilterBar` is the encoded responsive rule (stacked and
+ * full-width below `sm`, inline above), which is precisely what a
+ * hand-rolled row here would get wrong. `FormField`'s compact density
+ * renders a label identical to `FilterSelect`'s own, so the search box and
+ * the status dropdown align as one control strip instead of two
+ * differently-labelled controls in a row.
+ *
+ * Status labels are translated here for the first time (`status.*`). The
+ * list previously rendered the raw enum — a customer reading "IN_PROGRESS",
+ * in Arabic as well as English. A filter offering "In progress" beside rows
+ * saying "IN_PROGRESS" would not have been coherent, so the badge and the
+ * filter now read from the same keys.
  */
 export function TicketListView() {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<PortalTicketStatus | typeof ALL_STATUSES>(ALL_STATUSES);
   /** 1-based; `undefined` until the reader pages. */
   const [page, setPage] = useState<number | undefined>(undefined);
-  const ticketsQuery = useMyTicketsQuery(page);
+
+  /** Changing a filter resets to page 1 in the same update as the filter
+   * itself, so no request is ever made for "page 7 of the new filter" —
+   * `ArticleListView`'s own rule, which this list previously had no
+   * filters to need. */
+  function updateSearch(value: string) {
+    setSearch(value);
+    setPage(undefined);
+  }
+
+  function updateStatus(value: string) {
+    setStatus(value as PortalTicketStatus | typeof ALL_STATUSES);
+    setPage(undefined);
+  }
+
+  function clearFilters() {
+    setSearch("");
+    setStatus(ALL_STATUSES);
+    setPage(undefined);
+  }
+
+  const hasActiveFilters = search !== "" || status !== ALL_STATUSES;
+
+  const ticketsQuery = useMyTicketsQuery({
+    page,
+    ...(search ? { search } : {}),
+    ...(status !== ALL_STATUSES ? { status } : {}),
+  });
   const ticketPage = ticketsQuery.data;
   const tickets = ticketPage?.items;
 
@@ -56,6 +121,47 @@ export function TicketListView() {
               shift the list below it — mirrors ArticleListView exactly. */}
           <FetchingIndicator active={ticketsQuery.isPlaceholderData} label={tCommon("updating")} />
         </div>
+
+        <FilterBar className="mt-3">
+          {/* `FormField` compact renders the same `text-xs text-ink-muted`
+              label `FilterSelect` does, so the two controls share a
+              baseline instead of one carrying a visible label and the
+              other only an `aria-label`. */}
+          <FormField label={t("list.searchLabel")} className="sm:w-64">
+            <Input
+              type="search"
+              placeholder={t("list.searchPlaceholder")}
+              value={search}
+              onChange={(event) => updateSearch(event.target.value)}
+            />
+          </FormField>
+          <FilterSelect
+            label={t("list.filterStatus")}
+            value={status}
+            onChange={updateStatus}
+            options={STATUSES}
+            allValue={ALL_STATUSES}
+            allLabel={t("list.filterAll")}
+            renderLabel={(value) => t(`status.${value}` as Parameters<typeof t>[0])}
+          />
+        </FilterBar>
+
+        {/* The active-filter state: how many tickets the current filters
+            match, and the one control that undoes them. Rendered only when
+            something is actually filtered, so an untouched list is exactly
+            as quiet as it was before this story. */}
+        {hasActiveFilters && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
+            <span role="status">
+              {ticketPage === undefined
+                ? tCommon("updating")
+                : t("list.resultCount", { count: ticketPage.total })}
+            </span>
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              {t("list.clearFilters")}
+            </Button>
+          </div>
+        )}
 
         {ticketsQuery.isPending && (
           <div className="mt-3 flex flex-col gap-2">
@@ -74,8 +180,19 @@ export function TicketListView() {
           </Alert>
         )}
 
-        {tickets !== undefined && tickets.length === 0 && (
+        {/* Story 148 — "you have no tickets" and "nothing matched what you
+            asked for" are different facts, and telling a customer who has
+            twenty tickets that they have none is the version of this the
+            list used to show. Mirrors `ArticleListView`'s own split. */}
+        {tickets !== undefined && tickets.length === 0 && !hasActiveFilters && (
           <p className="mt-3 text-sm text-ink-subtle">{t("list.empty")}</p>
+        )}
+
+        {/* No second "clear" control here: the active-filter row above is
+            always on screen whenever this message is, and two buttons with
+            the same label a few pixels apart is worse than one. */}
+        {tickets !== undefined && tickets.length === 0 && hasActiveFilters && (
+          <p className="mt-3 text-sm text-ink-subtle">{t("list.noResults")}</p>
         )}
 
         {tickets !== undefined && tickets.length > 0 && (
@@ -83,18 +200,27 @@ export function TicketListView() {
             {tickets.map((ticket) => (
               <li
                 key={ticket.id}
-                className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
+                className="flex cursor-pointer items-center justify-between gap-2 border-b border-rule-subtle pb-2"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
               >
+                {/* `min-w-0 break-words` for the same reason
+                    `ArticleListView`'s title carries it: a subject is
+                    customer-written free text, and a flex item's default
+                    `min-width: auto` refuses to shrink below it, pushing
+                    the status and date past the viewport edge on a narrow
+                    screen. The status/date group keeps `shrink-0` so it is
+                    never squeezed instead. */}
                 <Link
                   href={`/${locale}/tickets/${ticket.id}`}
-                  className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
+                  className="focus-ring min-w-0 break-words rounded-sm font-medium text-ink-strong hover:underline"
                   onClick={(event) => event.stopPropagation()}
                 >
                   {ticket.subject}
                 </Link>
-                <span className="flex items-center gap-2 text-ink-subtle">
-                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+                <span className="flex shrink-0 items-center gap-2 text-ink-subtle">
+                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
+                    {t(`status.${ticket.status}` as Parameters<typeof t>[0])}
+                  </Badge>
                   <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
                 </span>
               </li>

@@ -84,7 +84,14 @@
       "createSubmitting": "Submitting...",
       "createFailed": "Couldn't submit the ticket. Please try again.",
       "createSuccess": "Ticket submitted.",
-      "actionForbidden": "You don't have permission to perform that action."
+      "actionForbidden": "You don't have permission to perform that action.",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Subject or category",
+      "filterStatus": "Status",
+      "filterAll": "Any status",
+      "clearFilters": "Clear filters",
+      "noResults": "No tickets match your search.",
+      "resultCount": "{count, plural, =0 {No matching tickets} one {# matching ticket} other {# matching tickets}}"
     },
     "detail": {
       "notFound": "This ticket could not be found.",
@@ -126,6 +133,12 @@
       "attachmentsEmpty": "No attachments yet.",
       "attachmentsUploading": "Uploading...",
       "attachmentsUploadFailed": "Couldn't upload the file. Please try again."
+    },
+    "status": {
+      "OPEN": "Open",
+      "IN_PROGRESS": "In progress",
+      "RESOLVED": "Resolved",
+      "CLOSED": "Closed"
     }
   },
   "knowledgeBase": {
