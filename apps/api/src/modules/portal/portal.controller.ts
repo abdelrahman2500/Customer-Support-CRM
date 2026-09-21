@@ -21,6 +21,7 @@ import type { EnvConfig } from "../../common/config/env.validation";
 import { buildRefreshCookieOptions } from "../../common/config/refresh-cookie";
 import { PortalLoginDto } from "./dto/portal-login.dto";
 import { UpdatePortalLocaleDto } from "./dto/update-portal-locale.dto";
+import { ChangePortalPasswordDto } from "./dto/change-portal-password.dto";
 import { PortalService } from "./portal.service";
 
 const REFRESH_COOKIE_NAME = "crm_portal_refresh_token";
@@ -97,6 +98,24 @@ export class PortalController {
   async me(@Req() request: Request): Promise<AuthenticatedContact> {
     const contact = request.user as JwtAccessTokenClaims;
     return this.portalService.getAuthenticatedContact(contact.sub);
+  }
+
+  /**
+   * Story 147 — mirrors `IdentityController.changeOwnPassword` exactly, for
+   * the portal audience. The contact is resolved from the JWT `sub`, never
+   * from the body, and `currentPassword` inside the DTO is the
+   * authorisation. The agent-driven
+   * `PATCH /customers/:id/contacts/:contactId/portal-password` is unchanged
+   * and remains the route for a customer who is locked out.
+   */
+  @PortalRoute()
+  @Patch("me/password")
+  async changeOwnPassword(
+    @Req() request: Request,
+    @Body() dto: ChangePortalPasswordDto,
+  ): Promise<{ id: string }> {
+    const contact = request.user as JwtAccessTokenClaims;
+    return this.portalService.changeOwnPassword(contact.sub, dto.currentPassword, dto.newPassword);
   }
 
   /** Story 119 — mirrors `IdentityController.updateLocale` exactly. */

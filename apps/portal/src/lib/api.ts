@@ -127,6 +127,23 @@ export function updatePreferredLocale(locale: "en" | "ar"): Promise<{ id: string
   });
 }
 
+/**
+ * Story 147 - the signed-in contact changes their own portal password.
+ * Mirrors `apps/web`'s own `changeOwnPassword` exactly, against the
+ * portal audience's route. Mirrors the backend's `ChangePortalPasswordDto`
+ * field-for-field; the form's confirmation field is a client-side typo
+ * guard and is deliberately not part of this payload.
+ */
+export function changeOwnPassword(input: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>("/portal/auth/me/password", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
 /** Performs one real request and turns a non-2xx response into a typed
  * `ApiError` — mirrors `apps/web`'s own `attempt` exactly. */
 async function attempt<T>(path: string, init: RequestInit, token: string | null): Promise<T> {

@@ -1176,5 +1176,22 @@
     "signOutConfirmDescription": "That device will be signed out immediately and will need to sign in again.",
     "actionForbidden": "You don't have permission to perform that action.",
     "actionFailed": "That change couldn't be saved. Please try again."
+  },
+  "changePassword": {
+    "heading": "Change password",
+    "description": "Choose a new password for your account. You will be signed out on every device, including this one.",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "newPasswordHint": "At least {min} characters, with upper and lower case letters, a number and a symbol.",
+    "confirmNewPassword": "Confirm new password",
+    "tooShort": "Must be at least {min} characters.",
+    "mismatch": "The two passwords do not match.",
+    "incomplete": "Fill in all three fields, and make sure the new password is long enough and matches its confirmation.",
+    "submit": "Change password",
+    "submitting": "Changing…",
+    "success": "Your password has been changed. Every session, including this one, has been signed out.",
+    "signInAgain": "Sign in again",
+    "actionForbidden": "You do not have permission to change this password.",
+    "actionFailed": "Could not change your password. Please try again."
   }
 }

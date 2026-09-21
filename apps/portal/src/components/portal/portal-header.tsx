@@ -42,6 +42,7 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * Story 54 — gains a second, to `/knowledge-base`.
  * Story 80 — gains a third, to `/chat` (AI Portal Chatbot).
  * Story 89 — gains a fourth, to `/notifications` (Notification History).
+ * Story 147 — gains a fifth, to `/account` (self-service password change).
  *
  * Story 82 — consumes `useBrandingQuery()` (`GET /portal/branding`):
  * a configured logo renders immediately before the existing
@@ -78,6 +79,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const tKnowledgeBase = useTranslations("knowledgeBase");
   const tChat = useTranslations("chat");
   const tNotifications = useTranslations("notifications");
+  const tAccount = useTranslations("account");
   const router = useRouter();
   const pathname = usePathname();
   const { locale } = useParams<{ locale: string }>();
@@ -129,12 +131,13 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const knowledgeBaseHref = `/${locale}/knowledge-base`;
   const chatHref = `/${locale}/chat`;
   const notificationsHref = `/${locale}/notifications`;
+  const accountHref = `/${locale}/account`;
   const linkClassName = (href: string) =>
     `flex items-center gap-1.5 rounded-md px-2 py-1.5 text-ink-muted hover:bg-surface-muted hover:text-ink focus-ring ${
       isActiveHref(href) ? "bg-surface-muted font-medium text-ink" : ""
     }`;
 
-  /** RM-11 — the one shared source for the nav's 4 links, so the desktop
+  /** RM-11 — the one shared source for the nav's links, so the desktop
    * `<nav>` and the mobile `DropdownMenu` can never render different
    * content for the same item. */
   const navItems: Array<{
@@ -156,6 +159,9 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
             }
           : undefined,
     },
+    // Story 147 - appended last, mirroring how every nav entry since
+    // Story 53 has been added to this array.
+    { href: accountHref, label: tAccount("nav") },
   ];
 
   return (

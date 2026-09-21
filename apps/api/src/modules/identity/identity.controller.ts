@@ -23,6 +23,7 @@ import { buildRefreshCookieOptions } from "../../common/config/refresh-cookie";
 import { LoginDto } from "./dto/login.dto";
 import { SwitchBranchDto } from "./dto/switch-branch.dto";
 import { UpdateLocaleDto } from "./dto/update-locale.dto";
+import { ChangeOwnPasswordDto } from "./dto/change-own-password.dto";
 import type { BranchMembershipSummary, SessionSummary } from "./identity.service";
 import { IdentityService } from "./identity.service";
 
@@ -119,6 +120,27 @@ export class IdentityController {
   ): Promise<{ id: string }> {
     const user = request.user as JwtAccessTokenClaims;
     return this.identityService.updatePreferredLocale(user.sub, dto.locale);
+  }
+
+  /**
+   * Story 147 — the caller changes their own password.
+   *
+   * No `@RequirePermissions`, mirroring `me`/`updateLocale`/`myBranches`
+   * above: this acts on the caller's own record, resolved from the JWT
+   * `sub`, never from the request body. Authorisation is `currentPassword`
+   * inside the DTO — see `IdentityService.changeOwnPassword`.
+   *
+   * Distinct from `UsersController`'s `PATCH users/:id/password`, which is
+   * an admin resetting *someone else's* credential and is gated on
+   * `user:reset-password`. Neither replaces the other.
+   */
+  @Patch("me/password")
+  async changeOwnPassword(
+    @Req() request: Request,
+    @Body() dto: ChangeOwnPasswordDto,
+  ): Promise<{ id: string }> {
+    const user = request.user as JwtAccessTokenClaims;
+    return this.identityService.changeOwnPassword(user.sub, dto);
   }
 
   /** Story 118 — the caller's own branch/department/role memberships,

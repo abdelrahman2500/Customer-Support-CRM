@@ -19,6 +19,7 @@ import type { EnvConfig } from "../../common/config/env.validation";
 import type { CreateUserDto } from "./dto/create-user.dto";
 import type { UpdateUserDto } from "./dto/update-user.dto";
 import type { ResetPasswordDto } from "./dto/reset-password.dto";
+import type { ChangeOwnPasswordDto } from "./dto/change-own-password.dto";
 import type { UpdateBranchDto } from "./dto/update-branch.dto";
 import type { CreateBranchDto } from "./dto/create-branch.dto";
 import type { CreateDepartmentDto } from "./dto/create-department.dto";
@@ -1014,6 +1015,58 @@ export class IdentityService {
     await this.recordAuditLog({
       actorId: this.tenantContext.userId,
       action: "user.password_reset",
+      entityType: "user",
+      entityId: id,
+    });
+
+    return { id };
+  }
+
+  /**
+   * Story 147 — the caller changes their OWN password.
+   *
+   * No permission gate, mirroring `me`/`myBranches`/`updateLocale`: this is
+   * the caller acting on their own record, identified by the JWT `sub` the
+   * controller passes in. Authorisation comes from `currentPassword`
+   * instead — a stolen access token on its own cannot change the credential
+   * it was issued against, which is exactly why the admin-only
+   * `user:reset-password` permission is not required here.
+   *
+   * Reuses `resetPassword`'s post-change sequence above: hash, update,
+   * revoke every refresh token, write an audit entry. Revoking is Story
+   * 48's decision and holds for the same reason — `refresh()` never checks
+   * the password hash, so without it a stolen-but-still-valid refresh token
+   * would survive the change. It does sign the caller out of their other
+   * devices, which is the intended security behaviour, not a side effect.
+   *
+   * A wrong `currentPassword` raises `BadRequestException`, not the
+   * `UnauthorizedException` `login` uses — see the inline comment below.
+   */
+  async changeOwnPassword(id: string, dto: ChangeOwnPasswordDto): Promise<{ id: string }> {
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("User not found");
+    }
+
+    const currentMatches = await bcrypt.compare(dto.currentPassword, existing.passwordHash);
+    if (!currentMatches) {
+      // Deliberately 400, not 401. A 401 here would be semantically wrong
+      // (the caller IS authenticated - their access token is valid; it is
+      // the submitted *payload* that is not) and practically harmful: both
+      // web clients' `apiFetch` treats any 401 as "this session is dead",
+      // refreshing and then signing the user out. Mistyping your current
+      // password must not log you out.
+      throw new BadRequestException("Current password is incorrect");
+    }
+
+    const passwordHash = await hashPassword(dto.newPassword);
+    await this.prisma.user.update({ where: { id }, data: { passwordHash } });
+    await this.revokeAllRefreshTokens(id);
+    // `actorId` is the caller themselves — unlike `resetPassword` above,
+    // where the actor is the admin acting on someone else.
+    await this.recordAuditLog({
+      actorId: id,
+      action: "user.password_changed",
       entityType: "user",
       entityId: id,
     });

@@ -1,11 +1,15 @@
 import { randomBytes, createHmac } from "node:crypto";
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
 import type { AuthenticatedContact, AuthTokenPair, JwtAccessTokenClaims } from "@crm/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { EnvConfig } from "../../common/config/env.validation";
+
+/** Story 147 — same cost factor `IdentityService` and `CustomersService`
+ * already use for every other password hash in this codebase. */
+const BCRYPT_ROUNDS = 12;
 
 /**
  * Story 52 — owns the Customer Portal's authentication surface. Mirrors
@@ -131,6 +135,51 @@ export class PortalService {
       where: { id: contactId },
       data: { preferredLocale: locale },
     });
+    return { id: contactId };
+  }
+
+  /**
+   * Story 147 — the signed-in contact changes their own portal password.
+   *
+   * The customer-facing counterpart to `IdentityService.changeOwnPassword`,
+   * and the same reasoning: the contact is resolved from the JWT `sub`, and
+   * `currentPassword` — not a permission — is the authorisation, so a
+   * stolen access token alone cannot change the credential.
+   *
+   * Until now a customer who wanted a new password had to ask an agent to
+   * set one for them through
+   * `PATCH /customers/:id/contacts/:contactId/portal-password`. That route
+   * is unchanged and still exists for the "customer is locked out" case;
+   * this simply stops it being the only way.
+   *
+   * Revokes every `ContactRefreshToken` for the contact, matching what
+   * `CustomersService`'s agent-driven password set already does, and for
+   * the same reason: `refresh()` never re-checks the password hash.
+   */
+  async changeOwnPassword(
+    contactId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ id: string }> {
+    const contact = await this.prisma.contact.findUnique({ where: { id: contactId } });
+    if (!contact || !contact.passwordHash) {
+      throw new UnauthorizedException("Contact no longer has portal access");
+    }
+
+    const currentMatches = await bcrypt.compare(currentPassword, contact.passwordHash);
+    if (!currentMatches) {
+      // 400, not 401 - see `IdentityService.changeOwnPassword` for why
+      // (the portal client shares the same sign-out-on-401 `apiFetch`).
+      throw new BadRequestException("Current password is incorrect");
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.prisma.contact.update({ where: { id: contactId }, data: { passwordHash } });
+    await this.prisma.contactRefreshToken.updateMany({
+      where: { contactId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
     return { id: contactId };
   }
 
