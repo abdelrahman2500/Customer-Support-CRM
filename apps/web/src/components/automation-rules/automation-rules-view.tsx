@@ -21,6 +21,7 @@ import {
   Badge,
   Button,
   Checkbox,
+  EmptyState,
   Input,
   Label,
   Skeleton,
@@ -133,11 +134,7 @@ export function AutomationRulesView() {
         </Alert>
       )}
 
-      {rulesQuery.isSuccess && rulesQuery.data.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("empty")}
-        </p>
-      )}
+      {rulesQuery.isSuccess && rulesQuery.data.length === 0 && <EmptyState title={t("empty")} />}
 
       {rulesQuery.isSuccess && rulesQuery.data.length > 0 && (
         <Table>

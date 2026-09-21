@@ -14,9 +14,9 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   Input,
   PageHeader,
-  showSuccessToast,
   Skeleton,
   Table,
   TableBody,
@@ -24,6 +24,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  showSuccessToast,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -62,9 +63,7 @@ export function TicketCategoriesView() {
         )}
 
         {categoriesQuery.isSuccess && categoriesQuery.data.length === 0 && (
-          <p className="mt-4 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-            {t("empty")}
-          </p>
+          <EmptyState title={t("empty")} className="mt-4" />
         )}
 
         {categoriesQuery.isSuccess && categoriesQuery.data.length > 0 && (

@@ -17,6 +17,7 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   Input,
   Select,
   SelectContent,
@@ -82,9 +83,7 @@ export function TasksPanel({ userId }: { userId: string }) {
       )}
 
       {tasksQuery.isSuccess && tasks.length === 0 && (
-        <p className="mt-2 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("tasks.empty")}
-        </p>
+        <EmptyState title={t("tasks.empty")} className="mt-2" />
       )}
 
       {tasksQuery.isSuccess && tasks.length > 0 && (

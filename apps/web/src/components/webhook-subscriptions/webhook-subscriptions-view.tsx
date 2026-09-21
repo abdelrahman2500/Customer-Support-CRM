@@ -19,6 +19,7 @@ import {
   Button,
   Card,
   Checkbox,
+  EmptyState,
   Input,
   Label,
   PageHeader,
@@ -67,9 +68,7 @@ export function WebhookSubscriptionsView() {
       )}
 
       {subscriptionsQuery.isSuccess && subscriptionsQuery.data.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("empty")}
-        </p>
+        <EmptyState title={t("empty")} />
       )}
 
       {subscriptionsQuery.isSuccess && subscriptionsQuery.data.length > 0 && (
@@ -127,9 +126,7 @@ function InboundWebhookLog() {
       )}
 
       {logsQuery.isSuccess && logsQuery.data.items.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("noInboundLogs")}
-        </p>
+        <EmptyState title={t("noInboundLogs")} />
       )}
 
       {logsQuery.isSuccess && logsQuery.data.items.length > 0 && (

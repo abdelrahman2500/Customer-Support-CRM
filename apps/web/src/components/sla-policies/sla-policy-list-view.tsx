@@ -8,7 +8,7 @@ import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { SlaPolicySummary } from "@/lib/sla-policies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Input, PageHeader, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, EmptyState, Input, PageHeader, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -66,12 +66,14 @@ export function SlaPolicyListView() {
       )}
 
       {policiesQuery.isSuccess && policiesQuery.data.length === 0 && (
-        <div className="rounded-md border border-dashed border-rule-strong p-8 text-center">
-          <p className="text-sm text-ink-subtle">{t("list.empty")}</p>
-          <Button size="sm" className="mt-3" asChild>
-            <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
-          </Button>
-        </div>
+        <EmptyState
+          title={t("list.empty")}
+          action={
+            <Button size="sm" asChild>
+              <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
+            </Button>
+          }
+        />
       )}
 
       {policiesQuery.isSuccess && policiesQuery.data.length > 0 && (

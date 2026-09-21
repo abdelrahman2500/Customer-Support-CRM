@@ -10,7 +10,7 @@ import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, Card, PageHeader, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, EmptyState, PageHeader, Skeleton } from "@crm/ui";
 import { TasksPanel } from "./tasks-panel";
 
 /** Story 28 — a work queue, not a full history: only tickets still open
@@ -261,15 +261,18 @@ export function DashboardView({ userId }: { userId: string }) {
             the clearest missing next-action: previously static text with
             no path forward when an agent has nothing open right now. */}
         {myTicketsQuery.isSuccess && openTickets.length === 0 && (
-          <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-            <p>{t("empty")}</p>
-            <Link
-              href={`/${locale}/tickets`}
-              className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
-            >
-              {t("browseAllTicketsLink")}
-            </Link>
-          </div>
+          <EmptyState
+            className="mt-2"
+            title={t("empty")}
+            action={
+              <Link
+                href={`/${locale}/tickets`}
+                className="focus-ring rounded-sm text-sm font-medium text-ink-strong hover:underline"
+              >
+                {t("browseAllTicketsLink")}
+              </Link>
+            }
+          />
         )}
 
         {myTicketsQuery.isSuccess && openTickets.length > 0 && (
@@ -333,9 +336,7 @@ export function DashboardView({ userId }: { userId: string }) {
         )}
 
         {unclaimedTicketsQuery.isSuccess && unclaimedTickets.length === 0 && (
-          <p className="mt-2 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-            {t("unassignedEmpty")}
-          </p>
+          <EmptyState title={t("unassignedEmpty")} className="mt-2" />
         )}
 
         {unclaimedTicketsQuery.isSuccess && unclaimedTickets.length > 0 && (

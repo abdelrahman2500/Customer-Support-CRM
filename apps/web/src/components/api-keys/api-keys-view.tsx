@@ -16,6 +16,7 @@ import {
   Button,
   Card,
   Checkbox,
+  EmptyState,
   Input,
   Label,
   PageHeader,
@@ -75,9 +76,7 @@ export function ApiKeysView() {
       )}
 
       {apiKeysQuery.isSuccess && apiKeysQuery.data.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("empty")}
-        </p>
+        <EmptyState title={t("empty")} />
       )}
 
       {apiKeysQuery.isSuccess && apiKeysQuery.data.length > 0 && (

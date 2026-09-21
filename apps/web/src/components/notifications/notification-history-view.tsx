@@ -9,7 +9,16 @@ import { useNotificationTemplatesQuery } from "@/hooks/use-notification-template
 import type { NotificationFilters, NotificationSummary } from "@/lib/notifications-api";
 import { renderNotificationTemplate } from "@/lib/notification-template-render";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, FetchingIndicator, PageHeader, Pagination, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  EmptyState,
+  FetchingIndicator,
+  PageHeader,
+  Pagination,
+  Skeleton,
+} from "@crm/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
 
@@ -276,9 +285,7 @@ export function NotificationHistoryView() {
       )}
 
       {notifications !== undefined && notifications.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("empty")}
-        </p>
+        <EmptyState title={t("empty")} />
       )}
 
       {notifications !== undefined && notifications.length > 0 && (

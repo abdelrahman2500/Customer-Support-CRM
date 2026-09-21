@@ -17,7 +17,7 @@ import {
   Pagination,
   Skeleton,
 } from "@crm/ui";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
+import { EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
 function DiffCell({ diff }: { diff: unknown }) {
   const t = useTranslations("auditLogs");
@@ -200,11 +200,7 @@ export function AuditLogView() {
         </Alert>
       )}
 
-      {logs !== undefined && logs.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("empty")}
-        </p>
-      )}
+      {logs !== undefined && logs.length === 0 && <EmptyState title={t("empty")} />}
 
       {logs !== undefined && logs.length > 0 && (
         <div className="overflow-x-auto">

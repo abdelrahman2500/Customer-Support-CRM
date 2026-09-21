@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-quick-replies";
 import type { QuickReplySummary } from "@/lib/quick-replies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Card, Input, PageHeader, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, EmptyState, Input, PageHeader, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -45,9 +45,7 @@ export function QuickRepliesView() {
       )}
 
       {quickRepliesQuery.isSuccess && quickRepliesQuery.data.length === 0 && (
-        <p className="rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("empty")}
-        </p>
+        <EmptyState title={t("empty")} />
       )}
 
       {quickRepliesQuery.isSuccess && quickRepliesQuery.data.length > 0 && (

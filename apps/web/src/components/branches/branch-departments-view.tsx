@@ -16,9 +16,9 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   Input,
   PageHeader,
-  showSuccessToast,
   Skeleton,
   Table,
   TableBody,
@@ -26,6 +26,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  showSuccessToast,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -191,9 +192,7 @@ function DepartmentsSection() {
       )}
 
       {departmentsQuery.isSuccess && departmentsQuery.data.length === 0 && (
-        <p className="mt-2 rounded-md border border-dashed border-rule-strong p-8 text-center text-sm text-ink-subtle">
-          {t("departments.empty")}
-        </p>
+        <EmptyState title={t("departments.empty")} className="mt-2" />
       )}
 
       {departmentsQuery.isSuccess && departmentsQuery.data.length > 0 && (
