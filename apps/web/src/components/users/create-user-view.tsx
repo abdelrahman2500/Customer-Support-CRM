@@ -7,7 +7,7 @@ import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router"
 import { useBranchesQuery, useCreateUserMutation, useDepartmentsQuery } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, showSuccessToast } from "@crm/ui";
+import { Alert, Button, Input, PageHeader, showSuccessToast } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 const UNSET_DEPARTMENT = "__unset__";
@@ -76,7 +76,7 @@ export function CreateUserView() {
 
   return (
     <section className="flex max-w-md flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("create.title")}</h1>
+      <PageHeader title={t("create.title")} />
 
       {error && <Alert variant="destructive">{error}</Alert>}
 

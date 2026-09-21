@@ -14,6 +14,7 @@ import {
   Button,
   FetchingIndicator,
   Input,
+  PageHeader,
   Pagination,
   QueryStateCard,
   Skeleton,
@@ -119,18 +120,23 @@ function ArticleListViewContent() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
-          {/* Story S-7 — this list's search is un-debounced, so every
-              keystroke was previously a new query key and a full skeleton
-              swap. Now the previous results stay and this is the signal. */}
-          <FetchingIndicator active={articlesQuery.isPlaceholderData} label={tCommon("updating")} />
-        </div>
-        <Button size="sm" asChild>
-          <Link href={`/${locale}/knowledge-base/new`}>{t("list.createButton")}</Link>
-        </Button>
-      </div>
+      <PageHeader
+        title={t("list.title")}
+        actions={
+          <>
+            {/* Story S-7 — this list's search is un-debounced, so every
+                  keystroke was previously a new query key and a full skeleton
+                  swap. Now the previous results stay and this is the signal. */}
+            <FetchingIndicator
+              active={articlesQuery.isPlaceholderData}
+              label={tCommon("updating")}
+            />
+            <Button size="sm" asChild>
+              <Link href={`/${locale}/knowledge-base/new`}>{t("list.createButton")}</Link>
+            </Button>
+          </>
+        }
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Input
@@ -277,7 +283,9 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
           {article.title}
         </Link>
       </TableCell>
-      <TableCell className="text-ink-subtle">{article.categoryName ?? t("list.noCategory")}</TableCell>
+      <TableCell className="text-ink-subtle">
+        {article.categoryName ?? t("list.noCategory")}
+      </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <Badge variant={article.status === "PUBLISHED" ? "success" : "secondary"}>

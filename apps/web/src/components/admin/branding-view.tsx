@@ -6,7 +6,7 @@ import { useBrandingQuery, useUpdateBrandingMutation } from "@/hooks/use-brandin
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { resolveNavigationLayout } from "@/components/workspace/nav-items";
 import type { BrandingSummary, NavigationLayout } from "@/lib/branding-api";
-import { Alert, Button, Card, Input, showSuccessToast, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Input, PageHeader, showSuccessToast, Skeleton } from "@crm/ui";
 
 const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 
@@ -36,8 +36,7 @@ export function BrandingView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
-      <p className="text-sm text-ink-subtle">{t("description")}</p>
+      <PageHeader title={t("title")} description={t("description")} />
 
       {brandingQuery.isLoading && (
         <div className="flex flex-col gap-2">

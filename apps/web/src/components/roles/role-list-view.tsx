@@ -29,7 +29,15 @@ import {
   TableRow,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Card, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
+import {
+  Card,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@crm/ui";
 
 /** The two seeded roles `seed.ts` reconciles by literal name — the backend
  * rejects a rename/deactivate on either (Design item 5); this is a
@@ -292,7 +300,7 @@ export function RoleListView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <PageHeader title={t("title")} />
 
       <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("list.rolesHeading")}</h2>

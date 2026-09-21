@@ -21,6 +21,7 @@ import {
   Checkbox,
   Input,
   Label,
+  PageHeader,
   Pagination,
   Skeleton,
   Table,
@@ -46,7 +47,7 @@ export function WebhookSubscriptionsView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <PageHeader title={t("title")} />
 
       {subscriptionsQuery.isLoading && (
         <div className="flex flex-col gap-2">

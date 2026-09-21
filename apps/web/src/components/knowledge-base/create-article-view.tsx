@@ -7,7 +7,7 @@ import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router"
 import { useCreateArticleMutation } from "@/hooks/use-knowledge-base";
 import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input } from "@crm/ui";
+import { Alert, Button, Input, PageHeader } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /** RM-27 — the free-text category `Input` became a `Select` sourced from
@@ -64,7 +64,7 @@ export function CreateArticleView() {
 
   return (
     <section className="flex max-w-md flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("create.title")}</h1>
+      <PageHeader title={t("create.title")} />
 
       {error && <Alert variant="destructive">{error}</Alert>}
 

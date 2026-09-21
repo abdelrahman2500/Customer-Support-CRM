@@ -8,7 +8,7 @@ import { useCreateSlaPolicyMutation } from "@/hooks/use-sla-policies";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { SlaPolicyPriority } from "@/lib/sla-policies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, showSuccessToast } from "@crm/ui";
+import { Alert, Button, Input, PageHeader, showSuccessToast } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 const PRIORITY_OPTIONS: SlaPolicyPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
@@ -80,7 +80,7 @@ export function CreateSlaPolicyView() {
 
   return (
     <section className="flex max-w-md flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("create.title")}</h1>
+      <PageHeader title={t("create.title")} />
 
       {error && <Alert variant="destructive">{error}</Alert>}
 

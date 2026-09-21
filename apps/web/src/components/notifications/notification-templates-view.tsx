@@ -15,6 +15,7 @@ import {
   Badge,
   Button,
   Card,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -76,8 +77,7 @@ export function NotificationTemplatesView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
-      <p className="text-sm text-ink-subtle">{t("description")}</p>
+      <PageHeader title={t("title")} description={t("description")} />
 
       {templatesQuery.isLoading && (
         <div className="flex flex-col gap-2">

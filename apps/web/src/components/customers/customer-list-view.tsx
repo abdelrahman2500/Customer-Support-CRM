@@ -13,6 +13,7 @@ import {
   Button,
   FetchingIndicator,
   Input,
+  PageHeader,
   Pagination,
   QueryStateCard,
   Skeleton,
@@ -145,18 +146,20 @@ function CustomerListViewContent() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
-          <FetchingIndicator
-            active={customersQuery.isPlaceholderData}
-            label={tCommon("updating")}
-          />
-        </div>
-        <Button size="sm" asChild>
-          <Link href={`/${locale}/customers/new`}>{t("list.createButton")}</Link>
-        </Button>
-      </div>
+      <PageHeader
+        title={t("list.title")}
+        actions={
+          <>
+            <FetchingIndicator
+              active={customersQuery.isPlaceholderData}
+              label={tCommon("updating")}
+            />
+            <Button size="sm" asChild>
+              <Link href={`/${locale}/customers/new`}>{t("list.createButton")}</Link>
+            </Button>
+          </>
+        }
+      />
 
       {/* RM-10 — one filter per row below `sm`, mirrors `TicketListView`'s
           own exact class change; unchanged, wrapped inline row at `sm`

@@ -8,7 +8,7 @@ import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { SlaPolicySummary } from "@/lib/sla-policies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Input, PageHeader, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -42,7 +42,7 @@ export function SlaPolicyListView() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
+        <PageHeader title={t("list.title")} />
         <Button size="sm" asChild>
           <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
         </Button>

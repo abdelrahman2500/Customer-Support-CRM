@@ -18,6 +18,7 @@ import {
   Checkbox,
   Input,
   Label,
+  PageHeader,
   Skeleton,
   Table,
   TableBody,
@@ -54,7 +55,7 @@ export function ApiKeysView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <PageHeader title={t("title")} />
 
       {apiKeysQuery.isLoading && (
         <div className="flex flex-col gap-2">

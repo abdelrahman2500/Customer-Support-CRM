@@ -15,6 +15,7 @@ import {
   Alert,
   Button,
   FetchingIndicator,
+  PageHeader,
   Pagination,
   Skeleton,
   Table,
@@ -124,7 +125,7 @@ export function NotificationHistoryView() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-ink">{t("history.title")}</h1>
+        <PageHeader title={t("history.title")} />
         {/* In the heading's own row, so it adds no height and cannot shift
             the table below it — mirrors TicketListView exactly. */}
         <FetchingIndicator

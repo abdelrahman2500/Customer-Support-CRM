@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateCustomerMutation } from "@/hooks/use-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input } from "@crm/ui";
+import { Alert, Button, Input, PageHeader } from "@crm/ui";
 
 /**
  * Story 25 — Create Customer (plan Task 3). Submits only `{ displayName }`
@@ -48,7 +48,7 @@ export function CreateCustomerView() {
 
   return (
     <section className="flex max-w-md flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("create.title")}</h1>
+      <PageHeader title={t("create.title")} />
 
       {created && (
         <Alert variant="success">

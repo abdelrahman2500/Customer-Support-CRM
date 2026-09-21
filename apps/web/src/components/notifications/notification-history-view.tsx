@@ -9,7 +9,7 @@ import { useNotificationTemplatesQuery } from "@/hooks/use-notification-template
 import type { NotificationFilters, NotificationSummary } from "@/lib/notifications-api";
 import { renderNotificationTemplate } from "@/lib/notification-template-render";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, FetchingIndicator, Pagination, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, FetchingIndicator, PageHeader, Pagination, Skeleton } from "@crm/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
 
@@ -238,7 +238,7 @@ export function NotificationHistoryView() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+        <PageHeader title={t("title")} />
         {/* Story S-8b/S-7 — the page being left stays on screen while the
             next one loads, so this is the only signal a page change is in
             flight. In the heading's own row, so it adds no height and

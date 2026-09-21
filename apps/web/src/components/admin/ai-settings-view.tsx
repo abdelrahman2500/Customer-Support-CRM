@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useAiSettingsQuery, useUpdateAiSettingsMutation } from "@/hooks/use-ai-settings";
 import type { AiSettingsSummary } from "@/lib/ai-settings-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Card, Checkbox, Label, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Checkbox, Label, PageHeader, Skeleton } from "@crm/ui";
 
 type ToggleKey = keyof AiSettingsSummary;
 
@@ -34,8 +34,7 @@ export function AiSettingsView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
-      <p className="text-sm text-ink-subtle">{t("description")}</p>
+      <PageHeader title={t("title")} description={t("description")} />
 
       {settingsQuery.isLoading && (
         <div className="flex flex-col gap-2">

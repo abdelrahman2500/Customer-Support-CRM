@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@crm/ui";
+import { PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from "@crm/ui";
 import { BrandingView } from "@/components/admin/branding-view";
 import { AiSettingsView } from "@/components/admin/ai-settings-view";
 import { BusinessHoursView } from "@/components/business-hours/business-hours-view";
@@ -39,8 +39,7 @@ export function SettingsView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
-      <p className="text-sm text-ink-subtle">{t("description")}</p>
+      <PageHeader title={t("title")} description={t("description")} />
 
       <Tabs defaultValue="branding" dir={localeDirection(locale)}>
         <TabsList>

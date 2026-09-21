@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { useMySessionsQuery, useRevokeSessionMutation } from "@/hooks/use-sessions";
 import type { SessionSummary } from "@/lib/sessions-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, PageHeader, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -24,8 +24,7 @@ export function MySessionsView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
-      <p className="text-sm text-ink-subtle">{t("description")}</p>
+      <PageHeader title={t("title")} description={t("description")} />
 
       {sessionsQuery.isLoading && (
         <div className="flex flex-col gap-2">
@@ -88,7 +87,9 @@ function SessionRow({ session }: { session: SessionSummary }) {
           {session.isCurrent && <Badge variant="secondary">{t("thisDevice")}</Badge>}
         </div>
       </TableCell>
-      <TableCell className="font-mono text-xs text-ink-subtle">{session.ipAddress ?? "—"}</TableCell>
+      <TableCell className="font-mono text-xs text-ink-subtle">
+        {session.ipAddress ?? "—"}
+      </TableCell>
       <TableCell>{new Date(session.lastActiveAt).toLocaleString(locale)}</TableCell>
       <TableCell>{new Date(session.sessionCreatedAt).toLocaleString(locale)}</TableCell>
       <TableCell>

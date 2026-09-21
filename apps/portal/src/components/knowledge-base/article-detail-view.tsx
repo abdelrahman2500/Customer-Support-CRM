@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Alert, Card, Skeleton } from "@crm/ui";
+import { Alert, Card, PageHeader, Skeleton } from "@crm/ui";
 import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
 import type { KbLocale } from "@/lib/knowledge-base-api";
@@ -63,7 +63,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
       </Link>
 
       <Card className="p-surface">
-        <h1 className="text-lg font-semibold text-ink">{article.title}</h1>
+        <PageHeader title={article.title} />
         {article.categoryName && (
           <p className="mt-1 text-xs text-ink-subtle">{article.categoryName}</p>
         )}

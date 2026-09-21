@@ -15,6 +15,7 @@ import {
   Button,
   Card,
   Input,
+  PageHeader,
   showSuccessToast,
   Skeleton,
   Table,
@@ -39,7 +40,7 @@ export function KbCategoriesView() {
   return (
     <section className="flex flex-col gap-6">
       <Card className="p-surface">
-        <h1 className="text-lg font-semibold text-ink">{t("heading")}</h1>
+        <PageHeader title={t("heading")} />
         <p className="mt-1 text-sm text-ink-subtle">{t("description")}</p>
 
         {categoriesQuery.isLoading && (

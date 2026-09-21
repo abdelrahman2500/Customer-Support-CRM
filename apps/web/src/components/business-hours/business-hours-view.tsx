@@ -17,7 +17,7 @@ import type {
 } from "@/lib/business-hours-api";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Card, Checkbox, Input, Label, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, Checkbox, Input, Label, PageHeader, Skeleton } from "@crm/ui";
 
 const WEEKDAY_KEYS = [
   "sunday",
@@ -469,7 +469,7 @@ export function BusinessHoursView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <PageHeader title={t("title")} />
       {!calendar ? (
         <CreateCalendarForm />
       ) : (

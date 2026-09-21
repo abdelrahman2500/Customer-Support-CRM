@@ -4,7 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Alert, Button, Card, FetchingIndicator, Input, Pagination, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  FetchingIndicator,
+  Input,
+  PageHeader,
+  Pagination,
+  Skeleton,
+} from "@crm/ui";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 
@@ -63,7 +72,7 @@ export function ArticleListView() {
     <Card asChild className="p-surface">
       <section>
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
+          <PageHeader title={t("list.title")} />
           {/* In the heading's own row, so it adds no height and cannot shift
             the list below it. */}
           <FetchingIndicator active={articlesQuery.isPlaceholderData} label={tCommon("updating")} />

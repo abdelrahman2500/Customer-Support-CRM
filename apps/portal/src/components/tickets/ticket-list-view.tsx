@@ -14,6 +14,7 @@ import {
   Card,
   FetchingIndicator,
   Input,
+  PageHeader,
   Pagination,
   showSuccessToast,
   Skeleton,
@@ -50,7 +51,7 @@ export function TicketListView() {
           padding convention (see that app's data cards throughout). */}
       <Card className="p-surface">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
+          <PageHeader title={t("list.title")} />
           {/* In the heading's own row, so it adds no height and cannot
               shift the list below it — mirrors ArticleListView exactly. */}
           <FetchingIndicator active={ticketsQuery.isPlaceholderData} label={tCommon("updating")} />

@@ -23,7 +23,7 @@ import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { BarChart, DonutGauge, RatingBar, ticketStatusBarColor } from "./report-charts";
 import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
-import { Alert, Button, Card, Checkbox, Input, Label, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Checkbox, Input, Label, PageHeader, Skeleton } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -539,7 +539,7 @@ export function ReportsView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <PageHeader title={t("title")} />
 
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-xs text-ink-muted">

@@ -7,7 +7,16 @@ import { useAuditLogsQuery } from "@/hooks/use-audit-logs";
 import { useUsersQuery } from "@/hooks/use-tickets";
 import type { AuditLogFilters, AuditLogSummary } from "@/lib/audit-logs-api";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, FetchingIndicator, Input, Pagination, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  FetchingIndicator,
+  Input,
+  PageHeader,
+  Pagination,
+  Skeleton,
+} from "@crm/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
 function DiffCell({ diff }: { diff: unknown }) {
@@ -113,7 +122,7 @@ export function AuditLogView() {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+        <PageHeader title={t("title")} />
         {/* Story S-8a/S-7 — the rows of the page being left stay on screen
             while the next page loads, so this is the only signal that a
             page change is in flight. In the heading's own row, so it adds

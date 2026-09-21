@@ -7,7 +7,7 @@ import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import type { KbLocale } from "@/lib/knowledge-base-api";
-import { Alert, Badge, Button, Card, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, PageHeader, Skeleton } from "@crm/ui";
 
 /**
  * Story 136 — the Customer Portal's real landing page.
@@ -79,7 +79,7 @@ export function PortalHomeView() {
     <div className="flex flex-col gap-4">
       <Card asChild className="p-surface">
         <section>
-          <h1 className="text-lg font-semibold text-ink">{t("welcomeHeading")}</h1>
+          <PageHeader title={t("welcomeHeading")} />
           <p className="mt-1 max-w-prose text-sm text-ink-muted">{t("welcomeBody")}</p>
         </section>
       </Card>

@@ -17,6 +17,7 @@ import {
   Button,
   Card,
   Input,
+  PageHeader,
   showSuccessToast,
   Skeleton,
   Table,
@@ -75,7 +76,7 @@ function MyBranchSection() {
 
   return (
     <Card className="p-surface">
-      <h1 className="text-lg font-semibold text-ink">{t("myBranch.heading")}</h1>
+      <PageHeader title={t("myBranch.heading")} />
       {branch ? (
         <MyBranchFields branch={branch} />
       ) : (

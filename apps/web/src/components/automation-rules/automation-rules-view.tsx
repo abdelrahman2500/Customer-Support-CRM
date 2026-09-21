@@ -32,7 +32,15 @@ import {
   TableRow,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Card, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
+import {
+  Card,
+  PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@crm/ui";
 
 /**
  * Story 57 — Automation Rules, over the already-existing
@@ -106,7 +114,7 @@ export function AutomationRulesView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <PageHeader title={t("title")} />
 
       {rulesQuery.isLoading && (
         <div className="flex flex-col gap-2">

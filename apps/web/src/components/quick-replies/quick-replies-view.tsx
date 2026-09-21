@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-quick-replies";
 import type { QuickReplySummary } from "@/lib/quick-replies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Card, Input, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, Input, PageHeader, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -25,7 +25,7 @@ export function QuickRepliesView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <PageHeader title={t("title")} />
 
       {quickRepliesQuery.isLoading && (
         <div className="flex flex-col gap-2">

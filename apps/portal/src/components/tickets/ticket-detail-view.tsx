@@ -17,7 +17,7 @@ import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
-import { Alert, Badge, Button, Card, Skeleton, Textarea } from "@crm/ui";
+import { Alert, Badge, Button, Card, PageHeader, Skeleton, Textarea } from "@crm/ui";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
@@ -106,7 +106,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
       </Link>
 
       <Card className="p-surface">
-        <h1 className="text-lg font-semibold text-ink">{ticket.subject}</h1>
+        <PageHeader title={ticket.subject} />
         <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
           <div>
             <dt className="text-xs text-ink-subtle">{t("detail.status")}</dt>

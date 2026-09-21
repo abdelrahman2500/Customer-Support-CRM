@@ -16,6 +16,7 @@ import {
   Button,
   FetchingIndicator,
   Input,
+  PageHeader,
   Pagination,
   QueryStateCard,
   Skeleton,
@@ -66,7 +67,9 @@ function parseTicketFilters(params: URLSearchParams): ListTicketsFilters {
   return {
     sortBy: (params.get("sortBy") as ListTicketsFilters["sortBy"]) ?? "createdAt",
     sortDir: (params.get("sortDir") as ListTicketsFilters["sortDir"]) ?? "desc",
-    ...(params.get("status") ? { status: params.get("status") as ListTicketsFilters["status"] } : {}),
+    ...(params.get("status")
+      ? { status: params.get("status") as ListTicketsFilters["status"] }
+      : {}),
     ...(params.get("priority")
       ? { priority: params.get("priority") as ListTicketsFilters["priority"] }
       : {}),
@@ -214,20 +217,25 @@ function TicketListViewContent() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
-          {/* Story S-7 — the rows below stay on screen while a filter change
-              resolves, so this is the only signal that anything is in
-              flight. `isPlaceholderData` rather than `isFetching`: a plain
-              background revalidation of the *same* filters is not worth
-              announcing, but data that is about to be replaced is. */}
-          <FetchingIndicator active={ticketsQuery.isPlaceholderData} label={tCommon("updating")} />
-        </div>
-        <Button size="sm" asChild>
-          <Link href={`/${locale}/tickets/new`}>{t("list.createButton")}</Link>
-        </Button>
-      </div>
+      <PageHeader
+        title={t("list.title")}
+        actions={
+          <>
+            {/* Story S-7 — the rows below stay on screen while a filter change
+                  resolves, so this is the only signal that anything is in
+                  flight. `isPlaceholderData` rather than `isFetching`: a plain
+                  background revalidation of the *same* filters is not worth
+                  announcing, but data that is about to be replaced is. */}
+            <FetchingIndicator
+              active={ticketsQuery.isPlaceholderData}
+              label={tCommon("updating")}
+            />
+            <Button size="sm" asChild>
+              <Link href={`/${locale}/tickets/new`}>{t("list.createButton")}</Link>
+            </Button>
+          </>
+        }
+      />
 
       {/* RM-10 — one filter per row below `sm` (tappable full-width
           controls) instead of wrapping fixed-`min-w` selects onto
@@ -348,7 +356,10 @@ function TicketListViewContent() {
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
               >
-                <TableCell label={t("list.columns.id")} className="font-mono text-xs text-ink-subtle">
+                <TableCell
+                  label={t("list.columns.id")}
+                  className="font-mono text-xs text-ink-subtle"
+                >
                   {ticket.id.slice(0, 8)}
                 </TableCell>
                 <TableCell label={t("list.columns.subject")} className="font-medium text-ink">

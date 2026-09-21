@@ -10,7 +10,7 @@ import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, Card, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, PageHeader, Skeleton } from "@crm/ui";
 import { TasksPanel } from "./tasks-panel";
 
 /** Story 28 — a work queue, not a full history: only tickets still open
@@ -235,7 +235,7 @@ export function DashboardView({ userId }: { userId: string }) {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
+      <PageHeader title={t("title")} />
 
       <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>

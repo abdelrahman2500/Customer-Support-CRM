@@ -33,7 +33,7 @@ import {
   TableRow,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
+import { PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /** Batch 4 (UX audit) — the URL <-> `ListUsersFilters` mapping for this
  * view's own `useUrlFilters`, mirroring `customer-list-view.tsx`'s
@@ -157,15 +157,17 @@ function UserListViewContent() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
-          <FetchingIndicator active={usersQuery.isPlaceholderData} label={tCommon("updating")} />
-        </div>
-        <Button size="sm" asChild>
-          <Link href={`/${locale}/users/new`}>{t("list.createButton")}</Link>
-        </Button>
-      </div>
+      <PageHeader
+        title={t("list.title")}
+        actions={
+          <>
+            <FetchingIndicator active={usersQuery.isPlaceholderData} label={tCommon("updating")} />
+            <Button size="sm" asChild>
+              <Link href={`/${locale}/users/new`}>{t("list.createButton")}</Link>
+            </Button>
+          </>
+        }
+      />
 
       <Input
         aria-label={t("list.searchLabel")}
@@ -232,7 +234,10 @@ function UserListViewContent() {
           label={tCommon("pagination.label")}
           previousLabel={tCommon("pagination.previous")}
           nextLabel={tCommon("pagination.next")}
-          indicator={tCommon("pagination.indicator", { page: page.page, totalPages: page.totalPages })}
+          indicator={tCommon("pagination.indicator", {
+            page: page.page,
+            totalPages: page.totalPages,
+          })}
         />
       )}
     </section>

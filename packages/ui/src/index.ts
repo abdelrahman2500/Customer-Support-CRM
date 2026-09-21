@@ -108,6 +108,11 @@ export type { FetchingIndicatorProps } from "./components/fetching-indicator";
 export { NavigationOverlay } from "./components/navigation-overlay";
 export type { NavigationOverlayProps } from "./components/navigation-overlay";
 
+// --- Page identity (Story 140) --------------------------------------------
+// One title/description/actions rhythm for every screen in both apps.
+export { PageHeader } from "./components/page-header";
+export type { PageHeaderProps } from "./components/page-header";
+
 export { Pagination } from "./components/pagination";
 export type { PaginationProps } from "./components/pagination";
 
