@@ -41,8 +41,21 @@
     "signedInAs": "مسجّل الدخول باسم {name}",
     "signOut": "تسجيل الخروج",
     "realtimeReconnecting": "الاتصال اللحظي منقطع. جارٍ إعادة المحاولة…",
-    "myTicketsLink": "عرض تذاكري",
-    "placeholder": "هذه الصفحة تؤكد فقط أنك مسجّل الدخول بأمان.",
+    "welcomeHeading": "مركز الدعم الخاص بك",
+    "welcomeBody": "تابع التذاكر التي أنشأتها، أو ابحث عن إجابات في قاعدة المعرفة، أو ابدأ محادثة جديدة مع فريقنا.",
+    "tickets": {
+      "heading": "تذاكرك",
+      "viewAll": "عرض الكل",
+      "total": "{count, plural, zero {# تذكرة} one {تذكرة واحدة} two {تذكرتان} few {# تذاكر} many {# تذكرة} other {# تذكرة}} إجمالاً",
+      "empty": "لم تنشئ أي تذكرة بعد."
+    },
+    "knowledgeBase": {
+      "heading": "قاعدة المعرفة",
+      "viewAll": "تصفح الكل"
+    },
+    "explore": {
+      "heading": "استكشف"
+    },
     "logoAlt": "شعار الشركة",
     "languageSwitcher": {
       "label": "اللغة",

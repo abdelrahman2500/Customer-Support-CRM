@@ -41,8 +41,21 @@
     "signedInAs": "Signed in as {name}",
     "signOut": "Sign out",
     "realtimeReconnecting": "Live updates are disconnected. Reconnecting…",
-    "myTicketsLink": "View my tickets",
-    "placeholder": "This page confirms you're securely signed in.",
+    "welcomeHeading": "Your support home",
+    "welcomeBody": "Track the tickets you've raised, find answers in the knowledge base, or start a new conversation with our team.",
+    "tickets": {
+      "heading": "Your tickets",
+      "viewAll": "View all",
+      "total": "{count, plural, one {# ticket} other {# tickets}} in total",
+      "empty": "You haven't raised any tickets yet."
+    },
+    "knowledgeBase": {
+      "heading": "Knowledge base",
+      "viewAll": "Browse all"
+    },
+    "explore": {
+      "heading": "Explore"
+    },
     "logoAlt": "Company logo",
     "languageSwitcher": {
       "label": "Language",

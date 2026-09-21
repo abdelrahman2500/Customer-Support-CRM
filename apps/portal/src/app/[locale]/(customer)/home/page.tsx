@@ -1,28 +1,19 @@
-import Link from "next/link";
-import { getLocale, getTranslations } from "next-intl/server";
+import { PortalHomeView } from "@/components/portal/portal-home-view";
 
 /**
  * Story 52 — the Customer Portal's first authenticated page, reached only
  * through the real `(customer)/layout.tsx` SSR auth guard.
  *
- * Story 53 — gains a link into the new "My Tickets" screen. Knowledge Base
- * browsing and CSAT/feedback (also named in
- * docs/architecture/08-supporting-domains.md) remain separate, future
- * stories' concern.
+ * Story 136 — the Story 52/53 placeholder body (one sentence under a key
+ * literally named `home.placeholder`, plus a single link) is replaced by a
+ * real landing page. This file becomes the same thin server page every other
+ * portal route already is (`tickets/page.tsx`, `knowledge-base/page.tsx`,
+ * `notifications/page.tsx`, `chat/page.tsx`): home was the lone `async`
+ * server-component exception, and the data the page now shows comes from
+ * client-side React Query hooks, so the content moves into a client view.
+ * `loading.tsx` is unchanged and still renders the shared
+ * `RouteLoadingSkeleton`.
  */
-export default async function PortalHomePage() {
-  const t = await getTranslations("home");
-  const locale = await getLocale();
-
-  return (
-    <div className="rounded-md border border-rule bg-surface p-4">
-      <p className="max-w-prose text-sm text-ink-muted">{t("placeholder")}</p>
-      <Link
-        href={`/${locale}/tickets`}
-        className="mt-3 inline-block text-sm font-medium text-ink hover:underline"
-      >
-        {t("myTicketsLink")}
-      </Link>
-    </div>
-  );
+export default function PortalHomePage() {
+  return <PortalHomeView />;
 }
