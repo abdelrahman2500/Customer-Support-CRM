@@ -107,7 +107,7 @@ function UnclaimedTicketRow({
           {customerName}
         </Link>
         {mutation.isError && (
-          <span className="text-xs text-red-600">
+          <span className="text-xs text-danger-foreground">
             {mutation.error instanceof ApiError && mutation.error.status === 403
               ? t("claimForbidden")
               : t("claimFailed")}

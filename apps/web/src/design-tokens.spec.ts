@@ -29,7 +29,8 @@ const SRC = resolve(process.cwd(), "src");
 
 /** The raw classes S-1 replaced. Each has an exact semantic token — see the
  * `was:` annotations in `packages/config/tailwind-tokens.css`. */
-const FORBIDDEN = /\b(?:bg|text|border|ring|divide|fill|stroke|placeholder)-(?:slate-\d{2,3}|white)\b/;
+const FORBIDDEN =
+  /\b(?:bg|text|border|ring|divide|fill|stroke|placeholder)-(?:slate-\d{2,3}|white)\b/;
 
 function collectSourceFiles(dir: string): string[] {
   const out: string[] = [];
@@ -113,5 +114,41 @@ describe("S-1 design tokens", () => {
     }
 
     expect(offenders, `Use <Card> instead:\n${offenders.join("\n")}`).toEqual([]);
+  });
+
+  /**
+   * Story 141 — raw inline validation-error colour.
+   *
+   * `text-red-600` was written 41 times across 23 files for field-level
+   * validation text, in five different size/spacing combinations, every one
+   * bypassing the `--danger-*` tokens. They now all use
+   * `text-danger-foreground` — the token `Alert`, `Badge` and `DropdownMenu`
+   * already use for danger text, and a touch darker (red-800) than the
+   * `red-600` it replaces, which raises contrast on the light surfaces these
+   * errors sit on.
+   *
+   * Narrow by design: only this one class. The status families stay exempt
+   * from `FORBIDDEN` above for the reason that comment gives, and a
+   * legitimate inline status colour elsewhere is not caught here.
+   */
+  const RAW_DANGER_TEXT = /text-red-600/;
+
+  it("colours inline validation errors through the danger token, not a raw palette class", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const lines = readFileSync(file, "utf8").split("\n");
+      lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+          return;
+        }
+        if (RAW_DANGER_TEXT.test(line)) {
+          offenders.push(`${file.slice(SRC.length + 1)}:${index + 1}`);
+        }
+      });
+    }
+
+    expect(offenders, `Use text-danger-foreground instead:\n${offenders.join("\n")}`).toEqual([]);
   });
 });

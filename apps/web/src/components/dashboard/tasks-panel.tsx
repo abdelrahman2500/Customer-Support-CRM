@@ -122,13 +122,15 @@ function TaskRow({ task }: { task: TaskSummary }) {
         <span className="font-medium text-ink-strong">{task.title}</span>
         {task.dueAt && (
           <span
-            className={isOverdue(task, now) ? "text-xs text-red-600" : "text-xs text-ink-subtle"}
+            className={
+              isOverdue(task, now) ? "text-xs text-danger-foreground" : "text-xs text-ink-subtle"
+            }
           >
             {new Date(task.dueAt).toLocaleString()}
           </span>
         )}
         {completeMutation.isError && (
-          <span className="text-xs text-red-600">
+          <span className="text-xs text-danger-foreground">
             {errorMessage(completeMutation.error, {
               forbidden: t("tasks.actionForbidden"),
               generic: t("tasks.actionFailed"),

@@ -116,7 +116,7 @@ function SessionRow({ session }: { session: SessionSummary }) {
           </>
         )}
         {mutation.isError && (
-          <p className="text-xs text-red-600">
+          <p className="text-xs text-danger-foreground">
             {errorMessage(mutation.error, {
               forbidden: t("actionForbidden"),
               generic: t("actionFailed"),

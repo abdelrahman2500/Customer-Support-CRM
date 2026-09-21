@@ -128,7 +128,7 @@ export function CreateUserView() {
             </SelectContent>
           </Select>
           {branchesQuery.isError && (
-            <span className="text-xs text-red-600">{t("create.branchLoadError")}</span>
+            <span className="text-xs text-danger-foreground">{t("create.branchLoadError")}</span>
           )}
         </label>
 
@@ -148,7 +148,9 @@ export function CreateUserView() {
             </SelectContent>
           </Select>
           {departmentsQuery.isError && (
-            <span className="text-xs text-red-600">{t("create.departmentLoadError")}</span>
+            <span className="text-xs text-danger-foreground">
+              {t("create.departmentLoadError")}
+            </span>
           )}
         </label>
 
@@ -167,7 +169,7 @@ export function CreateUserView() {
             </SelectContent>
           </Select>
           {rolesQuery.isError && (
-            <span className="text-xs text-red-600">{t("create.roleLoadError")}</span>
+            <span className="text-xs text-danger-foreground">{t("create.roleLoadError")}</span>
           )}
         </label>
 

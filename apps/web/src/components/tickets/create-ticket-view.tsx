@@ -182,7 +182,9 @@ export function CreateTicketView() {
               <span className="text-xs text-ink-subtle">{t("create.optionsLoading")}</span>
             )}
             {customerDetailQuery.isError && (
-              <span className="text-xs text-red-600">{t("create.contactsLoadError")}</span>
+              <span className="text-xs text-danger-foreground">
+                {t("create.contactsLoadError")}
+              </span>
             )}
           </label>
         )}
@@ -254,7 +256,9 @@ export function CreateTicketView() {
             <span className="text-xs text-ink-subtle">{t("create.optionsLoading")}</span>
           )}
           {departmentsQuery.isError && (
-            <span className="text-xs text-red-600">{t("create.departmentLoadError")}</span>
+            <span className="text-xs text-danger-foreground">
+              {t("create.departmentLoadError")}
+            </span>
           )}
         </label>
 
@@ -281,7 +285,9 @@ export function CreateTicketView() {
             <span className="text-xs text-ink-subtle">{t("create.optionsLoading")}</span>
           )}
           {usersQuery.isError && (
-            <span className="text-xs text-red-600">{t("create.assignedAgentLoadError")}</span>
+            <span className="text-xs text-danger-foreground">
+              {t("create.assignedAgentLoadError")}
+            </span>
           )}
         </label>
 

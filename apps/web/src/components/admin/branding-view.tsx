@@ -171,7 +171,7 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
               aria-invalid={invalidPrimary || undefined}
               onChange={(event) => setPrimaryColor(event.target.value)}
             />
-            {invalidPrimary && <span className="text-red-600">{t("invalidColor")}</span>}
+            {invalidPrimary && <span className="text-danger-foreground">{t("invalidColor")}</span>}
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("secondaryColorLabel")}
@@ -181,7 +181,9 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
               aria-invalid={invalidSecondary || undefined}
               onChange={(event) => setSecondaryColor(event.target.value)}
             />
-            {invalidSecondary && <span className="text-red-600">{t("invalidColor")}</span>}
+            {invalidSecondary && (
+              <span className="text-danger-foreground">{t("invalidColor")}</span>
+            )}
           </label>
           {/* Story 129 — native `<input type="radio">`s in a `<fieldset>`
             (the precedent is `automation-rules-view.tsx`). No `RadioGroup`

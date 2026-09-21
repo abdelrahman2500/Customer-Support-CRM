@@ -405,7 +405,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             </SelectContent>
           </Select>
           {categoriesQuery.isError && (
-            <span className="text-xs text-red-600">{t("detail.categoryLoadError")}</span>
+            <span className="text-xs text-danger-foreground">{t("detail.categoryLoadError")}</span>
           )}
         </Field>
 
@@ -489,7 +489,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             </SelectContent>
           </Select>
           {departmentsQuery.isError && (
-            <span className="text-xs text-red-600">{t("detail.departmentLoadError")}</span>
+            <span className="text-xs text-danger-foreground">
+              {t("detail.departmentLoadError")}
+            </span>
           )}
         </Field>
       </Card>
@@ -576,7 +578,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               isPending={holdMutation.isPending}
             />
             {(holdMutation.isError || resumeMutation.isError) && (
-              <p className="mt-1 text-xs text-red-600">
+              <p className="mt-1 text-xs text-danger-foreground">
                 {errorMessage(holdMutation.error ?? resumeMutation.error, {
                   forbidden: t("sla.actionForbidden"),
                   generic: t("sla.actionFailed"),

@@ -276,7 +276,7 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
             />
           </div>
           {(updateMutation.isError || deleteMutation.isError) && (
-            <p className="mt-1 text-xs text-red-600">
+            <p className="mt-1 text-xs text-danger-foreground">
               {errorMessage(updateMutation.error ?? deleteMutation.error, {
                 forbidden: t("actionForbidden"),
                 generic: t("actionFailed"),
@@ -311,7 +311,7 @@ function DeliveryAttemptsLog({ subscriptionId }: { subscriptionId: string }) {
   }
 
   if (attemptsQuery.isError) {
-    return <p className="text-xs text-red-600">{t("deliveriesError")}</p>;
+    return <p className="text-xs text-danger-foreground">{t("deliveriesError")}</p>;
   }
 
   if (!attemptsQuery.data || attemptsQuery.data.items.length === 0) {

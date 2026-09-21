@@ -325,7 +325,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
             onBlur={commitEmail}
           />
           {mutation.isError && (
-            <p className="text-xs text-red-600">
+            <p className="text-xs text-danger-foreground">
               {errorMessage(mutation.error, {
                 forbidden: t("list.actionForbidden"),
                 generic: t("list.actionFailed"),
@@ -374,7 +374,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
               <p className="text-xs text-emerald-600">{t("list.passwordResetSuccess")}</p>
             )}
             {resetPasswordMutation.isError && (
-              <p className="text-xs text-red-600">
+              <p className="text-xs text-danger-foreground">
                 {errorMessage(resetPasswordMutation.error, {
                   forbidden: t("list.actionForbidden"),
                   generic: t("list.actionFailed"),
@@ -392,7 +392,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
           onBlur={commitFullName}
         />
         {mutation.isError && (
-          <p className="mt-1 text-xs text-red-600">
+          <p className="mt-1 text-xs text-danger-foreground">
             {errorMessage(mutation.error, {
               forbidden: t("list.actionForbidden"),
               generic: t("list.actionFailed"),
@@ -424,7 +424,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
               <span className="text-xs text-ink-subtle">{t("list.optionsLoading")}</span>
             )}
             {rolesQuery.isError && (
-              <span className="text-xs text-red-600">{t("list.roleLoadError")}</span>
+              <span className="text-xs text-danger-foreground">{t("list.roleLoadError")}</span>
             )}
           </div>
 
@@ -455,12 +455,14 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
               <span className="text-xs text-ink-subtle">{t("list.optionsLoading")}</span>
             )}
             {departmentsQuery.isError && (
-              <span className="text-xs text-red-600">{t("list.departmentLoadError")}</span>
+              <span className="text-xs text-danger-foreground">
+                {t("list.departmentLoadError")}
+              </span>
             )}
           </div>
 
           {assignmentMutation.isError && (
-            <p className="text-xs text-red-600">
+            <p className="text-xs text-danger-foreground">
               {errorMessage(assignmentMutation.error, {
                 forbidden: t("list.actionForbidden"),
                 generic: t("list.actionFailed"),
@@ -507,7 +509,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
             </div>
           )}
           {unlockMutation.isError && (
-            <p className="text-xs text-red-600">
+            <p className="text-xs text-danger-foreground">
               {errorMessage(unlockMutation.error, {
                 forbidden: t("list.actionForbidden"),
                 generic: t("list.actionFailed"),

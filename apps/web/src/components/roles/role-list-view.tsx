@@ -163,7 +163,7 @@ function RoleRow({
             </Button>
           </div>
           {hasError && (
-            <p className="mt-1 text-xs text-red-600">
+            <p className="mt-1 text-xs text-danger-foreground">
               {errorMessage(activeError, {
                 forbidden: t("list.actionForbidden"),
                 generic: t("list.actionFailed"),

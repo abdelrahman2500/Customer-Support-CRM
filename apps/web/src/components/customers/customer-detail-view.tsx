@@ -132,7 +132,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
         {contact.isPrimary && <Badge variant="outline">{t("detail.primaryContact")}</Badge>}
       </div>
       {mutation.isError && (
-        <span className="text-xs text-red-600">
+        <span className="text-xs text-danger-foreground">
           {errorMessage(mutation.error, {
             forbidden: t("detail.actionForbidden"),
             generic: t("detail.actionFailed"),
@@ -182,7 +182,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
           <p className="text-xs text-emerald-600">{t("detail.portalPasswordSuccess")}</p>
         )}
         {portalPasswordMutation.isError && (
-          <p className="text-xs text-red-600">
+          <p className="text-xs text-danger-foreground">
             {errorMessage(portalPasswordMutation.error, {
               forbidden: t("detail.actionForbidden"),
               generic: t("detail.actionFailed"),
@@ -218,7 +218,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
           </div>
         )}
         {revokeMutation.isError && (
-          <p className="text-xs text-red-600">
+          <p className="text-xs text-danger-foreground">
             {errorMessage(revokeMutation.error, {
               forbidden: t("detail.actionForbidden"),
               generic: t("detail.actionFailed"),

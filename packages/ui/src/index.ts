@@ -108,6 +108,12 @@ export type { FetchingIndicatorProps } from "./components/fetching-indicator";
 export { NavigationOverlay } from "./components/navigation-overlay";
 export type { NavigationOverlayProps } from "./components/navigation-overlay";
 
+// --- Forms (Story 141) -----------------------------------------------------
+// Label + control + hint + error, in one shape, with the error on the
+// `--danger-*` tokens instead of a raw palette class.
+export { FormField } from "./components/form-field";
+export type { FormFieldProps } from "./components/form-field";
+
 // --- Page identity (Story 140) --------------------------------------------
 // One title/description/actions rhythm for every screen in both apps.
 export { PageHeader } from "./components/page-header";

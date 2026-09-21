@@ -885,7 +885,7 @@ function ReportCard({
           </Button>
         )}
       </header>
-      {exportError && <p className="mt-1 text-xs text-red-600">{t("export.error")}</p>}
+      {exportError && <p className="mt-1 text-xs text-danger-foreground">{t("export.error")}</p>}
       {query.isLoading && <ReportCardSkeleton variant={skeleton} />}
       {query.isError && forbidden && (
         <Alert variant="destructive" className="mt-2">

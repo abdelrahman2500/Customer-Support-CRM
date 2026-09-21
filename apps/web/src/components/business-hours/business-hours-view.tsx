@@ -309,7 +309,7 @@ function ExceptionRow({ exception }: { exception: BusinessHoursException }) {
         </Button>
       </span>
       {mutation.isError && (
-        <span className="w-full text-xs text-red-600">
+        <span className="w-full text-xs text-danger-foreground">
           {mutation.error instanceof ApiError && mutation.error.status === 403
             ? t("actionForbidden")
             : t("actionFailed")}

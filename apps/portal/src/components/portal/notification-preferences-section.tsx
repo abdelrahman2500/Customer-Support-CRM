@@ -106,7 +106,7 @@ function PreferenceRow({ preference }: { preference: PortalNotificationPreferenc
         </Button>
       </div>
       {mutation.isError && (
-        <p className="mt-1 text-xs text-red-600">
+        <p className="mt-1 text-xs text-danger-foreground">
           {errorMessage(mutation.error, {
             forbidden: t("preferences.actionForbidden"),
             generic: t("preferences.actionFailed"),

@@ -154,7 +154,7 @@ function MyBranchFields({ branch }: { branch: ManagedBranch }) {
         />
       </div>
       {mutation.isError && (
-        <p className="text-xs text-red-600">
+        <p className="text-xs text-danger-foreground">
           {errorMessage(mutation.error, {
             forbidden: t("myBranch.actionForbidden"),
             generic: t("myBranch.actionFailed"),
@@ -262,7 +262,7 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
           onBlur={commitName}
         />
         {mutation.isError && (
-          <p className="mt-1 text-xs text-red-600">
+          <p className="mt-1 text-xs text-danger-foreground">
             {errorMessage(mutation.error, {
               forbidden: t("departments.actionForbidden"),
               generic: t("departments.actionFailed"),

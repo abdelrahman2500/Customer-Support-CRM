@@ -163,7 +163,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
           isPending={mutation.isPending}
         />
         {mutation.isError && (
-          <p className="mt-1 text-xs text-red-600">
+          <p className="mt-1 text-xs text-danger-foreground">
             {errorMessage(mutation.error, {
               forbidden: t("actionForbidden"),
               generic: t("actionFailed"),
