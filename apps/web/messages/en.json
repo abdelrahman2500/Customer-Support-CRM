@@ -649,6 +649,10 @@
       "deleteConfirmTitle": "Delete task?",
       "deleteConfirmDescription": "This will permanently delete \"{title}\".",
       "overdue": "Overdue"
+    },
+    "stats": {
+      "assignedToMe": "Assigned to me",
+      "unclaimed": "Unclaimed"
     }
   },
   "notifications": {

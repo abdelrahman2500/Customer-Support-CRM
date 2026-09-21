@@ -649,6 +649,10 @@
       "deleteConfirmTitle": "حذف المهمة؟",
       "deleteConfirmDescription": "سيتم حذف \"{title}\" نهائيًا.",
       "overdue": "متأخرة"
+    },
+    "stats": {
+      "assignedToMe": "مُسندة إليّ",
+      "unclaimed": "غير مُسندة"
     }
   },
   "notifications": {

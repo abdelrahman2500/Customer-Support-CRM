@@ -37,6 +37,39 @@ const OPEN_STATUSES: readonly TicketStatus[] = ["OPEN", "IN_PROGRESS"];
  * used below, for the per-row badge and remaining-time text, which do.
  */
 
+/**
+ * Story 144 — one figure from the dashboard's summary row.
+ *
+ * Local to this screen rather than a `packages/ui` primitive: there are
+ * exactly two callers and no second screen asks for one, so promoting it
+ * would be an abstraction without a user (CLAUDE.md §2). It is a handful of
+ * lines to lift out if Reports or the portal ever wants the same tile.
+ *
+ * `value` is `number | undefined` so the tile can render its own skeleton
+ * while the query it summarises is still in flight, instead of the page
+ * shifting when three tiles appear at once.
+ */
+function StatTile({
+  label,
+  value,
+  isLoading,
+}: {
+  label: string;
+  value: number | undefined;
+  isLoading: boolean;
+}) {
+  return (
+    <Card className="p-surface">
+      <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">{label}</p>
+      {isLoading ? (
+        <Skeleton className="mt-2 h-8 w-16" />
+      ) : (
+        <p className="mt-1 text-2xl font-semibold tabular-nums text-ink">{value ?? "—"}</p>
+      )}
+    </Card>
+  );
+}
+
 function SlaPresentation({ ticket, now }: { ticket: TicketListItem; now: Date }) {
   const t = useTranslations("tickets");
   const status = deriveSlaStatus(ticket.slaTarget, now);
@@ -237,7 +270,32 @@ export function DashboardView({ userId }: { userId: string }) {
     <section className="flex flex-col gap-4">
       <PageHeader title={t("title")} />
 
-      <Card className="p-surface">
+      {/* Story 144 — the summary row. Both figures come from the paginated
+          envelope's own `total`, which counts every matching ticket
+          regardless of page, so they stay correct past the first page.
+          Deliberately only these two: a "breaching SLA" tile would have to
+          be counted from the loaded rows, which is page 1 only, and would
+          quietly under-report exactly the number an agent would most rely
+          on. Same reasoning Story 136 used to refuse a portal status
+          breakdown. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <StatTile
+          label={t("stats.assignedToMe")}
+          value={myTicketsQuery.data?.total}
+          isLoading={myTicketsQuery.isLoading}
+        />
+        <StatTile
+          label={t("stats.unclaimed")}
+          value={unclaimedTicketsQuery.data?.total}
+          isLoading={unclaimedTicketsQuery.isLoading}
+        />
+      </div>
+
+      {/* The primary operational queue. `raised` is the one place on this
+          page that takes elevation — `Card`'s own doc comment reserves it
+          for "the one thing on a page that should draw the eye", and before
+          this story every panel here carried identical weight. */}
+      <Card elevation="raised" className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>
 
         {myTicketsQuery.isLoading && (
@@ -313,46 +371,51 @@ export function DashboardView({ userId }: { userId: string }) {
         )}
       </Card>
 
-      <TasksPanel userId={userId} />
+      {/* Secondary panels: supporting context, side by side from lg up so
+          they read as a tier below the queue rather than three equal
+          full-width slabs. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <TasksPanel userId={userId} />
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("unassignedHeading")}</h2>
+        <Card className="p-surface">
+          <h2 className="text-sm font-semibold text-ink">{t("unassignedHeading")}</h2>
 
-        {unclaimedTicketsQuery.isLoading && (
-          <div className="mt-2 flex flex-col gap-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        )}
+          {unclaimedTicketsQuery.isLoading && (
+            <div className="mt-2 flex flex-col gap-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          )}
 
-        {unclaimedTicketsQuery.isError && (
-          <Alert variant="destructive" className="mt-2 flex items-center justify-between">
-            <span>{t("unassignedError")}</span>
-            <Button variant="outline" size="sm" onClick={() => unclaimedTicketsQuery.refetch()}>
-              {t("retry")}
-            </Button>
-          </Alert>
-        )}
+          {unclaimedTicketsQuery.isError && (
+            <Alert variant="destructive" className="mt-2 flex items-center justify-between">
+              <span>{t("unassignedError")}</span>
+              <Button variant="outline" size="sm" onClick={() => unclaimedTicketsQuery.refetch()}>
+                {t("retry")}
+              </Button>
+            </Alert>
+          )}
 
-        {unclaimedTicketsQuery.isSuccess && unclaimedTickets.length === 0 && (
-          <EmptyState title={t("unassignedEmpty")} className="mt-2" />
-        )}
+          {unclaimedTicketsQuery.isSuccess && unclaimedTickets.length === 0 && (
+            <EmptyState title={t("unassignedEmpty")} className="mt-2" />
+          )}
 
-        {unclaimedTicketsQuery.isSuccess && unclaimedTickets.length > 0 && (
-          <ul className="mt-2 flex flex-col gap-2 text-sm">
-            {unclaimedTickets.map((ticket) => (
-              <UnclaimedTicketRow
-                key={ticket.id}
-                ticket={ticket}
-                customerName={ticket.customerName ?? ticket.customerId}
-                now={unclaimedNow}
-                currentUserId={userId}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
+          {unclaimedTicketsQuery.isSuccess && unclaimedTickets.length > 0 && (
+            <ul className="mt-2 flex flex-col gap-2 text-sm">
+              {unclaimedTickets.map((ticket) => (
+                <UnclaimedTicketRow
+                  key={ticket.id}
+                  ticket={ticket}
+                  customerName={ticket.customerName ?? ticket.customerId}
+                  now={unclaimedNow}
+                  currentUserId={userId}
+                />
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
     </section>
   );
 }
