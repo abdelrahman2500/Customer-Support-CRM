@@ -220,26 +220,31 @@ export function AuditLogView() {
             <TableBody>
               {logs.map((log: AuditLogSummary) => (
                 <TableRow key={log.id}>
-                  <TableCell className="text-ink-subtle">
+                  {/* Story 150 — every cell's `label` reuses its own
+                      column's translation key, so the mobile label and the
+                      desktop header cannot drift apart. Below `sm` the
+                      header row is hidden and these eight values would
+                      otherwise stack as anonymous lines. */}
+                  <TableCell label={t("columns.createdAt")} className="text-ink-subtle">
                     {new Date(log.createdAt).toLocaleString(locale)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell label={t("columns.actor")}>
                     <ActorCell actorId={log.actorId} nameById={actorNameById} />
                   </TableCell>
-                  <TableCell>
+                  <TableCell label={t("columns.action")}>
                     <Badge variant="outline">{log.action}</Badge>
                   </TableCell>
-                  <TableCell>{log.entityType}</TableCell>
-                  <TableCell className="text-ink-subtle">
+                  <TableCell label={t("columns.entityType")}>{log.entityType}</TableCell>
+                  <TableCell label={t("columns.entityId")} className="text-ink-subtle">
                     {log.entityId ?? <span className="text-ink-subtle">{t("noEntityId")}</span>}
                   </TableCell>
-                  <TableCell className="text-ink-subtle">
+                  <TableCell label={t("columns.branch")} className="text-ink-subtle">
                     {log.branchId ?? <span className="text-ink-subtle">{t("noBranch")}</span>}
                   </TableCell>
-                  <TableCell className="text-ink-subtle">
+                  <TableCell label={t("columns.ipAddress")} className="text-ink-subtle">
                     {log.ipAddress ?? <span className="text-ink-subtle">{t("noIpAddress")}</span>}
                   </TableCell>
-                  <TableCell>
+                  <TableCell label={t("columns.diff")}>
                     <DiffCell diff={log.diff} />
                   </TableCell>
                 </TableRow>

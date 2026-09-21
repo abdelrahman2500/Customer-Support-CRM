@@ -120,9 +120,15 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
 
   return (
     <TableRow>
-      <TableCell className="font-medium text-ink-strong">{apiKey.label}</TableCell>
-      <TableCell className="font-mono text-xs text-ink-subtle">{apiKey.keyPrefix}…</TableCell>
-      <TableCell>
+      {/* Story 150 — labels reuse each column's own header key. The
+          actions cell below takes none: "ACTIONS: [Revoke]" is noise. */}
+      <TableCell label={t("columns.label")} className="font-medium text-ink-strong">
+        {apiKey.label}
+      </TableCell>
+      <TableCell label={t("columns.keyPrefix")} className="font-mono text-xs text-ink-subtle">
+        {apiKey.keyPrefix}…
+      </TableCell>
+      <TableCell label={t("columns.scopes")}>
         <div className="flex flex-wrap gap-1">
           {apiKey.scopes.map((scope) => (
             <Badge key={scope} variant="secondary">
@@ -131,7 +137,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
           ))}
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell label={t("columns.status")}>
         <Badge
           variant={
             status === "active" ? "success" : status === "expired" ? "secondary" : "destructive"
@@ -140,7 +146,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
           {t(`status.${status}`)}
         </Badge>
       </TableCell>
-      <TableCell className="text-ink-subtle">
+      <TableCell label={t("columns.lastUsedAt")} className="text-ink-subtle">
         {apiKey.lastUsedAt ? new Date(apiKey.lastUsedAt).toLocaleString() : t("neverUsed")}
       </TableCell>
       <TableCell>

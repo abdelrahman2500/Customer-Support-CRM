@@ -165,22 +165,23 @@ function SlaPolicyRow({
 
   return (
     <TableRow>
-      <TableCell className="text-ink-subtle">
+      {/* Story 150 — labels reuse each column's own header key. */}
+      <TableCell label={t("list.columns.department")} className="text-ink-subtle">
         {policy.departmentId ?? t("list.noDepartment")}
       </TableCell>
-      <TableCell className="text-ink-subtle">
+      <TableCell label={t("list.columns.category")} className="text-ink-subtle">
         {policy.categoryId
           ? (categoryNameById.get(policy.categoryId) ?? policy.categoryId)
           : t("list.noCategory")}
       </TableCell>
-      <TableCell>
+      <TableCell label={t("list.columns.priority")}>
         {policy.priority ? (
           <Badge variant="outline">{policy.priority}</Badge>
         ) : (
           <span className="text-ink-subtle">{t("list.noPriority")}</span>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell label={t("list.columns.responseTarget")}>
         <Input
           type="number"
           min={1}
@@ -191,7 +192,7 @@ function SlaPolicyRow({
           onBlur={commitResponseTarget}
         />
       </TableCell>
-      <TableCell>
+      <TableCell label={t("list.columns.resolutionTarget")}>
         <Input
           type="number"
           min={1}
@@ -202,7 +203,7 @@ function SlaPolicyRow({
           onBlur={commitResolutionTarget}
         />
       </TableCell>
-      <TableCell>
+      <TableCell label={t("list.columns.status")}>
         <div className="flex items-center gap-2">
           <Badge variant={policy.isActive ? "success" : "secondary"}>
             {policy.isActive ? t("list.active") : t("list.inactive")}

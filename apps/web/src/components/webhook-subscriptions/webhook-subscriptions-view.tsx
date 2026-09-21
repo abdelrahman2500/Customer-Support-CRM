@@ -142,17 +142,21 @@ function InboundWebhookLog() {
             <TableBody>
               {logsQuery.data.items.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell className="font-mono text-xs text-ink-strong">
+                  {/* Story 150 — labels reuse each column's own header key. */}
+                  <TableCell
+                    label={t("inboundColumns.providerKey")}
+                    className="font-mono text-xs text-ink-strong"
+                  >
                     {log.providerKey}
                   </TableCell>
-                  <TableCell>
+                  <TableCell label={t("inboundColumns.result")}>
                     <Badge variant={log.verified ? "success" : "destructive"}>
                       {log.verified
                         ? t("inboundVerified")
                         : (log.rejectReason ?? t("inboundRejected"))}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-ink-subtle">
+                  <TableCell label={t("inboundColumns.receivedAt")} className="text-ink-subtle">
                     {new Date(log.receivedAt).toLocaleString()}
                   </TableCell>
                 </TableRow>
@@ -214,12 +218,13 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
     <>
       <TableRow>
         <TableCell
+          label={t("columns.targetUrl")}
           className="max-w-xs truncate font-mono text-xs text-ink-strong"
           title={subscription.targetUrl}
         >
           {subscription.targetUrl}
         </TableCell>
-        <TableCell>
+        <TableCell label={t("columns.events")}>
           <div className="flex flex-wrap gap-1">
             {subscription.subscribedEventTypes.map((eventType) => (
               <Badge key={eventType} variant="secondary">
@@ -228,7 +233,7 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
             ))}
           </div>
         </TableCell>
-        <TableCell>
+        <TableCell label={t("columns.status")}>
           <Badge variant={subscription.isActive ? "success" : "secondary"}>
             {subscription.isActive ? t("active") : t("inactive")}
           </Badge>
@@ -328,15 +333,15 @@ function DeliveryAttemptsLog({ subscriptionId }: { subscriptionId: string }) {
         <TableBody>
           {attemptsQuery.data.items.map((attempt) => (
             <TableRow key={attempt.id}>
-              <TableCell>{attempt.eventType}</TableCell>
-              <TableCell>
+              <TableCell label={t("deliveryColumns.eventType")}>{attempt.eventType}</TableCell>
+              <TableCell label={t("deliveryColumns.result")}>
                 <Badge variant={attempt.succeeded ? "success" : "destructive"}>
                   {attempt.succeeded
                     ? t("deliverySucceeded", { status: attempt.responseStatus ?? "" })
                     : (attempt.errorMessage ?? t("deliveryFailed"))}
                 </Badge>
               </TableCell>
-              <TableCell className="text-ink-subtle">
+              <TableCell label={t("deliveryColumns.attemptedAt")} className="text-ink-subtle">
                 {new Date(attempt.attemptedAt).toLocaleString()}
               </TableCell>
             </TableRow>

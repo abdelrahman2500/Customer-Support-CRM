@@ -253,7 +253,8 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
 
   return (
     <TableRow>
-      <TableCell>
+      {/* Story 150 — labels reuse each column's own header key. */}
+      <TableCell label={t("departments.columns.name")}>
         <Input
           className="min-w-[10rem]"
           value={nameDraft}
@@ -269,7 +270,7 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
           </p>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell label={t("departments.columns.status")}>
         <div className="flex items-center gap-2">
           <Badge variant={department.isActive ? "success" : "secondary"}>
             {department.isActive ? t("departments.active") : t("departments.inactive")}

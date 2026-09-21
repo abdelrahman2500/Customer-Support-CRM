@@ -103,9 +103,14 @@ function QuickReplyRow({ quickReply }: { quickReply: QuickReplySummary }) {
 
   return (
     <TableRow>
-      <TableCell className="font-medium text-ink-strong">{quickReply.title}</TableCell>
-      <TableCell className="max-w-md truncate text-ink-subtle">{quickReply.body}</TableCell>
-      <TableCell>
+      {/* Story 150 — labels reuse each column's own header key. */}
+      <TableCell label={t("columns.title")} className="font-medium text-ink-strong">
+        {quickReply.title}
+      </TableCell>
+      <TableCell label={t("columns.body")} className="max-w-md truncate text-ink-subtle">
+        {quickReply.body}
+      </TableCell>
+      <TableCell label={t("columns.status")}>
         <div className="flex items-center gap-2">
           <Badge variant={quickReply.isActive ? "success" : "secondary"}>
             {quickReply.isActive ? t("active") : t("inactive")}

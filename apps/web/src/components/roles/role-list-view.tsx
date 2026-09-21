@@ -104,7 +104,10 @@ function RoleRow({
   return (
     <>
       <TableRow>
-        <TableCell className="font-medium text-ink">
+        {/* Story 150 — labels reuse each column's own header key. The
+            actions cell and the `colSpan` permissions panel below take
+            none: neither is a column. */}
+        <TableCell label={t("list.columns.name")} className="font-medium text-ink">
           {isProtected ? (
             <div className="flex items-center gap-2">
               <span>{role.name}</span>
@@ -119,8 +122,10 @@ function RoleRow({
             />
           )}
         </TableCell>
-        <TableCell className="text-ink-subtle">{role.permissions.length}</TableCell>
-        <TableCell>
+        <TableCell label={t("list.columns.permissionCount")} className="text-ink-subtle">
+          {role.permissions.length}
+        </TableCell>
+        <TableCell label={t("list.columns.visibility")}>
           <Select value={role.ticketVisibilityScope} onValueChange={changeVisibilityScope}>
             <SelectTrigger className="w-40" aria-label={t("list.columns.visibility")}>
               <SelectValue />

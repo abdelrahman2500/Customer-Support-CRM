@@ -303,9 +303,14 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
           <TableBody>
             {versionsQuery.data.map((version) => (
               <TableRow key={version.id}>
-                <TableCell>{version.versionNumber}</TableCell>
-                <TableCell>{version.title}</TableCell>
-                <TableCell>{new Date(version.publishedAt).toLocaleString(locale)}</TableCell>
+                {/* Story 150 — labels reuse each column's own header key. */}
+                <TableCell label={t("detail.versions.columns.version")}>
+                  {version.versionNumber}
+                </TableCell>
+                <TableCell label={t("detail.versions.columns.title")}>{version.title}</TableCell>
+                <TableCell label={t("detail.versions.columns.publishedAt")}>
+                  {new Date(version.publishedAt).toLocaleString(locale)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

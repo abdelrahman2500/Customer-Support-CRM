@@ -200,12 +200,15 @@ export function NotificationHistoryView() {
             <TableBody>
               {notifications.map((notification: PortalNotificationSummary) => (
                 <TableRow key={notification.id}>
-                  <TableCell>
+                  {/* Story 150 — labels reuse each column's own header
+                      key. The skeleton rows above take none: a placeholder
+                      is decorative, and "EVENT: ▭" reads as noise. */}
+                  <TableCell label={t("history.columns.event")}>
                     <span className="rounded-full border border-rule-strong px-2 py-0.5 text-xs">
                       {t(eventLabelKeyFor(notification.eventType))}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell label={t("history.columns.ticket")}>
                     <Link
                       href={`/${locale}/tickets/${notification.ticketId}`}
                       className="focus-ring rounded-sm hover:underline"
@@ -213,7 +216,7 @@ export function NotificationHistoryView() {
                       {ticketSubjectById.get(notification.ticketId) ?? notification.ticketId}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-ink-subtle">
+                  <TableCell label={t("history.columns.loggedAt")} className="text-ink-subtle">
                     {new Date(notification.loggedAt).toLocaleString(locale)}
                   </TableCell>
                 </TableRow>

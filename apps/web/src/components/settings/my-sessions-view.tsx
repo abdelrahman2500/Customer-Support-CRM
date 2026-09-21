@@ -81,17 +81,24 @@ function SessionRow({ session }: { session: SessionSummary }) {
 
   return (
     <TableRow>
-      <TableCell>
+      {/* Story 150 — below `sm` these two dates stacked as bare,
+          indistinguishable lines; the labels reuse each column's own
+          header key. The trailing actions cell takes none. */}
+      <TableCell label={t("columns.device")}>
         <div className="flex items-center gap-2">
           <span>{session.userAgent ?? t("unknownDevice")}</span>
           {session.isCurrent && <Badge variant="secondary">{t("thisDevice")}</Badge>}
         </div>
       </TableCell>
-      <TableCell className="font-mono text-xs text-ink-subtle">
+      <TableCell label={t("columns.ipAddress")} className="font-mono text-xs text-ink-subtle">
         {session.ipAddress ?? "—"}
       </TableCell>
-      <TableCell>{new Date(session.lastActiveAt).toLocaleString(locale)}</TableCell>
-      <TableCell>{new Date(session.sessionCreatedAt).toLocaleString(locale)}</TableCell>
+      <TableCell label={t("columns.lastActive")}>
+        {new Date(session.lastActiveAt).toLocaleString(locale)}
+      </TableCell>
+      <TableCell label={t("columns.signedInSince")}>
+        {new Date(session.sessionCreatedAt).toLocaleString(locale)}
+      </TableCell>
       <TableCell>
         {!session.isCurrent && (
           <>

@@ -123,7 +123,8 @@ function KbCategoryRow({ category }: { category: KbCategory }) {
 
   return (
     <TableRow>
-      <TableCell>
+      {/* Story 150 — labels reuse each column's own header key. */}
+      <TableCell label={t("columns.name")}>
         <Input
           className="min-w-[10rem]"
           value={nameDraft}
@@ -139,7 +140,7 @@ function KbCategoryRow({ category }: { category: KbCategory }) {
           </p>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell label={t("columns.status")}>
         <div className="flex items-center gap-2">
           <Badge variant={category.isActive ? "success" : "secondary"}>
             {category.isActive ? t("active") : t("inactive")}

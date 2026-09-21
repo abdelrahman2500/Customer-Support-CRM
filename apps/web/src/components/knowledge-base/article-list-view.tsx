@@ -281,7 +281,10 @@ function ArticleRow({ article }: { article: ArticleListItem }) {
 
   return (
     <TableRow>
-      <TableCell>
+      {/* Story 150 — labels reuse each column's own header key. The
+          trailing status cell carries the publish action, so it keeps its
+          header label but the action needs none of its own. */}
+      <TableCell label={t("list.columns.title")}>
         <Link
           href={`/${locale}/knowledge-base/${article.id}`}
           className="focus-ring rounded-sm text-start font-medium text-ink-strong hover:underline"
@@ -289,10 +292,12 @@ function ArticleRow({ article }: { article: ArticleListItem }) {
           {article.title}
         </Link>
       </TableCell>
-      <TableCell className="text-ink-subtle">
+      <TableCell label={t("list.columns.category")} className="text-ink-subtle">
         {article.categoryName ?? t("list.noCategory")}
       </TableCell>
-      <TableCell>
+      {/* Story 150 — this cell shipped in Story 149 without a `label`,
+          so on a phone the badge stood alone with nothing naming it. */}
+      <TableCell label={t("list.columns.translation")}>
         {/* `secondary`, deliberately not `destructive`: an untranslated
             article is a normal, valid state — the base English content
             still serves every reader, and `applyLocale` falls back to it
@@ -303,7 +308,7 @@ function ArticleRow({ article }: { article: ArticleListItem }) {
             : t("list.translation.untranslated")}
         </Badge>
       </TableCell>
-      <TableCell>
+      <TableCell label={t("list.columns.status")}>
         <div className="flex items-center gap-2">
           <Badge variant={article.status === "PUBLISHED" ? "success" : "secondary"}>
             {article.status === "PUBLISHED" ? t("list.published") : t("list.draft")}

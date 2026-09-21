@@ -201,13 +201,16 @@ function AutomationRuleRow({
 
   return (
     <TableRow>
-      <TableCell className="font-medium text-ink-strong">{rule.name}</TableCell>
-      <TableCell className="text-ink-subtle">
+      {/* Story 150 — labels reuse each column's own header key. */}
+      <TableCell label={t("columns.name")} className="font-medium text-ink-strong">
+        {rule.name}
+      </TableCell>
+      <TableCell label={t("columns.condition")} className="text-ink-subtle">
         {rule.conditionCategoryId
           ? (categoryNameById.get(rule.conditionCategoryId) ?? rule.conditionCategoryId)
           : t("anyCategory")}
       </TableCell>
-      <TableCell className="text-ink-subtle">
+      <TableCell label={t("columns.assignTo")} className="text-ink-subtle">
         {rule.actionAssignmentMode === "LEAST_LOADED" ? (
           <span>
             {t("leastLoaded")}
@@ -218,18 +221,20 @@ function AutomationRuleRow({
           (userNameById.get(rule.actionAssignToUserId) ?? rule.actionAssignToUserId)
         )}
       </TableCell>
-      <TableCell className="text-ink-subtle">
+      <TableCell label={t("columns.setCategory")} className="text-ink-subtle">
         {rule.actionSetCategoryId
           ? (categoryNameById.get(rule.actionSetCategoryId) ?? rule.actionSetCategoryId)
           : t("noAction")}
       </TableCell>
-      <TableCell className="text-ink-subtle">
+      <TableCell label={t("columns.setDepartment")} className="text-ink-subtle">
         {rule.actionSetDepartmentId
           ? (departmentNameById.get(rule.actionSetDepartmentId) ?? rule.actionSetDepartmentId)
           : t("noAction")}
       </TableCell>
-      <TableCell className="text-ink-subtle">{rule.actionSetPriority ?? t("noAction")}</TableCell>
-      <TableCell>
+      <TableCell label={t("columns.setPriority")} className="text-ink-subtle">
+        {rule.actionSetPriority ?? t("noAction")}
+      </TableCell>
+      <TableCell label={t("columns.status")}>
         <div className="flex items-center gap-2">
           <Badge variant={rule.isActive ? "success" : "secondary"}>
             {rule.isActive ? t("active") : t("inactive")}

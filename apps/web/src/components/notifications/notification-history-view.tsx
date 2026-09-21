@@ -94,10 +94,11 @@ function NotificationRow({
 
   return (
     <TableRow>
-      <TableCell>
+      {/* Story 150 — labels reuse each column's own header key. */}
+      <TableCell label={t("columns.event")}>
         <Badge variant="outline">{eventLabel}</Badge>
       </TableCell>
-      <TableCell>
+      <TableCell label={t("columns.ticket")}>
         <Link
           href={`/${locale}/tickets/${notification.ticketId}`}
           className="focus-ring rounded-sm hover:underline"
@@ -105,10 +106,10 @@ function NotificationRow({
           {ticketSubject ?? notification.ticketId}
         </Link>
       </TableCell>
-      <TableCell className="text-ink-subtle">
+      <TableCell label={t("columns.customer")} className="text-ink-subtle">
         {customerName ?? <span className="text-ink-subtle">{t("unknownCustomer")}</span>}
       </TableCell>
-      <TableCell className="text-ink-subtle">
+      <TableCell label={t("columns.target")} className="text-ink-subtle">
         {notification.targetType && notification.targetAt ? (
           <>
             {targetTypeLabelKey ? t(targetTypeLabelKey) : notification.targetType}
@@ -119,7 +120,7 @@ function NotificationRow({
           <span className="text-ink-subtle">{t("noTarget")}</span>
         )}
       </TableCell>
-      <TableCell className="text-ink-subtle">
+      <TableCell label={t("columns.loggedAt")} className="text-ink-subtle">
         {new Date(notification.loggedAt).toLocaleString(locale)}
       </TableCell>
     </TableRow>
