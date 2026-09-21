@@ -17,7 +17,7 @@ import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
-import { Alert, Badge, Button, Skeleton, Textarea } from "@crm/ui";
+import { Alert, Badge, Button, Card, Skeleton, Textarea } from "@crm/ui";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
@@ -45,7 +45,7 @@ export function TicketDetailSkeleton() {
     <section className="flex flex-col gap-6" aria-hidden="true">
       <Skeleton className="h-4 w-32" />
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <Skeleton className="h-6 w-1/2" />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -55,14 +55,14 @@ export function TicketDetailSkeleton() {
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
       <Skeleton className="h-40 w-full" />
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-2 h-24 w-full" />
-      </div>
+      </Card>
     </section>
   );
 }
@@ -81,9 +81,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   if (ticketQuery.isError) {
     const notFound = ticketQuery.error instanceof ApiError && ticketQuery.error.status === 404;
     return (
-      <Alert variant="destructive">
-        {notFound ? t("detail.notFound") : t("detail.loadError")}
-      </Alert>
+      <Alert variant="destructive">{notFound ? t("detail.notFound") : t("detail.loadError")}</Alert>
     );
   }
 
@@ -107,7 +105,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         {t("detail.backToList")}
       </Link>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h1 className="text-lg font-semibold text-ink">{ticket.subject}</h1>
         <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
           <div>
@@ -127,13 +125,13 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             </dd>
           </div>
         </dl>
-      </div>
+      </Card>
 
       <TicketChatCard ticketId={ticketId} />
 
       <TicketAttachmentsCard ticketId={ticketId} />
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.historyHeading")}</h2>
         {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {historyQuery.isError && (
@@ -159,7 +157,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             ))}
           </ol>
         )}
-      </div>
+      </Card>
 
       {CSAT_ELIGIBLE_STATUSES.includes(ticket.status) && <CsatSection ticketId={ticketId} />}
     </section>
@@ -176,7 +174,7 @@ function CsatSection({ ticketId }: { ticketId: string }) {
   const csatQuery = useMyTicketCsatQuery(ticketId);
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("detail.csatHeading")}</h2>
 
       {csatQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
@@ -198,7 +196,7 @@ function CsatSection({ ticketId }: { ticketId: string }) {
       )}
 
       {csatQuery.isSuccess && csatQuery.data == null && <CsatForm ticketId={ticketId} />}
-    </div>
+    </Card>
   );
 }
 
@@ -261,11 +259,7 @@ function CsatForm({ ticketId }: { ticketId: string }) {
           rows={3}
         />
       </label>
-      {error && (
-        <Alert variant="destructive">
-          {error}
-        </Alert>
-      )}
+      {error && <Alert variant="destructive">{error}</Alert>}
       <Button type="submit" disabled={mutation.isPending || !rating} className="w-fit">
         {mutation.isPending ? t("detail.csatSubmitting") : t("detail.csatSubmit")}
       </Button>

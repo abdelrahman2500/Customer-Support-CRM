@@ -13,7 +13,7 @@ import {
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Checkbox, cn, Label, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Checkbox, cn, Label, Skeleton } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /**
@@ -75,7 +75,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
   }, [messagesQuery.data]);
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("detail.chatHeading")}</h2>
 
       {messagesQuery.isLoading && <Skeleton className="mt-2 h-40 w-full" />}
@@ -127,7 +127,9 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
                     // the token defined as "text on top of --accent", so the
                     // pair stays legible if the accent is ever re-pointed
                     // (Story S-15 plans exactly that).
-                    isMine ? "bg-accent text-accent-foreground" : "bg-surface-muted text-ink-strong",
+                    isMine
+                      ? "bg-accent text-accent-foreground"
+                      : "bg-surface-muted text-ink-strong",
                   )}
                 >
                   {message.body}
@@ -158,7 +160,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
       )}
 
       <ChatComposer ticketId={ticketId} />
-    </div>
+    </Card>
   );
 }
 

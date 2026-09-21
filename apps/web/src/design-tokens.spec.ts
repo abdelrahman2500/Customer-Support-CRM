@@ -77,4 +77,41 @@ describe("S-1 design tokens", () => {
 
     expect(offenders, `Use the S-1 semantic tokens instead:\n${offenders.join("\n")}`).toEqual([]);
   });
+
+  /**
+   * Story 139 — the hand-rolled card surface.
+   *
+   * `packages/ui`'s `Card` has existed since Story S-3 but had zero adoption,
+   * while this literal surface string was written out 70 times across the two
+   * apps. Every true content surface now renders through `Card`; this keeps
+   * them there, so surface chrome has exactly one definition.
+   *
+   * Deliberately narrow — it matches this one string, so the remaining
+   * legitimate users of similar classes are untouched: the centred auth/error
+   * page shells (`rounded-lg … p-8 shadow-sm`), the toast, the dropdown
+   * panel, and the `bg-surface-sunk` inline notices. None of those is a
+   * content card.
+   */
+  const HAND_ROLLED_SURFACE = /rounded-md border border-rule bg-surface p-4/;
+
+  it("renders content surfaces through the shared Card, not a hand-rolled string", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const lines = readFileSync(file, "utf8").split("\n");
+      lines.forEach((line, index) => {
+        // Same comment skip as above: this repo's own doc comments quote the
+        // pre-migration class string as historical context.
+        const trimmed = line.trim();
+        if (trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+          return;
+        }
+        if (HAND_ROLLED_SURFACE.test(line)) {
+          offenders.push(`${file.slice(SRC.length + 1)}:${index + 1}`);
+        }
+      });
+    }
+
+    expect(offenders, `Use <Card> instead:\n${offenders.join("\n")}`).toEqual([]);
+  });
 });

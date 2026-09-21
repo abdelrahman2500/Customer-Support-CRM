@@ -11,11 +11,12 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   FetchingIndicator,
   Input,
   Pagination,
-  Skeleton,
   showSuccessToast,
+  Skeleton,
 } from "@crm/ui";
 
 /**
@@ -47,7 +48,7 @@ export function TicketListView() {
     <section className="flex flex-col gap-6">
       {/* Story 98 — p-4, not p-6: matches apps/web's own dominant card
           padding convention (see that app's data cards throughout). */}
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
           {/* In the heading's own row, so it adds no height and cannot
@@ -120,7 +121,7 @@ export function TicketListView() {
             />
           </div>
         )}
-      </div>
+      </Card>
 
       <CreateTicketForm />
     </section>
@@ -157,7 +158,7 @@ function CreateTicketForm() {
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("list.createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-sm text-ink-strong">
@@ -177,15 +178,11 @@ function CreateTicketForm() {
             onChange={(event) => setCategory(event.target.value)}
           />
         </label>
-        {error && (
-          <Alert variant="destructive">
-            {error}
-          </Alert>
-        )}
+        {error && <Alert variant="destructive">{error}</Alert>}
         <Button type="submit" disabled={mutation.isPending || !subject.trim()} className="w-fit">
           {mutation.isPending ? t("list.createSubmitting") : t("list.createSubmit")}
         </Button>
       </form>
-    </div>
+    </Card>
   );
 }

@@ -15,6 +15,7 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   Input,
   showSuccessToast,
   Skeleton,
@@ -73,14 +74,14 @@ function MyBranchSection() {
   const branch = branchQuery.data;
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h1 className="text-lg font-semibold text-ink">{t("myBranch.heading")}</h1>
       {branch ? (
         <MyBranchFields branch={branch} />
       ) : (
         <p className="mt-2 text-sm text-ink-subtle">{t("myBranch.loadError")}</p>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -168,7 +169,7 @@ function DepartmentsSection() {
   const departmentsQuery = useManagedDepartmentsQuery();
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("departments.heading")}</h2>
 
       {departmentsQuery.isLoading && (
@@ -211,7 +212,7 @@ function DepartmentsSection() {
       )}
 
       <AddDepartmentForm />
-    </div>
+    </Card>
   );
 }
 

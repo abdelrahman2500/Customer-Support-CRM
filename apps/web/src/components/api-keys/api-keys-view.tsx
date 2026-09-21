@@ -2,7 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { useApiKeysQuery, useCreateApiKeyMutation, useRevokeApiKeyMutation } from "@/hooks/use-api-keys";
+import {
+  useApiKeysQuery,
+  useCreateApiKeyMutation,
+  useRevokeApiKeyMutation,
+} from "@/hooks/use-api-keys";
 import { API_KEY_SCOPES } from "@/lib/api-keys-api";
 import type { ApiKeySummary } from "@/lib/api-keys-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
@@ -10,6 +14,7 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   Checkbox,
   Input,
   Label,
@@ -127,7 +132,11 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
         </div>
       </TableCell>
       <TableCell>
-        <Badge variant={status === "active" ? "success" : status === "expired" ? "secondary" : "destructive"}>
+        <Badge
+          variant={
+            status === "active" ? "success" : status === "expired" ? "secondary" : "destructive"
+          }
+        >
           {t(`status.${status}`)}
         </Badge>
       </TableCell>
@@ -154,7 +163,10 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
         />
         {mutation.isError && (
           <p className="mt-1 text-xs text-red-600">
-            {errorMessage(mutation.error, { forbidden: t("actionForbidden"), generic: t("actionFailed") })}
+            {errorMessage(mutation.error, {
+              forbidden: t("actionForbidden"),
+              generic: t("actionFailed"),
+            })}
           </p>
         )}
       </TableCell>
@@ -175,7 +187,9 @@ function AddApiKeyForm() {
   const mutation = useCreateApiKeyMutation();
 
   function toggleScope(scope: string, checked: boolean) {
-    setSelectedScopes((current) => (checked ? [...current, scope] : current.filter((value) => value !== scope)));
+    setSelectedScopes((current) =>
+      checked ? [...current, scope] : current.filter((value) => value !== scope),
+    );
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -188,12 +202,14 @@ function AddApiKeyForm() {
       setLabel("");
       setSelectedScopes([]);
     } catch (submitError) {
-      setError(errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }));
+      setError(
+        errorMessage(submitError, { forbidden: t("actionForbidden"), generic: t("createFailed") }),
+      );
     }
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
@@ -238,10 +254,12 @@ function AddApiKeyForm() {
           <Alert>
             <p className="font-medium">{t("keyRevealedTitle")}</p>
             <p className="mt-1 text-xs">{t("keyRevealedDescription")}</p>
-            <code className="mt-2 block break-all rounded bg-surface-muted p-2 text-xs">{revealedKey}</code>
+            <code className="mt-2 block break-all rounded bg-surface-muted p-2 text-xs">
+              {revealedKey}
+            </code>
           </Alert>
         )}
       </form>
-    </div>
+    </Card>
   );
 }

@@ -13,7 +13,7 @@ import {
 } from "@/hooks/use-chat";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Skeleton, Textarea } from "@crm/ui";
+import { Alert, Button, Card, Skeleton, Textarea } from "@crm/ui";
 
 /**
  * Story 80 — AI Portal Chatbot (Foundation). Crosses
@@ -93,7 +93,7 @@ export function ChatWidget() {
   }, [resultQuery.isSuccess, resultQuery.data?.outcome]);
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>
 
       {startSession.isError && (
@@ -165,16 +165,12 @@ export function ChatWidget() {
           >
             {escalate.isPending ? t("escalating") : t("escalate")}
           </Button>
-          {escalateError && (
-            <Alert variant="destructive">
-              {escalateError}
-            </Alert>
-          )}
+          {escalateError && <Alert variant="destructive">{escalateError}</Alert>}
         </div>
       )}
 
       <ChatComposer sessionId={sessionId} onSent={setPendingLogId} />
-    </div>
+    </Card>
   );
 }
 
@@ -243,11 +239,7 @@ function ChatComposer({
           {mutation.isPending ? t("sending") : t("send")}
         </Button>
       </div>
-      {error && (
-        <Alert variant="destructive">
-          {error}
-        </Alert>
-      )}
+      {error && <Alert variant="destructive">{error}</Alert>}
     </form>
   );
 }

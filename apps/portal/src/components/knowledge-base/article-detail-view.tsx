@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Alert, Skeleton } from "@crm/ui";
+import { Alert, Card, Skeleton } from "@crm/ui";
 import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
 import type { KbLocale } from "@/lib/knowledge-base-api";
@@ -38,9 +38,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
   if (articleQuery.isError) {
     const notFound = articleQuery.error instanceof ApiError && articleQuery.error.status === 404;
     return (
-      <Alert variant="destructive">
-        {notFound ? t("detail.notFound") : t("detail.loadError")}
-      </Alert>
+      <Alert variant="destructive">{notFound ? t("detail.notFound") : t("detail.loadError")}</Alert>
     );
   }
 
@@ -64,11 +62,13 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         {t("detail.backToList")}
       </Link>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h1 className="text-lg font-semibold text-ink">{article.title}</h1>
-        {article.categoryName && <p className="mt-1 text-xs text-ink-subtle">{article.categoryName}</p>}
+        {article.categoryName && (
+          <p className="mt-1 text-xs text-ink-subtle">{article.categoryName}</p>
+        )}
         <p className="mt-3 whitespace-pre-wrap text-sm text-ink-strong">{article.body}</p>
-      </div>
+      </Card>
     </section>
   );
 }

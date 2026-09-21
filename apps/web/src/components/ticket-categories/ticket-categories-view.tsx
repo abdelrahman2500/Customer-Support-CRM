@@ -13,6 +13,7 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   Input,
   showSuccessToast,
   Skeleton,
@@ -38,7 +39,7 @@ export function TicketCategoriesView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h1 className="text-lg font-semibold text-ink">{t("heading")}</h1>
         <p className="mt-1 text-sm text-ink-subtle">{t("description")}</p>
 
@@ -82,7 +83,7 @@ export function TicketCategoriesView() {
         )}
 
         <AddTicketCategoryForm />
-      </div>
+      </Card>
     </section>
   );
 }

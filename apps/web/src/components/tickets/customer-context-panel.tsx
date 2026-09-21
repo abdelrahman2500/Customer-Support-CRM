@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomerQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
-import { Alert, Badge, Skeleton } from "@crm/ui";
+import { Alert, Badge, Card, Skeleton } from "@crm/ui";
 
 /** Story 28's own "still needs work" definition (`dashboard-view.tsx`'s
  * `OPEN_STATUSES`) — reused here rather than re-invented, so "other open
@@ -55,15 +55,13 @@ export function CustomerContextPanel({
   // still open — excluded client-side (the plan's own wording), since the
   // backend has no "every ticket except this one" filter and inventing
   // one for a single capped list isn't worth a new query parameter.
-  const otherTickets = (ticketsQuery.data?.items ?? []).filter(
-    (ticket) => ticket.id !== ticketId,
-  );
+  const otherTickets = (ticketsQuery.data?.items ?? []).filter((ticket) => ticket.id !== ticketId);
   const primaryContacts = (customerQuery.data?.contacts ?? []).filter(
     (contact) => contact.isPrimary,
   );
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("detail.contextPanelHeading")}</h2>
 
       <div className="mt-3 flex flex-col gap-1">
@@ -134,6 +132,6 @@ export function CustomerContextPanel({
           </ul>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-ticket-kb-references";
 import { usePublishedArticleSearchQuery } from "@/hooks/use-knowledge-base";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Input, Skeleton } from "@crm/ui";
 
 /**
  * RM-05 — Ticket ↔ Knowledge Base Linkage. Mirrors `TicketDetailView`'s own
@@ -44,7 +44,7 @@ export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("detail.kbReferencesHeading")}</h2>
       {referencesQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
       {referencesQuery.isError && (
@@ -82,7 +82,7 @@ export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
         </Alert>
       )}
       <AttachArticleForm ticketId={ticketId} />
-    </div>
+    </Card>
   );
 }
 

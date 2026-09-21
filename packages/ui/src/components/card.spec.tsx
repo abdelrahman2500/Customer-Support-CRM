@@ -41,21 +41,24 @@ describe("Card", () => {
     );
 
     const card = container.firstElementChild as HTMLElement;
-    expect(card).toHaveClass("rounded-md");
+    // Story 139 — the chrome now comes from the Story 134 tokens. Each is
+    // value-identical to the class it replaced: --radius-surface is
+    // 0.375rem (rounded-md) and --space-surface is 1rem (p-4).
+    expect(card).toHaveClass("rounded-surface");
     expect(card).toHaveClass("border");
     expect(card).toHaveClass("border-rule");
     expect(card).toHaveClass("bg-surface");
     // Padding lives on the section, not the container.
-    expect(card).not.toHaveClass("p-4");
-    expect(card.firstElementChild).toHaveClass("p-4");
+    expect(card).not.toHaveClass("p-surface");
+    expect(card.firstElementChild).toHaveClass("p-surface");
   });
 
   it("is flat by default and can be raised for emphasis", () => {
     const { container: flat } = render(<Card />);
-    expect(flat.firstElementChild).not.toHaveClass("shadow-sm");
+    expect(flat.firstElementChild).not.toHaveClass("shadow-resting");
 
     const { container: raised } = render(<Card elevation="raised" />);
-    expect(raised.firstElementChild).toHaveClass("shadow-sm");
+    expect(raised.firstElementChild).toHaveClass("shadow-resting");
   });
 
   it("merges a caller className over the base classes", () => {

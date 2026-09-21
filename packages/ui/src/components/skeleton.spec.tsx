@@ -108,7 +108,7 @@ describe("SkeletonCard", () => {
     const { container } = render(<SkeletonCard />);
 
     const card = container.firstElementChild as HTMLElement;
-    expect(card).toHaveClass("rounded-md");
+    expect(card).toHaveClass("rounded-surface");
     expect(card).toHaveClass("border-rule");
     expect(card).toHaveClass("bg-surface");
   });

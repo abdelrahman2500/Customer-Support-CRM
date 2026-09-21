@@ -7,7 +7,7 @@ import {
 } from "@/hooks/use-portal-notification-preferences";
 import type { PortalNotificationPreferenceSummary } from "@/lib/notification-preferences-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Skeleton } from "@crm/ui";
 
 /** The same two event-type strings `PORTAL_NOTIFICATION_EVENT_TYPES` names
  * on the backend (`apps/api/src/modules/notifications/
@@ -32,7 +32,7 @@ export function NotificationPreferencesSection() {
   const preferencesQuery = usePortalNotificationPreferencesQuery();
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("preferences.heading")}</h2>
       <p className="mt-1 text-xs text-ink-subtle">{t("preferences.description")}</p>
 
@@ -60,7 +60,7 @@ export function NotificationPreferencesSection() {
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }
 

@@ -10,7 +10,10 @@ import {
 import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { AUTOMATION_ACTION_ASSIGNMENT_MODES } from "@/lib/automation-rules-api";
-import type { AutomationActionAssignmentMode, AutomationRuleSummary } from "@/lib/automation-rules-api";
+import type {
+  AutomationActionAssignmentMode,
+  AutomationRuleSummary,
+} from "@/lib/automation-rules-api";
 import type { TicketPriority } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
@@ -29,7 +32,7 @@ import {
   TableRow,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
+import { Card, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /**
  * Story 57 — Automation Rules, over the already-existing
@@ -207,7 +210,7 @@ function AutomationRuleRow({
             {t("eligibleAgentCount", { count: rule.eligibleAgentPool.length })}
           </span>
         ) : (
-          userNameById.get(rule.actionAssignToUserId) ?? rule.actionAssignToUserId
+          (userNameById.get(rule.actionAssignToUserId) ?? rule.actionAssignToUserId)
         )}
       </TableCell>
       <TableCell className="text-ink-subtle">
@@ -319,7 +322,7 @@ function AddAutomationRuleForm() {
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <div className="flex flex-wrap items-end gap-2">
@@ -352,7 +355,9 @@ function AddAutomationRuleForm() {
             {t("assignmentModeLabel")}
             <Select
               value={actionAssignmentMode}
-              onValueChange={(value) => setActionAssignmentMode(value as AutomationActionAssignmentMode)}
+              onValueChange={(value) =>
+                setActionAssignmentMode(value as AutomationActionAssignmentMode)
+              }
             >
               <SelectTrigger className="w-40" aria-label={t("assignmentModeLabel")}>
                 <SelectValue />
@@ -367,7 +372,9 @@ function AddAutomationRuleForm() {
             </Select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
-            {actionAssignmentMode === "LEAST_LOADED" ? t("fallbackAssignToLabel") : t("actionAssignToLabel")}
+            {actionAssignmentMode === "LEAST_LOADED"
+              ? t("fallbackAssignToLabel")
+              : t("actionAssignToLabel")}
             <Select value={actionAssignToUserId} onValueChange={setActionAssignToUserId}>
               <SelectTrigger
                 className="w-56"
@@ -469,6 +476,6 @@ function AddAutomationRuleForm() {
           </Alert>
         )}
       </form>
-    </div>
+    </Card>
   );
 }

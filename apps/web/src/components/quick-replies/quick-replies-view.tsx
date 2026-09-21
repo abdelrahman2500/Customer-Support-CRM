@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-quick-replies";
 import type { QuickReplySummary } from "@/lib/quick-replies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, Input, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -158,7 +158,7 @@ function AddQuickReplyForm() {
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
@@ -191,6 +191,6 @@ function AddQuickReplyForm() {
         </div>
         {error && <Alert variant="destructive">{error}</Alert>}
       </form>
-    </div>
+    </Card>
   );
 }

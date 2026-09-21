@@ -129,4 +129,34 @@ describe("S-1 design tokens (portal)", () => {
       `Use <Alert variant="destructive"> instead:\n${offenders.join("\n")}`,
     ).toEqual([]);
   });
+
+  /**
+   * Story 139 — the hand-rolled card surface. Same guard as
+   * `apps/web/src/design-tokens.spec.ts`'s, kept parallel rather than shared
+   * for the reason this file's own header gives.
+   *
+   * The portal's panels keep their `<section>` landmarks by passing
+   * `Card asChild`, so this migration changed styling ownership only, never
+   * the page structure.
+   */
+  const HAND_ROLLED_SURFACE = /rounded-md border border-rule bg-surface p-4/;
+
+  it("renders content surfaces through the shared Card, not a hand-rolled string", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const lines = readFileSync(file, "utf8").split("\n");
+      lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+          return;
+        }
+        if (HAND_ROLLED_SURFACE.test(line)) {
+          offenders.push(`${file.slice(SRC.length + 1)}:${index + 1}`);
+        }
+      });
+    }
+
+    expect(offenders, `Use <Card> instead:\n${offenders.join("\n")}`).toEqual([]);
+  });
 });

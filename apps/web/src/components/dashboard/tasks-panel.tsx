@@ -16,6 +16,7 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   Input,
   Select,
   SelectContent,
@@ -60,7 +61,7 @@ export function TasksPanel({ userId }: { userId: string }) {
   const tasks = tasksQuery.data?.items ?? [];
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("tasks.heading")}</h2>
 
       {tasksQuery.isLoading && (
@@ -95,7 +96,7 @@ export function TasksPanel({ userId }: { userId: string }) {
       )}
 
       <AddTaskForm />
-    </div>
+    </Card>
   );
 }
 
@@ -120,7 +121,9 @@ function TaskRow({ task }: { task: TaskSummary }) {
       <span className="flex flex-col">
         <span className="font-medium text-ink-strong">{task.title}</span>
         {task.dueAt && (
-          <span className={isOverdue(task, now) ? "text-xs text-red-600" : "text-xs text-ink-subtle"}>
+          <span
+            className={isOverdue(task, now) ? "text-xs text-red-600" : "text-xs text-ink-subtle"}
+          >
             {new Date(task.dueAt).toLocaleString()}
           </span>
         )}
@@ -158,7 +161,9 @@ function TaskRow({ task }: { task: TaskSummary }) {
           title={t("tasks.deleteConfirmTitle")}
           description={t("tasks.deleteConfirmDescription", { title: task.title })}
           confirmLabel={t("tasks.deleteButton")}
-          onConfirm={() => deleteMutation.mutate(undefined, { onSuccess: () => setConfirmDeleteOpen(false) })}
+          onConfirm={() =>
+            deleteMutation.mutate(undefined, { onSuccess: () => setConfirmDeleteOpen(false) })
+          }
           isPending={deleteMutation.isPending}
         />
       </span>
@@ -204,7 +209,10 @@ function AddTaskForm() {
   }
 
   return (
-    <form className="mt-3 flex flex-col gap-2 border-t border-rule-subtle pt-3 sm:flex-row sm:flex-wrap sm:items-end" onSubmit={handleSubmit}>
+    <form
+      className="mt-3 flex flex-col gap-2 border-t border-rule-subtle pt-3 sm:flex-row sm:flex-wrap sm:items-end"
+      onSubmit={handleSubmit}
+    >
       <label className="flex flex-1 flex-col gap-1 text-xs text-ink-muted">
         {t("tasks.titleLabel")}
         <Input

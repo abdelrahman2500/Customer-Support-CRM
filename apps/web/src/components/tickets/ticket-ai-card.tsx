@@ -5,9 +5,14 @@ import { useTranslations } from "next-intl";
 import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
 import type { TicketAiFeature } from "@/lib/ticket-ai-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Skeleton } from "@crm/ui";
 
-const FEATURES: TicketAiFeature[] = ["SUMMARIZE", "SUGGEST_REPLY", "CATEGORIZE", "SUGGEST_SOLUTIONS"];
+const FEATURES: TicketAiFeature[] = [
+  "SUMMARIZE",
+  "SUGGEST_REPLY",
+  "CATEGORIZE",
+  "SUGGEST_SOLUTIONS",
+];
 
 const FEATURE_LABEL_KEYS: Record<TicketAiFeature, string> = {
   SUMMARIZE: "detail.aiSummarize",
@@ -80,7 +85,7 @@ export function TicketAiCard({
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("detail.aiHeading")}</h2>
 
       <div className="mt-2 flex flex-wrap gap-2">
@@ -141,6 +146,6 @@ export function TicketAiCard({
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

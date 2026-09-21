@@ -14,6 +14,7 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   Select,
   SelectContent,
   SelectItem,
@@ -155,7 +156,7 @@ function TemplateForm({
   const labelKey = EVENT_LABEL_KEYS[eventType];
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ink">{labelKey ? t(labelKey) : eventType}</h2>
         {savedTemplate && <TemplateLifecycleToggle template={savedTemplate} />}
@@ -192,7 +193,7 @@ function TemplateForm({
         </div>
         {error && <Alert variant="destructive">{error}</Alert>}
       </form>
-    </div>
+    </Card>
   );
 }
 

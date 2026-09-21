@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cva } from "class-variance-authority";
 import type { VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
@@ -23,21 +24,35 @@ import { cn } from "../lib/cn";
  * exactly; `raised` is available for the one thing on a page that should draw
  * the eye. Nothing is migrated to `raised` in this story.
  */
-const cardVariants = cva("rounded-md border border-rule bg-surface", {
+const cardVariants = cva("rounded-surface border border-rule bg-surface", {
   variants: {
     elevation: {
       flat: "",
-      raised: "shadow-sm",
+      raised: "shadow-resting",
     },
   },
   defaultVariants: { elevation: "flat" },
 });
 
 export interface CardProps
-  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof cardVariants> {}
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof cardVariants> {
+  /**
+   * Story 139 — render the card's styling onto the caller's own element
+   * instead of a `div`, mirroring `Button`'s existing `asChild` exactly
+   * (same `@radix-ui/react-slot` mechanism).
+   *
+   * A surface is not always a `div`: the portal home's panels are
+   * `<section>` landmarks, and the branding screen's surface IS the
+   * `<form>` that submits it. Forcing those through a `div` would drop a
+   * landmark and break a submit handler respectively, so those call sites
+   * pass `asChild` and keep their own element.
+   */
+  asChild?: boolean;
+}
 
-export function Card({ className, elevation, ...props }: CardProps) {
-  return <div className={cn(cardVariants({ elevation }), className)} {...props} />;
+export function Card({ className, elevation, asChild = false, ...props }: CardProps) {
+  const Comp = asChild ? Slot : "div";
+  return <Comp className={cn(cardVariants({ elevation }), className)} {...props} />;
 }
 
 /**
@@ -47,7 +62,10 @@ export function Card({ className, elevation, ...props }: CardProps) {
  */
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("flex items-start justify-between gap-2 p-4 pb-0", className)} {...props} />
+    <div
+      className={cn("flex items-start justify-between gap-inline p-surface pb-0", className)}
+      {...props}
+    />
   );
 }
 
@@ -69,7 +87,7 @@ export function CardDescription({
 /** The body. Named `CardContent` rather than `CardBody` to match the
  * shadcn/ui vocabulary the rest of this package already follows. */
 export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-4", className)} {...props} />;
+  return <div className={cn("p-surface", className)} {...props} />;
 }
 
 /** Divided from the body, because a footer holds actions and needs to read as
@@ -78,7 +96,7 @@ export function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDiv
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-2 border-t border-rule-subtle px-4 py-3",
+        "flex flex-wrap items-center gap-inline border-t border-rule-subtle px-surface py-stack",
         className,
       )}
       {...props}

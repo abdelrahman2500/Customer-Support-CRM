@@ -30,7 +30,7 @@ import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Input, showSuccessToast, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, Input, showSuccessToast, Skeleton } from "@crm/ui";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -164,27 +164,27 @@ export function TicketDetailSkeleton() {
       </div>
 
       {/* RM-04 — the customer context panel. */}
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="mt-2 h-16 w-full" />
-      </div>
+      </Card>
 
-      <div className="grid grid-cols-1 gap-4 rounded-md border border-rule bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Card className="grid grid-cols-1 gap-4 p-surface sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 5 }).map((_, index) => (
           <div key={index} className="flex flex-col gap-1">
             <Skeleton className="h-3 w-16" />
             <Skeleton className="h-9 w-full" />
           </div>
         ))}
-      </div>
+      </Card>
 
       <Skeleton className="h-40 w-full rounded-md" />
 
       {Array.from({ length: 7 }).map((_, index) => (
-        <div key={index} className="rounded-md border border-rule bg-surface p-4">
+        <Card key={index} className="p-surface">
           <Skeleton className="h-4 w-32" />
           <Skeleton className="mt-2 h-16 w-full" />
-        </div>
+        </Card>
       ))}
     </section>
   );
@@ -313,7 +313,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 gap-4 rounded-md border border-rule bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Card className="grid grid-cols-1 gap-4 p-surface sm:grid-cols-2 lg:grid-cols-4">
         <Field label={t("detail.status")}>
           <Select
             value={ticket.status}
@@ -492,7 +492,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             <span className="text-xs text-red-600">{t("detail.departmentLoadError")}</span>
           )}
         </Field>
-      </div>
+      </Card>
 
       <TicketChatCard ticketId={ticketId} />
 
@@ -519,7 +519,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         </Alert>
       )}
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.slaHeading")}</h2>
         {slaTargetQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
         {slaTargetQuery.isSuccess && slaStatus.kind === "none" && (
@@ -570,7 +570,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               title={t("sla.holdConfirmTitle")}
               description={t("sla.holdConfirmDescription")}
               confirmLabel={t("sla.placeOnHold")}
-              onConfirm={() => holdMutation.mutate(undefined, { onSuccess: () => setConfirmHoldOpen(false) })}
+              onConfirm={() =>
+                holdMutation.mutate(undefined, { onSuccess: () => setConfirmHoldOpen(false) })
+              }
               isPending={holdMutation.isPending}
             />
             {(holdMutation.isError || resumeMutation.isError) && (
@@ -583,9 +585,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             )}
           </div>
         )}
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.escalationsHeading")}</h2>
         {escalationsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {escalationsQuery.isError && (
@@ -616,9 +618,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             })}
           </ol>
         )}
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.historyHeading")}</h2>
         {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {historyQuery.isError && (
@@ -644,9 +646,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             ))}
           </ol>
         )}
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.csatHeading")}</h2>
         {csatQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
         {csatQuery.isError && (
@@ -665,9 +667,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             {csatQuery.data.comment && <p className="text-ink-strong">{csatQuery.data.comment}</p>}
           </div>
         )}
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.notesHeading")}</h2>
         {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {notesQuery.isError && (
@@ -696,7 +698,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </ol>
         )}
         <AddNoteForm ticketId={ticketId} />
-      </div>
+      </Card>
 
       <AttachmentsCard
         owner={{ type: "ticket", id: ticketId }}

@@ -23,7 +23,7 @@ import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { BarChart, DonutGauge, RatingBar, ticketStatusBarColor } from "./report-charts";
 import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
-import { Alert, Button, Checkbox, Input, Label, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Checkbox, Input, Label, Skeleton } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -254,7 +254,9 @@ export function ReportsView() {
                   .join(", ")}
                 rows={ticketVolumeQuery.data.map((row) => ({
                   label: row.status,
-                  segments: [{ label: "", value: row.count, color: ticketStatusBarColor(row.status) }],
+                  segments: [
+                    { label: "", value: row.count, color: ticketStatusBarColor(row.status) },
+                  ],
                 }))}
               />
             )}
@@ -631,7 +633,10 @@ export function ReportsView() {
             value={selectedDashboardId ?? ALL_VALUE}
             onValueChange={(value) => setSelectedDashboardId(value === ALL_VALUE ? null : value)}
           >
-            <SelectTrigger className="w-full sm:w-auto sm:min-w-[10rem]" aria-label={t("dashboards.pickerLabel")}>
+            <SelectTrigger
+              className="w-full sm:w-auto sm:min-w-[10rem]"
+              aria-label={t("dashboards.pickerLabel")}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -674,7 +679,7 @@ export function ReportsView() {
       )}
 
       {showSaveForm && (
-        <div className="flex flex-wrap items-end gap-2 rounded-md border border-rule bg-surface p-3">
+        <Card className="flex flex-wrap items-end gap-2 p-3">
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("dashboards.nameLabel")}
             <Input
@@ -691,7 +696,10 @@ export function ReportsView() {
               checked={newDashboardShared}
               onCheckedChange={(checked) => setNewDashboardShared(checked === true)}
             />
-            <Label htmlFor="reports-new-dashboard-shared" className="text-xs font-normal text-ink-muted">
+            <Label
+              htmlFor="reports-new-dashboard-shared"
+              className="text-xs font-normal text-ink-muted"
+            >
               {t("dashboards.shareLabel")}
             </Label>
           </div>
@@ -705,7 +713,7 @@ export function ReportsView() {
           <Button variant="outline" size="sm" onClick={() => setShowSaveForm(false)}>
             {t("dashboards.cancel")}
           </Button>
-        </div>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
@@ -859,7 +867,7 @@ function ReportCard({
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       {/* `<header>`, not another `<div>` — several existing tests locate
           this card via `heading.closest("div")` to reach the OUTER card
           shell (skeleton/content included); a nested `<div>` here would
@@ -898,6 +906,6 @@ function ReportCard({
         </Alert>
       )}
       {query.isSuccess && <div className="mt-2">{children}</div>}
-    </div>
+    </Card>
   );
 }

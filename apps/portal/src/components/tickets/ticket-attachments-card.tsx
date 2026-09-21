@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-portal-attachments";
 import { getMyTicketAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Skeleton } from "@crm/ui";
+import { Alert, Card, Skeleton } from "@crm/ui";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -36,7 +36,7 @@ export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("detail.attachmentsHeading")}</h2>
       {attachmentsQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
       {attachmentsQuery.isError && (
@@ -70,7 +70,7 @@ export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
         </ol>
       )}
       <AddAttachmentForm ticketId={ticketId} />
-    </div>
+    </Card>
   );
 }
 
@@ -111,11 +111,7 @@ function AddAttachmentForm({ ticketId }: { ticketId: string }) {
       {mutation.isPending && (
         <p className="text-xs text-ink-subtle">{t("detail.attachmentsUploading")}</p>
       )}
-      {error && (
-        <Alert variant="destructive">
-          {error}
-        </Alert>
-      )}
+      {error && <Alert variant="destructive">{error}</Alert>}
     </div>
   );
 }

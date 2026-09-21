@@ -17,6 +17,7 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   Checkbox,
   Input,
   Label,
@@ -143,10 +144,14 @@ function InboundWebhookLog() {
             <TableBody>
               {logsQuery.data.items.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell className="font-mono text-xs text-ink-strong">{log.providerKey}</TableCell>
+                  <TableCell className="font-mono text-xs text-ink-strong">
+                    {log.providerKey}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={log.verified ? "success" : "destructive"}>
-                      {log.verified ? t("inboundVerified") : (log.rejectReason ?? t("inboundRejected"))}
+                      {log.verified
+                        ? t("inboundVerified")
+                        : (log.rejectReason ?? t("inboundRejected"))}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-ink-subtle">
@@ -197,7 +202,10 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
   }
 
   function confirmDeactivate() {
-    updateMutation.mutate({ isActive: false }, { onSuccess: () => setConfirmDeactivateOpen(false) });
+    updateMutation.mutate(
+      { isActive: false },
+      { onSuccess: () => setConfirmDeactivateOpen(false) },
+    );
   }
 
   function confirmDelete() {
@@ -207,7 +215,10 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
   return (
     <>
       <TableRow>
-        <TableCell className="max-w-xs truncate font-mono text-xs text-ink-strong" title={subscription.targetUrl}>
+        <TableCell
+          className="max-w-xs truncate font-mono text-xs text-ink-strong"
+          title={subscription.targetUrl}
+        >
           {subscription.targetUrl}
         </TableCell>
         <TableCell>
@@ -234,7 +245,11 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
             >
               {subscription.isActive ? t("deactivate") : t("activate")}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setDeliveriesExpanded((current) => !current)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeliveriesExpanded((current) => !current)}
+            >
               {deliveriesExpanded ? t("hideDeliveries") : t("viewDeliveries")}
             </Button>
             <Button variant="destructive" size="sm" onClick={() => setConfirmDeleteOpen(true)}>
@@ -388,7 +403,7 @@ function AddWebhookSubscriptionForm() {
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
@@ -433,10 +448,12 @@ function AddWebhookSubscriptionForm() {
           <Alert>
             <p className="font-medium">{t("secretRevealedTitle")}</p>
             <p className="mt-1 text-xs">{t("secretRevealedDescription")}</p>
-            <code className="mt-2 block break-all rounded bg-surface-muted p-2 text-xs">{revealedSecret}</code>
+            <code className="mt-2 block break-all rounded bg-surface-muted p-2 text-xs">
+              {revealedSecret}
+            </code>
           </Alert>
         )}
       </form>
-    </div>
+    </Card>
   );
 }

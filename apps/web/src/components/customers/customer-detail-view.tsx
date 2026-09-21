@@ -22,7 +22,7 @@ import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { ApiError } from "@/lib/api";
 import type { ContactSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Checkbox, Input, Label, Pagination, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, Checkbox, Input, Label, Pagination, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
@@ -424,13 +424,13 @@ export function CustomerDetailSkeleton() {
       </div>
 
       {["contacts", "tickets", "notes", "attachments"].map((section) => (
-        <div key={section} className="rounded-md border border-rule bg-surface p-4">
+        <Card key={section} className="p-surface">
           <Skeleton className="h-4 w-32" />
           <div className="mt-2 flex flex-col gap-2">
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />
           </div>
-        </div>
+        </Card>
       ))}
     </section>
   );
@@ -561,7 +561,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         </Alert>
       )}
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.contactsHeading")}</h2>
         {customer.contacts.length === 0 && (
           <p className="mt-2 text-sm text-ink-subtle">{t("detail.contactsEmpty")}</p>
@@ -574,9 +574,9 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           </ul>
         )}
         <AddContactForm customerId={customerId} />
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.ticketsHeading")}</h2>
         {ticketsQuery.isLoading && (
           <div className="mt-2 flex flex-col gap-2">
@@ -638,9 +638,9 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
             })}
           />
         )}
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.notesHeading")}</h2>
         {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {notesQuery.isError && (
@@ -669,7 +669,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           </ol>
         )}
         <AddCustomerNoteForm customerId={customerId} />
-      </div>
+      </Card>
 
       <AttachmentsCard
         owner={{ type: "customer", id: customerId }}
@@ -727,21 +727,19 @@ function AnonymizeCustomerCard({
   // be a no-op the user could misread as a second, different operation.
   if (anonymizedAt) {
     return (
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("detail.anonymizeHeading")}</h2>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
           <Badge variant="secondary">{t("detail.anonymizedBadge")}</Badge>
-          <span className="text-ink-subtle">
-            {new Date(anonymizedAt).toLocaleString(locale)}
-          </span>
+          <span className="text-ink-subtle">{new Date(anonymizedAt).toLocaleString(locale)}</span>
         </div>
         <p className="mt-2 text-sm text-ink-subtle">{t("detail.anonymizedRetentionNote")}</p>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="rounded-md border border-rule bg-surface p-4">
+    <Card className="p-surface">
       <h2 className="text-sm font-semibold text-ink">{t("detail.anonymizeHeading")}</h2>
       <p className="mt-2 text-sm text-ink-subtle">{t("detail.anonymizeDescription")}</p>
       <div className="mt-3">
@@ -771,6 +769,6 @@ function AnonymizeCustomerCard({
           })}
         </Alert>
       )}
-    </div>
+    </Card>
   );
 }

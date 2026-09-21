@@ -6,7 +6,7 @@ import { useBrandingQuery, useUpdateBrandingMutation } from "@/hooks/use-brandin
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { resolveNavigationLayout } from "@/components/workspace/nav-items";
 import type { BrandingSummary, NavigationLayout } from "@/lib/branding-api";
-import { Alert, Button, Input, showSuccessToast, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Input, showSuccessToast, Skeleton } from "@crm/ui";
 
 const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 
@@ -136,113 +136,114 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <form
-        className="flex flex-col gap-3 rounded-md border border-rule bg-surface p-4"
-        onSubmit={handleSubmit}
-      >
-        {/* The help text sits outside the `<label>`, tied to the input with
+      <Card asChild className="flex flex-col gap-3 p-surface">
+        <form onSubmit={handleSubmit}>
+          {/* The help text sits outside the `<label>`, tied to the input with
             `aria-describedby` instead: inside it, it would become part of
             the field's own accessible name rather than its description. */}
-        <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1">
+            <label className="flex flex-col gap-1 text-xs text-ink-muted">
+              {t("appNameLabel")}
+              <Input
+                value={appName}
+                maxLength={APP_NAME_MAX_LENGTH}
+                placeholder={t("appNamePlaceholder")}
+                aria-describedby="branding-app-name-help"
+                onChange={(event) => setAppName(event.target.value)}
+              />
+            </label>
+            <span id="branding-app-name-help" className="text-xs text-ink-subtle">
+              {t("appNameHelp")}
+            </span>
+          </div>
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
-            {t("appNameLabel")}
+            {t("logoUrlLabel")}
             <Input
-              value={appName}
-              maxLength={APP_NAME_MAX_LENGTH}
-              placeholder={t("appNamePlaceholder")}
-              aria-describedby="branding-app-name-help"
-              onChange={(event) => setAppName(event.target.value)}
+              value={logoUrl}
+              placeholder={t("logoUrlPlaceholder")}
+              onChange={(event) => setLogoUrl(event.target.value)}
             />
           </label>
-          <span id="branding-app-name-help" className="text-xs text-ink-subtle">
-            {t("appNameHelp")}
-          </span>
-        </div>
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("logoUrlLabel")}
-          <Input
-            value={logoUrl}
-            placeholder={t("logoUrlPlaceholder")}
-            onChange={(event) => setLogoUrl(event.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("primaryColorLabel")}
-          <Input
-            value={primaryColor}
-            placeholder="#0f172a"
-            aria-invalid={invalidPrimary || undefined}
-            onChange={(event) => setPrimaryColor(event.target.value)}
-          />
-          {invalidPrimary && <span className="text-red-600">{t("invalidColor")}</span>}
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("secondaryColorLabel")}
-          <Input
-            value={secondaryColor}
-            placeholder="#64748b"
-            aria-invalid={invalidSecondary || undefined}
-            onChange={(event) => setSecondaryColor(event.target.value)}
-          />
-          {invalidSecondary && <span className="text-red-600">{t("invalidColor")}</span>}
-        </label>
-        {/* Story 129 — native `<input type="radio">`s in a `<fieldset>`
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
+            {t("primaryColorLabel")}
+            <Input
+              value={primaryColor}
+              placeholder="#0f172a"
+              aria-invalid={invalidPrimary || undefined}
+              onChange={(event) => setPrimaryColor(event.target.value)}
+            />
+            {invalidPrimary && <span className="text-red-600">{t("invalidColor")}</span>}
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
+            {t("secondaryColorLabel")}
+            <Input
+              value={secondaryColor}
+              placeholder="#64748b"
+              aria-invalid={invalidSecondary || undefined}
+              onChange={(event) => setSecondaryColor(event.target.value)}
+            />
+            {invalidSecondary && <span className="text-red-600">{t("invalidColor")}</span>}
+          </label>
+          {/* Story 129 — native `<input type="radio">`s in a `<fieldset>`
             (the precedent is `automation-rules-view.tsx`). No `RadioGroup`
             primitive exists in `@crm/ui` and two options do not justify
             adding one: a native radio group is already keyboard-accessible
             (arrow keys, one roving tab stop) and needs no JavaScript. */}
-        <fieldset className="flex flex-col gap-1">
-          <legend className="text-xs text-ink-muted">{t("navigationLayoutLegend")}</legend>
-          <span className="text-xs text-ink-subtle">{t("navigationLayoutHelp")}</span>
-          <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {(["NAVBAR", "SIDEBAR"] as const).map((option) => {
-              const checked = navigationLayout === option;
-              return (
-                <label
-                  key={option}
-                  className={`flex cursor-pointer items-start gap-2 rounded-md border p-3 text-xs transition-colors ${
-                    checked ? "border-accent bg-accent-surface" : "border-rule hover:bg-surface-muted"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="navigationLayout"
-                    value={option}
-                    checked={checked}
-                    className="mt-0.5"
-                    onChange={() => setNavigationLayout(option)}
-                  />
-                  <span className="flex flex-col gap-1.5">
-                    <span className="font-medium text-ink-strong">
-                      {t(`navigationLayout.${option === "SIDEBAR" ? "sidebar" : "navbar"}`)}
+          <fieldset className="flex flex-col gap-1">
+            <legend className="text-xs text-ink-muted">{t("navigationLayoutLegend")}</legend>
+            <span className="text-xs text-ink-subtle">{t("navigationLayoutHelp")}</span>
+            <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {(["NAVBAR", "SIDEBAR"] as const).map((option) => {
+                const checked = navigationLayout === option;
+                return (
+                  <label
+                    key={option}
+                    className={`flex cursor-pointer items-start gap-2 rounded-md border p-3 text-xs transition-colors ${
+                      checked
+                        ? "border-accent bg-accent-surface"
+                        : "border-rule hover:bg-surface-muted"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="navigationLayout"
+                      value={option}
+                      checked={checked}
+                      className="mt-0.5"
+                      onChange={() => setNavigationLayout(option)}
+                    />
+                    <span className="flex flex-col gap-1.5">
+                      <span className="font-medium text-ink-strong">
+                        {t(`navigationLayout.${option === "SIDEBAR" ? "sidebar" : "navbar"}`)}
+                      </span>
+                      <span className="text-ink-subtle">
+                        {t(
+                          `navigationLayout.${
+                            option === "SIDEBAR" ? "sidebarDescription" : "navbarDescription"
+                          }`,
+                        )}
+                      </span>
+                      <NavigationLayoutThumbnail layout={option} />
                     </span>
-                    <span className="text-ink-subtle">
-                      {t(
-                        `navigationLayout.${
-                          option === "SIDEBAR" ? "sidebarDescription" : "navbarDescription"
-                        }`,
-                      )}
-                    </span>
-                    <NavigationLayoutThumbnail layout={option} />
-                  </span>
-                </label>
-              );
-            })}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+          <div>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={mutation.isPending || invalidPrimary || invalidSecondary}
+            >
+              {mutation.isPending ? t("saving") : t("save")}
+            </Button>
           </div>
-        </fieldset>
-        <div>
-          <Button
-            type="submit"
-            size="sm"
-            disabled={mutation.isPending || invalidPrimary || invalidSecondary}
-          >
-            {mutation.isPending ? t("saving") : t("save")}
-          </Button>
-        </div>
-        {error && <Alert variant="destructive">{error}</Alert>}
-      </form>
+          {error && <Alert variant="destructive">{error}</Alert>}
+        </form>
+      </Card>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("previewHeading")}</h2>
         <div className="mt-3 flex flex-col gap-3">
           <p className="truncate text-sm font-semibold text-ink-strong">{previewBrandName}</p>
@@ -273,7 +274,7 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
             <span className="text-ink-muted">{t("secondaryColorLabel")}</span>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

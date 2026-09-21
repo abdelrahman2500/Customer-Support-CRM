@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
+import { Card, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /** The two seeded roles `seed.ts` reconciles by literal name — the backend
  * rejects a rename/deactivate on either (Design item 5); this is a
@@ -294,7 +294,7 @@ export function RoleListView() {
     <section className="flex flex-col gap-6">
       <h1 className="text-lg font-semibold text-ink">{t("title")}</h1>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("list.rolesHeading")}</h2>
 
         {/* Batch 6 (UX audit) — the shared `QueryStateCard`, replacing a
@@ -344,9 +344,9 @@ export function RoleListView() {
         </QueryStateCard>
 
         <AddRoleForm />
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-rule bg-surface p-4">
+      <Card className="p-surface">
         <h2 className="text-sm font-semibold text-ink">{t("list.permissionsHeading")}</h2>
 
         <QueryStateCard
@@ -376,7 +376,7 @@ export function RoleListView() {
             ))}
           </div>
         </QueryStateCard>
-      </div>
+      </Card>
     </section>
   );
 }

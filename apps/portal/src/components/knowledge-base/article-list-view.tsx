@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Alert, Button, FetchingIndicator, Input, Pagination, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, FetchingIndicator, Input, Pagination, Skeleton } from "@crm/ui";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 
@@ -60,57 +60,58 @@ export function ArticleListView() {
   const articles = articlePage?.items;
 
   return (
-    <section className="rounded-md border border-rule bg-surface p-4">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
-        {/* In the heading's own row, so it adds no height and cannot shift
+    <Card asChild className="p-surface">
+      <section>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-lg font-semibold text-ink">{t("list.title")}</h1>
+          {/* In the heading's own row, so it adds no height and cannot shift
             the list below it. */}
-        <FetchingIndicator active={articlesQuery.isPlaceholderData} label={tCommon("updating")} />
-      </div>
-
-      <Input
-        type="text"
-        aria-label={t("list.searchLabel")}
-        placeholder={t("list.searchPlaceholder")}
-        value={search}
-        onChange={(event) => updateSearch(event.target.value)}
-        className="mt-3 max-w-sm"
-      />
-
-      {articlesQuery.isPending && (
-        <div className="mt-3 flex flex-col gap-2">
-          {[0, 1, 2].map((row) => (
-            <Skeleton key={row} className="h-10 w-full" />
-          ))}
+          <FetchingIndicator active={articlesQuery.isPlaceholderData} label={tCommon("updating")} />
         </div>
-      )}
 
-      {articlesQuery.isError && (
-        <Alert variant="destructive" className="mt-3 flex items-center justify-between">
-          <span>{t("list.error")}</span>
-          <Button variant="outline" size="sm" onClick={() => articlesQuery.refetch()}>
-            {t("list.retry")}
-          </Button>
-        </Alert>
-      )}
+        <Input
+          type="text"
+          aria-label={t("list.searchLabel")}
+          placeholder={t("list.searchPlaceholder")}
+          value={search}
+          onChange={(event) => updateSearch(event.target.value)}
+          className="mt-3 max-w-sm"
+        />
 
-      {articles !== undefined && articles.length === 0 && search !== "" && (
-        <p className="mt-3 text-sm text-ink-subtle">{t("list.noResults")}</p>
-      )}
+        {articlesQuery.isPending && (
+          <div className="mt-3 flex flex-col gap-2">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} className="h-10 w-full" />
+            ))}
+          </div>
+        )}
 
-      {articles !== undefined && articles.length === 0 && search === "" && (
-        <p className="mt-3 text-sm text-ink-subtle">{t("list.empty")}</p>
-      )}
+        {articlesQuery.isError && (
+          <Alert variant="destructive" className="mt-3 flex items-center justify-between">
+            <span>{t("list.error")}</span>
+            <Button variant="outline" size="sm" onClick={() => articlesQuery.refetch()}>
+              {t("list.retry")}
+            </Button>
+          </Alert>
+        )}
 
-      {articles !== undefined && articles.length > 0 && (
-        <ol className="mt-3 flex flex-col gap-2 text-sm">
-          {articles.map((article) => (
-            <li
-              key={article.id}
-              className="flex cursor-pointer items-center justify-between gap-2 border-b border-rule-subtle pb-2"
-              onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
-            >
-              {/* `min-w-0 break-words`: an article title is author-written
+        {articles !== undefined && articles.length === 0 && search !== "" && (
+          <p className="mt-3 text-sm text-ink-subtle">{t("list.noResults")}</p>
+        )}
+
+        {articles !== undefined && articles.length === 0 && search === "" && (
+          <p className="mt-3 text-sm text-ink-subtle">{t("list.empty")}</p>
+        )}
+
+        {articles !== undefined && articles.length > 0 && (
+          <ol className="mt-3 flex flex-col gap-2 text-sm">
+            {articles.map((article) => (
+              <li
+                key={article.id}
+                className="flex cursor-pointer items-center justify-between gap-2 border-b border-rule-subtle pb-2"
+                onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
+              >
+                {/* `min-w-0 break-words`: an article title is author-written
                   free text, and a flex item's default `min-width: auto`
                   refuses to shrink below it, so a long title pushed the
                   category beside it past the viewport edge (measured: 9px of
@@ -120,41 +121,42 @@ export function ArticleListView() {
                   the title is allowed to fill the space — the same shape as
                   `apps/web`'s own knowledge-base row, which already pairs
                   `justify-between` with a gap. */}
-              <Link
-                href={`/${locale}/knowledge-base/${article.id}`}
-                className="focus-ring min-w-0 break-words rounded-sm font-medium text-ink-strong hover:underline"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {article.title}
-              </Link>
-              <span className="shrink-0 text-ink-subtle">
-                {article.categoryName ?? t("list.noCategory")}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
+                <Link
+                  href={`/${locale}/knowledge-base/${article.id}`}
+                  className="focus-ring min-w-0 break-words rounded-sm font-medium text-ink-strong hover:underline"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {article.title}
+                </Link>
+                <span className="shrink-0 text-ink-subtle">
+                  {article.categoryName ?? t("list.noCategory")}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
 
-      {articlePage !== undefined && (
-        <div className="mt-3">
-          {/* Story S-8c — the shared pager, same primitive the agent
+        {articlePage !== undefined && (
+          <div className="mt-3">
+            {/* Story S-8c — the shared pager, same primitive the agent
               workspace uses. Renders nothing for a single page, so a small
               published library looks exactly as it did before. */}
-          <Pagination
-            page={articlePage.page}
-            totalPages={articlePage.totalPages}
-            onPageChange={setPage}
-            disabled={articlesQuery.isPlaceholderData}
-            label={tCommon("pagination.label")}
-            previousLabel={tCommon("pagination.previous")}
-            nextLabel={tCommon("pagination.next")}
-            indicator={tCommon("pagination.indicator", {
-              page: articlePage.page,
-              totalPages: articlePage.totalPages,
-            })}
-          />
-        </div>
-      )}
-    </section>
+            <Pagination
+              page={articlePage.page}
+              totalPages={articlePage.totalPages}
+              onPageChange={setPage}
+              disabled={articlesQuery.isPlaceholderData}
+              label={tCommon("pagination.label")}
+              previousLabel={tCommon("pagination.previous")}
+              nextLabel={tCommon("pagination.next")}
+              indicator={tCommon("pagination.indicator", {
+                page: articlePage.page,
+                totalPages: articlePage.totalPages,
+              })}
+            />
+          </div>
+        )}
+      </section>
+    </Card>
   );
 }
