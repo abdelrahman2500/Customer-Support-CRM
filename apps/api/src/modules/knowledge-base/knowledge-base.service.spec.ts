@@ -507,7 +507,9 @@ describe("KnowledgeBaseService", () => {
 
       const result = await service.listArticles({ search: "password" });
 
-      expect(result.items).toEqual([baseArticleSummary]);
+      // Story 149 — the search path gets the translation flag too, from the
+      // same post-processing step as the plain-list path.
+      expect(result.items).toEqual([{ ...baseArticleSummary, hasArabicTranslation: false }]);
     });
 
     it("treats a whitespace-only search as no search at all", async () => {
@@ -558,7 +560,14 @@ describe("KnowledgeBaseService", () => {
         where: { articleId: { in: ["article-1"] }, locale: "AR" },
       });
       expect(result.items).toEqual([
-        { ...baseArticleSummary, title: "كيفية إعادة تعيين كلمة المرور", body: "تعليمات..." },
+        {
+          ...baseArticleSummary,
+          title: "كيفية إعادة تعيين كلمة المرور",
+          body: "تعليمات...",
+          // Story 149 — the same mocked row that supplied the AR content
+          // also satisfies the status lookup.
+          hasArabicTranslation: true,
+        },
       ]);
     });
 
@@ -568,16 +577,32 @@ describe("KnowledgeBaseService", () => {
 
       const result = await service.listArticles({ locale: "AR" as never });
 
-      expect(result.items).toEqual([baseArticleSummary]);
+      expect(result.items).toEqual([{ ...baseArticleSummary, hasArabicTranslation: false }]);
     });
 
-    it("never queries translations when locale is omitted", async () => {
+    /**
+     * Story 109's invariant, preserved but re-scoped by Story 149.
+     *
+     * It used to read "no translation query at all when locale is
+     * omitted". Story 149 gave `listArticles` a SECOND, unrelated reason to
+     * touch that table — the translation-status badge, which the agent list
+     * needs whatever locale it is being read in. So the invariant that
+     * still matters, and that this asserts, is the original one:
+     * `applyLocale` issues no LOCALE-RESOLUTION query when no locale was
+     * asked for. The two are told apart by their shape — the status lookup
+     * is the only one that passes `select`, because it reads ids and never
+     * title/body.
+     */
+    it("issues no locale-resolution query when locale is omitted", async () => {
       prisma.knowledgeBaseArticle.findMany.mockResolvedValue([baseArticleRow]);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
 
       const result = await service.listArticles();
 
-      expect(prisma.knowledgeBaseArticleTranslation.findMany).not.toHaveBeenCalled();
-      expect(result.items).toEqual([baseArticleSummary]);
+      const calls = prisma.knowledgeBaseArticleTranslation.findMany.mock.calls;
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.[0]?.select).toEqual({ articleId: true });
+      expect(result.items).toEqual([{ ...baseArticleSummary, hasArabicTranslation: false }]);
     });
   });
 
@@ -1289,6 +1314,127 @@ describe("KnowledgeBaseService", () => {
       expect(countStrings.join("")).toContain("'PUBLISHED'");
       expect(countStrings.join("")).toContain("COUNT(*)");
       expect(countValues).toEqual(["branch-1", "password"]);
+    });
+  });
+
+  /**
+   * Story 149 — Knowledge Base translation status.
+   *
+   * The whole point of this feature is the QUERY SHAPE, and a mocked
+   * Prisma is the only place that can be asserted exactly: with a real
+   * database an N+1 is a performance smell you have to infer, here it is a
+   * call count.
+   */
+  describe("translation status (Story 149)", () => {
+    function articleRow(id: string) {
+      return {
+        id,
+        branchId: "branch-1",
+        title: `Article ${id}`,
+        body: "Body",
+        categoryId: null,
+        category: null,
+        status: "DRAFT",
+        publishedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      };
+    }
+
+    it("issues exactly ONE translation query for a whole page, not one per article", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue(
+        ["a", "b", "c", "d", "e"].map(articleRow),
+      );
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      await service.listArticles();
+
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).toHaveBeenCalledTimes(1);
+      // ...and that one query asks for the whole page's ids at once.
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).toHaveBeenCalledWith({
+        where: { articleId: { in: ["a", "b", "c", "d", "e"] }, locale: "AR" },
+        select: { articleId: true },
+      });
+    });
+
+    it("scales to a larger page without scaling the query count", async () => {
+      const ids = Array.from({ length: 50 }, (_, index) => `article-${index}`);
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue(ids.map(articleRow));
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      await service.listArticles({ pageSize: 50 });
+
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("issues no translation query at all for an empty page", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+
+      const result = await service.listArticles();
+
+      expect(result.items).toEqual([]);
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).not.toHaveBeenCalled();
+    });
+
+    it("resolves mixed states per-article, not per-page", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue(["a", "b", "c"].map(articleRow));
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([
+        { articleId: "a" },
+        { articleId: "c" },
+      ]);
+
+      const result = await service.listArticles();
+
+      // `a` and `c` have AR rows, `b` does not — and the order of the page
+      // is preserved, so the flags cannot silently shift by one.
+      expect(result.items.map((item) => [item.id, item.hasArabicTranslation])).toEqual([
+        ["a", true],
+        ["b", false],
+        ["c", true],
+      ]);
+    });
+
+    it("reports false for every article when none is translated", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue(["a", "b"].map(articleRow));
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      const result = await service.listArticles();
+
+      expect(result.items.every((item) => item.hasArabicTranslation === false)).toBe(true);
+    });
+
+    it("asks only for AR, so an EN translation row never counts", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([articleRow("a")]);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      await service.listArticles();
+
+      expect(prisma.knowledgeBaseArticleTranslation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ locale: "AR" }) }),
+      );
+    });
+
+    it("selects ids only — never the translated title/body the list does not render", async () => {
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([articleRow("a")]);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      await service.listArticles();
+
+      const call = prisma.knowledgeBaseArticleTranslation.findMany.mock.calls.at(-1)?.[0];
+      expect(call?.select).toEqual({ articleId: true });
+    });
+
+    it("leaves the pagination envelope untouched", async () => {
+      prisma.knowledgeBaseArticle.count.mockResolvedValue(7);
+      prisma.knowledgeBaseArticle.findMany.mockResolvedValue([articleRow("a")]);
+      prisma.knowledgeBaseArticleTranslation.findMany.mockResolvedValue([]);
+
+      const result = await service.listArticles({ page: 2, pageSize: 3 });
+
+      expect(result.total).toBe(7);
+      expect(result.page).toBe(2);
+      expect(result.pageSize).toBe(3);
+      expect(result.totalPages).toBe(3);
     });
   });
 });

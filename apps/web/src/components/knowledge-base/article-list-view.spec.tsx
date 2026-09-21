@@ -532,4 +532,69 @@ describe("ArticleListView", () => {
       expect(replace).not.toHaveBeenCalled();
     });
   });
+
+  /**
+   * Story 149 — Knowledge Base translation status.
+   *
+   * `useTranslations` is stubbed to echo the key in this file, so the
+   * assertions read as key paths. The real copy is asserted to exist in
+   * both locales by `translation-status-messages.spec.ts`.
+   */
+  describe("translation status (Story 149)", () => {
+    function renderWith(articles: unknown[]) {
+      mockedUseArticlesQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page(articles) }) as never,
+      );
+      render(<ArticleListView />);
+    }
+
+    it("adds a translation column header", () => {
+      renderWith([{ ...baseArticle, hasArabicTranslation: false }]);
+
+      expect(
+        screen.getByRole("columnheader", { name: "list.columns.translation" }),
+      ).toBeInTheDocument();
+    });
+
+    it("marks a translated article as translated", () => {
+      renderWith([{ ...baseArticle, hasArabicTranslation: true }]);
+
+      expect(screen.getByText("list.translation.translated")).toBeInTheDocument();
+      expect(screen.queryByText("list.translation.untranslated")).not.toBeInTheDocument();
+    });
+
+    it("marks an untranslated article as English-only", () => {
+      renderWith([{ ...baseArticle, hasArabicTranslation: false }]);
+
+      expect(screen.getByText("list.translation.untranslated")).toBeInTheDocument();
+      expect(screen.queryByText("list.translation.translated")).not.toBeInTheDocument();
+    });
+
+    it("renders each article's own state on a mixed page", () => {
+      renderWith([
+        { ...baseArticle, id: "a", title: "Translated one", hasArabicTranslation: true },
+        { ...baseArticle, id: "b", title: "Untranslated one", hasArabicTranslation: false },
+      ]);
+
+      // Scoped to each row, so the flags cannot be attributed to the
+      // wrong article by a test that only counts badges on the page.
+      const translatedRow = screen.getByText("Translated one").closest("tr")!;
+      const untranslatedRow = screen.getByText("Untranslated one").closest("tr")!;
+      expect(
+        within(translatedRow).getByText("list.translation.translated"),
+      ).toBeInTheDocument();
+      expect(
+        within(untranslatedRow).getByText("list.translation.untranslated"),
+      ).toBeInTheDocument();
+    });
+
+    it("styles an untranslated article as neutral, not as an error", () => {
+      renderWith([{ ...baseArticle, hasArabicTranslation: false }]);
+
+      // A missing Arabic translation is a valid state — the base English
+      // content still serves every reader — so it must not read as danger.
+      const badge = screen.getByText("list.translation.untranslated");
+      expect(badge.className).not.toMatch(/danger/);
+    });
+  });
 });

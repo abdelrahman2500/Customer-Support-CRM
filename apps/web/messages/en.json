@@ -695,10 +695,15 @@
       "columns": {
         "title": "Title",
         "category": "Category",
-        "status": "Status"
+        "status": "Status",
+        "translation": "Translation"
       },
       "unpublishConfirmTitle": "Unpublish this article?",
-      "unpublishConfirmDescription": "\"{title}\" will no longer be visible to agents searching the knowledge base or to customers in the portal."
+      "unpublishConfirmDescription": "\"{title}\" will no longer be visible to agents searching the knowledge base or to customers in the portal.",
+      "translation": {
+        "translated": "Arabic",
+        "untranslated": "English only"
+      }
     },
     "create": {
       "title": "New article",

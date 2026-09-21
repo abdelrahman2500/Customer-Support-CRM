@@ -27,6 +27,23 @@ export interface ArticleSummary {
   updatedAt: string;
 }
 
+/**
+ * Story 149 — mirrors the backend's own `ArticleListItem`: what
+ * `GET /knowledge-base/articles` returns, as opposed to what
+ * `GET /knowledge-base/articles/:id` returns.
+ *
+ * Kept distinct from `ArticleSummary` for the same reason the backend
+ * keeps them distinct — `getArticle` does not carry this field, and typing
+ * it as though it did would let a detail screen read `undefined` as
+ * "untranslated".
+ */
+export interface ArticleListItem extends ArticleSummary {
+  /** Whether the article has an Arabic (`AR`) translation. English is the
+   * base article's own content, so this is the only translation there is
+   * to be missing. */
+  hasArabicTranslation: boolean;
+}
+
 /** Mirrors the existing `CreateArticleDto` exactly (`apps/api/src/modules/knowledge-base/dto/create-article.dto.ts`). */
 export interface CreateArticleInput {
   title: string;
@@ -77,8 +94,8 @@ function toQueryString(filters: ArticleFilters): string {
 
 export function listArticles(
   filters: ArticleFilters = {},
-): Promise<PaginatedResponse<ArticleSummary>> {
-  return apiFetch<PaginatedResponse<ArticleSummary>>(
+): Promise<PaginatedResponse<ArticleListItem>> {
+  return apiFetch<PaginatedResponse<ArticleListItem>>(
     `/knowledge-base/articles${toQueryString(filters)}`,
   );
 }

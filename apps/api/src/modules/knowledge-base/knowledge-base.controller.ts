@@ -19,6 +19,7 @@ import { ListArticlesQueryDto } from "./dto/list-articles-query.dto";
 import { LocaleQueryDto } from "./dto/locale-query.dto";
 import { SetArticleTranslationDto } from "./dto/set-article-translation.dto";
 import type {
+  ArticleListItem,
   ArticleSummary,
   ArticleTranslationSummary,
   ArticleVersionSummary,
@@ -39,7 +40,7 @@ export class KnowledgeBaseController {
 
   @Get()
   @RequirePermissions("kb:read")
-  list(@Query() query: ListArticlesQueryDto): Promise<Paginated<ArticleSummary>> {
+  list(@Query() query: ListArticlesQueryDto): Promise<Paginated<ArticleListItem>> {
     return this.knowledgeBaseService.listArticles(query);
   }
 

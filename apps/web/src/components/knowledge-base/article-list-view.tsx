@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useArticlesQuery, useUpdateArticleMutation } from "@/hooks/use-knowledge-base";
 import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
-import type { ArticleSummary } from "@/lib/knowledge-base-api";
+import type { ArticleListItem } from "@/lib/knowledge-base-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { useUrlFilters } from "@/lib/url-filters";
 import {
@@ -214,6 +214,11 @@ function ArticleListViewContent() {
             <TableRow>
               <TableHead>{t("list.columns.title")}</TableHead>
               <TableHead>{t("list.columns.category")}</TableHead>
+              {/* Story 149 — translation coverage. Sits before Status so
+                  the two publishing-workflow signals ("is it live?" and
+                  "is it live in both languages?") read together, and the
+                  Status cell keeps its publish/unpublish action last. */}
+              <TableHead>{t("list.columns.translation")}</TableHead>
               <TableHead>{t("list.columns.status")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -255,7 +260,7 @@ function ArticleListViewContent() {
  * of hooks — the same constraint `SlaPolicyRow`/`DepartmentRow` already
  * established elsewhere in this codebase).
  */
-function ArticleRow({ article }: { article: ArticleSummary }) {
+function ArticleRow({ article }: { article: ArticleListItem }) {
   const t = useTranslations("knowledgeBase");
   const errorMessage = useErrorMessage();
   const { locale } = useParams<{ locale: string }>();
@@ -286,6 +291,17 @@ function ArticleRow({ article }: { article: ArticleSummary }) {
       </TableCell>
       <TableCell className="text-ink-subtle">
         {article.categoryName ?? t("list.noCategory")}
+      </TableCell>
+      <TableCell>
+        {/* `secondary`, deliberately not `destructive`: an untranslated
+            article is a normal, valid state — the base English content
+            still serves every reader, and `applyLocale` falls back to it
+            silently. Colouring it as an error would misrepresent it. */}
+        <Badge variant={article.hasArabicTranslation ? "success" : "secondary"}>
+          {article.hasArabicTranslation
+            ? t("list.translation.translated")
+            : t("list.translation.untranslated")}
+        </Badge>
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">

@@ -695,10 +695,15 @@
       "columns": {
         "title": "العنوان",
         "category": "الفئة",
-        "status": "الحالة"
+        "status": "الحالة",
+        "translation": "الترجمة"
       },
       "unpublishConfirmTitle": "هل تريد إلغاء نشر هذا المقال؟",
-      "unpublishConfirmDescription": "لن يكون \"{title}\" مرئيًا بعد الآن للوكلاء عند البحث في قاعدة المعرفة أو للعملاء في البوابة."
+      "unpublishConfirmDescription": "لن يكون \"{title}\" مرئيًا بعد الآن للوكلاء عند البحث في قاعدة المعرفة أو للعملاء في البوابة.",
+      "translation": {
+        "translated": "العربية",
+        "untranslated": "الإنجليزية فقط"
+      }
     },
     "create": {
       "title": "مقالة جديدة",

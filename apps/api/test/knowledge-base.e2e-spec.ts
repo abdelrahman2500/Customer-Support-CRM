@@ -319,17 +319,28 @@ describe("Knowledge Base (e2e)", () => {
   });
 
   // Story 64 — Article Search.
+  //
+  // Story 149 — both positive arms now ask for `pageSize: 100`. This test
+  // asserts that a search MATCHES an article, which is a question about the
+  // result set, not about page 1. Its fixture's title and body are ordinary
+  // English phrases, so in a persistent e2e database every previous run
+  // leaves another article matching them; once the match count passed the
+  // default page size of 25 the fixture dropped off the first page and the
+  // assertion failed for a reason the test was never about (measured: 28
+  // matches across 120 accumulated articles). Nothing is weakened — the
+  // `noMatch` arm is untouched, and asking for a wider page can only make
+  // a false positive harder, not easier.
   it("filters the list by title/body, case-insensitive, via ?search=", async () => {
     const byTitle = await request(app.getHttpServer())
       .get("/api/v1/knowledge-base/articles")
-      .query({ search: "RESET YOUR password" })
+      .query({ search: "RESET YOUR password", pageSize: 100 })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     expect(byTitle.body.items.map((article: { id: string }) => article.id)).toContain(articleId);
 
     const byBody = await request(app.getHttpServer())
       .get("/api/v1/knowledge-base/articles")
-      .query({ search: "step-by-step" })
+      .query({ search: "step-by-step", pageSize: 100 })
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
     expect(byBody.body.items.map((article: { id: string }) => article.id)).toContain(articleId);
@@ -455,6 +466,21 @@ describe("Knowledge Base (e2e)", () => {
      * to the base article. */
     let englishOnlyArticleId: string;
     let arabicCategoryId: string;
+    /**
+     * Story 149 — a per-run token in the fixture's ENGLISH body.
+     *
+     * The English-path test below used to search the bare word
+     * "Resetting", which this fixture's own fixed title supplies. Because
+     * the e2e database persists between local runs, every run added
+     * another "Resetting your password" article, and once the count passed
+     * the default page size of 25 the fixture the test was looking for
+     * dropped off page 1 and the assertion failed — measured at 28 matches
+     * against 120 articles. A per-run token restores the test's real
+     * intent (this fixture is reachable through the English index when
+     * locale=AR is absent) and makes it immune to accumulation, without
+     * weakening it: it can no longer pass by matching some other article.
+     */
+    const englishMarker = `resetfixture${randomUUID().replace(/-/g, "").slice(0, 10)}`;
 
     beforeAll(async () => {
       const category = await request(app.getHttpServer())
@@ -469,7 +495,7 @@ describe("Knowledge Base (e2e)", () => {
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .send({
           title: "Resetting your password",
-          body: "English base content for the Arabic search fixture.",
+          body: `English base content for the Arabic search fixture. ${englishMarker}`,
           categoryId: arabicCategoryId,
         })
         .expect(201);
@@ -629,7 +655,7 @@ describe("Knowledge Base (e2e)", () => {
     it("keeps the English path working for the same request without locale=AR", async () => {
       const response = await request(app.getHttpServer())
         .get("/api/v1/knowledge-base/articles")
-        .query({ search: "Resetting" })
+        .query({ search: englishMarker })
         .set("Authorization", `Bearer ${adminAccessToken}`)
         .expect(200);
 
@@ -930,6 +956,142 @@ describe("Knowledge Base (e2e)", () => {
         .get("/api/v1/knowledge-base/articles")
         .query({ page: 2 })
         .expect(401);
+    });
+  });
+
+  /**
+   * Story 149 — Knowledge Base translation status.
+   *
+   * Runs last and creates its own marker-tagged articles, so the counts and
+   * orderings every test above asserts are undisturbed, and every
+   * assertion here can scope itself to this run's own rows via `?search=`.
+   *
+   * The "exactly one query per page" guarantee is asserted precisely in
+   * `knowledge-base.service.spec.ts` against a mocked Prisma, where a call
+   * count is observable. These cases prove the resulting BEHAVIOUR against
+   * a real database.
+   */
+  describe("translation status (Story 149)", () => {
+    const marker = randomUUID().replace(/-/g, "").slice(0, 10);
+    let translatedId: string;
+    let untranslatedId: string;
+
+    async function createArticle(title: string): Promise<string> {
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title, body: `Body for ${title}` })
+        .expect(201);
+      return response.body.id;
+    }
+
+    function listByMarker(query: Record<string, unknown> = {}) {
+      return request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .query({ search: marker, ...query });
+    }
+
+    beforeAll(async () => {
+      translatedId = await createArticle(`${marker} translated article`);
+      untranslatedId = await createArticle(`${marker} untranslated article`);
+
+      await request(app.getHttpServer())
+        .put(`/api/v1/knowledge-base/articles/${translatedId}/translations/AR`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: "مقالة مترجمة", body: "محتوى عربي" })
+        .expect(200);
+    });
+
+    it("reports true for an article with an AR translation and false for one without", async () => {
+      const response = await listByMarker().expect(200);
+
+      const byId = new Map<string, boolean>(
+        response.body.items.map((item: { id: string; hasArabicTranslation: boolean }) => [
+          item.id,
+          item.hasArabicTranslation,
+        ]),
+      );
+      expect(byId.get(translatedId)).toBe(true);
+      expect(byId.get(untranslatedId)).toBe(false);
+    });
+
+    it("resolves mixed states within a single page", async () => {
+      const response = await listByMarker().expect(200);
+
+      const flags = response.body.items.map(
+        (item: { hasArabicTranslation: boolean }) => item.hasArabicTranslation,
+      );
+      // Both states really are present on the one page, so this is a
+      // genuine mixed-page assertion rather than an all-true/all-false one.
+      expect(flags).toContain(true);
+      expect(flags).toContain(false);
+    });
+
+    it("sets the flag on every item, on every page, when paginated", async () => {
+      const page1 = await listByMarker({ page: 1, pageSize: 1 }).expect(200);
+      const page2 = await listByMarker({ page: 2, pageSize: 1 }).expect(200);
+
+      for (const page of [page1, page2]) {
+        expect(page.body.items).toHaveLength(1);
+        expect(page.body.items[0]).toHaveProperty("hasArabicTranslation");
+        expect(typeof page.body.items[0].hasArabicTranslation).toBe("boolean");
+      }
+      // The two pages are different articles, and between them carry both
+      // states — the flag follows the row across the page boundary.
+      const ids = [page1.body.items[0].id, page2.body.items[0].id];
+      expect(new Set(ids).size).toBe(2);
+      expect(
+        [page1, page2].map((page) => page.body.items[0].hasArabicTranslation).sort(),
+      ).toEqual([false, true]);
+    });
+
+    it("becomes true as soon as a translation is added, and false again once removed", async () => {
+      await request(app.getHttpServer())
+        .put(`/api/v1/knowledge-base/articles/${untranslatedId}/translations/AR`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ title: "أصبحت مترجمة", body: "محتوى" })
+        .expect(200);
+
+      const after = await listByMarker().expect(200);
+      const flagAfter = after.body.items.find(
+        (item: { id: string }) => item.id === untranslatedId,
+      ).hasArabicTranslation;
+      expect(flagAfter).toBe(true);
+    });
+
+    it("is present on the plain listing path too, not only the search path", async () => {
+      // No `search`, so this goes down the Prisma `paginate` path rather
+      // than the raw-SQL full-text one. Both must carry the flag.
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items.length).toBeGreaterThan(0);
+      for (const item of response.body.items) {
+        expect(typeof item.hasArabicTranslation).toBe("boolean");
+      }
+    });
+
+    it("leaves the single-article read unchanged — no translation-status field", async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/knowledge-base/articles/${translatedId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      // `getArticle` returns `ArticleSummary`, deliberately not
+      // `ArticleListItem` — the field is the agent LIST's concern.
+      expect(response.body).not.toHaveProperty("hasArabicTranslation");
+    });
+
+    it("preserves the pagination envelope", async () => {
+      const response = await listByMarker({ page: 1, pageSize: 1 }).expect(200);
+
+      expect(response.body.page).toBe(1);
+      expect(response.body.pageSize).toBe(1);
+      expect(response.body.total).toBe(2);
+      expect(response.body.totalPages).toBe(2);
     });
   });
 });

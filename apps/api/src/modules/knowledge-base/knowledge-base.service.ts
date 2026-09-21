@@ -29,6 +29,35 @@ export interface ArticleSummary {
   updatedAt: Date;
 }
 
+/**
+ * Story 149 — an article as the AGENT LIST sees it: an `ArticleSummary`
+ * plus its translation coverage.
+ *
+ * A separate type rather than a field on `ArticleSummary`, mirroring
+ * `TicketsService`'s own `TicketSummary`/`TicketListItem` split.
+ * `getArticle` and every Customer Portal read return `ArticleSummary`, and
+ * none of them should grow a field only the agent-facing list asks about —
+ * the portal falls back to English silently by design, so "this article has
+ * no Arabic" is not a customer's concern.
+ */
+export interface ArticleListItem extends ArticleSummary {
+  /**
+   * Whether a `locale: AR` `KnowledgeBaseArticleTranslation` row exists.
+   *
+   * Arabic is the only translation this can be about. The base article's
+   * own `title`/`body` ARE the English content — Story 137's English tab
+   * edits them directly through the ordinary article `PATCH`, while its
+   * Arabic tab writes a translation row through `PUT .../translations/AR`.
+   * So every article always has English, and `KbLocale` has exactly two
+   * members.
+   *
+   * An `EN` translation row is writable through Story 109's endpoint but is
+   * never produced by the product's own authoring UI, and is deliberately
+   * not counted here.
+   */
+  hasArabicTranslation: boolean;
+}
+
 /** RM-27 — spread into a Prisma `include` wherever a `KnowledgeBaseArticle`
  * row is turned into an `ArticleSummary`, so `categoryName` is always
  * resolved via the relation, never denormalized. Mirrors
@@ -154,7 +183,7 @@ export class KnowledgeBaseService {
    * request down the full-text path or the plain listing one, and a UI
    * pager works identically either way.
    */
-  async listArticles(query: ListArticlesQueryDto = {}): Promise<Paginated<ArticleSummary>> {
+  async listArticles(query: ListArticlesQueryDto = {}): Promise<Paginated<ArticleListItem>> {
     const { branchId } = this.tenantContext.requireBranchScope();
     const search = query.search?.trim();
     if (search) {
@@ -167,7 +196,9 @@ export class KnowledgeBaseService {
         query.locale === "AR"
           ? await this.searchArticlesInArabic(branchId, search, query, searchOptions)
           : await this.searchArticles(branchId, search, query, searchOptions);
-      return this.applyLocaleToPage(searchPage, query.locale);
+      return this.attachTranslationStatusToPage(
+        await this.applyLocaleToPage(searchPage, query.locale),
+      );
     }
     // `id` tiebreaks `updatedAt`, which is not unique: a bulk import or a
     // batched publish writes several rows in the same millisecond, and
@@ -202,9 +233,11 @@ export class KnowledgeBaseService {
         pageSize: query.pageSize,
       },
     );
-    return this.applyLocaleToPage(
-      { ...page, items: page.items.map(toArticleSummary) },
-      query.locale,
+    return this.attachTranslationStatusToPage(
+      await this.applyLocaleToPage(
+        { ...page, items: page.items.map(toArticleSummary) },
+        query.locale,
+      ),
     );
   }
 
@@ -496,6 +529,49 @@ export class KnowledgeBaseService {
         ? { ...article, title: translation.title, body: translation.body }
         : article;
     });
+  }
+
+  /**
+   * Story 149 — resolves each article's Arabic translation coverage in ONE
+   * batched query, never one per article.
+   *
+   * Deliberately the same shape as `applyLocale` above rather than a Prisma
+   * relation `include`/`_count`, because `listArticles` returns rows from
+   * two different sources: the `paginate(...)` Prisma path and the
+   * `$queryRaw` full-text path (Story 102 English, Story 138 Arabic). An
+   * `include` can only serve the first. Running as a post-processing step
+   * over whatever the page already produced serves both, identically, and
+   * needs no change to the eight raw-SQL template literals in
+   * `searchArticles` or their Arabic siblings.
+   *
+   * `select: { articleId: true }` — ids only. The list renders a badge, not
+   * translated content, so pulling `title`/`body` here would move the
+   * entire Arabic corpus of a page over the wire to compute a boolean.
+   *
+   * An empty page short-circuits without querying at all, mirroring
+   * `applyLocale`'s own `articles.length === 0` guard.
+   */
+  private async attachTranslationStatus(articles: ArticleSummary[]): Promise<ArticleListItem[]> {
+    if (articles.length === 0) {
+      return [];
+    }
+    const translated = await this.prisma.knowledgeBaseArticleTranslation.findMany({
+      where: { articleId: { in: articles.map((article) => article.id) }, locale: "AR" },
+      select: { articleId: true },
+    });
+    const translatedIds = new Set(translated.map((row) => row.articleId));
+    return articles.map((article) => ({
+      ...article,
+      hasArabicTranslation: translatedIds.has(article.id),
+    }));
+  }
+
+  /** Story 149 — `attachTranslationStatus` over a page's `items`, leaving
+   * the envelope untouched. Mirrors `applyLocaleToPage` exactly. */
+  private async attachTranslationStatusToPage(
+    page: Paginated<ArticleSummary>,
+  ): Promise<Paginated<ArticleListItem>> {
+    return { ...page, items: await this.attachTranslationStatus(page.items) };
   }
 
   /** Story 109 — the single-article counterpart to `applyLocale`, used by
