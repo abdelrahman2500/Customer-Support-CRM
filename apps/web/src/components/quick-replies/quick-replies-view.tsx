@@ -9,7 +9,17 @@ import {
 } from "@/hooks/use-quick-replies";
 import type { QuickReplySummary } from "@/lib/quick-replies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Card, EmptyState, Input, PageHeader, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  PageHeader,
+  Skeleton,
+  Textarea,
+} from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -171,12 +181,7 @@ function AddQuickReplyForm() {
         </label>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("bodyLabel")}
-          <textarea
-            className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
-            rows={3}
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-          />
+          <Textarea rows={3} value={body} onChange={(event) => setBody(event.target.value)} />
         </label>
         <div>
           <Button

@@ -176,8 +176,10 @@ function TaskRow({ task }: { task: TaskSummary }) {
  * `AddQuickReplyForm`'s exact submit/error pattern. `dueAt` is a plain
  * native `datetime-local` input — no dedicated date/time primitive exists
  * in `@crm/ui`, matching this codebase's own "a plain HTML control is the
- * simplest existing precedent" convention (see `AddQuickReplyForm`'s own
- * plain `<textarea>`). */
+ * simplest existing precedent" convention. (Story 143 note: the
+ * `AddQuickReplyForm` textarea this comment used to cite as precedent now
+ * uses the shared `Textarea`; the reasoning still holds for `dueAt`, which
+ * has no primitive at all.) */
 function AddTaskForm() {
   const t = useTranslations("dashboard");
   const errorMessage = useErrorMessage();

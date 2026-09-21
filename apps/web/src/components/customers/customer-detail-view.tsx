@@ -22,7 +22,18 @@ import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { ApiError } from "@/lib/api";
 import type { ContactSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Card, Checkbox, Input, Label, Pagination, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Input,
+  Label,
+  Pagination,
+  Skeleton,
+  Textarea,
+} from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
@@ -354,9 +365,8 @@ function AddCustomerNoteForm({ customerId }: { customerId: string }) {
       <label className="sr-only" htmlFor="customer-note-body">
         {t("detail.notesPlaceholder")}
       </label>
-      <textarea
+      <Textarea
         id="customer-note-body"
-        className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
         rows={3}
         value={body}
         placeholder={t("detail.notesPlaceholder")}

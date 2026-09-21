@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  Textarea,
 } from "@crm/ui";
 
 /** RM-30 — the same sentinel-for-"no locale" convention
@@ -177,8 +178,7 @@ function TemplateForm({
         </label>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("templateLabel")}
-          <textarea
-            className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+          <Textarea
             rows={2}
             value={text}
             placeholder={t("templatePlaceholder")}

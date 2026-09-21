@@ -30,7 +30,7 @@ import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Card, Input, showSuccessToast, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, Input, Skeleton, Textarea, showSuccessToast } from "@crm/ui";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -794,8 +794,7 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
 
   return (
     <form className="relative mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
-      <textarea
-        className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+      <Textarea
         rows={3}
         value={body}
         placeholder={t("detail.notesPlaceholder")}

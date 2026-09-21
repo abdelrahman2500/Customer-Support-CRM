@@ -13,7 +13,7 @@ import {
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Card, Checkbox, cn, Label, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Checkbox, Label, Skeleton, Textarea, cn } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /**
@@ -247,8 +247,7 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
           </SelectContent>
         </Select>
       )}
-      <textarea
-        className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+      <Textarea
         rows={2}
         value={body}
         placeholder={t("detail.chatPlaceholder")}

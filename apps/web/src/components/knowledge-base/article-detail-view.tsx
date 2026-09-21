@@ -15,7 +15,7 @@ import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { localeDirection } from "@/i18n/direction";
-import { Alert, Badge, Button, Input, showSuccessToast, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Input, Skeleton, showSuccessToast } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import {
@@ -230,8 +230,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("detail.bodyLabel")}
-            <textarea
-              className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+            <Textarea
               rows={10}
               // Batch 5 (UX audit) — controlled, same revert-on-error rationale
               // as the title field above.

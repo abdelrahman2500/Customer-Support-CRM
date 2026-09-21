@@ -7,7 +7,7 @@ import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router"
 import { useCreateArticleMutation } from "@/hooks/use-knowledge-base";
 import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, PageHeader } from "@crm/ui";
+import { Alert, Button, Input, PageHeader, Textarea } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /** RM-27 — the free-text category `Input` became a `Select` sourced from
@@ -93,8 +93,7 @@ export function CreateArticleView() {
 
         <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("create.body")}
-          <textarea
-            className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+          <Textarea
             rows={6}
             value={body}
             onChange={(event) => setBody(event.target.value)}
