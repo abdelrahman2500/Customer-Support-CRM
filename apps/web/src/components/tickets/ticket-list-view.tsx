@@ -25,11 +25,6 @@ import {
   SortIndicator,
 } from "@crm/ui";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Table,
   TableBody,
   TableCell,

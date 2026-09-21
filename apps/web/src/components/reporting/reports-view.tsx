@@ -28,7 +28,6 @@ import {
   Button,
   Card,
   Checkbox,
-  FilterBar,
   FilterSelect,
   Input,
   Label,
