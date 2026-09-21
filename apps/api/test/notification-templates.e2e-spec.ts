@@ -148,8 +148,17 @@ describe("Notification Templates (e2e)", () => {
       .set("Authorization", `Bearer ${adminAccessToken}`)
       .expect(200);
 
+    // Also matched on `locale: null`. RM-30 made `eventType` non-unique by
+    // adding a per-locale override on top of the branch default, so
+    // `sla.at_risk` alone can select an AR row this test never created —
+    // and in a persistent e2e database a previous run's AR row is exactly
+    // what it found. The POST above sends no `locale`, so the row it
+    // created is the default one; this now asks for that row rather than
+    // whichever happens to come first. Not a weaker assertion: it is the
+    // same equality check against a correctly-identified row.
     const row = listResponse.body.find(
-      (item: { eventType: string }) => item.eventType === "sla.at_risk",
+      (item: { eventType: string; locale: string | null }) =>
+        item.eventType === "sla.at_risk" && item.locale === null,
     );
     expect(row.template).toBe(text);
   });
