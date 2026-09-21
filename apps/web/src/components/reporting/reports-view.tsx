@@ -155,9 +155,17 @@ function formatUsd(amount: number): string {
  * was to evaluate a no-dependency approach first) instead of a plain stat
  * number or `<ul>` list, reading the exact same `ReportingService`
  * response each already used — no backend change. The remaining four
- * widgets (Ticket Aging, Resolution Time, AI Usage, Ticket Volume by
- * Category) are unchanged, per the plan's own explicit scope. Every
- * existing textual detail line (`slaCompliance.detail`/`csat.detail`) is
+ * widgets were left as stat tiles/lists, "upgradeable later if warranted".
+ *
+ * Story 146 — took up that invitation for the two that are genuine
+ * distributions: Ticket Aging (four zero-filled buckets) and Ticket Volume
+ * by Category both now render through the same `BarChart`. Resolution Time
+ * stays a scalar KPI — it is two numbers, and a bar of one value compares
+ * nothing. AI Usage stays a cost KPI plus a per-feature breakdown: its rows
+ * carry five different metrics (calls, successes, errors, tokens, cost),
+ * and charting only the call count would quietly drop the other four.
+ *
+ * Every existing textual detail line (`slaCompliance.detail`/`csat.detail`) is
  * kept alongside its new chart, not replaced by it — the chart adds a
  * visual, it doesn't remove the precise number. `ReportCard`'s own
  * loading/forbidden/error states are untouched: a chart is just a new
@@ -401,15 +409,22 @@ export function ReportsView() {
             exportPath="ticket-aging"
             range={range}
           >
+            {/* Story 146 — the four buckets are a distribution, and a
+                distribution read as four right-aligned numbers makes the
+                reader do the comparison themselves. No empty branch: the
+                backend zero-fills every bucket, so this list is never
+                empty (Story 60). `bucket` is unique by construction, so no
+                `id` is needed — unlike the category chart below. */}
             {ticketAgingQuery.isSuccess && (
-              <ul className="flex flex-col gap-1 text-sm">
-                {ticketAgingQuery.data.map((row) => (
-                  <li key={row.bucket} className="flex items-center justify-between">
-                    <span className="text-ink-muted">{row.bucket}</span>
-                    <span className="font-medium text-ink">{row.count}</span>
-                  </li>
-                ))}
-              </ul>
+              <BarChart
+                ariaLabel={ticketAgingQuery.data
+                  .map((row) => `${row.bucket}: ${row.count}`)
+                  .join(", ")}
+                rows={ticketAgingQuery.data.map((row) => ({
+                  label: row.bucket,
+                  segments: [{ label: "", value: row.count, color: "rgb(var(--accent))" }],
+                }))}
+              />
             )}
           </ReportCard>
         );
@@ -518,30 +533,27 @@ export function ReportsView() {
               ticketVolumeByCategoryQuery.data.length === 0 && (
                 <p className="text-sm text-ink-subtle">{t("ticketVolumeByCategory.empty")}</p>
               )}
+            {/* Story 146 — same BarChart the other distributions use.
+                `categoryId` is the row key, never the display name: a
+                category name is free text an admin types and is not
+                guaranteed unique, and the `null` row is a real cohort
+                ("no category assigned") that needs a stable key of its
+                own. `BarChartRow.id` exists for exactly this. */}
             {ticketVolumeByCategoryQuery.isSuccess &&
               ticketVolumeByCategoryQuery.data.length > 0 && (
-                <ul className="flex flex-col gap-1 text-sm">
-                  {ticketVolumeByCategoryQuery.data.map((row) => (
-                    <li
-                      key={row.categoryId ?? "uncategorized"}
-                      className="flex items-center justify-between"
-                    >
-                      {/* `min-w-0 break-words`: a category name is free text
-                          an admin types, and a long one with no spaces
-                          cannot wrap on its own. A flex item's default
-                          `min-width: auto` then refuses to shrink below that
-                          unbreakable word, so the row — and the whole page —
-                          grew wider than the viewport (measured: a 406px
-                          name inside a 390px screen gave 66px of horizontal
-                          page overflow). The count stays `shrink-0` so it is
-                          never the thing squeezed instead. */}
-                      <span className="min-w-0 break-words text-ink-muted">
-                        {row.categoryName ?? t("ticketVolumeByCategory.uncategorized")}
-                      </span>
-                      <span className="shrink-0 font-medium text-ink">{row.count}</span>
-                    </li>
-                  ))}
-                </ul>
+                <BarChart
+                  ariaLabel={ticketVolumeByCategoryQuery.data
+                    .map(
+                      (row) =>
+                        `${row.categoryName ?? t("ticketVolumeByCategory.uncategorized")}: ${row.count}`,
+                    )
+                    .join(", ")}
+                  rows={ticketVolumeByCategoryQuery.data.map((row) => ({
+                    id: row.categoryId ?? "uncategorized",
+                    label: row.categoryName ?? t("ticketVolumeByCategory.uncategorized"),
+                    segments: [{ label: "", value: row.count, color: "rgb(var(--accent))" }],
+                  }))}
+                />
               )}
           </ReportCard>
         );

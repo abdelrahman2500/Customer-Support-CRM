@@ -212,12 +212,16 @@ describe("ReportsView", () => {
 
     render(<ReportsView />);
 
+    // Story 146 — this report is now a `BarChart`, so the protection moved
+    // with it: the chart's row label carries `break-words` (see
+    // `report-charts.tsx`). `min-w-0` is no longer needed because the label
+    // sits on its own line above the bar instead of competing with the
+    // count inside one flex row. The property under test is unchanged —
+    // a 406px unbreakable name must not widen the page at 390px.
     const label = screen.getByText(longName);
-    expect(label).toHaveClass("min-w-0");
     expect(label).toHaveClass("break-words");
-    // The count must never be the element that gets squeezed instead.
-    const count = label.parentElement?.querySelector("span:last-child");
-    expect(count).toHaveClass("shrink-0");
+    // The numeric value still must never be the element that gets squeezed.
+    expect(screen.getByText("1")).toHaveClass("shrink-0");
   });
 
   it("renders the ticket-aging card's four buckets, even when all are zero", () => {
@@ -353,19 +357,31 @@ describe("ReportsView", () => {
       expect(screen.getByText(`csat.detail:${JSON.stringify({ count: 4 })}`)).toBeInTheDocument();
     });
 
-    it("leaves the remaining four widgets (ticket-aging, resolution-time, ai-usage, ticket-volume-by-category) as plain lists/stats, unchanged", () => {
+    // Story 146 — RM-08 left four widgets as lists/stats and said they were
+    // "upgradeable later if warranted". Two were: the two that are genuine
+    // distributions. The scope assertion is updated to the new scope, not
+    // dropped — the other two must still NOT be charted.
+    it("charts ticket-aging, which is a distribution", () => {
       mockedUseTicketAgingQuery.mockReturnValue(
         queryResult({ data: [{ bucket: "0-1d", count: 2 }], isSuccess: true }) as never,
       );
 
       render(<ReportsView />);
 
-      // The ticket-aging card renders its bucket rows as plain text, never
-      // wrapped in a `role="img"` element — this story's own explicit
-      // non-goal for the other four widgets.
-      const heading = screen.getByText("ticketAging.heading");
-      const card = heading.closest("div")!;
-      expect(within(card).queryByRole("img")).not.toBeInTheDocument();
+      const card = screen.getByText("ticketAging.heading").closest("div")!;
+      expect(within(card).getByRole("img", { name: "0-1d: 2" })).toBeInTheDocument();
+    });
+
+    it("leaves resolution-time and ai-usage as scalar stats, never charts", () => {
+      render(<ReportsView />);
+
+      // Resolution time is two numbers and AI usage is a cost plus a
+      // five-metric breakdown; a bar of one value compares nothing, and
+      // charting one metric of five would silently drop the other four.
+      for (const heading of ["resolutionTime.heading", "aiUsage.heading"]) {
+        const card = screen.getByText(heading).closest("div")!;
+        expect(within(card).queryByRole("img")).not.toBeInTheDocument();
+      }
     });
   });
 

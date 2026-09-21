@@ -63,14 +63,11 @@ export interface BarChartRow {
  * row's real values — never left to a screen reader to infer from pixel
  * widths.
  */
-export function BarChart({
-  rows,
-  ariaLabel,
-}: {
-  rows: BarChartRow[];
-  ariaLabel: string;
-}) {
-  const maxValue = Math.max(1, ...rows.flatMap((row) => row.segments.map((segment) => segment.value)));
+export function BarChart({ rows, ariaLabel }: { rows: BarChartRow[]; ariaLabel: string }) {
+  const maxValue = Math.max(
+    1,
+    ...rows.flatMap((row) => row.segments.map((segment) => segment.value)),
+  );
 
   return (
     <div role="img" aria-label={ariaLabel} className="flex flex-col gap-3">
@@ -78,7 +75,14 @@ export function BarChart({
         // `row.id` when the caller has a real identity, else the position —
         // never `row.label` alone, which is not unique (see `BarChartRow.id`).
         <div key={row.id ?? `row-${rowIndex}`} className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-ink-strong">{row.label}</span>
+          {/* Story 146 — `break-words`: a row label can be a category name,
+              which is free text an admin types. An unbreakable 406px name in
+              a 390px viewport was measured overflowing the page before the
+              category report was charted, and the list this replaced carried
+              its own `min-w-0 break-words` for exactly that reason. The label
+              sits on its own line here rather than beside the bar, so
+              wrapping is all it needs. */}
+          <span className="break-words text-xs font-medium text-ink-strong">{row.label}</span>
           {row.segments.map((segment, index) => (
             <div
               key={`${row.id ?? `row-${rowIndex}`}-${index}`}
@@ -130,12 +134,7 @@ export function DonutGauge({
   const filled = (clamped / 100) * circumference;
 
   return (
-    <svg
-      viewBox="0 0 100 100"
-      className="h-24 w-24"
-      role="img"
-      aria-label={ariaLabel}
-    >
+    <svg viewBox="0 0 100 100" className="h-24 w-24" role="img" aria-label={ariaLabel}>
       <circle cx="50" cy="50" r={radius} fill="none" stroke="rgb(var(--rule))" strokeWidth="10" />
       <circle
         cx="50"
