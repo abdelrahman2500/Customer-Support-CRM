@@ -6,13 +6,16 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useArticleQuery,
+  useArticleTranslationsQuery,
   useArticleVersionsQuery,
+  useSetArticleTranslationMutation,
   useUpdateArticleMutation,
 } from "@/hooks/use-knowledge-base";
 import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Input, Skeleton } from "@crm/ui";
+import { localeDirection } from "@/i18n/direction";
+import { Alert, Badge, Button, Input, showSuccessToast, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import {
@@ -27,6 +30,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Textarea,
 } from "@crm/ui";
 
 /**
@@ -177,65 +185,85 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         </Alert>
       )}
 
-      <label className="flex flex-col gap-1 text-xs text-ink-muted">
-        {t("detail.categoryLabel")}
-        <Select
-          value={article.categoryId ?? undefined}
-          disabled={mutation.isPending || categoriesQuery.isLoading}
-          onValueChange={(value) => mutation.mutate({ categoryId: value })}
-        >
-          <SelectTrigger aria-label={t("detail.categoryLabel")} className="max-w-xs">
-            <SelectValue
-              placeholder={
-                categoriesQuery.isLoading ? t("detail.optionsLoading") : t("detail.noCategory")
-              }
+      {/* Story 137 — the article's own content, per locale. The base
+          (English) panel below is the pre-existing editor, moved wholesale
+          and otherwise untouched: same fields, same drafts, same
+          blur-commit handlers, same order. `defaultValue="en"` keeps it the
+          panel that renders on mount. `dir` is required, not decorative —
+          Radix follows the document direction for arrow-key movement
+          between tabs (see `packages/ui/src/components/tabs.tsx`). */}
+      <Tabs defaultValue="en" dir={localeDirection(locale)}>
+        <TabsList>
+          <TabsTrigger value="en">{t("detail.locales.en")}</TabsTrigger>
+          <TabsTrigger value="ar">{t("detail.locales.ar")}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="en" className="flex flex-col gap-4">
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
+            {t("detail.categoryLabel")}
+            <Select
+              value={article.categoryId ?? undefined}
+              disabled={mutation.isPending || categoriesQuery.isLoading}
+              onValueChange={(value) => mutation.mutate({ categoryId: value })}
+            >
+              <SelectTrigger aria-label={t("detail.categoryLabel")} className="max-w-xs">
+                <SelectValue
+                  placeholder={
+                    categoriesQuery.isLoading ? t("detail.optionsLoading") : t("detail.noCategory")
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {(categoriesQuery.data ?? []).map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {categoriesQuery.isError && (
+              <span className="text-xs text-red-600">{t("detail.categoryLoadError")}</span>
+            )}
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
+            {t("detail.bodyLabel")}
+            <textarea
+              className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
+              rows={10}
+              // Batch 5 (UX audit) — controlled, same revert-on-error rationale
+              // as the title field above.
+              value={bodyDraft ?? article.body}
+              onChange={(event) => setBodyDraft(event.target.value)}
+              onBlur={() => {
+                const value = bodyDraft?.trim();
+                if (value && bodyDraft !== article.body) {
+                  mutation.mutate({ body: value }, { onError: () => setBodyDraft(article.body) });
+                }
+              }}
             />
-          </SelectTrigger>
-          <SelectContent>
-            {(categoriesQuery.data ?? []).map((category) => (
-              <SelectItem key={category.id} value={category.id}>
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {categoriesQuery.isError && (
-          <span className="text-xs text-red-600">{t("detail.categoryLoadError")}</span>
-        )}
-      </label>
+          </label>
 
-      <label className="flex flex-col gap-1 text-xs text-ink-muted">
-        {t("detail.bodyLabel")}
-        <textarea
-          className="flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-ink-subtle focus-ring"
-          rows={10}
-          // Batch 5 (UX audit) — controlled, same revert-on-error rationale
-          // as the title field above.
-          value={bodyDraft ?? article.body}
-          onChange={(event) => setBodyDraft(event.target.value)}
-          onBlur={() => {
-            const value = bodyDraft?.trim();
-            if (value && bodyDraft !== article.body) {
-              mutation.mutate({ body: value }, { onError: () => setBodyDraft(article.body) });
-            }
-          }}
-        />
-      </label>
+          <AttachmentsCard
+            owner={{ type: "kb-article", id: articleId }}
+            locale={locale}
+            strings={{
+              heading: t("detail.attachmentsHeading"),
+              error: t("detail.attachmentsError"),
+              empty: t("detail.attachmentsEmpty"),
+              uploading: t("detail.attachmentsUploading"),
+              uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+              uploadForbidden: t("detail.actionForbidden"),
+            }}
+          />
 
-      <AttachmentsCard
-        owner={{ type: "kb-article", id: articleId }}
-        locale={locale}
-        strings={{
-          heading: t("detail.attachmentsHeading"),
-          error: t("detail.attachmentsError"),
-          empty: t("detail.attachmentsEmpty"),
-          uploading: t("detail.attachmentsUploading"),
-          uploadFailedFallback: t("detail.attachmentsUploadFailed"),
-          uploadForbidden: t("detail.actionForbidden"),
-        }}
-      />
+          <ArticleVersionHistory articleId={articleId} />
+        </TabsContent>
 
-      <ArticleVersionHistory articleId={articleId} />
+        <TabsContent value="ar">
+          <ArticleTranslationEditor articleId={articleId} />
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }
@@ -283,5 +311,123 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
         </Table>
       )}
     </section>
+  );
+}
+
+/**
+ * Story 137 — Arabic translation authoring over Story 109's already-shipped
+ * endpoints (`GET .../translations`, `PUT .../translations/AR`). No backend
+ * change; this is the authoring UI Story 109's own Non-goals deferred.
+ *
+ * Explicit save, deliberately NOT the base editor's blur-commit: `PUT
+ * .../translations/:locale` requires BOTH `title` and `body` and replaces
+ * them wholesale (`SetArticleTranslationDto`, and the API e2e case "re-
+ * setting the same locale replaces the translation wholesale (upsert), not
+ * merge"). A per-field commit would have to silently resend the other
+ * field, so the two fields are saved together or not at all.
+ *
+ * `dir="rtl"` on the fields is independent of the app's own UI locale: an
+ * agent working in English still types Arabic into them.
+ */
+function ArticleTranslationEditor({ articleId }: { articleId: string }) {
+  const t = useTranslations("knowledgeBase");
+  const errorMessage = useErrorMessage();
+
+  const translationsQuery = useArticleTranslationsQuery(articleId);
+  const mutation = useSetArticleTranslationMutation(articleId, "AR");
+
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const [bodyDraft, setBodyDraft] = useState<string | null>(null);
+
+  /** The endpoint returns an unordered array of at most two rows (one per
+   * `KbLocale`), never a keyed object — find by locale, never by position. */
+  const existing = translationsQuery.data?.find((row) => row.locale === "AR");
+
+  // Same draft-or-server shape the base editor uses, so a freshly saved
+  // server value flows back in once the query is invalidated.
+  const title = titleDraft ?? existing?.title ?? "";
+  const body = bodyDraft ?? existing?.body ?? "";
+
+  if (translationsQuery.isLoading) {
+    return <Skeleton className="h-32 w-full" />;
+  }
+
+  if (translationsQuery.isError) {
+    return (
+      <Alert variant="destructive">
+        {errorMessage(translationsQuery.error, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.translations.loadError"),
+        })}
+      </Alert>
+    );
+  }
+
+  const canSave = title.trim().length > 0 && body.trim().length > 0;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <h2 className="text-sm font-semibold text-ink">{t("detail.translations.heading")}</h2>
+
+      {/* `GET` returns `[]` — not a 404 — for an article with no translation
+          yet. That is the empty state, never an error. */}
+      {existing === undefined && (
+        <p className="text-sm text-ink-subtle">{t("detail.translations.none")}</p>
+      )}
+
+      {mutation.isError && (
+        <Alert variant="destructive">
+          {errorMessage(mutation.error, {
+            forbidden: t("detail.actionForbidden"),
+            generic: t("detail.translations.saveFailed"),
+          })}
+        </Alert>
+      )}
+
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
+        {t("detail.translations.titleLabel")}
+        <Input
+          className="max-w-md"
+          dir="rtl"
+          value={title}
+          aria-label={t("detail.translations.titleLabel")}
+          onChange={(event) => setTitleDraft(event.target.value)}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-xs text-ink-muted">
+        {t("detail.translations.bodyLabel")}
+        <Textarea
+          rows={10}
+          dir="rtl"
+          value={body}
+          aria-label={t("detail.translations.bodyLabel")}
+          onChange={(event) => setBodyDraft(event.target.value)}
+        />
+      </label>
+
+      <Button
+        className="w-fit"
+        // The client half of the backend's own `@MinLength(1)`; trimmed, so
+        // a whitespace-only value cannot be submitted either.
+        disabled={mutation.isPending || !canSave}
+        onClick={() =>
+          mutation.mutate(
+            { title: title.trim(), body: body.trim() },
+            {
+              onSuccess: () => {
+                // Drop the local drafts so the re-fetched server values are
+                // what renders next.
+                setTitleDraft(null);
+                setBodyDraft(null);
+                showSuccessToast(t("detail.translations.saveSuccess"));
+              },
+            },
+          )
+        }
+      >
+        {mutation.isPending ? t("detail.translations.saving") : t("detail.translations.save")}
+      </Button>
+    </div>
   );
 }

@@ -724,6 +724,21 @@
       "attachmentsEmpty": "No attachments yet.",
       "attachmentsUploading": "Uploading...",
       "attachmentsUploadFailed": "Couldn't upload the file. Please try again.",
+      "locales": {
+        "en": "English",
+        "ar": "العربية"
+      },
+      "translations": {
+        "heading": "Arabic translation",
+        "titleLabel": "Arabic title",
+        "bodyLabel": "Arabic body",
+        "none": "This article has no Arabic translation yet.",
+        "save": "Save Arabic translation",
+        "saving": "Saving...",
+        "saveSuccess": "Arabic translation saved.",
+        "saveFailed": "Couldn't save the Arabic translation. Please try again.",
+        "loadError": "Couldn't load this article's translations."
+      },
       "versions": {
         "title": "Version history",
         "empty": "This article has no published versions yet.",

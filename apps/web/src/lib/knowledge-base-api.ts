@@ -118,3 +118,54 @@ export interface ArticleVersionSummary {
 export function listArticleVersions(articleId: string): Promise<ArticleVersionSummary[]> {
   return apiFetch<ArticleVersionSummary[]>(`/knowledge-base/articles/${articleId}/versions`);
 }
+
+/** Story 109 — the locales an article's content can carry. Mirrors the
+ * backend's own `KbLocale` Prisma enum exactly; the API expects the
+ * upper-case form in the route segment. */
+export type ArticleLocale = "EN" | "AR";
+
+/** Story 109 — one article's content in one locale. Mirrors the backend's
+ * own `ArticleTranslationSummary` exactly
+ * (`apps/api/src/modules/knowledge-base/knowledge-base.service.ts`).
+ *
+ * `createdAt`/`updatedAt` are `string` rather than `Date`: the backend
+ * types them as `Date`, but they cross the wire as JSON, and every other
+ * interface in this file (`ArticleSummary`, `ArticleVersionSummary`)
+ * already models a timestamp as `string`. */
+export interface ArticleTranslationSummary {
+  id: string;
+  articleId: string;
+  locale: ArticleLocale;
+  title: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Mirrors `SetArticleTranslationDto` exactly: both fields required, both
+ * non-empty (`@IsString() @MinLength(1)`). `locale` is a route segment,
+ * never part of the body. */
+export interface SetArticleTranslationInput {
+  title: string;
+  body: string;
+}
+
+export function listArticleTranslations(articleId: string): Promise<ArticleTranslationSummary[]> {
+  return apiFetch<ArticleTranslationSummary[]>(
+    `/knowledge-base/articles/${articleId}/translations`,
+  );
+}
+
+/** Story 109 — a wholesale replace (the backend upserts on
+ * `(articleId, locale)`), never a merge, which is why both fields are
+ * required here. */
+export function setArticleTranslation(
+  articleId: string,
+  locale: ArticleLocale,
+  input: SetArticleTranslationInput,
+): Promise<ArticleTranslationSummary> {
+  return apiFetch<ArticleTranslationSummary>(
+    `/knowledge-base/articles/${articleId}/translations/${locale}`,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
+}

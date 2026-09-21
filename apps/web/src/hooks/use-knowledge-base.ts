@@ -3,10 +3,17 @@ import {
   createArticle,
   getArticle,
   listArticles,
+  listArticleTranslations,
   listArticleVersions,
+  setArticleTranslation,
   updateArticle,
 } from "@/lib/knowledge-base-api";
-import type { CreateArticleInput, UpdateArticleInput } from "@/lib/knowledge-base-api";
+import type {
+  ArticleLocale,
+  CreateArticleInput,
+  SetArticleTranslationInput,
+  UpdateArticleInput,
+} from "@/lib/knowledge-base-api";
 import { preservePreviousResults } from "@/lib/list-query";
 
 /**
@@ -84,6 +91,39 @@ export function useArticleVersionsQuery(articleId: string) {
   return useQuery({
     queryKey: articleVersionsQueryKey(articleId),
     queryFn: () => listArticleVersions(articleId),
+  });
+}
+
+/** Story 137 — a separate root key, mirroring `articleVersionsQueryKey`'s
+ * own precedent above. Nesting this under `["knowledge-base-articles", ...]`
+ * would make every unrelated article mutation invalidate it through the
+ * bare-prefix invalidation `useUpdateArticleMutation` performs. */
+export const articleTranslationsQueryKey = (articleId: string) =>
+  ["knowledge-base-article-translations", articleId] as const;
+
+export function useArticleTranslationsQuery(articleId: string) {
+  return useQuery({
+    queryKey: articleTranslationsQueryKey(articleId),
+    queryFn: () => listArticleTranslations(articleId),
+  });
+}
+
+/**
+ * Story 137 — never applies optimistically (the rule every other mutation
+ * hook in this file follows). Invalidates **only** the translations query:
+ * a translation is a separate row and changes nothing about the base
+ * article's own `title`/`body`/`status`, so invalidating `articleQueryKey`
+ * or the `["knowledge-base-articles"]` list prefix would re-fetch content
+ * this mutation cannot have altered.
+ */
+export function useSetArticleTranslationMutation(articleId: string, locale: ArticleLocale) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SetArticleTranslationInput) =>
+      setArticleTranslation(articleId, locale, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: articleTranslationsQueryKey(articleId) });
+    },
   });
 }
 
