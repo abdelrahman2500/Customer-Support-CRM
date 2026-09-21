@@ -13,6 +13,7 @@ import {
   Badge,
   Button,
   FetchingIndicator,
+  FilterBar,
   Input,
   PageHeader,
   Pagination,
@@ -138,7 +139,7 @@ function ArticleListViewContent() {
         }
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <FilterBar>
         <Input
           aria-label={t("list.searchLabel")}
           placeholder={t("list.searchPlaceholder")}
@@ -165,7 +166,7 @@ function ArticleListViewContent() {
             </SelectContent>
           </Select>
         </label>
-      </div>
+      </FilterBar>
 
       {/* Story S-7 — the two dashed blocks this replaces differed only in
           copy and CTA, and were selected by `search !== ""`. That is

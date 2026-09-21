@@ -12,6 +12,7 @@ import {
   Badge,
   Button,
   FetchingIndicator,
+  FilterBar,
   Input,
   PageHeader,
   Pagination,
@@ -164,7 +165,7 @@ function CustomerListViewContent() {
       {/* RM-10 — one filter per row below `sm`, mirrors `TicketListView`'s
           own exact class change; unchanged, wrapped inline row at `sm`
           and up. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <FilterBar>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("list.searchLabel")}
           <Input
@@ -193,7 +194,7 @@ function CustomerListViewContent() {
             </SelectContent>
           </Select>
         </label>
-      </div>
+      </FilterBar>
 
       {/* Story S-7 — see `TicketListView` for why the error is split in
           two and why this branches on `isPending` rather than

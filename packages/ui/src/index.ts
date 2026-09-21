@@ -108,6 +108,12 @@ export type { FetchingIndicatorProps } from "./components/fetching-indicator";
 export { NavigationOverlay } from "./components/navigation-overlay";
 export type { NavigationOverlayProps } from "./components/navigation-overlay";
 
+// --- List filtering (Story 145) -------------------------------------------
+// The responsive filter row above a list, plus the labelled dropdown filter
+// that ticket-list-view and reports-view each had their own copy of.
+export { FilterBar, FilterSelect } from "./components/filter-bar";
+export type { FilterSelectProps } from "./components/filter-bar";
+
 // --- Forms (Story 141) -----------------------------------------------------
 // Label + control + hint + error, in one shape, with the error on the
 // `--danger-*` tokens instead of a raw palette class.

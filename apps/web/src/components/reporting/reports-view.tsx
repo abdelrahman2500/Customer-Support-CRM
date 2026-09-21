@@ -23,7 +23,18 @@ import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { BarChart, DonutGauge, RatingBar, ticketStatusBarColor } from "./report-charts";
 import { ApiError } from "@/lib/api";
 import { formatRemaining } from "@/lib/sla";
-import { Alert, Button, Card, Checkbox, Input, Label, PageHeader, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  FilterBar,
+  FilterSelect,
+  Input,
+  Label,
+  PageHeader,
+  Skeleton,
+} from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -576,6 +587,8 @@ export function ReportsView() {
 
       <div className="flex flex-wrap items-end gap-2">
         <FilterSelect
+          allValue={ALL_VALUE}
+          allLabel={t("filters.all")}
           label={t("filters.department")}
           value={range.departmentId ?? ALL_VALUE}
           onChange={(value) =>
@@ -585,6 +598,8 @@ export function ReportsView() {
           renderLabel={(id) => departmentsQuery.data?.find((d) => d.id === id)?.name ?? id}
         />
         <FilterSelect
+          allValue={ALL_VALUE}
+          allLabel={t("filters.all")}
           label={t("filters.agent")}
           value={range.assignedToUserId ?? ALL_VALUE}
           onChange={(value) =>
@@ -597,6 +612,8 @@ export function ReportsView() {
           renderLabel={(id) => usersQuery.data?.find((u) => u.id === id)?.fullName ?? id}
         />
         <FilterSelect
+          allValue={ALL_VALUE}
+          allLabel={t("filters.all")}
           label={t("filters.category")}
           value={range.categoryId ?? ALL_VALUE}
           onChange={(value) =>
@@ -729,40 +746,6 @@ export function ReportsView() {
  * shape exactly, under this screen's own `"reporting"` namespace (that
  * one is unexported and scoped to the `"tickets"` namespace, so it isn't
  * reused directly). */
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-  renderLabel,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: readonly string[];
-  renderLabel?: (value: string) => string;
-}) {
-  const t = useTranslations("reporting");
-  return (
-    <label className="flex flex-col gap-1 text-xs text-ink-muted">
-      {label}
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="min-w-[10rem]" aria-label={label}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_VALUE}>{t("filters.all")}</SelectItem>
-          {options.map((option) => (
-            <SelectItem key={option} value={option}>
-              {renderLabel ? renderLabel(option) : option}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </label>
-  );
-}
-
 interface QueryLike {
   isLoading: boolean;
   isError: boolean;

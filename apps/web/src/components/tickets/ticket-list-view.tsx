@@ -15,6 +15,8 @@ import {
   Badge,
   Button,
   FetchingIndicator,
+  FilterBar,
+  FilterSelect,
   Input,
   PageHeader,
   Pagination,
@@ -241,20 +243,26 @@ function TicketListViewContent() {
           controls) instead of wrapping fixed-`min-w` selects onto
           however many lines happen to fit; unchanged, wrapped inline row
           at `sm` and up. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <FilterBar>
         <FilterSelect
+          allValue={ALL_VALUE}
+          allLabel={t("list.filterAll")}
           label={t("list.filterStatus")}
           value={filters.status ?? ALL_VALUE}
           onChange={(value) => updateFilter("status", value)}
           options={STATUS_OPTIONS}
         />
         <FilterSelect
+          allValue={ALL_VALUE}
+          allLabel={t("list.filterAll")}
           label={t("list.filterPriority")}
           value={filters.priority ?? ALL_VALUE}
           onChange={(value) => updateFilter("priority", value)}
           options={PRIORITY_OPTIONS}
         />
         <FilterSelect
+          allValue={ALL_VALUE}
+          allLabel={t("list.filterAll")}
           label={t("list.filterCategory")}
           value={filters.categoryId ?? ALL_VALUE}
           onChange={(value) => updateFilter("categoryId", value)}
@@ -262,6 +270,8 @@ function TicketListViewContent() {
           renderLabel={(id) => categoryNameById.get(id) ?? id}
         />
         <FilterSelect
+          allValue={ALL_VALUE}
+          allLabel={t("list.filterAll")}
           label={t("list.filterAssignedAgent")}
           value={filters.assignedToUserId ?? ALL_VALUE}
           onChange={(value) => updateFilter("assignedToUserId", value)}
@@ -277,7 +287,7 @@ function TicketListViewContent() {
             onBlur={(event) => updateFilter("search", event.target.value.trim() || ALL_VALUE)}
           />
         </label>
-      </div>
+      </FilterBar>
 
       {/* Story S-7 — `isPending`, not `isLoading`: with placeholder data in
           play the query only reports `pending` on a genuine first load, so
@@ -435,40 +445,6 @@ function TicketListViewContent() {
         />
       )}
     </section>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-  renderLabel,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: readonly string[];
-  renderLabel?: (value: string) => string;
-}) {
-  const t = useTranslations("tickets");
-  return (
-    <label className="flex flex-col gap-1 text-xs text-ink-muted">
-      {label}
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-full sm:w-auto sm:min-w-[10rem]" aria-label={label}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_VALUE}>{t("list.filterAll")}</SelectItem>
-          {options.map((option) => (
-            <SelectItem key={option} value={option}>
-              {renderLabel ? renderLabel(option) : option}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </label>
   );
 }
 
