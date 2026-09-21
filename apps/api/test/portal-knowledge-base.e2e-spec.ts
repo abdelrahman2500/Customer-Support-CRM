@@ -271,6 +271,95 @@ describe("Customer Portal — Knowledge Base (e2e)", () => {
 
       expect(response.body.title).toBe("How to contact support");
     });
+
+    /**
+     * Story 138 — Arabic full-text search from the portal, where
+     * `publishedOnly` applies. `localizedArticleId` above is already
+     * PUBLISHED and carries an AR translation containing "الدعم".
+     */
+    describe("Arabic full-text search (Story 138)", () => {
+      let draftWithArabicId: string;
+
+      beforeAll(async () => {
+        const draft = await request(app.getHttpServer())
+          .post("/api/v1/knowledge-base/articles")
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .send({ title: "Draft arabic support notes", body: "Draft base body." })
+          .expect(201);
+        draftWithArabicId = draft.body.id;
+
+        // Left as DRAFT on purpose: it must never reach a portal caller,
+        // including through `total`.
+        await request(app.getHttpServer())
+          .put(`/api/v1/knowledge-base/articles/${draftWithArabicId}/translations/AR`)
+          .set("Authorization", `Bearer ${adminAccessToken}`)
+          .send({ title: "مسودة عن الدعم", body: "نص المسودة عن الدعم الفني." })
+          .expect(200);
+      });
+
+      it("finds a published article by an Arabic term in its AR translation", async () => {
+        const response = await request(app.getHttpServer())
+          .get("/api/v1/portal/knowledge-base/articles")
+          .query({ search: "الدعم", locale: "AR" })
+          .set("Authorization", `Bearer ${portalAccessToken}`)
+          .expect(200);
+
+        expect(response.body.items.map((a: { id: string }) => a.id)).toContain(
+          localizedArticleId,
+        );
+      });
+
+      // The definite-article proof, portal side: "دعم" only reaches "الدعم"
+      // once the `arabic` configuration strips the article.
+      it("matches across a definite-article difference (دعم finds الدعم)", async () => {
+        const response = await request(app.getHttpServer())
+          .get("/api/v1/portal/knowledge-base/articles")
+          .query({ search: "دعم", locale: "AR" })
+          .set("Authorization", `Bearer ${portalAccessToken}`)
+          .expect(200);
+
+        expect(response.body.items.map((a: { id: string }) => a.id)).toContain(
+          localizedArticleId,
+        );
+      });
+
+      it("never surfaces a draft, in items or in total", async () => {
+        const response = await request(app.getHttpServer())
+          .get("/api/v1/portal/knowledge-base/articles")
+          .query({ search: "الدعم", locale: "AR" })
+          .set("Authorization", `Bearer ${portalAccessToken}`)
+          .expect(200);
+
+        const ids = response.body.items.map((a: { id: string }) => a.id);
+        expect(ids).not.toContain(draftWithArabicId);
+        expect(response.body.total).toBe(ids.length);
+      });
+
+      it("returns the AR content for the matched article", async () => {
+        const response = await request(app.getHttpServer())
+          .get("/api/v1/portal/knowledge-base/articles")
+          .query({ search: "الدعم", locale: "AR" })
+          .set("Authorization", `Bearer ${portalAccessToken}`)
+          .expect(200);
+
+        const found = response.body.items.find(
+          (article: { id: string }) => article.id === localizedArticleId,
+        );
+        expect(found).toMatchObject({ title: "كيفية التواصل مع الدعم" });
+      });
+
+      it("keeps the English search path unchanged for the same caller", async () => {
+        const response = await request(app.getHttpServer())
+          .get("/api/v1/portal/knowledge-base/articles")
+          .query({ search: "contact" })
+          .set("Authorization", `Bearer ${portalAccessToken}`)
+          .expect(200);
+
+        expect(response.body.items.map((a: { id: string }) => a.id)).toContain(
+          localizedArticleId,
+        );
+      });
+    });
   });
 
   it("unpublishing the article makes it disappear from the portal view", async () => {

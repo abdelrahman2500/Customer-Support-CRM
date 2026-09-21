@@ -158,13 +158,16 @@ export class KnowledgeBaseService {
     const { branchId } = this.tenantContext.requireBranchScope();
     const search = query.search?.trim();
     if (search) {
-      return this.applyLocaleToPage(
-        await this.searchArticles(branchId, search, query, {
-          status: query.status,
-          categoryId: query.categoryId,
-        }),
-        query.locale,
-      );
+      // Story 138 — `AR` routes to the Arabic translation index; every other
+      // locale (including `EN` and no locale at all) keeps Story 102's
+      // English/base-article path byte-for-byte unchanged. The two are never
+      // unioned — see `searchArticlesInArabic`'s own doc comment.
+      const searchOptions = { status: query.status, categoryId: query.categoryId };
+      const searchPage =
+        query.locale === "AR"
+          ? await this.searchArticlesInArabic(branchId, search, query, searchOptions)
+          : await this.searchArticles(branchId, search, query, searchOptions);
+      return this.applyLocaleToPage(searchPage, query.locale);
     }
     // `id` tiebreaks `updatedAt`, which is not unique: a bulk import or a
     // batched publish writes several rows in the same millisecond, and
@@ -372,10 +375,14 @@ export class KnowledgeBaseService {
   ): Promise<Paginated<ArticleSummary>> {
     const search = query.search?.trim();
     if (search) {
-      return this.applyLocaleToPage(
-        await this.searchArticles(branchId, search, query, { publishedOnly: true }),
-        query.locale,
-      );
+      // Story 138 — same locale routing as `listArticles`. `publishedOnly`
+      // is carried into the Arabic path identically, including its count
+      // query, so a draft never leaks through `items` or `total`.
+      const searchPage =
+        query.locale === "AR"
+          ? await this.searchArticlesInArabic(branchId, search, query, { publishedOnly: true })
+          : await this.searchArticles(branchId, search, query, { publishedOnly: true });
+      return this.applyLocaleToPage(searchPage, query.locale);
     }
     // Story S-8c — the `status: PUBLISHED` half of the scope is as much a
     // visibility rule as the branch is: a portal reader must never learn a
@@ -677,6 +684,166 @@ export class KnowledgeBaseService {
               FROM knowledge_base.knowledge_base_articles AS a
               WHERE a.branch_id = ${branchId}
                 AND a.search_vector @@ websearch_to_tsquery('english', ${search})
+            `,
+    ]);
+
+    const total = countRows[0]?.count ?? 0;
+    return {
+      items: rows.map(toArticleSummary),
+      total,
+      page,
+      pageSize,
+      totalPages: totalPagesFor(total, pageSize),
+    };
+  }
+
+  /**
+   * Story 138 — Arabic full-text search over `AR` translation rows, using
+   * PostgreSQL's built-in `arabic` configuration (the `arabic_stem` Snowball
+   * dictionary — core Postgres, no extension). `searchArticles` above stays
+   * exactly as Story 102 wrote it and continues to serve every other locale.
+   *
+   * Matches translations only, never the base article: an English-only
+   * article is deliberately unfindable in an Arabic search. Unioning the two
+   * is out of scope — `ts_rank` scores from two different text-search
+   * configurations are not comparable, so merging them would need a
+   * normalisation rule this story does not invent.
+   *
+   * `t.locale = 'AR'` must stay in every query below: the supporting index
+   * (`knowledge_base_article_translations_arabic_fts_idx`) is PARTIAL on that
+   * predicate, and the planner only uses it when the query implies it
+   * (confirmed by EXPLAIN against a 20k-row table).
+   *
+   * The `to_tsvector('arabic', t.title || ' ' || t.body)` expression must stay
+   * character-for-character identical to the migration's index expression.
+   * No `coalesce()` — both columns are NOT NULL on this table.
+   *
+   * The four row branches and four count branches mirror `searchArticles`'
+   * own `publishedOnly` × `hasCategory` shape exactly, so the two helpers are
+   * interchangeable from the caller's perspective and row/count filters can
+   * never drift apart.
+   */
+  private async searchArticlesInArabic(
+    branchId: string,
+    search: string,
+    pagination: { page?: number; pageSize?: number } = {},
+    options: {
+      publishedOnly?: boolean;
+      status?: KnowledgeBaseArticleStatus;
+      categoryId?: string;
+    } = {},
+  ): Promise<Paginated<ArticleSummary>> {
+    const page = pagination.page ?? 1;
+    const pageSize = pagination.pageSize ?? DEFAULT_PAGE_SIZE;
+    const offset = (page - 1) * pageSize;
+    // Same RM-05 collapse as `searchArticles`: the only status either caller
+    // ever wants filtered is `PUBLISHED`, which `publishedOnly` already drives.
+    const publishedOnly = options.publishedOnly || options.status === "PUBLISHED";
+    const categoryId = options.categoryId;
+    const hasCategory = categoryId !== undefined;
+
+    const [rows, countRows] = await Promise.all([
+      publishedOnly
+        ? hasCategory
+          ? this.prisma.$queryRaw<RawArticleRow[]>`
+              SELECT a.id, a.branch_id AS "branchId", a.title, a.body,
+                     a.category_id AS "categoryId", kbc.name AS "categoryName", a.status,
+                     a.published_at AS "publishedAt", a.created_at AS "createdAt",
+                     a.updated_at AS "updatedAt"
+              FROM knowledge_base.knowledge_base_articles AS a
+              JOIN knowledge_base.knowledge_base_article_translations AS t
+                ON t.article_id = a.id AND t.locale = 'AR'
+              LEFT JOIN knowledge_base.knowledge_base_categories AS kbc ON kbc.id = a.category_id
+              WHERE a.branch_id = ${branchId}
+                AND a.status = 'PUBLISHED'
+                AND a.category_id = ${categoryId}
+                AND to_tsvector('arabic', t.title || ' ' || t.body) @@ websearch_to_tsquery('arabic', ${search})
+              ORDER BY ts_rank(to_tsvector('arabic', t.title || ' ' || t.body), websearch_to_tsquery('arabic', ${search})) DESC, a.id DESC
+              LIMIT ${pageSize} OFFSET ${offset}
+            `
+          : this.prisma.$queryRaw<RawArticleRow[]>`
+              SELECT a.id, a.branch_id AS "branchId", a.title, a.body,
+                     a.category_id AS "categoryId", kbc.name AS "categoryName", a.status,
+                     a.published_at AS "publishedAt", a.created_at AS "createdAt",
+                     a.updated_at AS "updatedAt"
+              FROM knowledge_base.knowledge_base_articles AS a
+              JOIN knowledge_base.knowledge_base_article_translations AS t
+                ON t.article_id = a.id AND t.locale = 'AR'
+              LEFT JOIN knowledge_base.knowledge_base_categories AS kbc ON kbc.id = a.category_id
+              WHERE a.branch_id = ${branchId}
+                AND a.status = 'PUBLISHED'
+                AND to_tsvector('arabic', t.title || ' ' || t.body) @@ websearch_to_tsquery('arabic', ${search})
+              ORDER BY ts_rank(to_tsvector('arabic', t.title || ' ' || t.body), websearch_to_tsquery('arabic', ${search})) DESC, a.id DESC
+              LIMIT ${pageSize} OFFSET ${offset}
+            `
+        : hasCategory
+          ? this.prisma.$queryRaw<RawArticleRow[]>`
+              SELECT a.id, a.branch_id AS "branchId", a.title, a.body,
+                     a.category_id AS "categoryId", kbc.name AS "categoryName", a.status,
+                     a.published_at AS "publishedAt", a.created_at AS "createdAt",
+                     a.updated_at AS "updatedAt"
+              FROM knowledge_base.knowledge_base_articles AS a
+              JOIN knowledge_base.knowledge_base_article_translations AS t
+                ON t.article_id = a.id AND t.locale = 'AR'
+              LEFT JOIN knowledge_base.knowledge_base_categories AS kbc ON kbc.id = a.category_id
+              WHERE a.branch_id = ${branchId}
+                AND a.category_id = ${categoryId}
+                AND to_tsvector('arabic', t.title || ' ' || t.body) @@ websearch_to_tsquery('arabic', ${search})
+              ORDER BY ts_rank(to_tsvector('arabic', t.title || ' ' || t.body), websearch_to_tsquery('arabic', ${search})) DESC, a.id DESC
+              LIMIT ${pageSize} OFFSET ${offset}
+            `
+          : this.prisma.$queryRaw<RawArticleRow[]>`
+              SELECT a.id, a.branch_id AS "branchId", a.title, a.body,
+                     a.category_id AS "categoryId", kbc.name AS "categoryName", a.status,
+                     a.published_at AS "publishedAt", a.created_at AS "createdAt",
+                     a.updated_at AS "updatedAt"
+              FROM knowledge_base.knowledge_base_articles AS a
+              JOIN knowledge_base.knowledge_base_article_translations AS t
+                ON t.article_id = a.id AND t.locale = 'AR'
+              LEFT JOIN knowledge_base.knowledge_base_categories AS kbc ON kbc.id = a.category_id
+              WHERE a.branch_id = ${branchId}
+                AND to_tsvector('arabic', t.title || ' ' || t.body) @@ websearch_to_tsquery('arabic', ${search})
+              ORDER BY ts_rank(to_tsvector('arabic', t.title || ' ' || t.body), websearch_to_tsquery('arabic', ${search})) DESC, a.id DESC
+              LIMIT ${pageSize} OFFSET ${offset}
+            `,
+      publishedOnly
+        ? hasCategory
+          ? this.prisma.$queryRaw<{ count: number }[]>`
+              SELECT COUNT(*)::int AS count
+              FROM knowledge_base.knowledge_base_articles AS a
+              JOIN knowledge_base.knowledge_base_article_translations AS t
+                ON t.article_id = a.id AND t.locale = 'AR'
+              WHERE a.branch_id = ${branchId}
+                AND a.status = 'PUBLISHED'
+                AND a.category_id = ${categoryId}
+                AND to_tsvector('arabic', t.title || ' ' || t.body) @@ websearch_to_tsquery('arabic', ${search})
+            `
+          : this.prisma.$queryRaw<{ count: number }[]>`
+              SELECT COUNT(*)::int AS count
+              FROM knowledge_base.knowledge_base_articles AS a
+              JOIN knowledge_base.knowledge_base_article_translations AS t
+                ON t.article_id = a.id AND t.locale = 'AR'
+              WHERE a.branch_id = ${branchId}
+                AND a.status = 'PUBLISHED'
+                AND to_tsvector('arabic', t.title || ' ' || t.body) @@ websearch_to_tsquery('arabic', ${search})
+            `
+        : hasCategory
+          ? this.prisma.$queryRaw<{ count: number }[]>`
+              SELECT COUNT(*)::int AS count
+              FROM knowledge_base.knowledge_base_articles AS a
+              JOIN knowledge_base.knowledge_base_article_translations AS t
+                ON t.article_id = a.id AND t.locale = 'AR'
+              WHERE a.branch_id = ${branchId}
+                AND a.category_id = ${categoryId}
+                AND to_tsvector('arabic', t.title || ' ' || t.body) @@ websearch_to_tsquery('arabic', ${search})
+            `
+          : this.prisma.$queryRaw<{ count: number }[]>`
+              SELECT COUNT(*)::int AS count
+              FROM knowledge_base.knowledge_base_articles AS a
+              JOIN knowledge_base.knowledge_base_article_translations AS t
+                ON t.article_id = a.id AND t.locale = 'AR'
+              WHERE a.branch_id = ${branchId}
+                AND to_tsvector('arabic', t.title || ' ' || t.body) @@ websearch_to_tsquery('arabic', ${search})
             `,
     ]);
 

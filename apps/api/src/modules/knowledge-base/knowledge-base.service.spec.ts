@@ -327,6 +327,158 @@ describe("KnowledgeBaseService", () => {
       expect(values).toEqual(["branch-1", "password", "password", 25, 0]);
     });
 
+    // Story 138 — Arabic full-text search. `locale: "AR"` routes to the
+    // translations table and the `arabic` text-search configuration; every
+    // other locale keeps Story 102's English/base-article SQL untouched.
+    describe("Arabic full-text search (Story 138)", () => {
+      it("emits the arabic-configuration SQL against the translations table when locale is AR", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listArticles({ search: "دعم", locale: "AR" });
+
+        const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+        const sql = strings.join("");
+        expect(sql).toContain("to_tsvector('arabic'");
+        expect(sql).toContain("websearch_to_tsquery('arabic'");
+        expect(sql).toContain("knowledge_base.knowledge_base_article_translations");
+        // The supporting index is PARTIAL on this predicate; without it in
+        // the query the planner cannot prove implication and will not use it.
+        expect(sql).toContain("t.locale = 'AR'");
+        // Never the base-article vector — the two paths are not unioned.
+        expect(sql).not.toContain("a.search_vector");
+      });
+
+      it("uses the exact index expression, with no coalesce", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listArticles({ search: "دعم", locale: "AR" });
+
+        const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+        const sql = strings.join("");
+        // Character-for-character identical to the migration's index
+        // expression. `title`/`body` are NOT NULL on this table.
+        expect(sql).toContain("to_tsvector('arabic', t.title || ' ' || t.body)");
+        expect(sql).not.toContain("coalesce");
+      });
+
+      it("ranks with ts_rank and keeps the id tiebreaker", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listArticles({ search: "دعم", locale: "AR" });
+
+        const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+        expect(strings.join("")).toContain("ORDER BY ts_rank(");
+        expect(strings.join("")).toContain("DESC, a.id DESC");
+      });
+
+      it("keeps the English SQL for locale EN", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listArticles({ search: "password", locale: "EN" });
+
+        const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+        const sql = strings.join("");
+        expect(sql).toContain("a.search_vector");
+        expect(sql).toContain("websearch_to_tsquery('english'");
+        expect(sql).not.toContain("'arabic'");
+      });
+
+      it("keeps the English SQL when no locale is given at all", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listArticles({ search: "password" });
+
+        const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+        const sql = strings.join("");
+        expect(sql).toContain("a.search_vector");
+        expect(sql).not.toContain("'arabic'");
+      });
+
+      it("applies the PUBLISHED status filter on the Arabic path", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listArticles({ search: "دعم", locale: "AR", status: "PUBLISHED" });
+
+        const [rowStrings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+        const [countStrings] = prisma.$queryRaw.mock.calls[1] as [
+          TemplateStringsArray,
+          ...unknown[],
+        ];
+        // Row AND count must agree, or `total` would leak a draft.
+        expect(rowStrings.join("")).toContain("'PUBLISHED'");
+        expect(countStrings.join("")).toContain("'PUBLISHED'");
+      });
+
+      it("applies the categoryId filter on the Arabic path, to rows and count alike", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listArticles({ search: "دعم", locale: "AR", categoryId: "category-1" });
+
+        const [rowStrings, ...rowValues] = prisma.$queryRaw.mock.calls[0] as [
+          TemplateStringsArray,
+          ...unknown[],
+        ];
+        const [countStrings, ...countValues] = prisma.$queryRaw.mock.calls[1] as [
+          TemplateStringsArray,
+          ...unknown[],
+        ];
+        expect(rowStrings.join("")).toContain("a.category_id");
+        expect(rowValues).toContain("category-1");
+        expect(countStrings.join("")).toContain("a.category_id");
+        expect(countValues).toContain("category-1");
+      });
+
+      it("keeps the caller's branch scope on the Arabic path", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listArticles({ search: "دعم", locale: "AR" });
+
+        const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [
+          TemplateStringsArray,
+          ...unknown[],
+        ];
+        expect(strings.join("")).toContain("a.branch_id");
+        expect(values).toContain("branch-1");
+      });
+
+      it("issues exactly one row query and one count query, like the English path", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listArticles({ search: "دعم", locale: "AR" });
+
+        expect(prisma.knowledgeBaseArticle.findMany).not.toHaveBeenCalled();
+        expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+      });
+
+      it("never reaches the Arabic path without a search term", async () => {
+        prisma.knowledgeBaseArticle.findMany.mockResolvedValue([]);
+        prisma.knowledgeBaseArticle.count.mockResolvedValue(0);
+
+        await service.listArticles({ locale: "AR" });
+
+        expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      });
+
+      it("routes the portal path to Arabic too, carrying publishedOnly into both queries", async () => {
+        prisma.$queryRaw.mockResolvedValue([]);
+
+        await service.listPublishedArticlesForBranch("branch-1", {
+          search: "دعم",
+          locale: "AR",
+        });
+
+        const [rowStrings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+        const [countStrings] = prisma.$queryRaw.mock.calls[1] as [
+          TemplateStringsArray,
+          ...unknown[],
+        ];
+        expect(rowStrings.join("")).toContain("to_tsvector('arabic'");
+        expect(rowStrings.join("")).toContain("'PUBLISHED'");
+        expect(countStrings.join("")).toContain("to_tsvector('arabic'");
+        expect(countStrings.join("")).toContain("'PUBLISHED'");
+      });
+    });
+
     // Story 102 — Full-Text Search.
     it("matches via $queryRaw full-text search when search is given, bypassing findMany", async () => {
       prisma.$queryRaw.mockResolvedValue([]);

@@ -440,6 +440,207 @@ describe("Knowledge Base (e2e)", () => {
     });
   });
 
+  /**
+   * Story 138 — Arabic full-text search over `AR` translation rows, using
+   * PostgreSQL's built-in `arabic` configuration. Dedicated fixtures, not the
+   * shared `articleId` above, for the same isolation reason the translations
+   * block below gives.
+   */
+  describe("Arabic full-text search (Story 138)", () => {
+    /** Carries an AR translation whose body contains "المرور" (with the
+     * definite article) so a bare "مرور" query must still match. */
+    let arabicArticleId: string;
+    /** Has NO AR translation. Its English base body contains the same
+     * distinctive token, so it proves an Arabic search never falls through
+     * to the base article. */
+    let englishOnlyArticleId: string;
+    let arabicCategoryId: string;
+
+    beforeAll(async () => {
+      const category = await request(app.getHttpServer())
+        .post("/api/v1/kb-categories")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ name: `arabic-fts-${randomUUID().slice(0, 8)}` })
+        .expect(201);
+      arabicCategoryId = category.body.id;
+
+      const arabicArticle = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          title: "Resetting your password",
+          body: "English base content for the Arabic search fixture.",
+          categoryId: arabicCategoryId,
+        })
+        .expect(201);
+      arabicArticleId = arabicArticle.body.id;
+
+      await request(app.getHttpServer())
+        .put(`/api/v1/knowledge-base/articles/${arabicArticleId}/translations/AR`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          title: "إعادة تعيين كلمة المرور",
+          body: "تعليمات لإعادة تعيين كلمة المرور الخاصة بحسابك.",
+        })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/knowledge-base/articles/${arabicArticleId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status: "PUBLISHED" })
+        .expect(200);
+
+      // Same distinctive Arabic token, but only in the BASE content and with
+      // no AR translation row at all.
+      const englishOnly = await request(app.getHttpServer())
+        .post("/api/v1/knowledge-base/articles")
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({
+          title: "كلمة المرور base-only article",
+          body: "This article mentions كلمة المرور in its base content only.",
+        })
+        .expect(201);
+      englishOnlyArticleId = englishOnly.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/knowledge-base/articles/${englishOnlyArticleId}`)
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .send({ status: "PUBLISHED" })
+        .expect(200);
+
+    });
+
+    it("matches an exact Arabic term against the AR translation", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "المرور", locale: "AR" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items.map((a: { id: string }) => a.id)).toContain(arabicArticleId);
+    });
+
+    // The load-bearing proof that the `arabic` configuration is actually in
+    // use: "مرور" only matches content containing "المرور" once the definite
+    // article is stripped, which `simple` and `english` do not do.
+    it("matches across a definite-article difference (مرور finds المرور)", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "مرور", locale: "AR" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items.map((a: { id: string }) => a.id)).toContain(arabicArticleId);
+    });
+
+    it("stems an Arabic inflection (كيفية finds كيف-stemmed content)", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "إعادة", locale: "AR" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items.map((a: { id: string }) => a.id)).toContain(arabicArticleId);
+    });
+
+    it("never falls through to the base article — an English-only match is not an Arabic hit", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "المرور", locale: "AR" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items.map((a: { id: string }) => a.id)).not.toContain(
+        englishOnlyArticleId,
+      );
+    });
+
+    it("returns the AR title/body for a matched article", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "المرور", locale: "AR" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const matched = response.body.items.find(
+        (a: { id: string }) => a.id === arabicArticleId,
+      );
+      expect(matched.title).toBe("إعادة تعيين كلمة المرور");
+    });
+
+    it("honours the categoryId filter on the Arabic path", async () => {
+      const matching = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "المرور", locale: "AR", categoryId: arabicCategoryId })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(matching.body.items.map((a: { id: string }) => a.id)).toContain(arabicArticleId);
+
+      const otherCategory = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "المرور", locale: "AR", categoryId: randomUUID() })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+      expect(otherCategory.body.items).toEqual([]);
+      expect(otherCategory.body.total).toBe(0);
+    });
+
+    it("returns the standard page envelope with a consistent total", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "المرور", locale: "AR" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({ page: 1, pageSize: 25 });
+      expect(typeof response.body.total).toBe("number");
+      expect(response.body.total).toBeGreaterThanOrEqual(response.body.items.length);
+      expect(response.body.totalPages).toBeGreaterThanOrEqual(1);
+    });
+
+    it("returns an empty page past the end without changing the total", async () => {
+      const firstPage = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "المرور", locale: "AR" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      const pastEnd = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "المرور", locale: "AR", page: 999 })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(pastEnd.body.items).toEqual([]);
+      expect(pastEnd.body.total).toBe(firstPage.body.total);
+    });
+
+    it("returns nothing for an Arabic term present in no AR translation", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "زعفرانمختلف", locale: "AR" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items).toEqual([]);
+      expect(response.body.total).toBe(0);
+    });
+
+    it("keeps the English path working for the same request without locale=AR", async () => {
+      const response = await request(app.getHttpServer())
+        .get("/api/v1/knowledge-base/articles")
+        .query({ search: "Resetting" })
+        .set("Authorization", `Bearer ${adminAccessToken}`)
+        .expect(200);
+
+      expect(response.body.items.map((a: { id: string }) => a.id)).toContain(arabicArticleId);
+    });
+
+    // Draft visibility on the Arabic path is asserted in
+    // `portal-knowledge-base.e2e-spec.ts`, which owns the published-only
+    // caller and its portal token.
+  });
+
   // Story 109 — Multi-locale content. A dedicated fixture article, not
   // the shared `articleId` above (which other tests in this file mutate
   // through publish/unpublish/edit cycles) — translations are tested in
