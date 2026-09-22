@@ -38,8 +38,12 @@ const ALL_STATUSES = "ALL";
  * Story 53 — Customer Portal — Submit & Track Own Tickets. Mirrors
  * `apps/web`'s established loading/error/empty/populated card shape and
  * `AddDepartmentForm`'s "smallest UI surface for a one-field(ish) create"
- * convention — plain HTML/Tailwind, no shared UI component library exists
- * in `apps/portal` (Story 52 precedent).
+ * convention. It was written in plain HTML/Tailwind because no shared UI
+ * package existed for `apps/portal` then (Story 52 precedent) — that
+ * stopped being true at Story S-2, which extracted `@crm/ui`, and Story
+ * 135, which migrated this app onto it. This file now builds on those
+ * shared primitives throughout; the sentence is kept as history rather
+ * than deleted, because the layout it describes is still the one here.
  *
  * PORTAL-1 — Portal My Tickets Pagination. `useMyTicketsQuery`'s response is
  * now a `Paginated<PortalTicketSummary>` envelope instead of a flat array,

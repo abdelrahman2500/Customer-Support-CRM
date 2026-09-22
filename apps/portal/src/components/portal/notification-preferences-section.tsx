@@ -23,9 +23,10 @@ const EVENT_LABEL_KEYS: Record<string, string> = {
  * Story 90 — a self-contained, independently-rendered section (own query,
  * own error state), rendered above `NotificationHistoryView`'s existing
  * table. Mirrors `apps/web`'s `NotificationPreferencesSection` shape
- * exactly, plain Tailwind (no shared UI component library in
- * `apps/portal` — the same precedent every other portal view already
- * follows).
+ * exactly. It was written in plain Tailwind because no shared UI package
+ * existed for `apps/portal` then — Story S-2 extracted `@crm/ui` and Story
+ * 135 migrated this app onto it, so the section now builds on `Alert`,
+ * `Button`, `Card` and `Skeleton` from that package instead.
  */
 export function NotificationPreferencesSection() {
   const t = useTranslations("notifications");
