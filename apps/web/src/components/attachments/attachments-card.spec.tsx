@@ -64,6 +64,14 @@ describe("AttachmentsCard", () => {
     );
 
     expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+
+    // Story 161 -- the skeleton is the hidden placeholder itself, so no
+    // wrapper was introduced and its own classes are untouched.
+    const status = screen.getByRole("status", { name: "loading" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+    expect(status.children).toHaveLength(1);
+    expect(status.firstElementChild).toHaveAttribute("aria-hidden", "true");
+    expect(status.firstElementChild).toHaveClass("animate-pulse", "mt-2", "h-24", "w-full");
   });
 
   it("shows an error state when the query fails", () => {

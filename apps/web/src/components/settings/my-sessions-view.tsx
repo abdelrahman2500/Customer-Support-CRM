@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { useMySessionsQuery, useRevokeSessionMutation } from "@/hooks/use-sessions";
 import type { SessionSummary } from "@/lib/sessions-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, PageHeader, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
  */
 export function MySessionsView() {
   const t = useTranslations("mySessions");
+  const tCommon = useTranslations("common");
   const sessionsQuery = useMySessionsQuery();
 
   return (
@@ -27,11 +28,11 @@ export function MySessionsView() {
       <PageHeader title={t("title")} description={t("description")} />
 
       {sessionsQuery.isLoading && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {sessionsQuery.isError && (

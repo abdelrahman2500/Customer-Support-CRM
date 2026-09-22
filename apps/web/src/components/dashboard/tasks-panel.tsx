@@ -19,6 +19,7 @@ import {
   Button,
   EmptyState,
   Input,
+  LoadingStatus,
   SectionCard,
   Select,
   SelectContent,
@@ -56,6 +57,7 @@ const PRIORITIES: TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
  */
 export function TasksPanel({ userId }: { userId: string }) {
   const t = useTranslations("dashboard");
+  const tCommon = useTranslations("common");
   const tasksQuery = useTasksQuery({ completed: "false" });
 
   useTaskReminders(userId);
@@ -65,11 +67,11 @@ export function TasksPanel({ userId }: { userId: string }) {
   return (
     <SectionCard title={t("tasks.heading")}>
       {tasksQuery.isLoading && (
-        <div className="mt-2 flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="mt-2 flex flex-col gap-2">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
-        </div>
+        </LoadingStatus>
       )}
 
       {tasksQuery.isError && (

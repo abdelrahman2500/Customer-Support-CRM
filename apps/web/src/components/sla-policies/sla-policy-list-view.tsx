@@ -9,7 +9,16 @@ import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { SlaPolicySummary } from "@/lib/sla-policies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, EmptyState, Input, PageHeader, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  EmptyState,
+  Input,
+  LoadingStatus,
+  PageHeader,
+  Skeleton,
+} from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -27,6 +36,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
  */
 export function SlaPolicyListView() {
   const t = useTranslations("slaPolicies");
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
 
   const policiesQuery = useSlaPoliciesQuery();
@@ -50,11 +60,11 @@ export function SlaPolicyListView() {
       </div>
 
       {policiesQuery.isLoading && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2, 3, 4].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {policiesQuery.isError && (

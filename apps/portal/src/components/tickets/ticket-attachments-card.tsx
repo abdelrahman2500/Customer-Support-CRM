@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-portal-attachments";
 import { getMyTicketAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, SectionCard, Skeleton } from "@crm/ui";
+import { Alert, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -27,6 +27,7 @@ function formatFileSize(bytes: number): string {
  */
 export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
   const attachmentsQuery = useMyTicketAttachmentsQuery(ticketId);
 
@@ -37,7 +38,11 @@ export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
 
   return (
     <SectionCard title={t("detail.attachmentsHeading")}>
-      {attachmentsQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
+      {attachmentsQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="mt-2 h-16 w-full" />
+        </LoadingStatus>
+      )}
       {attachmentsQuery.isError && (
         <Alert variant="destructive" className="mt-2">
           {t("detail.attachmentsError")}

@@ -2,6 +2,7 @@ import * as React from "react";
 import { cn } from "../lib/cn";
 import { Alert } from "./alert";
 import { Button } from "./button";
+import { LoadingStatus } from "./loading-status";
 import { EmptyState } from "./empty-state";
 import type { EmptyStateProps } from "./empty-state";
 import { SkeletonText } from "./skeleton";
@@ -137,13 +138,19 @@ export function QueryStateCard({
   className,
 }: QueryStateCardProps) {
   if (isLoading) {
+    // Labelled `role="status"` with the placeholder hidden beneath it: the
+    // announcement is "Loading tickets", once, instead of a screen reader
+    // walking a stack of empty boxes.
+    //
+    // Story 161 moved that shape into `LoadingStatus` so the twenty-four
+    // screens that keep their own placeholder can have the same semantics
+    // without adopting this component's whole visual composition. Delegating
+    // to it here is what keeps the two from drifting: there is one definition
+    // of what a loading state announces, and this is a consumer of it.
     return (
-      // Labelled `role="status"` with the placeholder hidden beneath it: the
-      // announcement is "Loading tickets", once, instead of a screen reader
-      // walking a stack of empty boxes.
-      <div role="status" aria-busy="true" aria-label={loadingLabel} className={className}>
+      <LoadingStatus label={loadingLabel} className={className}>
         {loadingPlaceholder ?? <SkeletonText lines={5} barClassName="h-10" />}
-      </div>
+      </LoadingStatus>
     );
   }
 

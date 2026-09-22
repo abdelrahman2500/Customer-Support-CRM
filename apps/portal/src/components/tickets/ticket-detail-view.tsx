@@ -17,7 +17,17 @@ import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
-import { Alert, Badge, Button, Card, PageHeader, SectionCard, Skeleton, Textarea } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  LoadingStatus,
+  PageHeader,
+  SectionCard,
+  Skeleton,
+  Textarea,
+} from "@crm/ui";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
@@ -69,6 +79,7 @@ export function TicketDetailSkeleton() {
 
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
   usePortalTicketRealtime(ticketId);
   const ticketQuery = useMyTicketQuery(ticketId);
@@ -137,7 +148,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
       <TicketAttachmentsCard ticketId={ticketId} />
 
       <SectionCard title={t("detail.historyHeading")}>
-        {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+        {historyQuery.isLoading && (
+          <LoadingStatus label={tCommon("loading")} asChild>
+            <Skeleton className="mt-2 h-24 w-full" />
+          </LoadingStatus>
+        )}
         {historyQuery.isError && (
           <Alert variant="destructive" className="mt-2">
             {t("detail.historyError")}
@@ -179,7 +194,6 @@ function CsatSection({ ticketId }: { ticketId: string }) {
 
   return (
     <SectionCard title={t("detail.csatHeading")}>
-
       {csatQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
 
       {csatQuery.isError && (

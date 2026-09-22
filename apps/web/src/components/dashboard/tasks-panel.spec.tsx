@@ -93,6 +93,25 @@ describe("TasksPanel", () => {
     expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
+  // Story 161 -- the loading state announces itself and keeps its placeholder
+  // bars out of the accessibility tree, without changing how they look.
+  it("announces loading once and hides the placeholder bars from assistive tech", () => {
+    mockedUseTasksQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = render(<TasksPanel userId="user-1" />);
+
+    const status = screen.getByRole("status", { name: "loading" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+
+    // Every bar sits inside the hidden placeholder, whose own classes -- and
+    // therefore the bars' layout -- are exactly what they were before.
+    const placeholder = status.querySelector("[aria-hidden='true']");
+    expect(placeholder).toHaveClass("mt-2", "flex", "flex-col", "gap-2");
+    expect(placeholder?.querySelectorAll(".animate-pulse")).toHaveLength(3);
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(3);
+  });
+
   it("shows an error state with a retry action", () => {
     const refetch = vi.fn();
     mockedUseTasksQuery.mockReturnValue(queryResult({ isError: true, refetch }) as never);
@@ -105,7 +124,10 @@ describe("TasksPanel", () => {
 
   it("shows the empty state when there are no open tasks", () => {
     mockedUseTasksQuery.mockReturnValue(
-      queryResult({ isSuccess: true, data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 } }) as never,
+      queryResult({
+        isSuccess: true,
+        data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+      }) as never,
     );
 
     render(<TasksPanel userId="user-1" />);
@@ -217,7 +239,10 @@ describe("TasksPanel", () => {
       const mutateAsync = vi.fn().mockResolvedValue(taskFixture());
       mockedUseCreateTaskMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
       mockedUseTasksQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 } }) as never,
+        queryResult({
+          isSuccess: true,
+          data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+        }) as never,
       );
 
       render(<TasksPanel userId="user-1" />);
@@ -235,7 +260,10 @@ describe("TasksPanel", () => {
 
     it("disables submit while the title is empty", () => {
       mockedUseTasksQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 } }) as never,
+        queryResult({
+          isSuccess: true,
+          data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+        }) as never,
       );
 
       render(<TasksPanel userId="user-1" />);
@@ -247,7 +275,10 @@ describe("TasksPanel", () => {
       const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Server error", 500));
       mockedUseCreateTaskMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
       mockedUseTasksQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 } }) as never,
+        queryResult({
+          isSuccess: true,
+          data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+        }) as never,
       );
 
       render(<TasksPanel userId="user-1" />);
@@ -261,7 +292,10 @@ describe("TasksPanel", () => {
       const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Title is required", 400));
       mockedUseCreateTaskMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
       mockedUseTasksQuery.mockReturnValue(
-        queryResult({ isSuccess: true, data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 } }) as never,
+        queryResult({
+          isSuccess: true,
+          data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+        }) as never,
       );
 
       render(<TasksPanel userId="user-1" />);

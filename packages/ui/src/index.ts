@@ -129,6 +129,8 @@ export type { PageHeaderProps } from "./components/page-header";
 export { Pagination } from "./components/pagination";
 export type { PaginationProps } from "./components/pagination";
 
+export { LoadingStatus } from "./components/loading-status";
+export type { LoadingStatusProps } from "./components/loading-status";
 export { QueryStateCard } from "./components/query-state-card";
 export type { QueryStateCardProps, QueryStateErrorProps } from "./components/query-state-card";
 

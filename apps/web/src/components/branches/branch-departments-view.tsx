@@ -18,6 +18,7 @@ import {
   Card,
   EmptyState,
   Input,
+  LoadingStatus,
   PageHeader,
   SectionCard,
   showSuccessToast,
@@ -169,16 +170,17 @@ function MyBranchFields({ branch }: { branch: ManagedBranch }) {
 
 function DepartmentsSection() {
   const t = useTranslations("branches");
+  const tCommon = useTranslations("common");
   const departmentsQuery = useManagedDepartmentsQuery();
 
   return (
     <SectionCard title={t("departments.heading")}>
       {departmentsQuery.isLoading && (
-        <div className="mt-2 flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="mt-2 flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {departmentsQuery.isError && (

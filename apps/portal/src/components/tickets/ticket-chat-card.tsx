@@ -9,7 +9,7 @@ import {
   useSendMyTicketMessageMutation,
 } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, SectionCard, Skeleton, Textarea } from "@crm/ui";
+import { Alert, Button, LoadingStatus, SectionCard, Skeleton, Textarea } from "@crm/ui";
 
 /**
  * Story 78 — Live Chat UI (Customer Portal side). Reads
@@ -34,6 +34,7 @@ import { Alert, Button, SectionCard, Skeleton, Textarea } from "@crm/ui";
  */
 export function TicketChatCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
   const messagesQuery = useMyTicketMessagesQuery(ticketId);
   const listRef = useRef<HTMLOListElement>(null);
@@ -47,7 +48,11 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
 
   return (
     <SectionCard title={t("detail.chatHeading")}>
-      {messagesQuery.isLoading && <Skeleton className="mt-2 h-40 w-full" />}
+      {messagesQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="mt-2 h-40 w-full" />
+        </LoadingStatus>
+      )}
       {messagesQuery.isError && (
         <Alert variant="destructive" className="mt-2">
           {t("detail.chatLoadError")}

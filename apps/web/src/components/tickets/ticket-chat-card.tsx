@@ -13,7 +13,17 @@ import {
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Checkbox, cn, Label, SectionCard, Skeleton, Textarea } from "@crm/ui";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  cn,
+  Label,
+  LoadingStatus,
+  SectionCard,
+  Skeleton,
+  Textarea,
+} from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /**
@@ -50,6 +60,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
  */
 export function TicketChatCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
   const messagesQuery = useTicketMessagesQuery(ticketId);
   const usersQuery = useUsersQuery();
@@ -76,7 +87,11 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
 
   return (
     <SectionCard title={t("detail.chatHeading")}>
-      {messagesQuery.isLoading && <Skeleton className="mt-2 h-40 w-full" />}
+      {messagesQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="mt-2 h-40 w-full" />
+        </LoadingStatus>
+      )}
       {messagesQuery.isError && (
         <Alert variant="destructive" className="mt-2">
           {t("detail.chatLoadError")}

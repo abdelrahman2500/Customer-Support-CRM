@@ -11,7 +11,17 @@ import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, Card, EmptyState, PageHeader, SectionCard, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  LoadingStatus,
+  PageHeader,
+  SectionCard,
+  Skeleton,
+} from "@crm/ui";
 import { TasksPanel } from "./tasks-panel";
 
 /** Story 28 — a work queue, not a full history: only tickets still open
@@ -206,6 +216,7 @@ function UnclaimedTicketRow({
  */
 export function DashboardView({ userId }: { userId: string }) {
   const t = useTranslations("dashboard");
+  const tCommon = useTranslations("common");
   const ticketLabels = useTicketLabels();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
@@ -304,11 +315,11 @@ export function DashboardView({ userId }: { userId: string }) {
           this story every panel here carried identical weight. */}
       <SectionCard title={t("heading")} elevation="raised">
         {myTicketsQuery.isLoading && (
-          <div className="mt-2 flex flex-col gap-2">
+          <LoadingStatus label={tCommon("loading")} className="mt-2 flex flex-col gap-2">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
-          </div>
+          </LoadingStatus>
         )}
 
         {myTicketsQuery.isError && (
@@ -386,11 +397,11 @@ export function DashboardView({ userId }: { userId: string }) {
 
         <SectionCard title={t("unassignedHeading")}>
           {unclaimedTicketsQuery.isLoading && (
-            <div className="mt-2 flex flex-col gap-2">
+            <LoadingStatus label={tCommon("loading")} className="mt-2 flex flex-col gap-2">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
-            </div>
+            </LoadingStatus>
           )}
 
           {unclaimedTicketsQuery.isError && (

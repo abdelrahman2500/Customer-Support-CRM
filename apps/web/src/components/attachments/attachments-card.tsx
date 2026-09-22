@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { ChangeEvent } from "react";
 import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import type { AttachmentOwner } from "@/lib/attachments-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, SectionCard, Skeleton } from "@crm/ui";
+import { Alert, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
 
 /** Every string this shared component needs, supplied by the caller's own
  * `next-intl` namespace (`tickets.detail.attachments*` or
@@ -49,6 +50,7 @@ export function AttachmentsCard({
   locale: string;
   strings: AttachmentsCardStrings;
 }) {
+  const tCommon = useTranslations("common");
   const attachmentsQuery = useAttachmentsQuery(owner);
 
   async function handleDownload(attachmentId: string): Promise<void> {
@@ -58,7 +60,11 @@ export function AttachmentsCard({
 
   return (
     <SectionCard title={strings.heading}>
-      {attachmentsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+      {attachmentsQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="mt-2 h-24 w-full" />
+        </LoadingStatus>
+      )}
       {attachmentsQuery.isError && (
         <Alert variant="destructive" className="mt-2">
           {strings.error}

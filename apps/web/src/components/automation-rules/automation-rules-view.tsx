@@ -24,6 +24,7 @@ import {
   EmptyState,
   Input,
   Label,
+  LoadingStatus,
   Skeleton,
   Table,
   TableBody,
@@ -84,6 +85,7 @@ const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 const UNSET_PRIORITY = "__unset__";
 export function AutomationRulesView() {
   const t = useTranslations("automationRules");
+  const tCommon = useTranslations("common");
   const rulesQuery = useAutomationRulesQuery();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
@@ -118,11 +120,11 @@ export function AutomationRulesView() {
       <PageHeader title={t("title")} />
 
       {rulesQuery.isLoading && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {rulesQuery.isError && (

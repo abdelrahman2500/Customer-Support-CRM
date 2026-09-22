@@ -31,6 +31,7 @@ import {
   Checkbox,
   Input,
   Label,
+  LoadingStatus,
   Pagination,
   SectionCard,
   Skeleton,
@@ -623,10 +624,10 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <SectionCard title={t("detail.ticketsHeading")}>
             {ticketsQuery.isLoading && (
-              <div className="mt-2 flex flex-col gap-2">
+              <LoadingStatus label={tCommon("loading")} className="mt-2 flex flex-col gap-2">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
-              </div>
+              </LoadingStatus>
             )}
             {ticketsQuery.isError && (
               <Alert variant="destructive" className="mt-2">
@@ -687,7 +688,11 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           </SectionCard>
 
           <SectionCard title={t("detail.notesHeading")}>
-            {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+            {notesQuery.isLoading && (
+              <LoadingStatus label={tCommon("loading")} asChild>
+                <Skeleton className="mt-2 h-24 w-full" />
+              </LoadingStatus>
+            )}
             {notesQuery.isError && (
               <Alert variant="destructive" className="mt-2">
                 {t("detail.notesError")}

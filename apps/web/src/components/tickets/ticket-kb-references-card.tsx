@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-ticket-kb-references";
 import { usePublishedArticleSearchQuery } from "@/hooks/use-knowledge-base";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, SectionCard, Skeleton } from "@crm/ui";
+import { Alert, Button, Input, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
 
 /**
  * RM-05 — Ticket ↔ Knowledge Base Linkage. Mirrors `TicketDetailView`'s own
@@ -25,6 +25,7 @@ import { Alert, Button, Input, SectionCard, Skeleton } from "@crm/ui";
  */
 export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const referencesQuery = useTicketKbReferencesQuery(ticketId);
   const removeMutation = useDeleteTicketKbReferenceMutation(ticketId);
@@ -45,7 +46,11 @@ export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
 
   return (
     <SectionCard title={t("detail.kbReferencesHeading")}>
-      {referencesQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
+      {referencesQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="mt-2 h-16 w-full" />
+        </LoadingStatus>
+      )}
       {referencesQuery.isError && (
         <Alert variant="destructive" className="mt-2">
           {t("detail.kbReferencesError")}

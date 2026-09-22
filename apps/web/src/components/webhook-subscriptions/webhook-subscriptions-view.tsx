@@ -21,6 +21,7 @@ import {
   EmptyState,
   Input,
   Label,
+  LoadingStatus,
   PageHeader,
   Pagination,
   SectionCard,
@@ -44,6 +45,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
  */
 export function WebhookSubscriptionsView() {
   const t = useTranslations("webhookSubscriptions");
+  const tCommon = useTranslations("common");
   const subscriptionsQuery = useWebhookSubscriptionsQuery();
 
   return (
@@ -51,11 +53,11 @@ export function WebhookSubscriptionsView() {
       <PageHeader title={t("title")} />
 
       {subscriptionsQuery.isLoading && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {subscriptionsQuery.isError && (
@@ -114,7 +116,11 @@ function InboundWebhookLog() {
     <div className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold text-ink">{t("inboundLogHeading")}</h2>
 
-      {logsQuery.isLoading && <Skeleton className="h-16 w-full" />}
+      {logsQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="h-16 w-full" />
+        </LoadingStatus>
+      )}
 
       {logsQuery.isError && (
         <Alert variant="destructive" className="flex items-center justify-between">

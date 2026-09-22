@@ -37,6 +37,7 @@ import {
   Button,
   Card,
   Input,
+  LoadingStatus,
   SectionCard,
   showSuccessToast,
   Skeleton,
@@ -203,6 +204,7 @@ export function TicketDetailSkeleton() {
 
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const ticketLabels = useTicketLabels();
   const { locale } = useParams<{ locale: string }>();
 
@@ -402,7 +404,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           )}
 
           <SectionCard title={t("detail.notesHeading")}>
-            {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+            {notesQuery.isLoading && (
+              <LoadingStatus label={tCommon("loading")} asChild>
+                <Skeleton className="mt-2 h-24 w-full" />
+              </LoadingStatus>
+            )}
             {notesQuery.isError && (
               <Alert variant="destructive" className="mt-2">
                 {t("detail.notesError")}
@@ -719,7 +725,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </SectionCard>
 
           <SectionCard title={t("detail.escalationsHeading")}>
-            {escalationsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+            {escalationsQuery.isLoading && (
+              <LoadingStatus label={tCommon("loading")} asChild>
+                <Skeleton className="mt-2 h-24 w-full" />
+              </LoadingStatus>
+            )}
             {escalationsQuery.isError && (
               <Alert variant="destructive" className="mt-2">
                 {t("detail.escalationsError")}
@@ -751,7 +761,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </SectionCard>
 
           <SectionCard title={t("detail.historyHeading")}>
-            {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+            {historyQuery.isLoading && (
+              <LoadingStatus label={tCommon("loading")} asChild>
+                <Skeleton className="mt-2 h-24 w-full" />
+              </LoadingStatus>
+            )}
             {historyQuery.isError && (
               <Alert variant="destructive" className="mt-2">
                 {t("detail.historyError")}

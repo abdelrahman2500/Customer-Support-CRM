@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useCustomerQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
-import { Alert, Badge, SectionCard, Skeleton } from "@crm/ui";
+import { Alert, Badge, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
 
 /** Story 28's own "still needs work" definition (`dashboard-view.tsx`'s
  * `OPEN_STATUSES`) — reused here rather than re-invented, so "other open
@@ -43,6 +43,7 @@ export function CustomerContextPanel({
   customerId: string;
 }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const ticketLabels = useTicketLabels();
   const { locale } = useParams<{ locale: string }>();
 
@@ -76,7 +77,11 @@ export function CustomerContextPanel({
             {t("detail.contextPanelViewAll")}
           </Link>
         </div>
-        {ticketsQuery.isLoading && <Skeleton className="mt-1 h-12 w-full" />}
+        {ticketsQuery.isLoading && (
+          <LoadingStatus label={tCommon("loading")} asChild>
+            <Skeleton className="mt-1 h-12 w-full" />
+          </LoadingStatus>
+        )}
         {ticketsQuery.isError && (
           <Alert variant="destructive" className="mt-1">
             {t("detail.contextPanelTicketsError")}
@@ -113,7 +118,11 @@ export function CustomerContextPanel({
         <h3 className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
           {t("detail.contextPanelContactsHeading")}
         </h3>
-        {customerQuery.isLoading && <Skeleton className="mt-1 h-8 w-full" />}
+        {customerQuery.isLoading && (
+          <LoadingStatus label={tCommon("loading")} asChild>
+            <Skeleton className="mt-1 h-8 w-full" />
+          </LoadingStatus>
+        )}
         {customerQuery.isError && (
           <Alert variant="destructive" className="mt-1">
             {t("detail.contextPanelContactsError")}

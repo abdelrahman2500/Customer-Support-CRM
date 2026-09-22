@@ -15,7 +15,16 @@ import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { localeDirection } from "@/i18n/direction";
-import { Alert, Badge, Button, Input, SectionCard, Skeleton, showSuccessToast } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Input,
+  LoadingStatus,
+  SectionCard,
+  showSuccessToast,
+  Skeleton,
+} from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import {
@@ -316,6 +325,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
  * `ArticleListView`'s own loading/error/empty/populated shape. */
 function ArticleVersionHistory({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
+  const tCommon = useTranslations("common");
   // Same locale-aware date convention every other table in this app uses
   // (e.g. `audit-log-view.tsx`); omitting `locale` formats in the browser's
   // own locale rather than the one the user selected.
@@ -328,7 +338,11 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
   // (Story 154's `headingLevel`), which is the level this heading already had.
   return (
     <SectionCard title={t("detail.versions.title")} className="flex flex-col gap-2">
-      {versionsQuery.isLoading && <Skeleton className="h-10 w-full" />}
+      {versionsQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="h-10 w-full" />
+        </LoadingStatus>
+      )}
 
       {versionsQuery.isError && <Alert variant="destructive">{t("detail.versions.error")}</Alert>}
 

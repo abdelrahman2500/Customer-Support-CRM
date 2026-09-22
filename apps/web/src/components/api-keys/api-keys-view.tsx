@@ -18,6 +18,7 @@ import {
   EmptyState,
   Input,
   Label,
+  LoadingStatus,
   PageHeader,
   SectionCard,
   Skeleton,
@@ -52,6 +53,7 @@ function apiKeyStatus(apiKey: ApiKeySummary): "active" | "revoked" | "expired" {
  */
 export function ApiKeysView() {
   const t = useTranslations("apiKeys");
+  const tCommon = useTranslations("common");
   const apiKeysQuery = useApiKeysQuery();
 
   return (
@@ -59,11 +61,11 @@ export function ApiKeysView() {
       <PageHeader title={t("title")} />
 
       {apiKeysQuery.isLoading && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {apiKeysQuery.isError && (
