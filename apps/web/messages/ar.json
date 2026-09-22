@@ -32,7 +32,19 @@
       "description": "حدث خطأ غير متوقع. يمكنك المحاولة مرة أخرى.",
       "retry": "أعد المحاولة"
     },
-    "backLinkLabel": "العودة إلى الصفحة الرئيسية"
+    "backLinkLabel": "العودة إلى الصفحة الرئيسية",
+    "ticketStatus": {
+      "OPEN": "مفتوحة",
+      "IN_PROGRESS": "قيد المعالجة",
+      "RESOLVED": "تم الحل",
+      "CLOSED": "مغلقة"
+    },
+    "ticketPriority": {
+      "LOW": "منخفضة",
+      "MEDIUM": "متوسطة",
+      "HIGH": "عالية",
+      "URGENT": "عاجلة"
+    }
   },
   "auth": {
     "title": "تسجيل الدخول",

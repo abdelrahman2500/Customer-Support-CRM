@@ -5,6 +5,7 @@ import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import {
   useCreateTicketNoteMutation,
   useDepartmentsQuery,
@@ -192,6 +193,7 @@ export function TicketDetailSkeleton() {
 
 export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const ticketLabels = useTicketLabels();
   const { locale } = useParams<{ locale: string }>();
 
   useTicketRealtime(ticketId);
@@ -323,7 +325,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 { status: value as TicketStatus },
                 {
                   onSuccess: () =>
-                    showSuccessToast(t("detail.statusUpdateSuccess", { status: value })),
+                    showSuccessToast(
+                      t("detail.statusUpdateSuccess", { status: ticketLabels.status(value) }),
+                    ),
                 },
               )
             }
@@ -332,9 +336,13 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              {/* Story 153 — `value` stays the raw enum (it is what the
+                  mutation sends to the API); only the visible text is
+                  localized. `SelectValue` above renders the selected
+                  item's children, so the trigger follows automatically. */}
               {STATUS_OPTIONS.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {option}
+                  {ticketLabels.status(option)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -350,7 +358,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 { priority: value as TicketPriority },
                 {
                   onSuccess: () =>
-                    showSuccessToast(t("detail.priorityUpdateSuccess", { priority: value })),
+                    showSuccessToast(
+                      t("detail.priorityUpdateSuccess", {
+                        priority: ticketLabels.priority(value),
+                      }),
+                    ),
                 },
               )
             }
@@ -361,7 +373,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             <SelectContent>
               {PRIORITY_OPTIONS.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {option}
+                  {ticketLabels.priority(option)}
                 </SelectItem>
               ))}
             </SelectContent>

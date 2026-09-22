@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import {
   useCreateTaskMutation,
   useDeleteTaskMutation,
@@ -109,6 +110,7 @@ function isOverdue(task: TaskSummary, now: Date): boolean {
  * `UnclaimedTicketRow`'s own Rules-of-Hooks convention. */
 function TaskRow({ task }: { task: TaskSummary }) {
   const t = useTranslations("dashboard");
+  const ticketLabels = useTicketLabels();
   const errorMessage = useErrorMessage();
   const completeMutation = useUpdateTaskMutation(task.id);
   const deleteMutation = useDeleteTaskMutation(task.id);
@@ -138,7 +140,9 @@ function TaskRow({ task }: { task: TaskSummary }) {
         )}
       </span>
       <span className="flex items-center gap-2">
-        <Badge variant={ticketPriorityBadgeVariant(task.priority)}>{task.priority}</Badge>
+        <Badge variant={ticketPriorityBadgeVariant(task.priority)}>
+          {ticketLabels.priority(task.priority)}
+        </Badge>
         {isOverdue(task, now) && <Badge variant="destructive">{t("tasks.overdue")}</Badge>}
         <Button
           size="sm"

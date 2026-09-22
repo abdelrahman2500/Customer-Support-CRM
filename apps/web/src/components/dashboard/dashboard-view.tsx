@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
 import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
@@ -115,6 +116,7 @@ function UnclaimedTicketRow({
   currentUserId: string;
 }) {
   const t = useTranslations("dashboard");
+  const ticketLabels = useTicketLabels();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const mutation = useUpdateTicketMutation(ticket.id);
@@ -148,8 +150,12 @@ function UnclaimedTicketRow({
         )}
       </span>
       <span className="flex items-center gap-2">
-        <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
-        <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
+        <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
+          {ticketLabels.status(ticket.status)}
+        </Badge>
+        <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
+          {ticketLabels.priority(ticket.priority)}
+        </Badge>
         <SlaPresentation ticket={ticket} now={now} />
         <Button
           size="sm"
@@ -200,6 +206,7 @@ function UnclaimedTicketRow({
  */
 export function DashboardView({ userId }: { userId: string }) {
   const t = useTranslations("dashboard");
+  const ticketLabels = useTicketLabels();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
@@ -359,9 +366,11 @@ export function DashboardView({ userId }: { userId: string }) {
                   </Link>
                 </span>
                 <span className="flex items-center gap-2">
-                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
+                    {ticketLabels.status(ticket.status)}
+                  </Badge>
                   <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
-                    {ticket.priority}
+                    {ticketLabels.priority(ticket.priority)}
                   </Badge>
                   <SlaPresentation ticket={ticket} now={now} />
                 </span>

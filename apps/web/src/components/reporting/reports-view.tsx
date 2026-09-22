@@ -2,6 +2,7 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import {
   useAgentPerformanceQuery,
   useAiUsageQuery,
@@ -183,6 +184,7 @@ function formatUsd(amount: number): string {
  */
 export function ReportsView() {
   const t = useTranslations("reporting");
+  const ticketLabels = useTicketLabels();
   const [range, setRange] = useState<ReportDateRange>({});
   const [selectedDashboardId, setSelectedDashboardId] = useState<string | null>(null);
   const [showSaveForm, setShowSaveForm] = useState(false);
@@ -268,10 +270,10 @@ export function ReportsView() {
             {ticketVolumeQuery.isSuccess && ticketVolumeQuery.data.length > 0 && (
               <BarChart
                 ariaLabel={ticketVolumeQuery.data
-                  .map((row) => `${row.status}: ${row.count}`)
+                  .map((row) => `${ticketLabels.status(row.status)}: ${row.count}`)
                   .join(", ")}
                 rows={ticketVolumeQuery.data.map((row) => ({
-                  label: row.status,
+                  label: ticketLabels.status(row.status),
                   segments: [
                     { label: "", value: row.count, color: ticketStatusBarColor(row.status) },
                   ],

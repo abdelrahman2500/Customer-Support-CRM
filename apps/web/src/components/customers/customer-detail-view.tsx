@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import {
   useAnonymizeCustomerMutation,
@@ -448,6 +449,7 @@ export function CustomerDetailSkeleton() {
 
 export function CustomerDetailView({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");
+  const ticketLabels = useTicketLabels();
   const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const router = useRouter();
@@ -618,9 +620,11 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
                   {ticket.subject}
                 </Link>
                 <span className="flex items-center gap-2">
-                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
+                    {ticketLabels.status(ticket.status)}
+                  </Badge>
                   <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
-                    {ticket.priority}
+                    {ticketLabels.priority(ticket.priority)}
                   </Badge>
                   <span className="text-ink-subtle">
                     {new Date(ticket.createdAt).toLocaleDateString(locale)}

@@ -4,6 +4,7 @@ import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTicketsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
@@ -154,6 +155,7 @@ export function TicketListView() {
 
 function TicketListViewContent() {
   const t = useTranslations("tickets");
+  const ticketLabels = useTicketLabels();
   const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
@@ -390,11 +392,13 @@ function TicketListViewContent() {
                   </Link>
                 </TableCell>
                 <TableCell label={t("list.columns.status")}>
-                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
+                    {ticketLabels.status(ticket.status)}
+                  </Badge>
                 </TableCell>
                 <TableCell label={t("list.columns.priority")}>
                   <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
-                    {ticket.priority}
+                    {ticketLabels.priority(ticket.priority)}
                   </Badge>
                 </TableCell>
                 <TableCell label={t("list.columns.category")}>

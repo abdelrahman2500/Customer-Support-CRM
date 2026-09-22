@@ -123,7 +123,7 @@ describe("SlaPolicyListView", () => {
 
     expect(screen.getByText("dept-1")).toBeInTheDocument();
     expect(screen.getByText("billing")).toBeInTheDocument();
-    expect(screen.getByText("HIGH")).toBeInTheDocument();
+    expect(screen.getByText("ticketPriority.HIGH")).toBeInTheDocument();
     expect(screen.getByDisplayValue("30")).toBeInTheDocument();
     expect(screen.getByDisplayValue("240")).toBeInTheDocument();
     expect(screen.getByText("list.active")).toBeInTheDocument();

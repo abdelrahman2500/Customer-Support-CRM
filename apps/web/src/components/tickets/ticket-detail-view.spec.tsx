@@ -628,11 +628,12 @@ describe("TicketDetailView", () => {
       } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
-      fireEvent.click(screen.getByText("OPEN"));
-      fireEvent.click(await screen.findByRole("option", { name: "IN_PROGRESS" }));
+      fireEvent.click(screen.getByText("ticketStatus.OPEN"));
+      fireEvent.click(await screen.findByRole("option", { name: "ticketStatus.IN_PROGRESS" }));
 
+      // Story 153 — the toast reports the localized label, not the raw enum.
       expect(mockedShowSuccessToast).toHaveBeenCalledWith(
-        'detail.statusUpdateSuccess:{"status":"IN_PROGRESS"}',
+        'detail.statusUpdateSuccess:{"status":"ticketStatus.IN_PROGRESS"}',
       );
     });
 
@@ -650,11 +651,11 @@ describe("TicketDetailView", () => {
       } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
-      fireEvent.click(screen.getByText("HIGH"));
-      fireEvent.click(await screen.findByRole("option", { name: "URGENT" }));
+      fireEvent.click(screen.getByText("ticketPriority.HIGH"));
+      fireEvent.click(await screen.findByRole("option", { name: "ticketPriority.URGENT" }));
 
       expect(mockedShowSuccessToast).toHaveBeenCalledWith(
-        'detail.priorityUpdateSuccess:{"priority":"URGENT"}',
+        'detail.priorityUpdateSuccess:{"priority":"ticketPriority.URGENT"}',
       );
     });
 
@@ -689,8 +690,8 @@ describe("TicketDetailView", () => {
       } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
-      fireEvent.click(screen.getByText("OPEN"));
-      fireEvent.click(await screen.findByRole("option", { name: "IN_PROGRESS" }));
+      fireEvent.click(screen.getByText("ticketStatus.OPEN"));
+      fireEvent.click(await screen.findByRole("option", { name: "ticketStatus.IN_PROGRESS" }));
 
       expect(mockedShowSuccessToast).not.toHaveBeenCalled();
     });

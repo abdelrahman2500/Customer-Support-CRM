@@ -224,7 +224,11 @@ describe("TicketListView", () => {
 
       render(<TicketListView />);
 
-      expect(screen.getByText(status)).toHaveClass(expectedClass);
+      // Story 153 — the badge's text is now the localized label. This file
+      // stubs `useTranslations` as `(key) => key` and that stub drops the
+      // namespace, so the rendered text is the bare key path. The variant is
+      // still derived from the RAW enum, which is what this test is about.
+      expect(screen.getByText(`ticketStatus.${status}`)).toHaveClass(expectedClass);
     });
 
     it("gives OPEN and RESOLVED visually distinct badge classes from one another", () => {
@@ -237,7 +241,7 @@ describe("TicketListView", () => {
 
       render(<TicketListView />);
 
-      expect(screen.getByText("OPEN").className).not.toBe(screen.getByText("RESOLVED").className);
+      expect(screen.getByText("ticketStatus.OPEN").className).not.toBe(screen.getByText("ticketStatus.RESOLVED").className);
     });
   });
 
@@ -466,9 +470,9 @@ describe("TicketListView", () => {
       expect(subjectCell).toHaveTextContent("list.columns.subject");
       const customerCell = screen.getByText("Acme Inc.").closest("td");
       expect(customerCell).toHaveTextContent("list.columns.customer");
-      const statusCell = screen.getByText("OPEN").closest("td");
+      const statusCell = screen.getByText("ticketStatus.OPEN").closest("td");
       expect(statusCell).toHaveTextContent("list.columns.status");
-      const priorityCell = screen.getByText("HIGH").closest("td");
+      const priorityCell = screen.getByText("ticketPriority.HIGH").closest("td");
       expect(priorityCell).toHaveTextContent("list.columns.priority");
       const categoryCell = screen.getByText("billing").closest("td");
       expect(categoryCell).toHaveTextContent("list.columns.category");

@@ -32,7 +32,19 @@
       "description": "An unexpected error occurred. You can try again.",
       "retry": "Try again"
     },
-    "backLinkLabel": "Go back home"
+    "backLinkLabel": "Go back home",
+    "ticketStatus": {
+      "OPEN": "Open",
+      "IN_PROGRESS": "In progress",
+      "RESOLVED": "Resolved",
+      "CLOSED": "Closed"
+    },
+    "ticketPriority": {
+      "LOW": "Low",
+      "MEDIUM": "Medium",
+      "HIGH": "High",
+      "URGENT": "Urgent"
+    }
   },
   "auth": {
     "title": "Sign in",

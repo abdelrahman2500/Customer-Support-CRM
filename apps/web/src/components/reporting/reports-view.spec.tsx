@@ -265,9 +265,9 @@ describe("ReportsView", () => {
 
     render(<ReportsView />);
 
-    expect(screen.getByText("OPEN")).toBeInTheDocument();
+    expect(screen.getByText("ticketStatus.OPEN")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("RESOLVED")).toBeInTheDocument();
+    expect(screen.getByText("ticketStatus.RESOLVED")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
   });
 
@@ -327,7 +327,8 @@ describe("ReportsView", () => {
 
       render(<ReportsView />);
 
-      expect(screen.getByRole("img", { name: "OPEN: 3" })).toBeInTheDocument();
+      // Story 153 — the chart's aria-label uses the localized status label.
+      expect(screen.getByRole("img", { name: "ticketStatus.OPEN: 3" })).toBeInTheDocument();
     });
 
     it("renders the sla-compliance widget as a chart (role=img), alongside its own existing detail text", () => {

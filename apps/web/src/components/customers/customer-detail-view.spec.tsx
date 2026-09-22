@@ -340,8 +340,8 @@ describe("CustomerDetailView", () => {
 
       render(<CustomerDetailView customerId="customer-1" />);
 
-      expect(screen.getByText("OPEN")).toHaveClass("bg-warning-surface");
-      expect(screen.getByText("RESOLVED")).toHaveClass("bg-success-surface");
+      expect(screen.getByText("ticketStatus.OPEN")).toHaveClass("bg-warning-surface");
+      expect(screen.getByText("ticketStatus.RESOLVED")).toHaveClass("bg-success-surface");
     });
 
     it("navigates to the ticket detail route when a related ticket row is clicked", () => {

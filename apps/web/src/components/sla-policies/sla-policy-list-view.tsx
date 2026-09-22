@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla-policies";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { SlaPolicySummary } from "@/lib/sla-policies-api";
@@ -114,6 +115,7 @@ function SlaPolicyRow({
   categoryNameById: Map<string, string>;
 }) {
   const t = useTranslations("slaPolicies");
+  const ticketLabels = useTicketLabels();
   const errorMessage = useErrorMessage();
   const mutation = useUpdateSlaPolicyMutation(policy.id);
 
@@ -176,7 +178,7 @@ function SlaPolicyRow({
       </TableCell>
       <TableCell label={t("list.columns.priority")}>
         {policy.priority ? (
-          <Badge variant="outline">{policy.priority}</Badge>
+          <Badge variant="outline">{ticketLabels.priority(policy.priority)}</Badge>
         ) : (
           <span className="text-ink-subtle">{t("list.noPriority")}</span>
         )}

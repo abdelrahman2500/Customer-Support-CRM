@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useCustomerQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { Alert, Badge, Card, Skeleton } from "@crm/ui";
@@ -42,6 +43,7 @@ export function CustomerContextPanel({
   customerId: string;
 }) {
   const t = useTranslations("tickets");
+  const ticketLabels = useTicketLabels();
   const { locale } = useParams<{ locale: string }>();
 
   const ticketsQuery = useTicketsQuery({
@@ -96,9 +98,11 @@ export function CustomerContextPanel({
                   {ticket.subject}
                 </Link>
                 <span className="flex shrink-0 items-center gap-1">
-                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>{ticket.status}</Badge>
+                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
+                    {ticketLabels.status(ticket.status)}
+                  </Badge>
                   <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
-                    {ticket.priority}
+                    {ticketLabels.priority(ticket.priority)}
                   </Badge>
                 </span>
               </li>
