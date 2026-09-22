@@ -14,9 +14,9 @@ import {
   Badge,
   Button,
   Card,
-  EmptyState,
   Input,
   PageHeader,
+  QueryStateCard,
   Skeleton,
   Table,
   TableBody,
@@ -37,6 +37,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
  */
 export function TicketCategoriesView() {
   const t = useTranslations("ticketCategories");
+  const tCommon = useTranslations("common");
   const categoriesQuery = useManagedTicketCategoriesQuery();
 
   return (
@@ -45,28 +46,42 @@ export function TicketCategoriesView() {
         <PageHeader title={t("heading")} />
         <p className="mt-1 text-sm text-ink-subtle">{t("description")}</p>
 
-        {categoriesQuery.isLoading && (
-          <div className="mt-4 flex flex-col gap-2">
-            {[0, 1, 2].map((row) => (
-              <Skeleton key={row} className="h-10 w-full" />
-            ))}
-          </div>
-        )}
-
-        {categoriesQuery.isError && (
-          <Alert variant="destructive" className="mt-4 flex items-center justify-between">
-            <span>{t("error")}</span>
-            <Button variant="outline" size="sm" onClick={() => categoriesQuery.refetch()}>
-              {t("retry")}
-            </Button>
-          </Alert>
-        )}
-
-        {categoriesQuery.isSuccess && categoriesQuery.data.length === 0 && (
-          <EmptyState title={t("empty")} className="mt-4" />
-        )}
-
-        {categoriesQuery.isSuccess && categoriesQuery.data.length > 0 && (
+        {/* Story 155 — the hand-rolled four-branch ladder, replaced by the
+            shared primitive. Same skeleton, same retry, same empty copy.
+            One behaviour genuinely improves: `isError` now also requires
+            `data === undefined`, so a failed *background* refetch keeps the
+            rows on screen and shows a non-destructive banner instead of
+            throwing away readable content (Story S-7's reasoning, which
+            this ladder predated). */}
+        <QueryStateCard
+          className="mt-4"
+          isLoading={categoriesQuery.isLoading}
+          isError={categoriesQuery.isError && categoriesQuery.data === undefined}
+          isEmpty={categoriesQuery.isSuccess && categoriesQuery.data.length === 0}
+          loadingLabel={tCommon("loading")}
+          loadingPlaceholder={
+            <div className="flex flex-col gap-2">
+              {[0, 1, 2].map((row) => (
+                <Skeleton key={row} className="h-10 w-full" />
+              ))}
+            </div>
+          }
+          error={{
+            title: t("error"),
+            retryLabel: t("retry"),
+            onRetry: () => void categoriesQuery.refetch(),
+          }}
+          backgroundError={
+            categoriesQuery.isError && categoriesQuery.data !== undefined
+              ? {
+                  title: t("error"),
+                  retryLabel: t("retry"),
+                  onRetry: () => void categoriesQuery.refetch(),
+                }
+              : undefined
+          }
+          empty={{ title: t("empty") }}
+        >
           <Table className="mt-4">
             <TableHeader>
               <TableRow>
@@ -75,12 +90,12 @@ export function TicketCategoriesView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {categoriesQuery.data.map((category) => (
+              {(categoriesQuery.data ?? []).map((category) => (
                 <TicketCategoryRow key={category.id} category={category} />
               ))}
             </TableBody>
           </Table>
-        )}
+        </QueryStateCard>
 
         <AddTicketCategoryForm />
       </Card>

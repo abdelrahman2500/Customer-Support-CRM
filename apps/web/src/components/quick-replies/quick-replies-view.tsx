@@ -14,9 +14,9 @@ import {
   Badge,
   Button,
   Card,
-  EmptyState,
   Input,
   PageHeader,
+  QueryStateCard,
   Skeleton,
   Textarea,
 } from "@crm/ui";
@@ -31,34 +31,46 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
  */
 export function QuickRepliesView() {
   const t = useTranslations("quickReplies");
+  const tCommon = useTranslations("common");
   const quickRepliesQuery = useQuickRepliesQuery();
 
   return (
     <section className="flex flex-col gap-4">
       <PageHeader title={t("title")} />
 
-      {quickRepliesQuery.isLoading && (
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2].map((row) => (
-            <Skeleton key={row} className="h-10 w-full" />
-          ))}
-        </div>
-      )}
-
-      {quickRepliesQuery.isError && (
-        <Alert variant="destructive" className="flex items-center justify-between">
-          <span>{t("error")}</span>
-          <Button variant="outline" size="sm" onClick={() => quickRepliesQuery.refetch()}>
-            {t("retry")}
-          </Button>
-        </Alert>
-      )}
-
-      {quickRepliesQuery.isSuccess && quickRepliesQuery.data.length === 0 && (
-        <EmptyState title={t("empty")} />
-      )}
-
-      {quickRepliesQuery.isSuccess && quickRepliesQuery.data.length > 0 && (
+      {/* Story 155 — the hand-rolled four-branch ladder, replaced by the
+          shared primitive. Same skeleton, same retry, same empty copy.
+          `isError` now also requires `data === undefined`, so a failed
+          background refetch keeps the rows on screen instead of throwing
+          away readable content (Story S-7's reasoning). */}
+      <QueryStateCard
+        isLoading={quickRepliesQuery.isLoading}
+        isError={quickRepliesQuery.isError && quickRepliesQuery.data === undefined}
+        isEmpty={quickRepliesQuery.isSuccess && quickRepliesQuery.data.length === 0}
+        loadingLabel={tCommon("loading")}
+        loadingPlaceholder={
+          <div className="flex flex-col gap-2">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} className="h-10 w-full" />
+            ))}
+          </div>
+        }
+        error={{
+          title: t("error"),
+          retryLabel: t("retry"),
+          onRetry: () => void quickRepliesQuery.refetch(),
+        }}
+        backgroundError={
+          quickRepliesQuery.isError && quickRepliesQuery.data !== undefined
+            ? {
+                title: t("error"),
+                retryLabel: t("retry"),
+                onRetry: () => void quickRepliesQuery.refetch(),
+              }
+            : undefined
+        }
+        empty={{ title: t("empty") }}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -68,12 +80,12 @@ export function QuickRepliesView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {quickRepliesQuery.data.map((quickReply) => (
+            {(quickRepliesQuery.data ?? []).map((quickReply) => (
               <QuickReplyRow key={quickReply.id} quickReply={quickReply} />
             ))}
           </TableBody>
         </Table>
-      )}
+      </QueryStateCard>
 
       <AddQuickReplyForm />
     </section>
