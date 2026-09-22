@@ -445,6 +445,39 @@ describe("TicketListView", () => {
     });
   });
 
+  /**
+   * Story 157 — creation placement. Asserted by DOM order rather than by
+   * eyeballing the JSX, because the whole point of the change is where the
+   * form sits relative to the list a customer would otherwise scroll past.
+   */
+  describe("ticket creation placement (Story 157)", () => {
+    it("puts the create form before the ticket list", () => {
+      mockedUseMyTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: ticketPage([baseTicket]) }) as never,
+      );
+
+      render(<TicketListView />);
+
+      const createHeading = screen.getByText("list.createHeading");
+      const listHeading = screen.getByText("list.title");
+      expect(
+        createHeading.compareDocumentPosition(listHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("gives the submit button the primary action size", () => {
+      mockedUseMyTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: ticketPage([]) }) as never,
+      );
+
+      render(<TicketListView />);
+
+      // `h-10` is `Button`'s `lg`, which Story S-3 introduced for "a page's
+      // single primary action" and left unapplied everywhere.
+      expect(screen.getByRole("button", { name: "list.createSubmit" })).toHaveClass("h-10");
+    });
+  });
+
   // Story 98 — Design System & Visual Polish.
   it("gives each status a visually distinct pill, mirroring apps/web's own status color semantics", () => {
     mockedUseMyTicketsQuery.mockReturnValue(

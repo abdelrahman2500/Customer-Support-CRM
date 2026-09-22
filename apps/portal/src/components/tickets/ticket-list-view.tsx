@@ -21,6 +21,7 @@ import {
   PageHeader,
   Pagination,
   showSuccessToast,
+  SectionCard,
   Skeleton,
 } from "@crm/ui";
 
@@ -116,6 +117,14 @@ export function TicketListView() {
 
   return (
     <section className="flex flex-col gap-6">
+      {/* Story 157 — creation comes FIRST. It used to sit after the list and
+          its pager, so a customer arriving to report a problem scrolled past
+          every ticket they already had — and on a phone, past the pagination
+          too — before finding the form. Submitting a ticket is the primary
+          reason a customer opens this screen; the list is what they check
+          afterwards. */}
+      <CreateTicketForm />
+
       {/* Story 98 — p-4, not p-6: matches apps/web's own dominant card
           padding convention (see that app's data cards throughout). */}
       <Card className="p-surface">
@@ -253,8 +262,6 @@ export function TicketListView() {
           </div>
         )}
       </Card>
-
-      <CreateTicketForm />
     </section>
   );
 }
@@ -289,8 +296,7 @@ function CreateTicketForm() {
   }
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("list.createHeading")}</h2>
+    <SectionCard title={t("list.createHeading")}>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("list.createSubjectLabel")}
@@ -310,10 +316,17 @@ function CreateTicketForm() {
           />
         </label>
         {error && <Alert variant="destructive">{error}</Alert>}
-        <Button type="submit" disabled={mutation.isPending || !subject.trim()} className="w-fit">
+        {/* Story 157 — `lg` is this page's single primary action, which is
+            what Story S-3 introduced the size for and left unapplied. */}
+        <Button
+          type="submit"
+          size="lg"
+          disabled={mutation.isPending || !subject.trim()}
+          className="w-fit"
+        >
           {mutation.isPending ? t("list.createSubmitting") : t("list.createSubmit")}
         </Button>
       </form>
-    </Card>
+    </SectionCard>
   );
 }
