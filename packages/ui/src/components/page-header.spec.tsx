@@ -36,7 +36,10 @@ describe("PageHeader", () => {
 
   it("lets a long free-text title shrink instead of pushing actions off-screen", () => {
     const { container } = render(
-      <PageHeader title="A very long customer name that would otherwise not wrap" actions={<span>x</span>} />,
+      <PageHeader
+        title="A very long customer name that would otherwise not wrap"
+        actions={<span>x</span>}
+      />,
     );
 
     // `min-w-0` is what allows the flex item to go below its content width.

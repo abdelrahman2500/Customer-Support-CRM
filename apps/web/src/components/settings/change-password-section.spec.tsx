@@ -80,11 +80,14 @@ const LABEL = {
   confirm: /^Confirm new password/,
 };
 
-async function fill(user: ReturnType<typeof userEvent.setup>, values: {
-  current: string;
-  next: string;
-  confirm: string;
-}) {
+async function fill(
+  user: ReturnType<typeof userEvent.setup>,
+  values: {
+    current: string;
+    next: string;
+    confirm: string;
+  },
+) {
   await user.type(screen.getByLabelText(LABEL.current), values.current);
   await user.type(screen.getByLabelText(LABEL.next), values.next);
   await user.type(screen.getByLabelText(LABEL.confirm), values.confirm);
@@ -153,9 +156,7 @@ describe("ChangePasswordSection", () => {
     renderSection();
 
     expect(screen.getByText(enMessages.changePassword.success)).toBeInTheDocument();
-    expect(
-      screen.queryByLabelText(LABEL.current),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(LABEL.current)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: enMessages.changePassword.signInAgain }));
 

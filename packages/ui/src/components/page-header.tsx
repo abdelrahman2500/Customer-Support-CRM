@@ -58,9 +58,7 @@ export function PageHeader({ title, description, actions, className }: PageHeade
         <h1 className="text-lg font-semibold text-ink">{title}</h1>
         {description && <p className="mt-1 text-sm text-ink-subtle">{description}</p>}
       </div>
-      {actions && (
-        <div className="flex shrink-0 flex-wrap items-center gap-inline">{actions}</div>
-      )}
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-inline">{actions}</div>}
     </header>
   );
 }

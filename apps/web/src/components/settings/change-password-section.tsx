@@ -136,10 +136,7 @@ export function ChangePasswordSection() {
           />
         </FormField>
 
-        <FormField
-          label={t("confirmNewPassword")}
-          error={mismatch ? t("mismatch") : undefined}
-        >
+        <FormField label={t("confirmNewPassword")} error={mismatch ? t("mismatch") : undefined}>
           <Input
             type="password"
             autoComplete="new-password"

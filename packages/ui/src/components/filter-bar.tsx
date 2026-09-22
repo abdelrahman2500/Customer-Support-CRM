@@ -14,7 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
  * what stops the next list screen from quietly dropping it.
  */
 export function FilterBar({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-stack sm:flex-row sm:flex-wrap", className)} {...props} />;
+  return (
+    <div className={cn("flex flex-col gap-stack sm:flex-row sm:flex-wrap", className)} {...props} />
+  );
 }
 
 /**

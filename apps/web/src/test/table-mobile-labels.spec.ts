@@ -34,10 +34,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const APP_ROOTS = [
-  path.resolve(__dirname, ".."),
-  path.resolve(__dirname, "../../../portal/src"),
-];
+const APP_ROOTS = [path.resolve(__dirname, ".."), path.resolve(__dirname, "../../../portal/src")];
 
 /**
  * `<file>:<1-based line>` for every cell that is deliberately unlabelled.
@@ -46,7 +43,11 @@ const APP_ROOTS = [
  */
 const INTENTIONALLY_UNLABELLED: { file: string; because: string; count: number }[] = [
   { file: "api-keys/api-keys-view.tsx", because: "actions cell (Revoke)", count: 1 },
-  { file: "roles/role-list-view.tsx", because: "actions cell + colSpan permissions panel", count: 2 },
+  {
+    file: "roles/role-list-view.tsx",
+    because: "actions cell + colSpan permissions panel",
+    count: 2,
+  },
   { file: "settings/my-sessions-view.tsx", because: "actions cell (Sign out)", count: 1 },
   {
     file: "webhook-subscriptions/webhook-subscriptions-view.tsx",

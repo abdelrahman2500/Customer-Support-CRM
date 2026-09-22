@@ -47,7 +47,12 @@ const LABEL = {
 };
 
 function mockMutation(
-  state: { mutate?: ReturnType<typeof vi.fn>; isError?: boolean; isSuccess?: boolean; error?: unknown } = {},
+  state: {
+    mutate?: ReturnType<typeof vi.fn>;
+    isError?: boolean;
+    isSuccess?: boolean;
+    error?: unknown;
+  } = {},
 ) {
   const mutate = state.mutate ?? vi.fn();
   mockedUseChangePasswordMutation.mockReturnValue({
