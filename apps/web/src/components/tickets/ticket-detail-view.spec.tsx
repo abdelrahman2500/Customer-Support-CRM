@@ -323,8 +323,12 @@ describe("TicketDetailView", () => {
 
     render(<TicketDetailView ticketId="ticket-1" />);
 
-    // Story 42 — subject is now an editable input, not static text.
-    expect(screen.getByDisplayValue("Cannot log in")).toBeInTheDocument();
+    // Story 156 — the subject is a visible heading again, editable behind
+    // an explicit Edit affordance rather than being a permanent input.
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Cannot log in" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "detail.subjectEdit" })).toBeInTheDocument();
     expect(screen.getByText(/Acme Inc\./)).toBeInTheDocument();
   });
 
@@ -406,6 +410,55 @@ describe("TicketDetailView", () => {
   });
 
   // Story 42 — subject reassignment.
+  /**
+   * Story 156 — the workspace layout. These assert the ORDER and the
+   * presence of every section, because the restructure moved eleven blocks
+   * and the risk is that one silently disappeared.
+   */
+  describe("workspace layout (Story 156)", () => {
+    function renderLoaded() {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      render(<TicketDetailView ticketId="ticket-1" />);
+    }
+
+    it("keeps every section that existed before the restructure", () => {
+      renderLoaded();
+
+      for (const heading of [
+        "detail.slaHeading",
+        "detail.escalationsHeading",
+        "detail.historyHeading",
+        "detail.csatHeading",
+        "detail.notesHeading",
+      ]) {
+        expect(screen.getByText(heading)).toBeInTheDocument();
+      }
+    });
+
+    it("puts the conversation ahead of the read-mostly sections in the DOM", () => {
+      renderLoaded();
+
+      // The conversation is the agent's primary surface; it used to be the
+      // fifth block on the page, after the metadata grid. Queried by its own
+      // heading rather than a test-only attribute added to production code.
+      const chat = screen.getByText("detail.chatHeading");
+      const history = screen.getByText("detail.historyHeading");
+      expect(
+        chat.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it("gives the page exactly one h1, carrying the subject", () => {
+      renderLoaded();
+
+      const headings = screen.getAllByRole("heading", { level: 1 });
+      expect(headings).toHaveLength(1);
+      expect(headings[0]).toHaveTextContent("Cannot log in");
+    });
+  });
+
   describe("subject editing (Story 42)", () => {
     it("commits a subject edit on blur when the value changed", () => {
       vi.mocked(useTicketQuery).mockReturnValue(
@@ -420,6 +473,8 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
 
+      // Story 156 — editing is an explicit mode now.
+      fireEvent.click(screen.getByRole("button", { name: "detail.subjectEdit" }));
       const input = screen.getByDisplayValue("Cannot log in");
       fireEvent.change(input, { target: { value: "Cannot log in anymore" } });
       fireEvent.blur(input);
@@ -445,6 +500,8 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
 
+      // Story 156 — editing is an explicit mode now.
+      fireEvent.click(screen.getByRole("button", { name: "detail.subjectEdit" }));
       const input = screen.getByDisplayValue("Cannot log in");
       fireEvent.change(input, { target: { value: "Cannot log in anymore" } });
       fireEvent.blur(input);
@@ -452,6 +509,10 @@ describe("TicketDetailView", () => {
       const onError = mutate.mock.calls[0]![1].onError as () => void;
       act(() => onError());
 
+      // Story 156 — blur also leaves edit mode, so the revert is observed by
+      // reopening: the draft must have gone back to the server's value, not
+      // kept the rejected keystrokes.
+      fireEvent.click(screen.getByRole("button", { name: "detail.subjectEdit" }));
       expect(screen.getByDisplayValue("Cannot log in")).toBeInTheDocument();
     });
 
@@ -468,6 +529,8 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
 
+      // Story 156 — editing is an explicit mode now.
+      fireEvent.click(screen.getByRole("button", { name: "detail.subjectEdit" }));
       fireEvent.blur(screen.getByDisplayValue("Cannot log in"));
 
       expect(mutate).not.toHaveBeenCalled();
@@ -486,6 +549,8 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
 
+      // Story 156 — editing is an explicit mode now.
+      fireEvent.click(screen.getByRole("button", { name: "detail.subjectEdit" }));
       const input = screen.getByDisplayValue("Cannot log in");
       fireEvent.change(input, { target: { value: "   " } });
       fireEvent.blur(input);

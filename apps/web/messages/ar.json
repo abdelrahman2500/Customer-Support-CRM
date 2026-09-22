@@ -237,7 +237,8 @@
       "categoryUpdateSuccess": "تم تحديث الفئة إلى {category}.",
       "assignedAgentUpdateSuccess": "تم تعيين الوكيل إلى {agent}.",
       "departmentUpdateSuccess": "تم تحديث القسم إلى {department}.",
-      "optionsLoading": "جارٍ التحميل…"
+      "optionsLoading": "جارٍ التحميل…",
+      "subjectEdit": "تعديل"
     },
     "sla": {
       "none": "لا يوجد هدف اتفاقية مستوى خدمة",

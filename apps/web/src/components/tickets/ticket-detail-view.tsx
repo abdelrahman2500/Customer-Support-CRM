@@ -170,7 +170,7 @@ export function TicketDetailSkeleton() {
         <Skeleton className="mt-2 h-16 w-full" />
       </Card>
 
-      <Card className="grid grid-cols-1 gap-4 p-surface sm:grid-cols-2 lg:grid-cols-4">
+      <Card className="grid grid-cols-1 gap-4 p-surface sm:grid-cols-2 lg:grid-cols-1">
         {Array.from({ length: 5 }).map((_, index) => (
           <div key={index} className="flex flex-col gap-1">
             <Skeleton className="h-3 w-16" />
@@ -214,6 +214,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const resumeMutation = useResumeTicketMutation(ticketId);
 
   const [subjectDraft, setSubjectDraft] = useState<string | null>(null);
+  /** Story 156 — the subject is a heading until an agent chooses to edit it. */
+  const [editingSubject, setEditingSubject] = useState(false);
   const [aiCategoryNoMatch, setAiCategoryNoMatch] = useState<string | null>(null);
   const [confirmHoldOpen, setConfirmHoldOpen] = useState(false);
 
@@ -253,6 +255,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           pattern exactly (this screen never had one). `rtl:rotate-180` so
           "back" points the way back in both directions; `aria-hidden`
           since the adjacent label already names the action. */}
+
       <Link
         href={`/${locale}/tickets`}
         className="focus-ring self-start rounded-sm text-sm font-medium text-ink-muted hover:text-ink hover:underline"
@@ -264,34 +267,70 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
       </Link>
 
       <div>
-        {/* NAV-2 — no visible heading exists on this page (the subject is
-            an editable Input, not static text), so a keyboard/screen-reader
-            user navigating by heading level got nothing. Visually hidden:
-            the Input's own aria-label is still the visible control's
-            accessible name; this only adds the missing document-outline
-            landmark. */}
-        <h1 className="sr-only">{ticket.subject}</h1>
-        <Input
-          className="w-full max-w-md text-lg font-semibold"
-          // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
-          // rejected edit can be explicitly reverted, mirroring
-          // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern:
-          // `subjectDraft` starts `null` (this hook runs before `ticket`
-          // exists, above the loading/error early-returns) and falls back
-          // to the server's own value until the field is actually touched.
-          value={subjectDraft ?? ticket.subject}
-          aria-label={t("detail.subjectLabel")}
-          onChange={(event) => setSubjectDraft(event.target.value)}
-          onBlur={() => {
-            const value = subjectDraft?.trim();
-            if (value && subjectDraft !== ticket.subject) {
-              mutation.mutate(
-                { subject: value },
-                { onError: () => setSubjectDraft(ticket.subject) },
-              );
-            }
-          }}
-        />
+        {/* Story 156 — a real, visible page title.
+
+            NAV-2 added an `sr-only` h1 because the subject was an
+            always-editable `Input`, so the page had no visible heading at
+            all — the right accessibility patch for a layout problem it
+            could not fix. The page read as a form rather than a record, and
+            its most important text was the one thing not rendered as text.
+
+            The subject is still editable through the same `PATCH`, with the
+            same blur-commit and the same revert-on-error; editing is now an
+            explicit mode instead of the permanent state. The `h1` carries
+            the title in both modes, so the document outline never depends
+            on which mode is active. */}
+        {editingSubject ? (
+          <>
+            <h1 className="sr-only">{ticket.subject}</h1>
+            <Input
+              autoFocus
+              className="w-full max-w-xl text-lg font-semibold"
+              // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
+              // rejected edit can be explicitly reverted, mirroring
+              // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern:
+              // `subjectDraft` starts `null` (this hook runs before `ticket`
+              // exists, above the loading/error early-returns) and falls back
+              // to the server's own value until the field is actually touched.
+              value={subjectDraft ?? ticket.subject}
+              aria-label={t("detail.subjectLabel")}
+              onChange={(event) => setSubjectDraft(event.target.value)}
+              onKeyDown={(event) => {
+                // Escape abandons the edit; the draft resets so reopening
+                // starts from the server's value, never a stale keystroke.
+                if (event.key === "Escape") {
+                  setSubjectDraft(ticket.subject);
+                  setEditingSubject(false);
+                }
+                if (event.key === "Enter") {
+                  event.currentTarget.blur();
+                }
+              }}
+              onBlur={() => {
+                const value = subjectDraft?.trim();
+                if (value && subjectDraft !== ticket.subject) {
+                  mutation.mutate(
+                    { subject: value },
+                    { onError: () => setSubjectDraft(ticket.subject) },
+                  );
+                }
+                setEditingSubject(false);
+              }}
+            />
+          </>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-semibold text-ink">{ticket.subject}</h1>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setEditingSubject(true)}
+            >
+              {t("detail.subjectEdit")}
+            </Button>
+          </div>
+        )}
         <p className="text-sm text-ink-subtle">
           {t("detail.customer")}:{" "}
           <Link
@@ -304,8 +343,6 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         </p>
       </div>
 
-      <CustomerContextPanel ticketId={ticketId} customerId={ticket.customerId} />
-
       {mutation.isError && (
         <Alert variant="destructive">
           {errorMessage(mutation.error, {
@@ -315,419 +352,444 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         </Alert>
       )}
 
-      <Card className="grid grid-cols-1 gap-4 p-surface sm:grid-cols-2 lg:grid-cols-4">
-        <Field label={t("detail.status")}>
-          <Select
-            value={ticket.status}
-            disabled={mutation.isPending}
-            onValueChange={(value) =>
-              mutation.mutate(
-                { status: value as TicketStatus },
-                {
-                  onSuccess: () =>
-                    showSuccessToast(
-                      t("detail.statusUpdateSuccess", { status: ticketLabels.status(value) }),
-                    ),
-                },
-              )
-            }
-          >
-            <SelectTrigger aria-label={t("detail.status")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {/* Story 153 — `value` stays the raw enum (it is what the
-                  mutation sends to the API); only the visible text is
-                  localized. `SelectValue` above renders the selected
-                  item's children, so the trigger follows automatically. */}
-              {STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {ticketLabels.status(option)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+      {/* Story 156 — a two-column workspace on desktop, one column below `lg`.
 
-        <Field label={t("detail.priority")}>
-          <Select
-            value={ticket.priority}
-            disabled={mutation.isPending}
-            onValueChange={(value) =>
-              mutation.mutate(
-                { priority: value as TicketPriority },
-                {
-                  onSuccess: () =>
-                    showSuccessToast(
-                      t("detail.priorityUpdateSuccess", {
-                        priority: ticketLabels.priority(value),
-                      }),
-                    ),
-                },
-              )
-            }
-          >
-            <SelectTrigger aria-label={t("detail.priority")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PRIORITY_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {ticketLabels.priority(option)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+          The page was eleven equally-weighted full-width cards in a single
+          stack, with the conversation fifth: an agent scrolled past the
+          customer panel and a four-column metadata grid to reach the thing
+          they came to read, then past seven more cards below it.
 
-        <Field label={t("detail.category")}>
-          <Select
-            value={ticket.categoryId ?? undefined}
-            disabled={mutation.isPending || categoriesQuery.isLoading}
-            onValueChange={(value) =>
-              mutation.mutate(
-                { categoryId: value },
-                {
-                  // Batch 5 (UX audit) — mirrors the status/priority Selects
-                  // just above: every immediate-commit field on this page
-                  // now confirms itself the same way, not just two of five.
-                  onSuccess: () => {
-                    const category = (categoriesQuery.data ?? []).find((c) => c.id === value);
-                    showSuccessToast(
-                      t("detail.categoryUpdateSuccess", { category: category?.name ?? value }),
-                    );
-                  },
-                },
-              )
-            }
-          >
-            <SelectTrigger aria-label={t("detail.category")}>
-              <SelectValue
-                placeholder={
-                  categoriesQuery.isLoading ? t("detail.optionsLoading") : t("detail.noCategory")
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {(categoriesQuery.data ?? []).map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {categoriesQuery.isError && (
-            <span className="text-xs text-danger-foreground">{t("detail.categoryLoadError")}</span>
-          )}
-        </Field>
+          Main column holds the conversation and everything an agent WRITES
+          (AI assist, notes, attachments, KB references). Side column holds
+          what they READ or set once (metadata, customer context, SLA,
+          escalations, history, CSAT). Nothing is hidden and nothing moved
+          behind a tab — the order changed, not the content.
 
-        <Field label={t("detail.assignedAgent")}>
-          <Select
-            value={ticket.assignedToUserId ?? undefined}
-            disabled={mutation.isPending || usersQuery.isLoading}
-            onValueChange={(value) =>
-              mutation.mutate(
-                { assignedToUserId: value },
-                {
-                  onSuccess: () =>
-                    showSuccessToast(
-                      t("detail.assignedAgentUpdateSuccess", {
-                        agent: userNameById.get(value) ?? value,
-                      }),
-                    ),
-                },
-              )
-            }
-          >
-            <SelectTrigger aria-label={t("detail.assignedAgent")}>
-              <SelectValue
-                placeholder={
-                  usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {(usersQuery.data ?? []).map((user) => (
-                <SelectItem key={user.id} value={user.id}>
-                  <span className="flex w-full items-center justify-between gap-2">
-                    <span>{user.fullName}</span>
-                    {/* RM-06 — mirrors `UserListView`'s own presence Badge shape,
-                        just under this namespace's own key names. */}
-                    <Badge variant={presence[user.id] === "online" ? "success" : "secondary"}>
-                      {presence[user.id] === "online"
-                        ? t("detail.presenceOnline")
-                        : t("detail.presenceOffline")}
-                    </Badge>
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+          `items-start` so the columns size independently instead of the
+          shorter one stretching. Below `lg` the grid is one column and the
+          main column renders first, so a phone opens on the conversation. */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+          <TicketChatCard ticketId={ticketId} />
 
-        <Field label={t("detail.department")}>
-          <Select
-            value={ticket.departmentId ?? undefined}
-            disabled={mutation.isPending || departmentsQuery.isLoading}
-            onValueChange={(value) =>
-              mutation.mutate(
-                { departmentId: value },
-                {
-                  onSuccess: () => {
-                    const department = (departmentsQuery.data ?? []).find((d) => d.id === value);
-                    showSuccessToast(
-                      t("detail.departmentUpdateSuccess", {
-                        department: department?.name ?? value,
-                      }),
-                    );
-                  },
-                },
-              )
-            }
-          >
-            <SelectTrigger aria-label={t("detail.department")}>
-              <SelectValue
-                placeholder={
-                  departmentsQuery.isLoading ? t("detail.optionsLoading") : t("detail.noDepartment")
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {(departmentsQuery.data ?? []).map((department) => (
-                <SelectItem key={department.id} value={department.id}>
-                  {department.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {departmentsQuery.isError && (
-            <span className="text-xs text-danger-foreground">
-              {t("detail.departmentLoadError")}
-            </span>
-          )}
-        </Field>
-      </Card>
-
-      <TicketChatCard ticketId={ticketId} />
-
-      <TicketAiCard
-        ticketId={ticketId}
-        onApplyCategory={(suggested) => {
-          const match = (categoriesQuery.data ?? []).find(
-            (category) => category.name.toLowerCase() === suggested.trim().toLowerCase(),
-          );
-          if (match) {
-            setAiCategoryNoMatch(null);
-            mutation.mutate({ categoryId: match.id });
-          } else {
-            setAiCategoryNoMatch(suggested);
-          }
-        }}
-      />
-      {aiCategoryNoMatch && (
-        <Alert>
-          {t("detail.aiCategoryNoMatch", { category: aiCategoryNoMatch })}{" "}
-          <Link className="underline" href={`/${locale}/ticket-categories`}>
-            {t("detail.aiCategoryNoMatchLink")}
-          </Link>
-        </Alert>
-      )}
-
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.slaHeading")}</h2>
-        {slaTargetQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
-        {slaTargetQuery.isSuccess && slaStatus.kind === "none" && (
-          <p className="mt-1 text-sm text-ink-subtle">{t("sla.none")}</p>
-        )}
-        {slaTargetQuery.isSuccess && slaStatus.kind === "breached" && (
-          <Badge variant="destructive" className="mt-2">
-            {t("sla.breachedAt", { time: new Date(slaStatus.targetAt).toLocaleString(locale) })}
-          </Badge>
-        )}
-        {slaTargetQuery.isSuccess && slaStatus.kind === "on-track" && (
-          <p className="mt-1 text-sm text-ink-strong">
-            {t("sla.remaining", { time: formatRemaining(slaStatus.remainingMs) })}
-          </p>
-        )}
-        {/* RM-25 — SLA Pause/Resume. Shown instead of a ticking countdown
-            while held: the clock genuinely isn't advancing, so a countdown
-            here would misrepresent it. */}
-        {slaTargetQuery.isSuccess && slaStatus.kind === "on-hold" && (
-          <Badge variant="secondary" className="mt-2">
-            {t("sla.onHoldSince", { time: slaStatus.onHoldSince.toLocaleString(locale) })}
-          </Badge>
-        )}
-        {slaTargetQuery.isSuccess && slaStatus.kind !== "none" && (
-          <div className="mt-2">
-            {slaStatus.kind === "on-hold" ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={resumeMutation.isPending}
-                onClick={() => resumeMutation.mutate()}
-              >
-                {t("sla.resume")}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={holdMutation.isPending}
-                onClick={() => setConfirmHoldOpen(true)}
-              >
-                {t("sla.placeOnHold")}
-              </Button>
-            )}
-            <ConfirmDialog
-              open={confirmHoldOpen}
-              onOpenChange={setConfirmHoldOpen}
-              title={t("sla.holdConfirmTitle")}
-              description={t("sla.holdConfirmDescription")}
-              confirmLabel={t("sla.placeOnHold")}
-              onConfirm={() =>
-                holdMutation.mutate(undefined, { onSuccess: () => setConfirmHoldOpen(false) })
+          <TicketAiCard
+            ticketId={ticketId}
+            onApplyCategory={(suggested) => {
+              const match = (categoriesQuery.data ?? []).find(
+                (category) => category.name.toLowerCase() === suggested.trim().toLowerCase(),
+              );
+              if (match) {
+                setAiCategoryNoMatch(null);
+                mutation.mutate({ categoryId: match.id });
+              } else {
+                setAiCategoryNoMatch(suggested);
               }
-              isPending={holdMutation.isPending}
-            />
-            {(holdMutation.isError || resumeMutation.isError) && (
-              <p className="mt-1 text-xs text-danger-foreground">
-                {errorMessage(holdMutation.error ?? resumeMutation.error, {
-                  forbidden: t("sla.actionForbidden"),
-                  generic: t("sla.actionFailed"),
-                })}
+            }}
+          />
+
+          {aiCategoryNoMatch && (
+            <Alert>
+              {t("detail.aiCategoryNoMatch", { category: aiCategoryNoMatch })}{" "}
+              <Link className="underline" href={`/${locale}/ticket-categories`}>
+                {t("detail.aiCategoryNoMatchLink")}
+              </Link>
+            </Alert>
+          )}
+
+          <Card className="p-surface">
+            <h2 className="text-sm font-semibold text-ink">{t("detail.notesHeading")}</h2>
+            {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+            {notesQuery.isError && (
+              <Alert variant="destructive" className="mt-2">
+                {t("detail.notesError")}
+              </Alert>
+            )}
+            {notesQuery.isSuccess && notesQuery.data.length === 0 && (
+              <p className="mt-2 text-sm text-ink-subtle">{t("detail.notesEmpty")}</p>
+            )}
+            {notesQuery.isSuccess && notesQuery.data.length > 0 && (
+              <ol className="mt-2 flex flex-col gap-2 text-sm">
+                {notesQuery.data.map((note) => (
+                  <li key={note.id} className="border-b border-rule-subtle pb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-ink-strong">
+                        {userNameById.get(note.authorUserId) ?? note.authorUserId}
+                      </span>
+                      <span className="text-ink-subtle">
+                        {new Date(note.createdAt).toLocaleString(locale)}
+                      </span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-ink-strong">{note.body}</p>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <AddNoteForm ticketId={ticketId} />
+          </Card>
+
+          <AttachmentsCard
+            owner={{ type: "ticket", id: ticketId }}
+            locale={locale}
+            strings={{
+              heading: t("detail.attachmentsHeading"),
+              error: t("detail.attachmentsError"),
+              empty: t("detail.attachmentsEmpty"),
+              uploading: t("detail.attachmentsUploading"),
+              uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+              uploadForbidden: t("detail.actionForbidden"),
+            }}
+          />
+
+          <TicketKbReferencesCard ticketId={ticketId} />
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-6">
+          <Card className="grid grid-cols-1 gap-4 p-surface sm:grid-cols-2 lg:grid-cols-1">
+            <Field label={t("detail.status")}>
+              <Select
+                value={ticket.status}
+                disabled={mutation.isPending}
+                onValueChange={(value) =>
+                  mutation.mutate(
+                    { status: value as TicketStatus },
+                    {
+                      onSuccess: () =>
+                        showSuccessToast(
+                          t("detail.statusUpdateSuccess", { status: ticketLabels.status(value) }),
+                        ),
+                    },
+                  )
+                }
+              >
+                <SelectTrigger aria-label={t("detail.status")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* Story 153 — `value` stays the raw enum (it is what the
+                      mutation sends to the API); only the visible text is
+                      localized. `SelectValue` above renders the selected
+                      item's children, so the trigger follows automatically. */}
+                  {STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {ticketLabels.status(option)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label={t("detail.priority")}>
+              <Select
+                value={ticket.priority}
+                disabled={mutation.isPending}
+                onValueChange={(value) =>
+                  mutation.mutate(
+                    { priority: value as TicketPriority },
+                    {
+                      onSuccess: () =>
+                        showSuccessToast(
+                          t("detail.priorityUpdateSuccess", {
+                            priority: ticketLabels.priority(value),
+                          }),
+                        ),
+                    },
+                  )
+                }
+              >
+                <SelectTrigger aria-label={t("detail.priority")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITY_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {ticketLabels.priority(option)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label={t("detail.category")}>
+              <Select
+                value={ticket.categoryId ?? undefined}
+                disabled={mutation.isPending || categoriesQuery.isLoading}
+                onValueChange={(value) =>
+                  mutation.mutate(
+                    { categoryId: value },
+                    {
+                      // Batch 5 (UX audit) — mirrors the status/priority Selects
+                      // just above: every immediate-commit field on this page
+                      // now confirms itself the same way, not just two of five.
+                      onSuccess: () => {
+                        const category = (categoriesQuery.data ?? []).find((c) => c.id === value);
+                        showSuccessToast(
+                          t("detail.categoryUpdateSuccess", { category: category?.name ?? value }),
+                        );
+                      },
+                    },
+                  )
+                }
+              >
+                <SelectTrigger aria-label={t("detail.category")}>
+                  <SelectValue
+                    placeholder={
+                      categoriesQuery.isLoading ? t("detail.optionsLoading") : t("detail.noCategory")
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {(categoriesQuery.data ?? []).map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {categoriesQuery.isError && (
+                <span className="text-xs text-danger-foreground">{t("detail.categoryLoadError")}</span>
+              )}
+            </Field>
+
+            <Field label={t("detail.assignedAgent")}>
+              <Select
+                value={ticket.assignedToUserId ?? undefined}
+                disabled={mutation.isPending || usersQuery.isLoading}
+                onValueChange={(value) =>
+                  mutation.mutate(
+                    { assignedToUserId: value },
+                    {
+                      onSuccess: () =>
+                        showSuccessToast(
+                          t("detail.assignedAgentUpdateSuccess", {
+                            agent: userNameById.get(value) ?? value,
+                          }),
+                        ),
+                    },
+                  )
+                }
+              >
+                <SelectTrigger aria-label={t("detail.assignedAgent")}>
+                  <SelectValue
+                    placeholder={
+                      usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {(usersQuery.data ?? []).map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      <span className="flex w-full items-center justify-between gap-2">
+                        <span>{user.fullName}</span>
+                        {/* RM-06 — mirrors `UserListView`'s own presence Badge shape,
+                            just under this namespace's own key names. */}
+                        <Badge variant={presence[user.id] === "online" ? "success" : "secondary"}>
+                          {presence[user.id] === "online"
+                            ? t("detail.presenceOnline")
+                            : t("detail.presenceOffline")}
+                        </Badge>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field label={t("detail.department")}>
+              <Select
+                value={ticket.departmentId ?? undefined}
+                disabled={mutation.isPending || departmentsQuery.isLoading}
+                onValueChange={(value) =>
+                  mutation.mutate(
+                    { departmentId: value },
+                    {
+                      onSuccess: () => {
+                        const department = (departmentsQuery.data ?? []).find((d) => d.id === value);
+                        showSuccessToast(
+                          t("detail.departmentUpdateSuccess", {
+                            department: department?.name ?? value,
+                          }),
+                        );
+                      },
+                    },
+                  )
+                }
+              >
+                <SelectTrigger aria-label={t("detail.department")}>
+                  <SelectValue
+                    placeholder={
+                      departmentsQuery.isLoading ? t("detail.optionsLoading") : t("detail.noDepartment")
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {(departmentsQuery.data ?? []).map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {departmentsQuery.isError && (
+                <span className="text-xs text-danger-foreground">
+                  {t("detail.departmentLoadError")}
+                </span>
+              )}
+            </Field>
+          </Card>
+
+          <CustomerContextPanel ticketId={ticketId} customerId={ticket.customerId} />
+
+          <Card className="p-surface">
+            <h2 className="text-sm font-semibold text-ink">{t("detail.slaHeading")}</h2>
+            {slaTargetQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
+            {slaTargetQuery.isSuccess && slaStatus.kind === "none" && (
+              <p className="mt-1 text-sm text-ink-subtle">{t("sla.none")}</p>
+            )}
+            {slaTargetQuery.isSuccess && slaStatus.kind === "breached" && (
+              <Badge variant="destructive" className="mt-2">
+                {t("sla.breachedAt", { time: new Date(slaStatus.targetAt).toLocaleString(locale) })}
+              </Badge>
+            )}
+            {slaTargetQuery.isSuccess && slaStatus.kind === "on-track" && (
+              <p className="mt-1 text-sm text-ink-strong">
+                {t("sla.remaining", { time: formatRemaining(slaStatus.remainingMs) })}
               </p>
             )}
-          </div>
-        )}
-      </Card>
+            {/* RM-25 — SLA Pause/Resume. Shown instead of a ticking countdown
+                while held: the clock genuinely isn't advancing, so a countdown
+                here would misrepresent it. */}
+            {slaTargetQuery.isSuccess && slaStatus.kind === "on-hold" && (
+              <Badge variant="secondary" className="mt-2">
+                {t("sla.onHoldSince", { time: slaStatus.onHoldSince.toLocaleString(locale) })}
+              </Badge>
+            )}
+            {slaTargetQuery.isSuccess && slaStatus.kind !== "none" && (
+              <div className="mt-2">
+                {slaStatus.kind === "on-hold" ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={resumeMutation.isPending}
+                    onClick={() => resumeMutation.mutate()}
+                  >
+                    {t("sla.resume")}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={holdMutation.isPending}
+                    onClick={() => setConfirmHoldOpen(true)}
+                  >
+                    {t("sla.placeOnHold")}
+                  </Button>
+                )}
+                <ConfirmDialog
+                  open={confirmHoldOpen}
+                  onOpenChange={setConfirmHoldOpen}
+                  title={t("sla.holdConfirmTitle")}
+                  description={t("sla.holdConfirmDescription")}
+                  confirmLabel={t("sla.placeOnHold")}
+                  onConfirm={() =>
+                    holdMutation.mutate(undefined, { onSuccess: () => setConfirmHoldOpen(false) })
+                  }
+                  isPending={holdMutation.isPending}
+                />
+                {(holdMutation.isError || resumeMutation.isError) && (
+                  <p className="mt-1 text-xs text-danger-foreground">
+                    {errorMessage(holdMutation.error ?? resumeMutation.error, {
+                      forbidden: t("sla.actionForbidden"),
+                      generic: t("sla.actionFailed"),
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
+          </Card>
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.escalationsHeading")}</h2>
-        {escalationsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
-        {escalationsQuery.isError && (
-          <Alert variant="destructive" className="mt-2">
-            {t("detail.escalationsError")}
-          </Alert>
-        )}
-        {escalationsQuery.isSuccess && escalationsQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-ink-subtle">{t("detail.escalationsEmpty")}</p>
-        )}
-        {escalationsQuery.isSuccess && escalationsQuery.data.length > 0 && (
-          <ol className="mt-2 flex flex-col gap-2 text-sm">
-            {escalationsQuery.data.map((escalation) => {
-              const targetTypeLabelKey = TARGET_TYPE_LABEL_KEYS[escalation.targetType];
-              return (
-                <li
-                  key={escalation.id}
-                  className="flex items-center justify-between border-b border-rule-subtle pb-2"
-                >
-                  <span className="font-medium text-ink-strong">
-                    {targetTypeLabelKey ? t(targetTypeLabelKey) : escalation.targetType}
-                  </span>
-                  <span className="text-ink-subtle">
-                    {new Date(escalation.escalatedAt).toLocaleString(locale)}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </Card>
+          <Card className="p-surface">
+            <h2 className="text-sm font-semibold text-ink">{t("detail.escalationsHeading")}</h2>
+            {escalationsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+            {escalationsQuery.isError && (
+              <Alert variant="destructive" className="mt-2">
+                {t("detail.escalationsError")}
+              </Alert>
+            )}
+            {escalationsQuery.isSuccess && escalationsQuery.data.length === 0 && (
+              <p className="mt-2 text-sm text-ink-subtle">{t("detail.escalationsEmpty")}</p>
+            )}
+            {escalationsQuery.isSuccess && escalationsQuery.data.length > 0 && (
+              <ol className="mt-2 flex flex-col gap-2 text-sm">
+                {escalationsQuery.data.map((escalation) => {
+                  const targetTypeLabelKey = TARGET_TYPE_LABEL_KEYS[escalation.targetType];
+                  return (
+                    <li
+                      key={escalation.id}
+                      className="flex items-center justify-between border-b border-rule-subtle pb-2"
+                    >
+                      <span className="font-medium text-ink-strong">
+                        {targetTypeLabelKey ? t(targetTypeLabelKey) : escalation.targetType}
+                      </span>
+                      <span className="text-ink-subtle">
+                        {new Date(escalation.escalatedAt).toLocaleString(locale)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </Card>
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.historyHeading")}</h2>
-        {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
-        {historyQuery.isError && (
-          <Alert variant="destructive" className="mt-2">
-            {t("detail.historyError")}
-          </Alert>
-        )}
-        {historyQuery.isSuccess && historyQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-ink-subtle">{t("detail.historyEmpty")}</p>
-        )}
-        {historyQuery.isSuccess && historyQuery.data.length > 0 && (
-          <ol className="mt-2 flex flex-col gap-2 text-sm">
-            {historyQuery.data.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex items-center justify-between border-b border-rule-subtle pb-2"
-              >
-                <span className="font-medium text-ink-strong">{entry.eventType}</span>
-                <span className="text-ink-subtle">
-                  {new Date(entry.createdAt).toLocaleString(locale)}
+          <Card className="p-surface">
+            <h2 className="text-sm font-semibold text-ink">{t("detail.historyHeading")}</h2>
+            {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+            {historyQuery.isError && (
+              <Alert variant="destructive" className="mt-2">
+                {t("detail.historyError")}
+              </Alert>
+            )}
+            {historyQuery.isSuccess && historyQuery.data.length === 0 && (
+              <p className="mt-2 text-sm text-ink-subtle">{t("detail.historyEmpty")}</p>
+            )}
+            {historyQuery.isSuccess && historyQuery.data.length > 0 && (
+              <ol className="mt-2 flex flex-col gap-2 text-sm">
+                {historyQuery.data.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex items-center justify-between border-b border-rule-subtle pb-2"
+                  >
+                    <span className="font-medium text-ink-strong">{entry.eventType}</span>
+                    <span className="text-ink-subtle">
+                      {new Date(entry.createdAt).toLocaleString(locale)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Card>
+
+          <Card className="p-surface">
+            <h2 className="text-sm font-semibold text-ink">{t("detail.csatHeading")}</h2>
+            {csatQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
+            {csatQuery.isError && (
+              <Alert variant="destructive" className="mt-2">
+                {t("detail.csatError")}
+              </Alert>
+            )}
+            {csatQuery.isSuccess && !csatQuery.data && (
+              <p className="mt-2 text-sm text-ink-subtle">{t("detail.csatEmpty")}</p>
+            )}
+            {csatQuery.isSuccess && csatQuery.data && (
+              <div className="mt-2 flex flex-col gap-1 text-sm">
+                <span className="font-medium text-ink-strong">
+                  {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
                 </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Card>
-
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.csatHeading")}</h2>
-        {csatQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
-        {csatQuery.isError && (
-          <Alert variant="destructive" className="mt-2">
-            {t("detail.csatError")}
-          </Alert>
-        )}
-        {csatQuery.isSuccess && !csatQuery.data && (
-          <p className="mt-2 text-sm text-ink-subtle">{t("detail.csatEmpty")}</p>
-        )}
-        {csatQuery.isSuccess && csatQuery.data && (
-          <div className="mt-2 flex flex-col gap-1 text-sm">
-            <span className="font-medium text-ink-strong">
-              {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
-            </span>
-            {csatQuery.data.comment && <p className="text-ink-strong">{csatQuery.data.comment}</p>}
-          </div>
-        )}
-      </Card>
-
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.notesHeading")}</h2>
-        {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
-        {notesQuery.isError && (
-          <Alert variant="destructive" className="mt-2">
-            {t("detail.notesError")}
-          </Alert>
-        )}
-        {notesQuery.isSuccess && notesQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-ink-subtle">{t("detail.notesEmpty")}</p>
-        )}
-        {notesQuery.isSuccess && notesQuery.data.length > 0 && (
-          <ol className="mt-2 flex flex-col gap-2 text-sm">
-            {notesQuery.data.map((note) => (
-              <li key={note.id} className="border-b border-rule-subtle pb-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-ink-strong">
-                    {userNameById.get(note.authorUserId) ?? note.authorUserId}
-                  </span>
-                  <span className="text-ink-subtle">
-                    {new Date(note.createdAt).toLocaleString(locale)}
-                  </span>
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-ink-strong">{note.body}</p>
-              </li>
-            ))}
-          </ol>
-        )}
-        <AddNoteForm ticketId={ticketId} />
-      </Card>
-
-      <AttachmentsCard
-        owner={{ type: "ticket", id: ticketId }}
-        locale={locale}
-        strings={{
-          heading: t("detail.attachmentsHeading"),
-          error: t("detail.attachmentsError"),
-          empty: t("detail.attachmentsEmpty"),
-          uploading: t("detail.attachmentsUploading"),
-          uploadFailedFallback: t("detail.attachmentsUploadFailed"),
-          uploadForbidden: t("detail.actionForbidden"),
-        }}
-      />
-
-      <TicketKbReferencesCard ticketId={ticketId} />
+                {csatQuery.data.comment && <p className="text-ink-strong">{csatQuery.data.comment}</p>}
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
     </section>
   );
 }

@@ -237,7 +237,8 @@
       "categoryUpdateSuccess": "Category updated to {category}.",
       "assignedAgentUpdateSuccess": "Assigned agent updated to {agent}.",
       "departmentUpdateSuccess": "Department updated to {department}.",
-      "optionsLoading": "Loading…"
+      "optionsLoading": "Loading…",
+      "subjectEdit": "Edit"
     },
     "sla": {
       "none": "No SLA target",

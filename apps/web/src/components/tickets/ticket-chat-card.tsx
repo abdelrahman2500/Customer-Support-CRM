@@ -91,7 +91,14 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
         <ol
           ref={listRef}
           aria-label={t("detail.chatHeading")}
-          className="mt-2 flex max-h-80 flex-col gap-3 overflow-y-auto py-1"
+          // Story 156 — was a flat `max-h-80` (320px). The conversation is
+          // the agent's primary work surface on this page, and 320px showed
+          // roughly three messages while the metadata above it took a
+          // full-width four-column grid. `min-h` keeps a short thread from
+          // collapsing into a cramped strip; `max-h` is viewport-relative so
+          // it grows with the screen instead of being pinned to one desktop
+          // guess, and still bounds the scroll region on a phone.
+          className="mt-2 flex max-h-[60vh] min-h-[16rem] flex-col gap-3 overflow-y-auto py-1"
         >
           {messagesQuery.data.map((message) => {
             const isMine =
