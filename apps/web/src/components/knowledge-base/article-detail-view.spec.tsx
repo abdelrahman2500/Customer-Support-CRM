@@ -156,7 +156,13 @@ describe("ArticleDetailView", () => {
 
     render(<ArticleDetailView articleId="article-1" />);
 
-    expect(screen.getByDisplayValue("How to reset a password")).toBeInTheDocument();
+    // Story 159 — the title is a visible heading, editable behind an
+    // explicit Edit affordance rather than being a permanent input.
+    expect(
+      screen.getByRole("heading", { level: 1, name: "How to reset a password" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "detail.titleEdit" })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("How to reset a password")).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "detail.categoryLabel" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Step-by-step instructions...")).toBeInTheDocument();
     expect(screen.getByText("list.draft")).toBeInTheDocument();
@@ -236,6 +242,8 @@ describe("ArticleDetailView", () => {
 
     render(<ArticleDetailView articleId="article-1" />);
 
+    // Story 159 — editing is an explicit mode now.
+    fireEvent.click(screen.getByRole("button", { name: "detail.titleEdit" }));
     const input = screen.getByDisplayValue("How to reset a password");
     fireEvent.change(input, { target: { value: "How to reset your password" } });
     fireEvent.blur(input);
@@ -262,6 +270,7 @@ describe("ArticleDetailView", () => {
 
     render(<ArticleDetailView articleId="article-1" />);
 
+    fireEvent.click(screen.getByRole("button", { name: "detail.titleEdit" }));
     const input = screen.getByDisplayValue("How to reset a password");
     fireEvent.change(input, { target: { value: "How to reset your password" } });
     fireEvent.blur(input);
@@ -269,6 +278,9 @@ describe("ArticleDetailView", () => {
     const onError = mutate.mock.calls[0]![1].onError as () => void;
     act(() => onError());
 
+    // Story 159 — blur also leaves edit mode, so the reverted draft is
+    // observed by reopening the field, not by reading a still-open input.
+    fireEvent.click(screen.getByRole("button", { name: "detail.titleEdit" }));
     expect(screen.getByDisplayValue("How to reset a password")).toBeInTheDocument();
   });
 
@@ -285,9 +297,39 @@ describe("ArticleDetailView", () => {
     } as never);
 
     render(<ArticleDetailView articleId="article-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "detail.titleEdit" }));
     fireEvent.blur(screen.getByDisplayValue("How to reset a password"));
 
     expect(mutate).not.toHaveBeenCalled();
+  });
+
+  // Story 159 — matches ticket detail's own Escape behaviour.
+  it("abandons a title edit on Escape without committing it", () => {
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ data: baseArticle, isSuccess: true }) as never,
+    );
+    const mutate = vi.fn();
+    vi.mocked(useUpdateArticleMutation).mockReturnValue({
+      mutate,
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<ArticleDetailView articleId="article-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "detail.titleEdit" }));
+    const input = screen.getByDisplayValue("How to reset a password");
+    fireEvent.change(input, { target: { value: "How to reset your password" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(mutate).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "How to reset a password" }),
+    ).toBeInTheDocument();
+
+    // Reopening starts from the server's value, never the abandoned draft.
+    fireEvent.click(screen.getByRole("button", { name: "detail.titleEdit" }));
+    expect(screen.getByDisplayValue("How to reset a password")).toBeInTheDocument();
   });
 
   it("publishes a draft article via the publish button", () => {
@@ -423,7 +465,11 @@ describe("ArticleDetailView", () => {
 
     render(<ArticleDetailView articleId="article-1" />);
 
-    expect(screen.getByText("detail.versions.title")).toBeInTheDocument();
+    // Story 159 — version history is a `SectionCard` now, so its heading
+    // is the `h2` `SectionCard` renders rather than a bare styled span.
+    expect(
+      screen.getByRole("heading", { level: 2, name: "detail.versions.title" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("How to reset your password")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
@@ -561,14 +607,12 @@ describe("ArticleDetailView", () => {
       render(<ArticleDetailView articleId="article-1" />);
       await openArabicTab();
 
-      expect(screen.getByRole("textbox", { name: "detail.translations.titleLabel" })).toHaveAttribute(
-        "dir",
-        "rtl",
-      );
-      expect(screen.getByRole("textbox", { name: "detail.translations.bodyLabel" })).toHaveAttribute(
-        "dir",
-        "rtl",
-      );
+      expect(
+        screen.getByRole("textbox", { name: "detail.translations.titleLabel" }),
+      ).toHaveAttribute("dir", "rtl");
+      expect(
+        screen.getByRole("textbox", { name: "detail.translations.bodyLabel" }),
+      ).toHaveAttribute("dir", "rtl");
     });
 
     it("saves both trimmed fields together in one request", async () => {
@@ -601,7 +645,9 @@ describe("ArticleDetailView", () => {
     });
 
     it("fires the success toast once a save resolves", async () => {
-      const mutate = vi.fn((_input, options?: { onSuccess?: () => void }) => options?.onSuccess?.());
+      const mutate = vi.fn((_input, options?: { onSuccess?: () => void }) =>
+        options?.onSuccess?.(),
+      );
       vi.mocked(useSetArticleTranslationMutation).mockReturnValue({
         mutate,
         isPending: false,
@@ -719,7 +765,9 @@ describe("ArticleDetailView", () => {
       await userEvent.setup().click(screen.getByRole("tab", { name: "detail.locales.en" }));
 
       expect(screen.getByDisplayValue("Step-by-step instructions...")).toBeInTheDocument();
-      expect(screen.getByDisplayValue("How to reset a password")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 1, name: "How to reset a password" }),
+      ).toBeInTheDocument();
     });
   });
 });

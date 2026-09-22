@@ -124,7 +124,9 @@ describe("CustomerDetailView", () => {
     // RM-02 — every render path also calls `useCustomerNotesQuery`/
     // `useUsersQuery` (the new Notes card); default to an empty, successful
     // result so pre-existing tests are unaffected.
-    mockedUseCustomerNotesQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
+    mockedUseCustomerNotesQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [] }) as never,
+    );
     mockedUseUsersQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
     mockedUseCreateCustomerNoteMutation.mockReturnValue(idleMutation() as never);
     // Story 132 - every render path also calls `useAnonymizeCustomerMutation`
@@ -184,12 +186,39 @@ describe("CustomerDetailView", () => {
 
     render(<CustomerDetailView customerId="customer-1" />);
 
-    expect(screen.getByDisplayValue("Acme Inc.")).toBeInTheDocument();
+    // Story 159 — the name is a visible heading, editable behind an
+    // explicit Edit affordance rather than being a permanent input.
+    expect(screen.getByRole("heading", { level: 1, name: "Acme Inc." })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "detail.displayNameEdit" })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Acme Inc.")).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Jane Doe")).toBeInTheDocument();
     expect(screen.getByDisplayValue("jane@acme.test")).toBeInTheDocument();
     // "detail.primaryContact" also labels the add-contact form's checkbox —
     // scope to the contacts list to assert the row's own primary badge.
     expect(within(screen.getByRole("list")).getByText("detail.primaryContact")).toBeInTheDocument();
+  });
+
+  // Story 159 — the page became a two-column grid; every section it had
+  // before must still be on it, in neither column exclusively.
+  it("keeps every section on the page after the two-column split", () => {
+    mockedUseCustomerQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: { id: "customer-1", displayName: "Acme Inc.", isActive: true, contacts: [] },
+      }) as never,
+    );
+
+    render(<CustomerDetailView customerId="customer-1" />);
+
+    for (const heading of [
+      "detail.ticketsHeading",
+      "detail.notesHeading",
+      "detail.contactsHeading",
+      "detail.attachmentsHeading",
+      "detail.anonymizeHeading",
+    ]) {
+      expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+    }
   });
 
   // Batch 3 (UX audit) — mirrors the portal's own equivalent link, which
@@ -403,6 +432,8 @@ describe("CustomerDetailView", () => {
       mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
+      // Story 159 — editing is an explicit mode now.
+      fireEvent.click(screen.getByRole("button", { name: "detail.displayNameEdit" }));
       const input = screen.getByDisplayValue("Acme Inc.");
       fireEvent.change(input, { target: { value: "Acme Corp." } });
       fireEvent.blur(input);
@@ -420,6 +451,7 @@ describe("CustomerDetailView", () => {
       mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByRole("button", { name: "detail.displayNameEdit" }));
       const input = screen.getByDisplayValue("Acme Inc.");
       fireEvent.change(input, { target: { value: "Acme Corp." } });
       fireEvent.blur(input);
@@ -427,6 +459,9 @@ describe("CustomerDetailView", () => {
       const onError = mutate.mock.calls[0]![1].onError as () => void;
       act(() => onError());
 
+      // Story 159 — blur also leaves edit mode, so the reverted draft is
+      // observed by reopening the field, not by reading a still-open input.
+      fireEvent.click(screen.getByRole("button", { name: "detail.displayNameEdit" }));
       expect(screen.getByDisplayValue("Acme Inc.")).toBeInTheDocument();
     });
 
@@ -435,10 +470,30 @@ describe("CustomerDetailView", () => {
       mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByRole("button", { name: "detail.displayNameEdit" }));
       const input = screen.getByDisplayValue("Acme Inc.");
       fireEvent.blur(input);
 
       expect(mutate).not.toHaveBeenCalled();
+    });
+
+    // Story 159 — matches ticket detail's own Escape behaviour.
+    it("abandons a display-name edit on Escape without committing it", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByRole("button", { name: "detail.displayNameEdit" }));
+      const input = screen.getByDisplayValue("Acme Inc.");
+      fireEvent.change(input, { target: { value: "Acme Corp." } });
+      fireEvent.keyDown(input, { key: "Escape" });
+
+      expect(mutate).not.toHaveBeenCalled();
+      expect(screen.getByRole("heading", { level: 1, name: "Acme Inc." })).toBeInTheDocument();
+
+      // Reopening starts from the server's value, never the abandoned draft.
+      fireEvent.click(screen.getByRole("button", { name: "detail.displayNameEdit" }));
+      expect(screen.getByDisplayValue("Acme Inc.")).toBeInTheDocument();
     });
 
     it("toggles isActive via the real PATCH /customers/:id mutation", async () => {
@@ -1069,9 +1124,7 @@ describe("CustomerDetailView", () => {
 
       render(<CustomerDetailView customerId="customer-1" />);
 
-      expect(
-        screen.getByRole("button", { name: "detail.anonymizeSubmit" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "detail.anonymizeSubmit" })).toBeInTheDocument();
     });
 
     it("renders the action as destructive, distinguishing it from ordinary edits", () => {

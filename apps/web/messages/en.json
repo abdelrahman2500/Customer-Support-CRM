@@ -362,7 +362,8 @@
       "anonymizedBadge": "Anonymized",
       "anonymizedRetentionNote": "Identifying details and portal access were removed. Tickets, SLA records and reporting history were kept, and message text, notes, survey comments and uploaded files were not erased.",
       "anonymizeForbidden": "You don't have permission to anonymize a customer.",
-      "anonymizeFailed": "Couldn't anonymize this customer. Please try again."
+      "anonymizeFailed": "Couldn't anonymize this customer. Please try again.",
+      "displayNameEdit": "Edit"
     },
     "create": {
       "title": "New customer",
@@ -770,7 +771,8 @@
           "title": "Title",
           "publishedAt": "Published at"
         }
-      }
+      },
+      "titleEdit": "Edit"
     }
   },
   "notificationHistory": {

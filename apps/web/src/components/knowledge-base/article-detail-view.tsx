@@ -15,7 +15,7 @@ import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { localeDirection } from "@/i18n/direction";
-import { Alert, Badge, Button, Input, Skeleton, showSuccessToast } from "@crm/ui";
+import { Alert, Badge, Button, Input, SectionCard, Skeleton, showSuccessToast } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import {
@@ -83,6 +83,8 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [bodyDraft, setBodyDraft] = useState<string | null>(null);
+  /** Story 159 — the title is a heading until an author chooses to edit it. */
+  const [editingTitle, setEditingTitle] = useState(false);
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
 
   if (articleQuery.isLoading) {
@@ -129,30 +131,71 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         {t("detail.backToList")}
       </Link>
 
-      <div className="flex items-center justify-between">
-        {/* NAV-2 — no visible heading exists on this page (the title is
-            an editable Input, not static text), so a keyboard/screen-reader
-            user navigating by heading level got nothing. Visually hidden:
-            the Input's own aria-label is still the visible control's
-            accessible name; this only adds the missing document-outline
-            landmark. */}
-        <h1 className="sr-only">{article.title}</h1>
-        <Input
-          className="max-w-md text-lg font-semibold"
-          // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
-          // rejected edit can be explicitly reverted, mirroring
-          // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern.
-          value={titleDraft ?? article.title}
-          aria-label={t("detail.titleLabel")}
-          onChange={(event) => setTitleDraft(event.target.value)}
-          onBlur={() => {
-            const value = titleDraft?.trim();
-            if (value && titleDraft !== article.title) {
-              mutation.mutate({ title: value }, { onError: () => setTitleDraft(article.title) });
-            }
-          }}
-        />
-        <div className="flex items-center gap-2">
+      {/* Story 159 — a real, visible page title, adopting Story 156's
+          ticket-detail pattern.
+
+          NAV-2 added an `sr-only` h1 because the title was an
+          always-editable `Input`, so the page had no visible heading at
+          all — the right accessibility patch for a layout problem it could
+          not fix. The page read as a form rather than a record, and its
+          most important text was the one thing not rendered as text.
+
+          The title is still editable through the same `PATCH`, with the
+          same blur-commit and the same revert-on-error; editing is now an
+          explicit mode instead of the permanent state. The `h1` carries
+          the title in both modes, so the document outline never depends on
+          which mode is active. `flex-wrap` keeps the status badge and the
+          publish action beside a long title rather than off the screen.
+
+          This page keeps its single full-width column: unlike ticket
+          detail, it is a content editor whose body `Textarea` is the work
+          surface, and it already organizes itself through Story 137's
+          locale `Tabs`. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {editingTitle ? (
+          <>
+            <h1 className="sr-only">{article.title}</h1>
+            <Input
+              autoFocus
+              className="w-full max-w-md text-lg font-semibold"
+              // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
+              // rejected edit can be explicitly reverted, mirroring
+              // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern.
+              value={titleDraft ?? article.title}
+              aria-label={t("detail.titleLabel")}
+              onChange={(event) => setTitleDraft(event.target.value)}
+              onKeyDown={(event) => {
+                // Escape abandons the edit; the draft resets so reopening
+                // starts from the server's value, never a stale keystroke.
+                if (event.key === "Escape") {
+                  setTitleDraft(article.title);
+                  setEditingTitle(false);
+                }
+                if (event.key === "Enter") {
+                  event.currentTarget.blur();
+                }
+              }}
+              onBlur={() => {
+                const value = titleDraft?.trim();
+                if (value && titleDraft !== article.title) {
+                  mutation.mutate(
+                    { title: value },
+                    { onError: () => setTitleDraft(article.title) },
+                  );
+                }
+                setEditingTitle(false);
+              }}
+            />
+          </>
+        ) : (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h1 className="text-lg font-semibold text-ink">{article.title}</h1>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingTitle(true)}>
+              {t("detail.titleEdit")}
+            </Button>
+          </div>
+        )}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Badge variant={article.status === "PUBLISHED" ? "success" : "secondary"}>
             {article.status === "PUBLISHED" ? t("list.published") : t("list.draft")}
           </Badge>
@@ -279,10 +322,12 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
   const { locale } = useParams<{ locale: string }>();
   const versionsQuery = useArticleVersionsQuery(articleId);
 
+  // Story 159 — a `SectionCard` rather than a hairline-separated `<section>`,
+  // so version history reads as a peer of the article's other panels instead
+  // of an afterthought appended below them. `SectionCard` supplies the `h2`
+  // (Story 154's `headingLevel`), which is the level this heading already had.
   return (
-    <section className="flex flex-col gap-2 border-t border-rule pt-4">
-      <h2 className="text-sm font-semibold text-ink">{t("detail.versions.title")}</h2>
-
+    <SectionCard title={t("detail.versions.title")} className="flex flex-col gap-2">
       {versionsQuery.isLoading && <Skeleton className="h-10 w-full" />}
 
       {versionsQuery.isError && <Alert variant="destructive">{t("detail.versions.error")}</Alert>}
@@ -316,7 +361,7 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
           </TableBody>
         </Table>
       )}
-    </section>
+    </SectionCard>
   );
 }
 

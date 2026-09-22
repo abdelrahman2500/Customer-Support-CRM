@@ -472,6 +472,8 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
   const relatedTickets = relatedTicketsPage?.items ?? [];
   const updateCustomerMutation = useUpdateCustomerMutation(customerId);
   const [displayNameDraft, setDisplayNameDraft] = useState<string | null>(null);
+  /** Story 159 — the display name is a heading until an agent chooses to edit it. */
+  const [editingName, setEditingName] = useState(false);
   // RM-02 — Customer Notes.
   const notesQuery = useCustomerNotesQuery(customerId);
   const usersQuery = useUsersQuery();
@@ -515,33 +517,67 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         {t("detail.backToList")}
       </Link>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* NAV-2 — no visible heading exists on this page (the name is
-              an editable Input, not static text), so a keyboard/screen-reader
-              user navigating by heading level got nothing. Visually
-              hidden: the Input's own aria-label is still the visible
-              control's accessible name; this only adds the missing
-              document-outline landmark. */}
-          <h1 className="sr-only">{customer.displayName}</h1>
-          <Input
-            className="w-56 text-lg font-semibold"
-            // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
-            // rejected edit can be explicitly reverted, mirroring
-            // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern.
-            value={displayNameDraft ?? customer.displayName}
-            aria-label={t("detail.displayNameLabel")}
-            onChange={(event) => setDisplayNameDraft(event.target.value)}
-            onBlur={() => {
-              const value = displayNameDraft?.trim();
-              if (value && displayNameDraft !== customer.displayName) {
-                updateCustomerMutation.mutate(
-                  { displayName: value },
-                  { onError: () => setDisplayNameDraft(customer.displayName) },
-                );
-              }
-            }}
-          />
+      {/* Story 159 — a real, visible page title, adopting Story 156's
+          ticket-detail pattern.
+
+          NAV-2 added an `sr-only` h1 because the name was an
+          always-editable `Input`, so the page had no visible heading at
+          all — the right accessibility patch for a layout problem it could
+          not fix. The page read as a form rather than a record, and its
+          most important text was the one thing not rendered as text.
+
+          The name is still editable through the same `PATCH`, with the
+          same blur-commit and the same revert-on-error; editing is now an
+          explicit mode instead of the permanent state. The `h1` carries
+          the name in both modes, so the document outline never depends on
+          which mode is active. `flex-wrap` keeps a long name from pushing
+          the status `Select` and the New Ticket action off a narrow
+          screen. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          {editingName ? (
+            <>
+              <h1 className="sr-only">{customer.displayName}</h1>
+              <Input
+                autoFocus
+                className="w-56 text-lg font-semibold"
+                // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
+                // rejected edit can be explicitly reverted, mirroring
+                // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern.
+                value={displayNameDraft ?? customer.displayName}
+                aria-label={t("detail.displayNameLabel")}
+                onChange={(event) => setDisplayNameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  // Escape abandons the edit; the draft resets so reopening
+                  // starts from the server's value, never a stale keystroke.
+                  if (event.key === "Escape") {
+                    setDisplayNameDraft(customer.displayName);
+                    setEditingName(false);
+                  }
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+                onBlur={() => {
+                  const value = displayNameDraft?.trim();
+                  if (value && displayNameDraft !== customer.displayName) {
+                    updateCustomerMutation.mutate(
+                      { displayName: value },
+                      { onError: () => setDisplayNameDraft(customer.displayName) },
+                    );
+                  }
+                  setEditingName(false);
+                }}
+              />
+            </>
+          ) : (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h1 className="text-lg font-semibold text-ink">{customer.displayName}</h1>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setEditingName(true)}>
+                {t("detail.displayNameEdit")}
+              </Button>
+            </div>
+          )}
           <Select
             value={customer.isActive ? "active" : "inactive"}
             disabled={updateCustomerMutation.isPending}
@@ -558,7 +594,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
             </SelectContent>
           </Select>
         </div>
-        <Button size="sm" asChild>
+        <Button size="sm" className="shrink-0" asChild>
           <Link href={`/${locale}/tickets/new?customerId=${customerId}`}>
             {t("detail.newTicketButton")}
           </Link>
@@ -574,129 +610,144 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         </Alert>
       )}
 
-      <SectionCard title={t("detail.contactsHeading")}>
-        {customer.contacts.length === 0 && (
-          <p className="mt-2 text-sm text-ink-subtle">{t("detail.contactsEmpty")}</p>
-        )}
-        {customer.contacts.length > 0 && (
-          <ul className="mt-2 flex flex-col gap-2 text-sm">
-            {customer.contacts.map((contact) => (
-              <ContactRow key={contact.id} customerId={customerId} contact={contact} />
-            ))}
-          </ul>
-        )}
-        <AddContactForm customerId={customerId} />
-      </SectionCard>
+      {/* Story 159 — a two-column workspace on desktop, one column below `lg`.
 
-      <SectionCard title={t("detail.ticketsHeading")}>
-        {ticketsQuery.isLoading && (
-          <div className="mt-2 flex flex-col gap-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        )}
-        {ticketsQuery.isError && (
-          <Alert variant="destructive" className="mt-2">
-            {t("detail.ticketsError")}
-          </Alert>
-        )}
-        {ticketsQuery.isSuccess && relatedTickets.length === 0 && (
-          <p className="mt-2 text-sm text-ink-subtle">{t("detail.ticketsEmpty")}</p>
-        )}
-        {ticketsQuery.isSuccess && relatedTickets.length > 0 && (
-          <ul className="mt-2 flex flex-col gap-2 text-sm">
-            {relatedTickets.map((ticket) => (
-              <li
-                key={ticket.id}
-                className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
-                onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
-              >
-                <Link
-                  href={`/${locale}/tickets/${ticket.id}`}
-                  className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {ticket.subject}
-                </Link>
-                <span className="flex items-center gap-2">
-                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
-                    {ticketLabels.status(ticket.status)}
-                  </Badge>
-                  <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
-                    {ticketLabels.priority(ticket.priority)}
-                  </Badge>
-                  <span className="text-ink-subtle">
-                    {new Date(ticket.createdAt).toLocaleDateString(locale)}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+          Adopts Story 156's ticket-detail split. The five sections divide
+          cleanly by what an agent does with them: tickets and notes are the
+          working record of this customer and get the wide column; contacts,
+          attachments and the irreversible anonymize control are reference
+          and administration, and sit beside it. Below `lg` the grid
+          collapses to one column and the main column still comes first, so
+          nothing is buried on a phone. */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+          <SectionCard title={t("detail.ticketsHeading")}>
+            {ticketsQuery.isLoading && (
+              <div className="mt-2 flex flex-col gap-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            )}
+            {ticketsQuery.isError && (
+              <Alert variant="destructive" className="mt-2">
+                {t("detail.ticketsError")}
+              </Alert>
+            )}
+            {ticketsQuery.isSuccess && relatedTickets.length === 0 && (
+              <p className="mt-2 text-sm text-ink-subtle">{t("detail.ticketsEmpty")}</p>
+            )}
+            {ticketsQuery.isSuccess && relatedTickets.length > 0 && (
+              <ul className="mt-2 flex flex-col gap-2 text-sm">
+                {relatedTickets.map((ticket) => (
+                  <li
+                    key={ticket.id}
+                    className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
+                    onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
+                  >
+                    <Link
+                      href={`/${locale}/tickets/${ticket.id}`}
+                      className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {ticket.subject}
+                    </Link>
+                    <span className="flex items-center gap-2">
+                      <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
+                        {ticketLabels.status(ticket.status)}
+                      </Badge>
+                      <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
+                        {ticketLabels.priority(ticket.priority)}
+                      </Badge>
+                      <span className="text-ink-subtle">
+                        {new Date(ticket.createdAt).toLocaleDateString(locale)}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-        {/* Story S-8e — renders nothing until this customer actually has
-            more than one page of tickets, so the common case is unchanged. */}
-        {relatedTicketsPage !== undefined && (
-          <Pagination
-            page={relatedTicketsPage.page}
-            totalPages={relatedTicketsPage.totalPages}
-            onPageChange={setTicketsPage}
-            disabled={ticketsQuery.isPlaceholderData}
-            label={tCommon("pagination.label")}
-            previousLabel={tCommon("pagination.previous")}
-            nextLabel={tCommon("pagination.next")}
-            indicator={tCommon("pagination.indicator", {
-              page: relatedTicketsPage.page,
-              totalPages: relatedTicketsPage.totalPages,
-            })}
+            {/* Story S-8e — renders nothing until this customer actually has
+                more than one page of tickets, so the common case is unchanged. */}
+            {relatedTicketsPage !== undefined && (
+              <Pagination
+                page={relatedTicketsPage.page}
+                totalPages={relatedTicketsPage.totalPages}
+                onPageChange={setTicketsPage}
+                disabled={ticketsQuery.isPlaceholderData}
+                label={tCommon("pagination.label")}
+                previousLabel={tCommon("pagination.previous")}
+                nextLabel={tCommon("pagination.next")}
+                indicator={tCommon("pagination.indicator", {
+                  page: relatedTicketsPage.page,
+                  totalPages: relatedTicketsPage.totalPages,
+                })}
+              />
+            )}
+          </SectionCard>
+
+          <SectionCard title={t("detail.notesHeading")}>
+            {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
+            {notesQuery.isError && (
+              <Alert variant="destructive" className="mt-2">
+                {t("detail.notesError")}
+              </Alert>
+            )}
+            {notesQuery.isSuccess && notesQuery.data.length === 0 && (
+              <p className="mt-2 text-sm text-ink-subtle">{t("detail.notesEmpty")}</p>
+            )}
+            {notesQuery.isSuccess && notesQuery.data.length > 0 && (
+              <ol className="mt-2 flex flex-col gap-2 text-sm">
+                {notesQuery.data.map((note) => (
+                  <li key={note.id} className="border-b border-rule-subtle pb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-ink-strong">
+                        {userNameById.get(note.authorUserId) ?? note.authorUserId}
+                      </span>
+                      <span className="text-ink-subtle">
+                        {new Date(note.createdAt).toLocaleString(locale)}
+                      </span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-ink-strong">{note.body}</p>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <AddCustomerNoteForm customerId={customerId} />
+          </SectionCard>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-6">
+          <SectionCard title={t("detail.contactsHeading")}>
+            {customer.contacts.length === 0 && (
+              <p className="mt-2 text-sm text-ink-subtle">{t("detail.contactsEmpty")}</p>
+            )}
+            {customer.contacts.length > 0 && (
+              <ul className="mt-2 flex flex-col gap-2 text-sm">
+                {customer.contacts.map((contact) => (
+                  <ContactRow key={contact.id} customerId={customerId} contact={contact} />
+                ))}
+              </ul>
+            )}
+            <AddContactForm customerId={customerId} />
+          </SectionCard>
+
+          <AttachmentsCard
+            owner={{ type: "customer", id: customerId }}
+            locale={locale}
+            strings={{
+              heading: t("detail.attachmentsHeading"),
+              error: t("detail.attachmentsError"),
+              empty: t("detail.attachmentsEmpty"),
+              uploading: t("detail.attachmentsUploading"),
+              uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+              uploadForbidden: t("detail.actionForbidden"),
+            }}
           />
-        )}
-      </SectionCard>
 
-      <SectionCard title={t("detail.notesHeading")}>
-        {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
-        {notesQuery.isError && (
-          <Alert variant="destructive" className="mt-2">
-            {t("detail.notesError")}
-          </Alert>
-        )}
-        {notesQuery.isSuccess && notesQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-ink-subtle">{t("detail.notesEmpty")}</p>
-        )}
-        {notesQuery.isSuccess && notesQuery.data.length > 0 && (
-          <ol className="mt-2 flex flex-col gap-2 text-sm">
-            {notesQuery.data.map((note) => (
-              <li key={note.id} className="border-b border-rule-subtle pb-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-ink-strong">
-                    {userNameById.get(note.authorUserId) ?? note.authorUserId}
-                  </span>
-                  <span className="text-ink-subtle">
-                    {new Date(note.createdAt).toLocaleString(locale)}
-                  </span>
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-ink-strong">{note.body}</p>
-              </li>
-            ))}
-          </ol>
-        )}
-        <AddCustomerNoteForm customerId={customerId} />
-      </SectionCard>
-
-      <AttachmentsCard
-        owner={{ type: "customer", id: customerId }}
-        locale={locale}
-        strings={{
-          heading: t("detail.attachmentsHeading"),
-          error: t("detail.attachmentsError"),
-          empty: t("detail.attachmentsEmpty"),
-          uploading: t("detail.attachmentsUploading"),
-          uploadFailedFallback: t("detail.attachmentsUploadFailed"),
-          uploadForbidden: t("detail.actionForbidden"),
-        }}
-      />
-
-      <AnonymizeCustomerCard customerId={customerId} anonymizedAt={customer.anonymizedAt} />
+          <AnonymizeCustomerCard customerId={customerId} anonymizedAt={customer.anonymizedAt} />
+        </div>
+      </div>
     </section>
   );
 }
