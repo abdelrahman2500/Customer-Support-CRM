@@ -17,7 +17,7 @@ import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
-import { Alert, Badge, Button, Card, PageHeader, Skeleton, Textarea } from "@crm/ui";
+import { Alert, Badge, Button, Card, PageHeader, SectionCard, Skeleton, Textarea } from "@crm/ui";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
@@ -136,8 +136,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
       <TicketAttachmentsCard ticketId={ticketId} />
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.historyHeading")}</h2>
+      <SectionCard title={t("detail.historyHeading")}>
         {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {historyQuery.isError && (
           <Alert variant="destructive" className="mt-2">
@@ -162,7 +161,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             ))}
           </ol>
         )}
-      </Card>
+      </SectionCard>
 
       {CSAT_ELIGIBLE_STATUSES.includes(ticket.status) && <CsatSection ticketId={ticketId} />}
     </section>
@@ -179,8 +178,7 @@ function CsatSection({ ticketId }: { ticketId: string }) {
   const csatQuery = useMyTicketCsatQuery(ticketId);
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("detail.csatHeading")}</h2>
+    <SectionCard title={t("detail.csatHeading")}>
 
       {csatQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
 
@@ -201,7 +199,7 @@ function CsatSection({ ticketId }: { ticketId: string }) {
       )}
 
       {csatQuery.isSuccess && csatQuery.data == null && <CsatForm ticketId={ticketId} />}
-    </Card>
+    </SectionCard>
   );
 }
 

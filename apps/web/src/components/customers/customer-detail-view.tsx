@@ -32,6 +32,7 @@ import {
   Input,
   Label,
   Pagination,
+  SectionCard,
   Skeleton,
   Textarea,
 } from "@crm/ui";
@@ -573,8 +574,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         </Alert>
       )}
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.contactsHeading")}</h2>
+      <SectionCard title={t("detail.contactsHeading")}>
         {customer.contacts.length === 0 && (
           <p className="mt-2 text-sm text-ink-subtle">{t("detail.contactsEmpty")}</p>
         )}
@@ -586,10 +586,9 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           </ul>
         )}
         <AddContactForm customerId={customerId} />
-      </Card>
+      </SectionCard>
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.ticketsHeading")}</h2>
+      <SectionCard title={t("detail.ticketsHeading")}>
         {ticketsQuery.isLoading && (
           <div className="mt-2 flex flex-col gap-2">
             <Skeleton className="h-8 w-full" />
@@ -652,10 +651,9 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
             })}
           />
         )}
-      </Card>
+      </SectionCard>
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.notesHeading")}</h2>
+      <SectionCard title={t("detail.notesHeading")}>
         {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
         {notesQuery.isError && (
           <Alert variant="destructive" className="mt-2">
@@ -683,7 +681,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           </ol>
         )}
         <AddCustomerNoteForm customerId={customerId} />
-      </Card>
+      </SectionCard>
 
       <AttachmentsCard
         owner={{ type: "customer", id: customerId }}
@@ -741,20 +739,18 @@ function AnonymizeCustomerCard({
   // be a no-op the user could misread as a second, different operation.
   if (anonymizedAt) {
     return (
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("detail.anonymizeHeading")}</h2>
+      <SectionCard title={t("detail.anonymizeHeading")}>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
           <Badge variant="secondary">{t("detail.anonymizedBadge")}</Badge>
           <span className="text-ink-subtle">{new Date(anonymizedAt).toLocaleString(locale)}</span>
         </div>
         <p className="mt-2 text-sm text-ink-subtle">{t("detail.anonymizedRetentionNote")}</p>
-      </Card>
+      </SectionCard>
     );
   }
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("detail.anonymizeHeading")}</h2>
+    <SectionCard title={t("detail.anonymizeHeading")}>
       <p className="mt-2 text-sm text-ink-subtle">{t("detail.anonymizeDescription")}</p>
       <div className="mt-3">
         <Button
@@ -783,6 +779,6 @@ function AnonymizeCustomerCard({
           })}
         </Alert>
       )}
-    </Card>
+    </SectionCard>
   );
 }

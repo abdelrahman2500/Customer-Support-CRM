@@ -69,12 +69,43 @@ export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDiv
   );
 }
 
-/** `text-sm font-semibold` — the size and weight this app's section headings
- * already use. Renders an `h3` by default; a page whose card *is* the primary
- * heading passes `asChild`-style overrides through `className` and its own
- * element instead. */
-export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("text-sm font-semibold text-ink", className)} {...props} />;
+/** The heading levels a card title can legitimately be. Deliberately not
+ * `keyof JSX.IntrinsicElements`: a card title is a heading, and letting a
+ * caller pass `div` or `span` would let the document outline be dropped by
+ * accident — the exact failure this prop exists to prevent. */
+export type CardTitleLevel = "h2" | "h3" | "h4";
+
+export interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
+  /**
+   * Heading level. Defaults to `h3`, which is what this component has always
+   * rendered — existing callers are unaffected.
+   *
+   * Story 154 — added because the default was wrong for the dominant case and
+   * that made the whole component unusable. 49 section headings across both
+   * apps are hand-written `<h2 className="text-sm font-semibold text-ink">`,
+   * carrying the same three classes this component owns. Every one of them
+   * needs `h2`: they sit under a page-level `PageHeader` `h1`, so an `h3`
+   * would skip a level. Story 139 measured that and correctly declined to
+   * adopt `CardTitle` rather than break the outline — which left the
+   * component with zero consumers.
+   */
+  as?: CardTitleLevel;
+}
+
+/**
+ * `text-sm font-semibold` — the size and weight this app's section headings
+ * already use.
+ *
+ * Why `as` and not this package's usual `asChild`: `asChild` delegates the
+ * whole element, so a caller would write
+ * `<CardTitle asChild><h2>Notes</h2></CardTitle>` — longer than the raw
+ * `<h2 className="text-sm font-semibold text-ink">` it is meant to replace,
+ * which would leave adoption exactly where Story 139 found it. `as` picks a
+ * level; it does not hand over the element, so the two conventions do not
+ * overlap. `Card`, `Button` and `Select` keep `asChild` for what it is for.
+ */
+export function CardTitle({ className, as: Heading = "h3", ...props }: CardTitleProps) {
+  return <Heading className={cn("text-sm font-semibold text-ink", className)} {...props} />;
 }
 
 export function CardDescription({
@@ -101,5 +132,64 @@ export function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDiv
       )}
       {...props}
     />
+  );
+}
+
+/**
+ * Story 154 — a card that is a titled section of a page.
+ *
+ * This shape was written out by hand **49 times** across both apps:
+ *
+ *     <Card className="p-surface">
+ *       <h2 className="text-sm font-semibold text-ink">{title}</h2>
+ *       …body…
+ *     </Card>
+ *
+ * It renders exactly that and **adds no DOM node** — the same constraint
+ * Story 139 worked under when it chose `<Card className="p-surface">` over
+ * `<Card><CardContent>`: `.closest()` selectors and heading structure in the
+ * existing tests depend on the node count staying put.
+ *
+ * `h2` is the default because that is what all 49 sites use: a section sits
+ * under the page's own `PageHeader` `h1`. `headingLevel` is there for the
+ * rare nested section, not as an invitation to vary.
+ *
+ * Deliberately NOT built on `CardHeader`/`CardContent`: those wrap their
+ * children in extra `<div>`s, which is what kept them at zero adoption.
+ * `actions` is the one composition this needed — a heading row with a
+ * trailing control, which several call sites already hand-roll.
+ */
+export interface SectionCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
+  /** The section's heading. */
+  title: React.ReactNode;
+  /** Heading level. `h2` by default — see this component's doc comment. */
+  headingLevel?: CardTitleLevel;
+  /** Optional trailing control on the heading row (a filter, a toggle). */
+  actions?: React.ReactNode;
+  /** Optional raised treatment, passed through to `Card`. */
+  elevation?: CardProps["elevation"];
+}
+
+export function SectionCard({
+  title,
+  headingLevel = "h2",
+  actions,
+  elevation,
+  className,
+  children,
+  ...props
+}: SectionCardProps) {
+  return (
+    <Card elevation={elevation} className={cn("p-surface", className)} {...props}>
+      {actions ? (
+        <div className="flex items-start justify-between gap-inline">
+          <CardTitle as={headingLevel}>{title}</CardTitle>
+          <div className="flex shrink-0 items-center gap-inline">{actions}</div>
+        </div>
+      ) : (
+        <CardTitle as={headingLevel}>{title}</CardTitle>
+      )}
+      {children}
+    </Card>
   );
 }

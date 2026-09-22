@@ -92,8 +92,9 @@ export {
   CardDescription,
   CardContent,
   CardFooter,
+  SectionCard,
 } from "./components/card";
-export type { CardProps } from "./components/card";
+export type { CardProps, CardTitleProps, CardTitleLevel, SectionCardProps } from "./components/card";
 
 export { Alert } from "./components/alert";
 export type { AlertProps } from "./components/alert";
