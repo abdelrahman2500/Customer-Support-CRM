@@ -30,8 +30,8 @@ import {
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  Card,
   PageHeader,
+  SectionCard,
   Select,
   SelectContent,
   SelectItem,
@@ -307,9 +307,7 @@ export function RoleListView() {
     <section className="flex flex-col gap-6">
       <PageHeader title={t("title")} />
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("list.rolesHeading")}</h2>
-
+      <SectionCard title={t("list.rolesHeading")}>
         {/* Batch 6 (UX audit) — the shared `QueryStateCard`, replacing a
             hand-rolled loading/error/empty ladder whose empty branch was a
             third, borderless variant distinct from both `EmptyState`'s
@@ -357,11 +355,9 @@ export function RoleListView() {
         </QueryStateCard>
 
         <AddRoleForm />
-      </Card>
+      </SectionCard>
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("list.permissionsHeading")}</h2>
-
+      <SectionCard title={t("list.permissionsHeading")}>
         <QueryStateCard
           className="mt-2"
           isLoading={permissionsQuery.isLoading}
@@ -389,7 +385,7 @@ export function RoleListView() {
             ))}
           </div>
         </QueryStateCard>
-      </Card>
+      </SectionCard>
     </section>
   );
 }

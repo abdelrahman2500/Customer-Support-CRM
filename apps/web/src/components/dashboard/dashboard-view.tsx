@@ -11,7 +11,7 @@ import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import { ApiError } from "@/lib/api";
-import { Alert, Badge, Button, Card, EmptyState, PageHeader, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, EmptyState, PageHeader, SectionCard, Skeleton } from "@crm/ui";
 import { TasksPanel } from "./tasks-panel";
 
 /** Story 28 — a work queue, not a full history: only tickets still open
@@ -302,9 +302,7 @@ export function DashboardView({ userId }: { userId: string }) {
           page that takes elevation — `Card`'s own doc comment reserves it
           for "the one thing on a page that should draw the eye", and before
           this story every panel here carried identical weight. */}
-      <Card elevation="raised" className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>
-
+      <SectionCard title={t("heading")} elevation="raised">
         {myTicketsQuery.isLoading && (
           <div className="mt-2 flex flex-col gap-2">
             <Skeleton className="h-10 w-full" />
@@ -378,7 +376,7 @@ export function DashboardView({ userId }: { userId: string }) {
             ))}
           </ul>
         )}
-      </Card>
+      </SectionCard>
 
       {/* Secondary panels: supporting context, side by side from lg up so
           they read as a tier below the queue rather than three equal
@@ -386,9 +384,7 @@ export function DashboardView({ userId }: { userId: string }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <TasksPanel userId={userId} />
 
-        <Card className="p-surface">
-          <h2 className="text-sm font-semibold text-ink">{t("unassignedHeading")}</h2>
-
+        <SectionCard title={t("unassignedHeading")}>
           {unclaimedTicketsQuery.isLoading && (
             <div className="mt-2 flex flex-col gap-2">
               <Skeleton className="h-10 w-full" />
@@ -423,7 +419,7 @@ export function DashboardView({ userId }: { userId: string }) {
               ))}
             </ul>
           )}
-        </Card>
+        </SectionCard>
       </div>
     </section>
   );

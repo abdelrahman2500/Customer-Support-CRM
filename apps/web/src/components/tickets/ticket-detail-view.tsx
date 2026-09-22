@@ -31,7 +31,17 @@ import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Card, Input, Skeleton, Textarea, showSuccessToast } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Input,
+  SectionCard,
+  showSuccessToast,
+  Skeleton,
+  Textarea,
+} from "@crm/ui";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -321,12 +331,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold text-ink">{ticket.subject}</h1>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setEditingSubject(true)}
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingSubject(true)}>
               {t("detail.subjectEdit")}
             </Button>
           </div>
@@ -396,8 +401,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             </Alert>
           )}
 
-          <Card className="p-surface">
-            <h2 className="text-sm font-semibold text-ink">{t("detail.notesHeading")}</h2>
+          <SectionCard title={t("detail.notesHeading")}>
             {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
             {notesQuery.isError && (
               <Alert variant="destructive" className="mt-2">
@@ -425,7 +429,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               </ol>
             )}
             <AddNoteForm ticketId={ticketId} />
-          </Card>
+          </SectionCard>
 
           <AttachmentsCard
             owner={{ type: "ticket", id: ticketId }}
@@ -533,7 +537,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 <SelectTrigger aria-label={t("detail.category")}>
                   <SelectValue
                     placeholder={
-                      categoriesQuery.isLoading ? t("detail.optionsLoading") : t("detail.noCategory")
+                      categoriesQuery.isLoading
+                        ? t("detail.optionsLoading")
+                        : t("detail.noCategory")
                     }
                   />
                 </SelectTrigger>
@@ -546,7 +552,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 </SelectContent>
               </Select>
               {categoriesQuery.isError && (
-                <span className="text-xs text-danger-foreground">{t("detail.categoryLoadError")}</span>
+                <span className="text-xs text-danger-foreground">
+                  {t("detail.categoryLoadError")}
+                </span>
               )}
             </Field>
 
@@ -603,7 +611,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                     { departmentId: value },
                     {
                       onSuccess: () => {
-                        const department = (departmentsQuery.data ?? []).find((d) => d.id === value);
+                        const department = (departmentsQuery.data ?? []).find(
+                          (d) => d.id === value,
+                        );
                         showSuccessToast(
                           t("detail.departmentUpdateSuccess", {
                             department: department?.name ?? value,
@@ -617,7 +627,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 <SelectTrigger aria-label={t("detail.department")}>
                   <SelectValue
                     placeholder={
-                      departmentsQuery.isLoading ? t("detail.optionsLoading") : t("detail.noDepartment")
+                      departmentsQuery.isLoading
+                        ? t("detail.optionsLoading")
+                        : t("detail.noDepartment")
                     }
                   />
                 </SelectTrigger>
@@ -639,8 +651,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
           <CustomerContextPanel ticketId={ticketId} customerId={ticket.customerId} />
 
-          <Card className="p-surface">
-            <h2 className="text-sm font-semibold text-ink">{t("detail.slaHeading")}</h2>
+          <SectionCard title={t("detail.slaHeading")}>
             {slaTargetQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
             {slaTargetQuery.isSuccess && slaStatus.kind === "none" && (
               <p className="mt-1 text-sm text-ink-subtle">{t("sla.none")}</p>
@@ -705,10 +716,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 )}
               </div>
             )}
-          </Card>
+          </SectionCard>
 
-          <Card className="p-surface">
-            <h2 className="text-sm font-semibold text-ink">{t("detail.escalationsHeading")}</h2>
+          <SectionCard title={t("detail.escalationsHeading")}>
             {escalationsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
             {escalationsQuery.isError && (
               <Alert variant="destructive" className="mt-2">
@@ -738,10 +748,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 })}
               </ol>
             )}
-          </Card>
+          </SectionCard>
 
-          <Card className="p-surface">
-            <h2 className="text-sm font-semibold text-ink">{t("detail.historyHeading")}</h2>
+          <SectionCard title={t("detail.historyHeading")}>
             {historyQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
             {historyQuery.isError && (
               <Alert variant="destructive" className="mt-2">
@@ -766,10 +775,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 ))}
               </ol>
             )}
-          </Card>
+          </SectionCard>
 
-          <Card className="p-surface">
-            <h2 className="text-sm font-semibold text-ink">{t("detail.csatHeading")}</h2>
+          <SectionCard title={t("detail.csatHeading")}>
             {csatQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
             {csatQuery.isError && (
               <Alert variant="destructive" className="mt-2">
@@ -784,10 +792,12 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 <span className="font-medium text-ink-strong">
                   {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
                 </span>
-                {csatQuery.data.comment && <p className="text-ink-strong">{csatQuery.data.comment}</p>}
+                {csatQuery.data.comment && (
+                  <p className="text-ink-strong">{csatQuery.data.comment}</p>
+                )}
               </div>
             )}
-          </Card>
+          </SectionCard>
         </div>
       </div>
     </section>

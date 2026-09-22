@@ -6,7 +6,16 @@ import { useBrandingQuery, useUpdateBrandingMutation } from "@/hooks/use-brandin
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { resolveNavigationLayout } from "@/components/workspace/nav-items";
 import type { BrandingSummary, NavigationLayout } from "@/lib/branding-api";
-import { Alert, Button, Card, Input, PageHeader, showSuccessToast, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  Input,
+  PageHeader,
+  SectionCard,
+  showSuccessToast,
+  Skeleton,
+} from "@crm/ui";
 
 const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 
@@ -244,8 +253,7 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
         </form>
       </Card>
 
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("previewHeading")}</h2>
+      <SectionCard title={t("previewHeading")}>
         <div className="mt-3 flex flex-col gap-3">
           <p className="truncate text-sm font-semibold text-ink-strong">{previewBrandName}</p>
           {logoUrl.trim() ? (
@@ -275,7 +283,7 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
             <span className="text-ink-muted">{t("secondaryColorLabel")}</span>
           </div>
         </div>
-      </Card>
+      </SectionCard>
     </div>
   );
 }

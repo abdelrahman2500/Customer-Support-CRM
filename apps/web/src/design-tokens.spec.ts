@@ -151,4 +151,157 @@ describe("S-1 design tokens", () => {
 
     expect(offenders, `Use text-danger-foreground instead:\n${offenders.join("\n")}`).toEqual([]);
   });
+  /**
+   * Story 160 — the hand-rolled section card.
+   *
+   * Story 154 built `SectionCard` so one primitive owns "a titled section on a
+   * surface". Adoption after it was incidental, and 31 sites across the two
+   * apps still wrote the composition out by hand:
+   *
+   *   <Card className="p-surface">
+   *     <h2 className="text-sm font-semibold text-ink">{title}</h2>
+   *
+   * That duplication is how the heading-level drift Story 154 had to fix arose
+   * in the first place — when a shape lives in 31 places, a change to it lands
+   * in some of them. `SectionCard` renders byte-identical markup (same `Card`,
+   * same default `elevation="flat"`, `headingLevel="h2"` by default, and
+   * `CardTitle`'s classes are exactly the heading string above), so there is no
+   * reason left to write it by hand.
+   *
+   * Matched as a PAIR, unlike this file's other guards, which are single-line
+   * regexes. The anti-pattern is the combination: `p-surface` alone is worn by
+   * skeleton placeholders, KPI tiles, `PageHeader` wrappers, `asChild` form and
+   * section surfaces and metadata grids — 25 of them here — and none of those is
+   * a section card. Matching `Card`, or `p-surface`, on its own would flag every
+   * one.
+   */
+  const SECTION_HEADING = /^<h2\b[^>]*className="text-sm font-semibold text-ink"/;
+
+  /** Offending line numbers (1-based) for one file's lines. */
+  function findHandRolledSectionCards(lines: string[]): number[] {
+    const hits: number[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      if (!/<Card\b/.test(lines[i] ?? "")) continue;
+
+      // The opening tag may span lines; find where it closes.
+      let end = -1;
+      for (let j = i; j < lines.length && j < i + 12; j++) {
+        if (/>\s*$/.test(lines[j] ?? "")) {
+          end = j;
+          break;
+        }
+      }
+      if (end === -1) continue;
+      const tag = lines.slice(i, end + 1).join("\n");
+      // A self-closing <Card ... /> has no children to head.
+      if (/\/>\s*$/.test(tag)) continue;
+      if (!/p-surface/.test(tag)) continue;
+
+      // First meaningful child, skipping blank lines and JSX comments — a
+      // comment between the surface and its heading must not hide the pair.
+      let inComment = false;
+      for (let k = end + 1; k < lines.length; k++) {
+        const child = (lines[k] ?? "").trim();
+        if (child === "") continue;
+        if (inComment) {
+          if (child.endsWith("*/}")) inComment = false;
+          continue;
+        }
+        if (child.startsWith("{/*")) {
+          if (!child.endsWith("*/}")) inComment = true;
+          continue;
+        }
+        if (SECTION_HEADING.test(child)) hits.push(i + 1);
+        break;
+      }
+    }
+
+    return hits;
+  }
+
+  it("renders titled sections through SectionCard, not a hand-rolled Card plus h2", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const lines = readFileSync(file, "utf8").split("\n");
+      for (const line of findHandRolledSectionCards(lines)) {
+        offenders.push(`${file.slice(SRC.length + 1)}:${line}`);
+      }
+    }
+
+    expect(offenders, `Use <SectionCard title={...}> instead:\n${offenders.join("\n")}`).toEqual(
+      [],
+    );
+  });
+
+  it("matches the section-card pair specifically, not either half alone", () => {
+    // The pair, including the variations that exist in this tree.
+    expect(
+      findHandRolledSectionCards([
+        '<Card className="p-surface">',
+        '<h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>',
+      ]),
+    ).toEqual([1]);
+    expect(
+      findHandRolledSectionCards([
+        '<Card elevation="raised" className="p-surface">',
+        '<h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>',
+      ]),
+    ).toEqual([1]);
+    expect(
+      findHandRolledSectionCards([
+        "<Card",
+        '  className="p-surface"',
+        ">",
+        "{/* a comment must not hide the pair */}",
+        "",
+        '<h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>',
+      ]),
+    ).toEqual([1]);
+
+    // Legitimate `p-surface` Cards that are NOT section cards. Each of these
+    // shapes really exists in this tree and must stay allowed.
+    expect(
+      findHandRolledSectionCards([
+        '<Card className="p-surface">',
+        '<PageHeader title={t("heading")} />',
+      ]),
+    ).toEqual([]);
+    expect(
+      findHandRolledSectionCards([
+        '<Card className="p-surface">',
+        '<Skeleton className="h-4 w-32" />',
+      ]),
+    ).toEqual([]);
+    expect(
+      findHandRolledSectionCards([
+        '<Card asChild className="p-surface">',
+        "<form onSubmit={handleSubmit}>",
+      ]),
+    ).toEqual([]);
+    expect(
+      findHandRolledSectionCards([
+        '<Card className="grid grid-cols-1 gap-4 p-surface sm:grid-cols-2">',
+        '<Field label={t("detail.status")}>',
+      ]),
+    ).toEqual([]);
+
+    // A canonical heading that is not inside a `p-surface` surface.
+    expect(
+      findHandRolledSectionCards([
+        "<Card>",
+        '<h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>',
+      ]),
+    ).toEqual([]);
+    expect(
+      findHandRolledSectionCards([
+        "<section>",
+        '<h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>',
+      ]),
+    ).toEqual([]);
+
+    // A self-closing Card has no children to head.
+    expect(findHandRolledSectionCards(['<Card className="p-surface" />'])).toEqual([]);
+  });
 });

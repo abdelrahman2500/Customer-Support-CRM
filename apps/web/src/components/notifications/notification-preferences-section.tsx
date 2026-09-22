@@ -7,7 +7,7 @@ import {
 } from "@/hooks/use-notification-preferences";
 import type { NotificationPreferenceSummary } from "@/lib/notification-preferences-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Card, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, SectionCard, Skeleton } from "@crm/ui";
 
 /** The same three event-type strings `NOTIFICATION_EVENT_TYPES` names on the
  * backend (`apps/api/src/modules/notifications/notification-preferences.service.ts`)
@@ -30,8 +30,7 @@ export function NotificationPreferencesSection() {
   const preferencesQuery = useNotificationPreferencesQuery();
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("preferences.heading")}</h2>
+    <SectionCard title={t("preferences.heading")}>
       <p className="mt-1 text-xs text-ink-subtle">{t("preferences.description")}</p>
 
       {preferencesQuery.isLoading && (
@@ -58,7 +57,7 @@ export function NotificationPreferencesSection() {
           ))}
         </ul>
       )}
-    </Card>
+    </SectionCard>
   );
 }
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Alert, Button, Card, FormField, Input } from "@crm/ui";
+import { Alert, Button, Card, FormField, Input, SectionCard } from "@crm/ui";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useChangePasswordMutation } from "@/hooks/use-change-password";
 import { useErrorMessage } from "@/hooks/use-error-message";
@@ -94,15 +94,14 @@ export function ChangePasswordSection() {
 
   if (mutation.isSuccess) {
     return (
-      <Card className="p-surface">
-        <h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>
+      <SectionCard title={t("heading")}>
         <Alert variant="success" className="mt-2">
           {t("success")}
         </Alert>
         <Button type="button" className="mt-2" onClick={() => void handleSignOut()}>
           {t("signInAgain")}
         </Button>
-      </Card>
+      </SectionCard>
     );
   }
 

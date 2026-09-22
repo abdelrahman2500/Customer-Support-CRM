@@ -13,10 +13,10 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   Input,
   PageHeader,
   QueryStateCard,
+  SectionCard,
   Skeleton,
   Textarea,
 } from "@crm/ui";
@@ -183,8 +183,7 @@ function AddQuickReplyForm() {
   }
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
+    <SectionCard title={t("createHeading")}>
       <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("titleLabel")}
@@ -211,6 +210,6 @@ function AddQuickReplyForm() {
         </div>
         {error && <Alert variant="destructive">{error}</Alert>}
       </form>
-    </Card>
+    </SectionCard>
   );
 }

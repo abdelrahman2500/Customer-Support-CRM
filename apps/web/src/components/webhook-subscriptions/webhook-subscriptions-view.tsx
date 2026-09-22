@@ -17,13 +17,13 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   Checkbox,
   EmptyState,
   Input,
   Label,
   PageHeader,
   Pagination,
+  SectionCard,
   Skeleton,
   Table,
   TableBody,
@@ -406,8 +406,7 @@ function AddWebhookSubscriptionForm() {
   }
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
+    <SectionCard title={t("createHeading")}>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("targetUrlLabel")}
@@ -457,6 +456,6 @@ function AddWebhookSubscriptionForm() {
           </Alert>
         )}
       </form>
-    </Card>
+    </SectionCard>
   );
 }

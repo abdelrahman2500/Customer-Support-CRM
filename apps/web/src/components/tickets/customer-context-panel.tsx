@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useCustomerQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
-import { Alert, Badge, Card, Skeleton } from "@crm/ui";
+import { Alert, Badge, SectionCard, Skeleton } from "@crm/ui";
 
 /** Story 28's own "still needs work" definition (`dashboard-view.tsx`'s
  * `OPEN_STATUSES`) — reused here rather than re-invented, so "other open
@@ -63,9 +63,7 @@ export function CustomerContextPanel({
   );
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("detail.contextPanelHeading")}</h2>
-
+    <SectionCard title={t("detail.contextPanelHeading")}>
       <div className="mt-3 flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
@@ -136,6 +134,6 @@ export function CustomerContextPanel({
           </ul>
         )}
       </div>
-    </Card>
+    </SectionCard>
   );
 }

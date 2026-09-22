@@ -6,7 +6,7 @@ import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-at
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import type { AttachmentOwner } from "@/lib/attachments-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Card, Skeleton } from "@crm/ui";
+import { Alert, SectionCard, Skeleton } from "@crm/ui";
 
 /** Every string this shared component needs, supplied by the caller's own
  * `next-intl` namespace (`tickets.detail.attachments*` or
@@ -57,8 +57,7 @@ export function AttachmentsCard({
   }
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{strings.heading}</h2>
+    <SectionCard title={strings.heading}>
       {attachmentsQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}
       {attachmentsQuery.isError && (
         <Alert variant="destructive" className="mt-2">
@@ -91,7 +90,7 @@ export function AttachmentsCard({
         </ol>
       )}
       <AddAttachmentForm owner={owner} strings={strings} />
-    </Card>
+    </SectionCard>
   );
 }
 

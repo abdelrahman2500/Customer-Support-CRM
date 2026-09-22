@@ -9,7 +9,7 @@ import {
   useSendMyTicketMessageMutation,
 } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Card, Skeleton, Textarea } from "@crm/ui";
+import { Alert, Button, SectionCard, Skeleton, Textarea } from "@crm/ui";
 
 /**
  * Story 78 — Live Chat UI (Customer Portal side). Reads
@@ -46,9 +46,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
   }, [messagesQuery.data]);
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("detail.chatHeading")}</h2>
-
+    <SectionCard title={t("detail.chatHeading")}>
       {messagesQuery.isLoading && <Skeleton className="mt-2 h-40 w-full" />}
       {messagesQuery.isError && (
         <Alert variant="destructive" className="mt-2">
@@ -102,7 +100,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
       )}
 
       <ChatComposer ticketId={ticketId} />
-    </Card>
+    </SectionCard>
   );
 }
 

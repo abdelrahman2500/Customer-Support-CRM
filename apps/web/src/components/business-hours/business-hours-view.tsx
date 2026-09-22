@@ -17,7 +17,17 @@ import type {
 } from "@/lib/business-hours-api";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, Card, Checkbox, Input, Label, PageHeader, Skeleton } from "@crm/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Input,
+  Label,
+  PageHeader,
+  SectionCard,
+  Skeleton,
+} from "@crm/ui";
 
 const WEEKDAY_KEYS = [
   "sunday",
@@ -175,8 +185,7 @@ function CreateCalendarForm() {
   }
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
+    <SectionCard title={t("createHeading")}>
       <p className="mt-1 text-sm text-ink-subtle">{t("createPrompt")}</p>
       {error && (
         <Alert variant="destructive" className="mt-2">
@@ -189,7 +198,7 @@ function CreateCalendarForm() {
           {mutation.isPending ? t("createSubmitting") : t("createButton")}
         </Button>
       </form>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -211,8 +220,7 @@ function WeeklyScheduleEditor({ calendar }: { calendar: BusinessHoursCalendar })
   }
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("scheduleHeading")}</h2>
+    <SectionCard title={t("scheduleHeading")}>
       <DaysGrid days={days} onChange={updateDay} />
       <Button
         type="button"
@@ -230,7 +238,7 @@ function WeeklyScheduleEditor({ calendar }: { calendar: BusinessHoursCalendar })
             : t("actionFailed")}
         </Alert>
       )}
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -417,8 +425,7 @@ function AddExceptionForm() {
 function ExceptionsSection({ calendar }: { calendar: BusinessHoursCalendar }) {
   const t = useTranslations("businessHours");
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("exceptionsHeading")}</h2>
+    <SectionCard title={t("exceptionsHeading")}>
       {calendar.exceptions.length === 0 && (
         <p className="mt-2 text-sm text-ink-subtle">{t("exceptionsEmpty")}</p>
       )}
@@ -430,7 +437,7 @@ function ExceptionsSection({ calendar }: { calendar: BusinessHoursCalendar }) {
         </ul>
       )}
       <AddExceptionForm />
-    </Card>
+    </SectionCard>
   );
 }
 

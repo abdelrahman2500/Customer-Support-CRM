@@ -13,7 +13,7 @@ import {
 } from "@/hooks/use-chat";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Card, Skeleton, Textarea } from "@crm/ui";
+import { Alert, Button, SectionCard, Skeleton, Textarea } from "@crm/ui";
 
 /**
  * Story 80 — AI Portal Chatbot (Foundation). Crosses
@@ -93,9 +93,7 @@ export function ChatWidget() {
   }, [resultQuery.isSuccess, resultQuery.data?.outcome]);
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("heading")}</h2>
-
+    <SectionCard title={t("heading")}>
       {startSession.isError && (
         <Alert variant="destructive" className="mt-2">
           {t("startFailed")}
@@ -170,7 +168,7 @@ export function ChatWidget() {
       )}
 
       <ChatComposer sessionId={sessionId} onSent={setPendingLogId} />
-    </Card>
+    </SectionCard>
   );
 }
 

@@ -13,7 +13,7 @@ import {
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Card, Checkbox, Label, Skeleton, Textarea, cn } from "@crm/ui";
+import { Alert, Button, Checkbox, cn, Label, SectionCard, Skeleton, Textarea } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /**
@@ -75,9 +75,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
   }, [messagesQuery.data]);
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("detail.chatHeading")}</h2>
-
+    <SectionCard title={t("detail.chatHeading")}>
       {messagesQuery.isLoading && <Skeleton className="mt-2 h-40 w-full" />}
       {messagesQuery.isError && (
         <Alert variant="destructive" className="mt-2">
@@ -167,7 +165,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
       )}
 
       <ChatComposer ticketId={ticketId} />
-    </Card>
+    </SectionCard>
   );
 }
 

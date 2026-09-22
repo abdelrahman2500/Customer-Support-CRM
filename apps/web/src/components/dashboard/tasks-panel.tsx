@@ -17,9 +17,9 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   EmptyState,
   Input,
+  SectionCard,
   Select,
   SelectContent,
   SelectItem,
@@ -63,9 +63,7 @@ export function TasksPanel({ userId }: { userId: string }) {
   const tasks = tasksQuery.data?.items ?? [];
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("tasks.heading")}</h2>
-
+    <SectionCard title={t("tasks.heading")}>
       {tasksQuery.isLoading && (
         <div className="mt-2 flex flex-col gap-2">
           <Skeleton className="h-10 w-full" />
@@ -96,7 +94,7 @@ export function TasksPanel({ userId }: { userId: string }) {
       )}
 
       <AddTaskForm />
-    </Card>
+    </SectionCard>
   );
 }
 

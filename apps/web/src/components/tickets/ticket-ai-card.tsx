@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
 import type { TicketAiFeature } from "@/lib/ticket-ai-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Card, Skeleton } from "@crm/ui";
+import { Alert, Button, SectionCard, Skeleton } from "@crm/ui";
 
 const FEATURES: TicketAiFeature[] = [
   "SUMMARIZE",
@@ -85,9 +85,7 @@ export function TicketAiCard({
   }
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("detail.aiHeading")}</h2>
-
+    <SectionCard title={t("detail.aiHeading")}>
       <div className="mt-2 flex flex-wrap gap-2">
         {FEATURES.map((feature) => (
           <Button
@@ -146,6 +144,6 @@ export function TicketAiCard({
           )}
         </div>
       )}
-    </Card>
+    </SectionCard>
   );
 }

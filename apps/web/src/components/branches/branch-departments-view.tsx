@@ -19,6 +19,8 @@ import {
   EmptyState,
   Input,
   PageHeader,
+  SectionCard,
+  showSuccessToast,
   Skeleton,
   Table,
   TableBody,
@@ -26,7 +28,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  showSuccessToast,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -171,9 +172,7 @@ function DepartmentsSection() {
   const departmentsQuery = useManagedDepartmentsQuery();
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("departments.heading")}</h2>
-
+    <SectionCard title={t("departments.heading")}>
       {departmentsQuery.isLoading && (
         <div className="mt-2 flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
@@ -212,7 +211,7 @@ function DepartmentsSection() {
       )}
 
       <AddDepartmentForm />
-    </Card>
+    </SectionCard>
   );
 }
 

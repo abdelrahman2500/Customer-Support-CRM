@@ -34,8 +34,8 @@ import {
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  Card,
   PageHeader,
+  SectionCard,
   Select,
   SelectContent,
   SelectItem,
@@ -332,8 +332,7 @@ function AddAutomationRuleForm() {
   }
 
   return (
-    <Card className="p-surface">
-      <h2 className="text-sm font-semibold text-ink">{t("createHeading")}</h2>
+    <SectionCard title={t("createHeading")}>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
@@ -486,6 +485,6 @@ function AddAutomationRuleForm() {
           </Alert>
         )}
       </form>
-    </Card>
+    </SectionCard>
   );
 }
