@@ -145,7 +145,11 @@ test("a draft article is invisible in the portal until an agent publishes it", a
   await expect(adminPage).toHaveURL(/\/en\/knowledge-base\/[0-9a-f-]{36}$/);
   const articleId = new URL(adminPage.url()).pathname.split("/").pop() as string;
 
-  await expect(adminPage.getByLabel("Article title")).toHaveValue(articleTitle);
+  // Story 159 turned the title into a real page heading with an explicit
+  // "Edit" mode; the `Article title` `Input` it replaced only exists while
+  // that mode is open, so the heading is what proves this is the right
+  // article.
+  await expect(adminPage.getByRole("heading", { name: articleTitle })).toBeVisible();
   await expect(adminPage.getByText("Draft", { exact: true })).toBeVisible();
 
   // ---- Phase 2: the portal reader cannot see the draft ----

@@ -41,8 +41,12 @@ test("an agent signs in, opens a ticket, and resolves it", async ({ page }) => {
   await page.getByText(subject).click();
   await expect(page).toHaveURL(/\/tickets\/[^/]+$/);
 
+  // Story 153 localized every ticket enum: an option's `value` is still the
+  // raw `RESOLVED` sent to the API, but the text an agent reads — on the
+  // option and, through `SelectValue`, on the trigger — is the
+  // `common.ticketStatus.RESOLVED` label.
   await page.getByLabel("Status").click();
-  await page.getByRole("option", { name: "RESOLVED", exact: true }).click();
+  await page.getByRole("option", { name: "Resolved", exact: true }).click();
 
-  await expect(page.getByLabel("Status")).toHaveText("RESOLVED");
+  await expect(page.getByLabel("Status")).toHaveText("Resolved");
 });
