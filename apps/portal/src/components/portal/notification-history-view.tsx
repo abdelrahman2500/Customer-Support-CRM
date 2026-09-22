@@ -15,6 +15,7 @@ import {
   Alert,
   Button,
   FetchingIndicator,
+  LoadingStatus,
   PageHeader,
   Pagination,
   Skeleton,
@@ -141,7 +142,11 @@ export function NotificationHistoryView() {
           exactly) rather than generic full-width row bars, which gave no
           hint of the 3-column structure about to appear. */}
       {notificationsQuery.isPending && (
-        <div className="overflow-x-auto">
+        <LoadingStatus
+          label={tCommon("loading")}
+          className="overflow-x-auto"
+          placeholderHidden={false}
+        >
           <Table>
             <TableHeader>
               <TableRow>
@@ -169,7 +174,7 @@ export function NotificationHistoryView() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </LoadingStatus>
       )}
 
       {notificationsQuery.isError && (

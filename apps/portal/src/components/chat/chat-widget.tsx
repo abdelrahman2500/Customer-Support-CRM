@@ -13,7 +13,7 @@ import {
 } from "@/hooks/use-chat";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, SectionCard, Skeleton, Textarea } from "@crm/ui";
+import { Alert, Button, LoadingStatus, SectionCard, Skeleton, Textarea } from "@crm/ui";
 
 /**
  * Story 80 — AI Portal Chatbot (Foundation). Crosses
@@ -33,6 +33,7 @@ import { Alert, Button, SectionCard, Skeleton, Textarea } from "@crm/ui";
  */
 export function ChatWidget() {
   const t = useTranslations("chat");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const { locale } = useParams<{ locale: string }>();
   const router = useRouter();
@@ -100,7 +101,11 @@ export function ChatWidget() {
         </Alert>
       )}
 
-      {messagesQuery.isLoading && <Skeleton className="mt-2 h-40 w-full" />}
+      {messagesQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="mt-2 h-40 w-full" />
+        </LoadingStatus>
+      )}
       {messagesQuery.isError && (
         <Alert variant="destructive" className="mt-2">
           {t("loadError")}

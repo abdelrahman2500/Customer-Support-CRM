@@ -92,6 +92,7 @@ export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
 
 function AttachArticleForm({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +124,11 @@ function AttachArticleForm({ ticketId }: { ticketId: string }) {
           onChange={(event) => setSearch(event.target.value)}
         />
       </label>
-      {searchQuery.isLoading && <Skeleton className="h-8 w-full" />}
+      {searchQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="h-8 w-full" />
+        </LoadingStatus>
+      )}
       {searchQuery.isSuccess && search.trim().length > 0 && searchQuery.data.items.length === 0 && (
         <p className="text-sm text-ink-subtle">{t("detail.kbReferencesSearchEmpty")}</p>
       )}

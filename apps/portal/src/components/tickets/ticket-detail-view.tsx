@@ -190,11 +190,16 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
  */
 function CsatSection({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const csatQuery = useMyTicketCsatQuery(ticketId);
 
   return (
     <SectionCard title={t("detail.csatHeading")}>
-      {csatQuery.isLoading && <Skeleton className="mt-2 h-16 w-full" />}
+      {csatQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="mt-2 h-16 w-full" />
+        </LoadingStatus>
+      )}
 
       {csatQuery.isError && (
         <Alert variant="destructive" className="mt-2">

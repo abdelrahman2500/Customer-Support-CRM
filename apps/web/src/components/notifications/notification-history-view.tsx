@@ -15,6 +15,7 @@ import {
   Button,
   EmptyState,
   FetchingIndicator,
+  LoadingStatus,
   PageHeader,
   Pagination,
   Skeleton,
@@ -265,11 +266,11 @@ export function NotificationHistoryView() {
           play the query only reports `pending` on a true first load, so the
           skeleton appears once and never again for a page change. */}
       {notificationsQuery.isPending && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2, 3, 4].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {notificationsQuery.isError && forbidden && (

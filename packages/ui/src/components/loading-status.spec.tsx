@@ -66,6 +66,39 @@ describe("LoadingStatus", () => {
     expect(placeholder).toHaveClass("animate-pulse", "mt-2", "h-40", "w-full");
   });
 
+  // Story 162 -- a placeholder that is not wholly decorative keeps its own
+  // hiding. The portal's notification history renders real column headers
+  // beside its placeholder rows and must not lose them to a blanket hide.
+  it("leaves the placeholder announced when placeholderHidden is false", () => {
+    render(
+      <LoadingStatus label="Loading history" placeholderHidden={false}>
+        <table>
+          <thead>
+            <tr>
+              <th>Event</th>
+            </tr>
+          </thead>
+          <tbody aria-hidden="true">
+            <tr>
+              <td>
+                <Skeleton className="h-5 w-20" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </LoadingStatus>,
+    );
+
+    const status = screen.getByRole("status", { name: "Loading history" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+    // The wrapper no longer hides the subtree...
+    expect(status.firstElementChild).not.toHaveAttribute("aria-hidden");
+    // ...so the caller's own real header survives, while its own
+    // aria-hidden still covers the placeholder rows.
+    expect(screen.getByRole("columnheader", { name: "Event" })).toBeInTheDocument();
+    expect(screen.queryByRole("cell")).not.toBeInTheDocument();
+  });
+
   it("does not expose the placeholder's own content as readable text", () => {
     render(
       <LoadingStatus label="Loading history">

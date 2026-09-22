@@ -77,6 +77,26 @@ describe("TicketAiCard", () => {
     expect(screen.queryByText("detail.aiUseAsCategory")).not.toBeInTheDocument();
   });
 
+  // Story 162 -- the result skeleton is a single element, so `asChild` makes
+  // the Skeleton itself the hidden placeholder: no wrapper, same classes.
+  it("announces the AI result load without adding a wrapper around its skeleton", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ id: "log-1", outcome: "PENDING" });
+    vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+      mutateAsync,
+      isPending: false,
+    } as never);
+    vi.mocked(useTicketAiResultQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+    fireEvent.click(screen.getByText("detail.aiSummarize"));
+
+    const status = await screen.findByRole("status", { name: "loading" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+    expect(status.children).toHaveLength(1);
+    expect(status.firstElementChild).toHaveAttribute("aria-hidden", "true");
+    expect(status.firstElementChild).toHaveClass("animate-pulse", "h-16", "w-full");
+  });
+
   it("submits Summarize and shows PENDING once tracked", async () => {
     const mutateAsync = vi.fn().mockResolvedValue({ id: "log-1", outcome: "PENDING" });
     vi.mocked(useSubmitAiOperationMutation).mockReturnValue({

@@ -18,10 +18,11 @@ import {
   FilterSelect,
   FormField,
   Input,
+  LoadingStatus,
   PageHeader,
   Pagination,
-  showSuccessToast,
   SectionCard,
+  showSuccessToast,
   Skeleton,
 } from "@crm/ui";
 
@@ -177,11 +178,11 @@ export function TicketListView() {
         )}
 
         {ticketsQuery.isPending && (
-          <div className="mt-3 flex flex-col gap-2">
+          <LoadingStatus label={tCommon("loading")} className="mt-3 flex flex-col gap-2">
             {[0, 1, 2].map((row) => (
               <Skeleton key={row} className="h-10 w-full" />
             ))}
-          </div>
+          </LoadingStatus>
         )}
 
         {ticketsQuery.isError && (

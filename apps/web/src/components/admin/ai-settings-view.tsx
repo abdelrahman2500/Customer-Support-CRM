@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useAiSettingsQuery, useUpdateAiSettingsMutation } from "@/hooks/use-ai-settings";
 import type { AiSettingsSummary } from "@/lib/ai-settings-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Card, Checkbox, Label, PageHeader, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, Checkbox, Label, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
 
 type ToggleKey = keyof AiSettingsSummary;
 
@@ -30,6 +30,7 @@ const TOGGLES: { key: ToggleKey; labelKey: string }[] = [
  */
 export function AiSettingsView() {
   const t = useTranslations("aiSettings");
+  const tCommon = useTranslations("common");
   const settingsQuery = useAiSettingsQuery();
 
   return (
@@ -37,11 +38,11 @@ export function AiSettingsView() {
       <PageHeader title={t("title")} description={t("description")} />
 
       {settingsQuery.isLoading && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2, 3, 4].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {settingsQuery.isError && (

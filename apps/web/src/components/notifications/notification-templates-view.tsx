@@ -15,6 +15,7 @@ import {
   Badge,
   Button,
   Card,
+  LoadingStatus,
   PageHeader,
   Select,
   SelectContent,
@@ -59,6 +60,7 @@ const EVENT_LABEL_KEYS: Record<string, string> = {
  */
 export function NotificationTemplatesView() {
   const t = useTranslations("notificationTemplates");
+  const tCommon = useTranslations("common");
   const templatesQuery = useNotificationTemplatesQuery();
 
   // RM-30 — keyed by `eventType:locale` (`UNSET_LOCALE` standing in for
@@ -81,11 +83,11 @@ export function NotificationTemplatesView() {
       <PageHeader title={t("title")} description={t("description")} />
 
       {templatesQuery.isLoading && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
             <Skeleton key={row} className="h-24 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {templatesQuery.isError && (

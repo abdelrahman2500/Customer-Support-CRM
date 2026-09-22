@@ -304,4 +304,151 @@ describe("S-1 design tokens", () => {
     // A self-closing Card has no children to head.
     expect(findHandRolledSectionCards(['<Card className="p-surface" />'])).toEqual([]);
   });
+  /**
+   * Story 162 — a query loading state with no accessible announcement.
+   *
+   * `LoadingStatus` (Story 161) is the one definition of what a loading state
+   * announces: a labelled `role="status"` with `aria-busy`, over a placeholder
+   * kept out of the accessibility tree. Before Stories 161/162, forty-two
+   * loading branches across both apps had neither half — nothing was said
+   * while a panel loaded, and a bare `Skeleton` (which, unlike `SkeletonText`,
+   * is not `aria-hidden`) left empty boxes in the tree with nothing to say.
+   *
+   * Deliberately narrow. It fires only on the combination of all three:
+   *
+   *   1. a `*Query.isLoading` / `*Query.isPending` branch opener,
+   *   2. a bare `<Skeleton` rendered directly inside that branch, and
+   *   3. no `LoadingStatus`, `QueryStateCard` or `role="status"` in it.
+   *
+   * That keeps the hundred other `Skeleton` usages in this tree out of it —
+   * route-level `loading.tsx` fallbacks, the detail-page skeletons, mutation
+   * pending states and `SkeletonText`/`SkeletonCard` consumers are all
+   * legitimate and none is a query loading branch.
+   *
+   * Known and accepted false negative: a placeholder rendered through a local
+   * component (`reports-view`'s `ReportCardSkeleton`) holds its accessibility
+   * one indirection away, which a source scan cannot follow. A guard that
+   * tried to would have to resolve components across files, and would start
+   * flagging legitimate code. The component-level specs cover those.
+   */
+  const QUERY_LOADING_BRANCH = /\{\w*Query\.(?:isLoading|isPending) &&/;
+  const ACCESSIBLE_LOADING = /LoadingStatus|QueryStateCard|role="status"/;
+
+  /** Offending line numbers (1-based) for one file's lines. */
+  function findUnannouncedQueryLoading(lines: string[]): number[] {
+    const hits: number[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      const trimmed = line.trim();
+      if (trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+        continue;
+      }
+      if (!QUERY_LOADING_BRANCH.test(line)) continue;
+
+      // The branch runs until its JSX expression closes at the opener's own
+      // indentation, or ends on the opening line when it is a one-liner.
+      const indent = line.match(/^\s*/)?.[0] ?? "";
+      let end = i;
+      for (let k = i; k < lines.length && k < i + 25; k++) {
+        end = k;
+        if (k === i && /\}$/.test(line.trimEnd())) break;
+        if (k > i && (lines[k] === indent + ")}" || (lines[k] ?? "").trimEnd().endsWith("/>}"))) {
+          break;
+        }
+      }
+
+      const branch = lines.slice(i, end + 1).join("\n");
+      if (!/<Skeleton\b/.test(branch)) continue;
+      if (ACCESSIBLE_LOADING.test(branch)) continue;
+      hits.push(i + 1);
+    }
+
+    return hits;
+  }
+
+  it("announces every query loading state that renders a bare skeleton", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const lines = readFileSync(file, "utf8").split(/\r?\n/);
+      for (const line of findUnannouncedQueryLoading(lines)) {
+        offenders.push(`${file.slice(SRC.length + 1)}:${line}`);
+      }
+    }
+
+    expect(
+      offenders,
+      `Wrap the placeholder in <LoadingStatus label={tCommon("loading")}>:\n${offenders.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("flags an unannounced query loading branch but not legitimate skeletons", () => {
+    // The defect, in both placeholder shapes.
+    expect(
+      findUnannouncedQueryLoading([
+        '        {notesQuery.isLoading && <Skeleton className="mt-2 h-24 w-full" />}',
+      ]),
+    ).toEqual([1]);
+    expect(
+      findUnannouncedQueryLoading([
+        "      {tasksQuery.isPending && (",
+        '        <div className="flex flex-col gap-2">',
+        '          <Skeleton className="h-10 w-full" />',
+        "        </div>",
+        "      )}",
+      ]),
+    ).toEqual([1]);
+
+    // Already announced, in each of the three accepted forms.
+    expect(
+      findUnannouncedQueryLoading([
+        "      {tasksQuery.isLoading && (",
+        '        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">',
+        '          <Skeleton className="h-10 w-full" />',
+        "        </LoadingStatus>",
+        "      )}",
+      ]),
+    ).toEqual([]);
+    expect(
+      findUnannouncedQueryLoading([
+        "      {notesQuery.isLoading && (",
+        '        <LoadingStatus label={tCommon("loading")} asChild>',
+        '          <Skeleton className="mt-2 h-24 w-full" />',
+        "        </LoadingStatus>",
+        "      )}",
+      ]),
+    ).toEqual([]);
+    expect(
+      findUnannouncedQueryLoading([
+        "      {rowsQuery.isPending && (",
+        '        <div role="status" aria-label="Loading">',
+        '          <Skeleton className="h-10 w-full" />',
+        "        </div>",
+        "      )}",
+      ]),
+    ).toEqual([]);
+
+    // Legitimate skeletons that are NOT query loading branches.
+    expect(findUnannouncedQueryLoading(['      <Skeleton className="h-8 w-1/2" />'])).toEqual([]);
+    expect(
+      findUnannouncedQueryLoading([
+        "      {saveMutation.isPending && (",
+        '        <Skeleton className="h-4 w-16" />',
+        "      )}",
+      ]),
+    ).toEqual([]);
+    // A query branch whose placeholder is not a bare Skeleton.
+    expect(
+      findUnannouncedQueryLoading([
+        '        {rowsQuery.isLoading && <SkeletonText lines={3} barClassName="h-10" />}',
+      ]),
+    ).toEqual([]);
+    // Commented-out or documented code must not count.
+    expect(
+      findUnannouncedQueryLoading([
+        '      // {notesQuery.isLoading && <Skeleton className="h-4 w-full" />}',
+      ]),
+    ).toEqual([]);
+  });
 });

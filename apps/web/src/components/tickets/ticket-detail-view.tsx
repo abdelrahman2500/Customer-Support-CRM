@@ -658,7 +658,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <CustomerContextPanel ticketId={ticketId} customerId={ticket.customerId} />
 
           <SectionCard title={t("detail.slaHeading")}>
-            {slaTargetQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
+            {slaTargetQuery.isLoading && (
+              <LoadingStatus label={tCommon("loading")} asChild>
+                <Skeleton className="mt-2 h-5 w-40" />
+              </LoadingStatus>
+            )}
             {slaTargetQuery.isSuccess && slaStatus.kind === "none" && (
               <p className="mt-1 text-sm text-ink-subtle">{t("sla.none")}</p>
             )}
@@ -792,7 +796,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </SectionCard>
 
           <SectionCard title={t("detail.csatHeading")}>
-            {csatQuery.isLoading && <Skeleton className="mt-2 h-5 w-40" />}
+            {csatQuery.isLoading && (
+              <LoadingStatus label={tCommon("loading")} asChild>
+                <Skeleton className="mt-2 h-5 w-40" />
+              </LoadingStatus>
+            )}
             {csatQuery.isError && (
               <Alert variant="destructive" className="mt-2">
                 {t("detail.csatError")}

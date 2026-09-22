@@ -32,6 +32,7 @@ import {
   FilterSelect,
   Input,
   Label,
+  LoadingStatus,
   PageHeader,
   Skeleton,
 } from "@crm/ui";
@@ -774,21 +775,28 @@ interface QueryLike {
  * Ticket Aging) or one big stat number plus a caption line (SLA
  * Compliance, CSAT). `skeleton` shapes it per card instead.
  */
-function ReportCardSkeleton({ variant }: { variant: "list" | "stat" }) {
+function ReportCardSkeleton({
+  variant,
+  label,
+}: {
+  variant: "list" | "stat";
+  /** Story 162 — announced while the card's own query is loading. */
+  label: string;
+}) {
   if (variant === "stat") {
     return (
-      <div className="mt-2 flex flex-col gap-1">
+      <LoadingStatus label={label} className="mt-2 flex flex-col gap-1">
         <Skeleton className="h-8 w-16" />
         <Skeleton className="h-4 w-32" />
-      </div>
+      </LoadingStatus>
     );
   }
   return (
-    <div className="mt-2 flex flex-col gap-1">
+    <LoadingStatus label={label} className="mt-2 flex flex-col gap-1">
       <Skeleton className="h-5 w-full" />
       <Skeleton className="h-5 w-full" />
       <Skeleton className="h-5 w-full" />
-    </div>
+    </LoadingStatus>
   );
 }
 
@@ -830,6 +838,7 @@ function ReportCard({
   range?: ReportDateRange;
   children: ReactNode;
 }) {
+  const tCommon = useTranslations("common");
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState(false);
 
@@ -882,7 +891,7 @@ function ReportCard({
         )}
       </header>
       {exportError && <p className="mt-1 text-xs text-danger-foreground">{t("export.error")}</p>}
-      {query.isLoading && <ReportCardSkeleton variant={skeleton} />}
+      {query.isLoading && <ReportCardSkeleton variant={skeleton} label={tCommon("loading")} />}
       {query.isError && forbidden && (
         <Alert variant="destructive" className="mt-2">
           {t("forbidden")}

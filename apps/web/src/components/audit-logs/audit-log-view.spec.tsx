@@ -88,6 +88,25 @@ describe("AuditLogView", () => {
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
+  // Story 162 -- `isPending` here is the query's genuine first load (the
+  // view keeps previous results across page changes), so the announcement
+  // fires once and never on a background refetch.
+  it("announces the initial load and hides its placeholder bars", () => {
+    mockedUseAuditLogsQuery.mockReturnValue(queryResult({ isPending: true }) as never);
+
+    const { container } = render(<AuditLogView />);
+
+    const status = screen.getByRole("status", { name: "loading" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+
+    const placeholder = status.querySelector("[aria-hidden='true']");
+    expect(placeholder).toHaveClass("flex", "flex-col", "gap-2");
+    expect(placeholder?.querySelectorAll(".animate-pulse")).toHaveLength(5);
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(5);
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
   it("shows the empty state when the query succeeds with zero entries", () => {
     mockedUseAuditLogsQuery.mockReturnValue(
       queryResult({ data: page([]), isSuccess: true }) as never,

@@ -61,6 +61,25 @@ describe("AiSettingsView", () => {
     expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
+  // Story 162 -- the panel-level loading state announces itself and keeps
+  // its five placeholder bars out of the accessibility tree, unchanged.
+  it("announces the panel loading state and hides its placeholder bars", () => {
+    mockedUseAiSettingsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = render(<AiSettingsView />);
+
+    const status = screen.getByRole("status", { name: "loading" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+
+    // The placeholder kept the wrapper's own classes, so the bars keep
+    // their layout and their count.
+    const placeholder = status.querySelector("[aria-hidden='true']");
+    expect(placeholder).toHaveClass("flex", "flex-col", "gap-2");
+    expect(placeholder?.querySelectorAll(".animate-pulse")).toHaveLength(5);
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(5);
+  });
+
   it("shows a generic error state with a retry action", () => {
     const refetch = vi.fn();
     mockedUseAiSettingsQuery.mockReturnValue(queryResult({ isError: true, refetch }) as never);

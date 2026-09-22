@@ -7,7 +7,7 @@ import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
 import type { KbLocale } from "@/lib/knowledge-base-api";
-import { Alert, Badge, Button, Card, PageHeader, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, Card, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
 
 /**
  * Story 136 — the Customer Portal's real landing page.
@@ -62,6 +62,7 @@ export function PortalHomeView() {
   const tKnowledgeBase = useTranslations("knowledgeBase");
   const tChat = useTranslations("chat");
   const tNotifications = useTranslations("notifications");
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
 
   const ticketsQuery = useMyTicketsQuery();
@@ -96,7 +97,11 @@ export function PortalHomeView() {
             </Link>
           </div>
 
-          {ticketsQuery.isPending && <Skeleton className="mt-3 h-24 w-full" />}
+          {ticketsQuery.isPending && (
+            <LoadingStatus label={tCommon("loading")} asChild>
+              <Skeleton className="mt-3 h-24 w-full" />
+            </LoadingStatus>
+          )}
 
           {ticketsQuery.isError && (
             <Alert variant="destructive" className="mt-3 flex items-center justify-between">
@@ -164,7 +169,11 @@ export function PortalHomeView() {
             </Link>
           </div>
 
-          {articlesQuery.isPending && <Skeleton className="mt-3 h-24 w-full" />}
+          {articlesQuery.isPending && (
+            <LoadingStatus label={tCommon("loading")} asChild>
+              <Skeleton className="mt-3 h-24 w-full" />
+            </LoadingStatus>
+          )}
 
           {articlesQuery.isError && (
             <Alert variant="destructive" className="mt-3 flex items-center justify-between">

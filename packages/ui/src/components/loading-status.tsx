@@ -64,11 +64,27 @@ export interface LoadingStatusProps extends React.HTMLAttributes<HTMLDivElement>
    * a wrapping `div` — for a placeholder that is already a single element.
    */
   asChild?: boolean;
+  /**
+   * Story 162 — set `false` for a placeholder that is not wholly decorative,
+   * leaving it in the accessibility tree with its own finer-grained hiding in
+   * charge.
+   *
+   * The portal's notification history is the case that asked for this: its
+   * placeholder is a real `Table` carrying the same column headers the
+   * populated table will use, and it already marks only its `TableBody`
+   * `aria-hidden` so those headers stay announced. Hiding the whole subtree
+   * would take away content that screen deliberately kept.
+   *
+   * Rare by design. A placeholder made of bare `Skeleton` bars has nothing to
+   * say and should keep the default.
+   */
+  placeholderHidden?: boolean;
 }
 
 export function LoadingStatus({
   label,
   asChild = false,
+  placeholderHidden = true,
   className,
   children,
   ...props
@@ -77,7 +93,11 @@ export function LoadingStatus({
 
   return (
     <div role="status" aria-busy="true" aria-label={label}>
-      <Placeholder aria-hidden="true" className={cn(className)} {...props}>
+      <Placeholder
+        aria-hidden={placeholderHidden ? "true" : undefined}
+        className={cn(className)}
+        {...props}
+      >
         {children}
       </Placeholder>
     </div>

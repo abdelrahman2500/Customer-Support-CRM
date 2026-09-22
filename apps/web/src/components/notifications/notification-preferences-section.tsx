@@ -7,7 +7,7 @@ import {
 } from "@/hooks/use-notification-preferences";
 import type { NotificationPreferenceSummary } from "@/lib/notification-preferences-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Badge, Button, SectionCard, Skeleton } from "@crm/ui";
+import { Alert, Badge, Button, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
 
 /** The same three event-type strings `NOTIFICATION_EVENT_TYPES` names on the
  * backend (`apps/api/src/modules/notifications/notification-preferences.service.ts`)
@@ -27,6 +27,7 @@ const EVENT_LABEL_KEYS: Record<string, string> = {
  */
 export function NotificationPreferencesSection() {
   const t = useTranslations("notificationHistory");
+  const tCommon = useTranslations("common");
   const preferencesQuery = useNotificationPreferencesQuery();
 
   return (
@@ -34,11 +35,11 @@ export function NotificationPreferencesSection() {
       <p className="mt-1 text-xs text-ink-subtle">{t("preferences.description")}</p>
 
       {preferencesQuery.isLoading && (
-        <div className="mt-2 flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="mt-2 flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
             <Skeleton key={row} className="h-8 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {preferencesQuery.isError && (

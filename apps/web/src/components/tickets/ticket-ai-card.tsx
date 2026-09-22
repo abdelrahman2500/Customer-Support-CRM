@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useSubmitAiOperationMutation, useTicketAiResultQuery } from "@/hooks/use-ticket-ai";
 import type { TicketAiFeature } from "@/lib/ticket-ai-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, SectionCard, Skeleton } from "@crm/ui";
+import { Alert, Button, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
 
 const FEATURES: TicketAiFeature[] = [
   "SUMMARIZE",
@@ -50,6 +50,7 @@ export function TicketAiCard({
   onApplyCategory: (category: string) => void;
 }) {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   // Global Navigation Loading (UX audit) — `submitMutation` is one shared
   // mutation object for all four buttons below, so `submitMutation.isPending`
@@ -110,7 +111,11 @@ export function TicketAiCard({
 
       {operation && (
         <div className="mt-3">
-          {resultQuery.isLoading && <Skeleton className="h-16 w-full" />}
+          {resultQuery.isLoading && (
+            <LoadingStatus label={tCommon("loading")} asChild>
+              <Skeleton className="h-16 w-full" />
+            </LoadingStatus>
+          )}
 
           {resultQuery.isSuccess && resultQuery.data.outcome === "PENDING" && (
             <p className="text-sm text-ink-subtle">{t("detail.aiPending")}</p>

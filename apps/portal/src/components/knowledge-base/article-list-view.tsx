@@ -10,6 +10,7 @@ import {
   Card,
   FetchingIndicator,
   Input,
+  LoadingStatus,
   PageHeader,
   Pagination,
   Skeleton,
@@ -88,11 +89,11 @@ export function ArticleListView() {
         />
 
         {articlesQuery.isPending && (
-          <div className="mt-3 flex flex-col gap-2">
+          <LoadingStatus label={tCommon("loading")} className="mt-3 flex flex-col gap-2">
             {[0, 1, 2].map((row) => (
               <Skeleton key={row} className="h-10 w-full" />
             ))}
-          </div>
+          </LoadingStatus>
         )}
 
         {articlesQuery.isError && (

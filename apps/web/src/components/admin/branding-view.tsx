@@ -11,6 +11,7 @@ import {
   Button,
   Card,
   Input,
+  LoadingStatus,
   PageHeader,
   SectionCard,
   showSuccessToast,
@@ -41,6 +42,7 @@ const APP_NAME_MAX_LENGTH = 60;
  */
 export function BrandingView() {
   const t = useTranslations("branding");
+  const tCommon = useTranslations("common");
   const brandingQuery = useBrandingQuery();
 
   return (
@@ -48,11 +50,11 @@ export function BrandingView() {
       <PageHeader title={t("title")} description={t("description")} />
 
       {brandingQuery.isLoading && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {brandingQuery.isError && (

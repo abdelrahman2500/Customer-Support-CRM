@@ -13,6 +13,7 @@ import {
   Button,
   FetchingIndicator,
   Input,
+  LoadingStatus,
   PageHeader,
   Pagination,
   Skeleton,
@@ -182,11 +183,11 @@ export function AuditLogView() {
           in play the query only reports `pending` on a genuine first load,
           so the skeleton appears once and never again for a page change. */}
       {auditLogsQuery.isPending && (
-        <div className="flex flex-col gap-2">
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
           {[0, 1, 2, 3, 4].map((row) => (
             <Skeleton key={row} className="h-10 w-full" />
           ))}
-        </div>
+        </LoadingStatus>
       )}
 
       {auditLogsQuery.isError && forbidden && <Alert variant="destructive">{t("forbidden")}</Alert>}
