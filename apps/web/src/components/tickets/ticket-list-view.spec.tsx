@@ -474,8 +474,45 @@ describe("TicketListView", () => {
       expect(statusCell).toHaveTextContent("list.columns.status");
       const priorityCell = screen.getByText("ticketPriority.HIGH").closest("td");
       expect(priorityCell).toHaveTextContent("list.columns.priority");
-      const categoryCell = screen.getByText("billing").closest("td");
-      expect(categoryCell).toHaveTextContent("list.columns.category");
+      // Story 158 — the id and category folded into the subject cell, so
+      // they no longer have columns (or mobile labels) of their own. They
+      // must still be VISIBLE, which is the guarantee that matters: the
+      // columns were reduced, the information was not dropped.
+      expect(subjectCell).toHaveTextContent("billing");
+      expect(subjectCell).toHaveTextContent("ticket-1");
+    });
+
+    it("keeps the folded id and category readable on the mobile card", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([
+            {
+              id: "ticket-1",
+              subject: "Cannot log in",
+              categoryId: "category-1",
+              categoryName: "billing",
+              priority: "HIGH",
+              status: "OPEN",
+              customerId: "customer-1",
+              customerName: "Acme Inc.",
+              contactId: null,
+              departmentId: null,
+              assignedToUserId: null,
+              createdAt: "2024-01-01T00:00:00.000Z",
+              updatedAt: "2024-01-02T00:00:00.000Z",
+              slaTarget: null,
+            },
+          ]),
+        }) as never,
+      );
+
+      render(<TicketListView />);
+
+      // Below `sm` the row is a stacked card; the folded values ride along
+      // with the subject rather than becoming two more anonymous lines.
+      expect(screen.getByText("billing")).toBeInTheDocument();
+      expect(screen.getByText("ticket-1")).toBeInTheDocument();
     });
   });
 

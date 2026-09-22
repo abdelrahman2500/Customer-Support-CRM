@@ -322,12 +322,12 @@ function TicketListViewContent() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t("list.columns.id")}</TableHead>
+              {/* Story 158 — the ticket id and category folded into the
+                  subject cell; see the row below for why. */}
               <TableHead>{t("list.columns.subject")}</TableHead>
               <TableHead>{t("list.columns.customer")}</TableHead>
               <TableHead>{t("list.columns.status")}</TableHead>
               <TableHead>{t("list.columns.priority")}</TableHead>
-              <TableHead>{t("list.columns.category")}</TableHead>
               <TableHead>{t("list.columns.assignedAgent")}</TableHead>
               <TableHead>{t("list.columns.sla")}</TableHead>
               <TableHead aria-sort={sortAriaValue(filters, "createdAt")}>
@@ -363,12 +363,13 @@ function TicketListViewContent() {
                 className="cursor-pointer"
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
               >
-                <TableCell
-                  label={t("list.columns.id")}
-                  className="font-mono text-xs text-ink-subtle"
-                >
-                  {ticket.id.slice(0, 8)}
-                </TableCell>
+                {/* Story 158 — the id and category live here rather than in
+                    columns of their own. Ten columns overflowed on a desktop
+                    and became a ten-field stack per ticket on a phone, while
+                    neither of these is what an agent scans a queue by: the id
+                    is an opaque 8-character hash, and the category already
+                    has its own filter above the table. Both stay visible and
+                    stay labelled — they moved, they were not dropped. */}
                 <TableCell label={t("list.columns.subject")} className="font-medium text-ink">
                   <Link
                     href={`/${locale}/tickets/${ticket.id}`}
@@ -377,6 +378,10 @@ function TicketListViewContent() {
                   >
                     {ticket.subject}
                   </Link>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs font-normal text-ink-subtle">
+                    <span className="font-mono">{ticket.id.slice(0, 8)}</span>
+                    <span>{ticket.categoryName ?? t("list.noCategory")}</span>
+                  </span>
                 </TableCell>
                 <TableCell label={t("list.columns.customer")}>
                   <Link
@@ -400,9 +405,6 @@ function TicketListViewContent() {
                   <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
                     {ticketLabels.priority(ticket.priority)}
                   </Badge>
-                </TableCell>
-                <TableCell label={t("list.columns.category")}>
-                  {ticket.categoryName ?? t("list.noCategory")}
                 </TableCell>
                 <TableCell label={t("list.columns.assignedAgent")}>
                   {ticket.assignedToUserId
