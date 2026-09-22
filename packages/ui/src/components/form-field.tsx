@@ -35,6 +35,32 @@ import { cn } from "../lib/cn";
  * `red-600` it replaces (the token resolves to red-800), which raises
  * contrast on the light surfaces these errors sit on. The `--danger-solid`
  * token is the exact old value, but it names a *fill*, not text.
+ *
+ * ## Story 151 — why the hint and error sit OUTSIDE the `<label>`
+ *
+ * They used to be inside it, and that quietly broke the accessible name. An
+ * implicit label contributes its entire text subtree to the control's name,
+ * so a field with both read as one run-on string — measured against the real
+ * component before this change:
+ *
+ *     label.textContent           === "SubjectKeep it short.Required"
+ *     getByLabelText("Subject")   === null   // exact match failed
+ *
+ * The hint and error are *descriptions*, not part of the name. So the
+ * `<label>` now wraps only the label text and the control — implicit
+ * labelling is untouched, and there is still no `id`/`htmlFor` pair to
+ * desynchronise — while the hint and error moved out to siblings and are
+ * tied back to the control with `aria-describedby`. `getByLabelText` now
+ * matches exactly.
+ *
+ * `aria-invalid` and `aria-describedby` are injected onto the child by
+ * `cloneElement`, so no call site has to generate or thread an id. Both
+ * MERGE rather than overwrite: a value the caller already set on the
+ * control wins (`aria-invalid`) or comes first (`aria-describedby`).
+ *
+ * `gap-tight` is applied at both levels deliberately, and the rendered
+ * rhythm is unchanged: label→control, control-group→hint and hint→error are
+ * each still one `gap-tight` apart, exactly as when all four were siblings.
  */
 export interface FormFieldProps {
   /** The field's visible label. */
@@ -58,6 +84,17 @@ const DENSITY = {
   comfortable: "text-sm text-ink-strong",
 } as const;
 
+/**
+ * The only two props this component reads from, and writes back to, the
+ * control it wraps. Declaring them explicitly is what lets `isValidElement`
+ * narrow the child to a typed element — so `children.props["aria-invalid"]`
+ * is `AriaAttributes["aria-invalid"]` rather than `any`.
+ */
+interface ControlAriaProps {
+  "aria-describedby"?: string;
+  "aria-invalid"?: React.AriaAttributes["aria-invalid"];
+}
+
 export function FormField({
   label,
   children,
@@ -66,16 +103,48 @@ export function FormField({
   density = "compact",
   className,
 }: FormFieldProps) {
+  const generatedId = React.useId();
+  const hintId = `${generatedId}-hint`;
+  const errorId = `${generatedId}-error`;
+
+  // `null` for a fragment, an array, or a bare string — anything we cannot
+  // safely clone. Those render exactly as they did before this story.
+  const control = React.isValidElement<ControlAriaProps>(children) ? children : null;
+
+  // Caller's own description first, then ours. An empty result becomes
+  // `undefined` so no `aria-describedby=""` is emitted.
+  const describedBy =
+    [
+      control?.props["aria-describedby"],
+      hint ? hintId : undefined,
+      error ? errorId : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined;
+
   return (
-    <label className={cn("flex flex-col gap-tight", DENSITY[density], className)}>
-      {label}
-      {children}
-      {hint && <span className="text-xs text-ink-subtle">{hint}</span>}
+    <div className={cn("flex flex-col gap-tight", DENSITY[density], className)}>
+      <label className="flex flex-col gap-tight">
+        {label}
+        {control
+          ? React.cloneElement(control, {
+              "aria-describedby": describedBy,
+              // `??`, not `||`: an explicit `aria-invalid={false}` from the
+              // caller is a real answer and must survive.
+              "aria-invalid": control.props["aria-invalid"] ?? (error ? true : undefined),
+            })
+          : children}
+      </label>
+      {hint && (
+        <span id={hintId} className="text-xs text-ink-subtle">
+          {hint}
+        </span>
+      )}
       {error && (
-        <span role="status" className="text-xs text-danger-foreground">
+        <span id={errorId} role="status" className="text-xs text-danger-foreground">
           {error}
         </span>
       )}
-    </label>
+    </div>
   );
 }
