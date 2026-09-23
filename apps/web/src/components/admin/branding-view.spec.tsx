@@ -127,6 +127,24 @@ describe("BrandingView", () => {
     expect(screen.queryByText("noLogo")).not.toBeInTheDocument();
   });
 
+  it("clears an existing logo when the logo URL is emptied", () => {
+    const mutateAsync = vi.fn().mockResolvedValue({});
+    mockedUseBrandingQuery.mockReturnValue(
+      queryResult({
+        data: branding({ logoUrl: "https://example.com/logo.png" }),
+        isSuccess: true,
+      }) as never,
+    );
+    mockedUseUpdateBrandingMutation.mockReturnValue(mutationResult({ mutateAsync }) as never);
+
+    render(<BrandingView />);
+
+    fireEvent.change(screen.getByLabelText("logoUrlLabel"), { target: { value: "" } });
+    fireEvent.click(screen.getByText("save"));
+
+    expect(mutateAsync).toHaveBeenCalledWith({ logoUrl: null, navigationLayout: "NAVBAR" });
+  });
+
   it("saves the form via the update mutation", async () => {
     const mutateAsync = vi.fn().mockResolvedValue({});
     mockedUseBrandingQuery.mockReturnValue(

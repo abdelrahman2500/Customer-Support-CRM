@@ -611,6 +611,140 @@ describe("WorkspaceHeader", () => {
     });
   });
 
+  /**
+   * Story 173 — the header overflowed a 320px viewport (measured against a
+   * real build: 354px EN, 367px AR) because it was a single non-wrapping
+   * flex row. RM-10/RM-11 made both navigation surfaces responsive and
+   * never returned for this row.
+   *
+   * These are class-level assertions on purpose. jsdom loads no Tailwind
+   * CSS, so a `scrollWidth` assertion here returns the same value before
+   * and after the fix — it would pass against the bug. The repository has
+   * already hit and recorded this exact limit twice (`packages/ui/src/lib/
+   * cn.spec.ts`, and Story 169's `Button` guard) and resolved it the same
+   * way: pin the mechanism here, prove the behaviour in a browser.
+   */
+  describe("responsive header (Story 173)", () => {
+    /** The same two-membership shape `describe("branch switcher (Story 118)")`
+     * uses; duplicated rather than lifted so none of its tests is touched. */
+    const twoMemberships = [
+      {
+        branchId: "branch-1",
+        branchName: "Main Branch",
+        departmentId: null,
+        departmentName: null,
+        roleId: "role-1",
+        roleName: "Agent",
+        isActive: true,
+      },
+      {
+        branchId: "branch-2",
+        branchName: "Second Branch",
+        departmentId: null,
+        departmentName: null,
+        roleId: "role-2",
+        roleName: "Agent",
+        isActive: false,
+      },
+    ];
+
+    it("lets the header row wrap instead of overflowing", () => {
+      const { container } = renderHeader();
+
+      const header = container.querySelector("header")!;
+      expect(header).toHaveClass("flex-wrap");
+      expect(header).toHaveClass("gap-y-inline");
+      expect(header).not.toHaveClass("flex-nowrap");
+    });
+
+    /**
+     * The guard for the multi-membership case. Wrapping the `<header>` alone
+     * was measured insufficient (360px EN / 372px AR with a branch switcher
+     * present) because this cluster's own children cannot compress.
+     */
+    it("lets the controls cluster itself wrap, and lets it shrink", () => {
+      const { container } = renderHeader();
+
+      const cluster = container.querySelector("header")!.children[1];
+      expect(cluster).toHaveClass("min-w-0");
+      expect(cluster).toHaveClass("flex-wrap");
+      expect(cluster).toHaveClass("gap-y-inline");
+      // The column gap is unchanged.
+      expect(cluster).toHaveClass("gap-4");
+    });
+
+    /** Both classes asserted together — `truncate` without `min-w-0` raises
+     * the item's automatic minimum width to the whole string and makes the
+     * overflow worse, so a partial application must fail this test. */
+    it("makes the signed-in identity the elastic, truncatable item", () => {
+      renderHeader();
+
+      const identity = screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`);
+      expect(identity).toHaveClass("min-w-0");
+      expect(identity).toHaveClass("truncate");
+    });
+
+    it("bounds the brand logo below sm only, leaving its desktop sizing natural", () => {
+      const { container } = renderHeader({
+        branding: branding({ logoUrl: "https://example.com/logo.png" }),
+      });
+
+      const logo = container.querySelector("img")!;
+      expect(logo).toHaveClass("max-w-32");
+      expect(logo).toHaveClass("object-contain");
+      expect(logo).toHaveClass("sm:max-w-none");
+      // The existing sizing is kept.
+      expect(logo).toHaveClass("h-8");
+      expect(logo).toHaveClass("w-auto");
+    });
+
+    /**
+     * The test that catches a "fix" implemented by hiding controls. Every
+     * control stays in the document in the widest configuration, and none of
+     * them — nor the cluster — is display-toggled by a `hidden` class.
+     */
+    it("keeps every control present in the multi-membership case, hiding nothing", () => {
+      mockedUseMyBranchMembershipsQuery.mockReturnValue({ data: twoMemberships } as never);
+
+      const { container } = renderHeader();
+
+      const identity = screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`);
+      const branchSwitcher = screen.getByLabelText("branchSwitcher.label");
+      const languageSwitcher = screen.getByLabelText("languageSwitcher.label");
+      const signOut = screen.getByRole("button", { name: "signOut" });
+
+      for (const control of [identity, branchSwitcher, languageSwitcher, signOut]) {
+        expect(control).toBeInTheDocument();
+        expect(control.className.split(/\s+/)).not.toContain("hidden");
+      }
+      const cluster = container.querySelector("header")!.children[1]!;
+      expect(cluster.className.split(/\s+/)).not.toContain("hidden");
+    });
+
+    /**
+     * RTL regression guard, mirroring `workspace-sidebar.spec.tsx`'s own —
+     * `docs/architecture/12-risks-tradeoffs-and-scope.md`'s risk #1 forbids
+     * physical-direction utilities, and a wrapping row is exactly where a
+     * stray `mr-`/`pl-` would leak in.
+     */
+    it("uses only logical-direction classes across the header subtree", () => {
+      mockedUseMyBranchMembershipsQuery.mockReturnValue({ data: twoMemberships } as never);
+
+      const { container } = renderHeader({
+        branding: branding({ logoUrl: "https://example.com/logo.png" }),
+      });
+
+      const header = container.querySelector("header")!;
+      for (const element of [header, ...header.querySelectorAll("[class]")]) {
+        const classes = element.className.toString().split(/\s+/);
+        expect(classes.some((c) => /^(ml|mr|pl|pr|left|right|text-left|text-right)-/.test(c))).toBe(
+          false,
+        );
+        expect(classes.some((c) => /^border-[lr]-/.test(c))).toBe(false);
+      }
+    });
+  });
+
   // Story 119 — i18n/RTL: Persisted locale preference + language switcher.
   describe("language switcher (Story 119)", () => {
     it("renders a switcher pre-selecting the current URL locale", () => {

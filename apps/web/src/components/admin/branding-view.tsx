@@ -112,7 +112,11 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
     try {
       await mutation.mutateAsync({
         ...(appName.trim() ? { appName: appName.trim() } : {}),
-        ...(logoUrl.trim() ? { logoUrl: logoUrl.trim() } : {}),
+        ...(logoUrl.trim()
+          ? { logoUrl: logoUrl.trim() }
+          : initial.logoUrl !== null
+            ? { logoUrl: null }
+            : {}),
         ...(primaryColor.trim() ? { primaryColor: primaryColor.trim() } : {}),
         ...(secondaryColor.trim() ? { secondaryColor: secondaryColor.trim() } : {}),
         // Always sent, unlike the four text fields above: this is a closed

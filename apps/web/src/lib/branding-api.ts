@@ -24,7 +24,7 @@ export interface BrandingSummary {
 
 export interface UpdateBrandingInput {
   appName?: string;
-  logoUrl?: string;
+  logoUrl?: string | null;
   primaryColor?: string;
   secondaryColor?: string;
   navigationLayout?: NavigationLayout;

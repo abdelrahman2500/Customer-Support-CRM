@@ -1,0 +1,19 @@
+# make-the-agent-workspace-header-safe-below-sm — plan overview
+
+Entry point for the **make-the-agent-workspace-header-safe-below-sm** feature. Stories execute in order by their `NN` prefix.
+
+## Stories
+
+| NN  | File                                                                                                                       | Title                                           | Tracker id | Depends on                                                                                                                                                                     |
+| --- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 173 | [173-story-make-the-agent-workspace-header-safe-below-sm.md](./173-story-make-the-agent-workspace-header-safe-below-sm.md) | Make the agent workspace header safe below `sm` | —          | Story 129 (brand block + branch switcher), Story 118 (the `twoMemberships` fixture), RM-10/RM-11 (the responsive pattern), Story 134 (`--space-inline`), Story 172 (HEAD only) |
+
+## Dependency notes
+
+- **Single-story feature.** Found by the real-browser verification pass that followed Stories 168–172, not by a test — the defect had no failing test anywhere, because jsdom loads no Tailwind CSS.
+- **Completes RM-10/RM-11.** Those stories made the agent workspace's _navigation_ responsive — `workspace-navbar.tsx` line 50 and `workspace-sidebar.tsx` line 87 are both `hidden … sm:flex`, with the header's own `sm:hidden` hamburger serving both layouts below `sm`. The header's identity/controls row was never given the same treatment and is the last unprotected element in the shell.
+- **The portal is the precedent, not the target.** `apps/portal/src/components/portal/portal-header.tsx` line 174 already carries `flex flex-wrap … gap-y-2`, and its own doc comment (lines 63–68) records the identical finding. The portal is explicitly out of scope; one correction is called out in the plan so the executor does not copy the wrong thing — the portal's `hidden sm:flex` sits on its `<nav>` (line 214), **not** on its controls cluster.
+- **Planning corrected the intake on one substantive point.** The intake prescribes three changes (header `flex-wrap`, cluster `min-w-0`, bounded image). Measured against a live build at 320px with a branch switcher present, those three leave **EN at 360px and AR at 372px — still overflowing**. A fourth change, `flex-wrap` on the controls cluster itself, is what actually satisfies acceptance criterion 3, and the plan makes it a named, non-optional task with the measurement table behind it. The intake's line numbers are also each off by one or two; the plan carries re-read values.
+- **Desktop and tablet are provably unaffected.** With the full fix applied in-page, the header's own box and every child's x/y/width/height were byte-identical at 834 and 1440 in both locales — `flex-wrap` is inert while content fits, and a row gap has no effect on an unwrapped row.
+- **Blast radius is two files**, both `apps/web/src/components/workspace/`. `apps/portal` and `packages/**` are untouched, so those suites are expected unchanged (portal 414, `@crm/ui` 312).
+- **The tests are class-level on purpose.** jsdom cannot distinguish a fixed layout from a broken one, so a `scrollWidth` assertion there would pass against the bug. The plan follows the precedent already recorded in `packages/ui/src/lib/cn.spec.ts` and Story 169: assert the mechanism in the unit test, prove the behaviour in a browser. No Playwright infrastructure is added.

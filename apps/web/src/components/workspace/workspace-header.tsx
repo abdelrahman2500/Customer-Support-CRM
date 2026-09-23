@@ -180,11 +180,26 @@ export function WorkspaceHeader({
     <>
       <header
         style={{ "--brand-primary": branding?.primaryColor ?? undefined } as CSSProperties}
-        className="flex items-center justify-between border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
+        // Story 173 — `flex-wrap` + `gap-y-inline`. Below `sm` this row's own
+        // content exceeds a 320px viewport (measured: 354px EN, 367px AR),
+        // and it had no responsive treatment at all while RM-10/RM-11 gave
+        // both navigation surfaces theirs. Mirrors `apps/portal`'s header,
+        // which already carries `flex flex-wrap … gap-y-2` for exactly this;
+        // `gap-y-inline` is the same 0.5rem spelled as Story 134's token.
+        // Wrapping, never hiding: every control below stays operable.
+        className="flex flex-wrap items-center justify-between gap-y-inline border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
       >
         {branding?.logoUrl ? (
+          // `max-w-32 … sm:max-w-none` — a configured logo is unbounded free
+          // content, the same hazard the text brand below already guards with
+          // `truncate`; it claimed 57px of the 320px budget. Capped only
+          // below `sm`, so the natural desktop presentation is untouched.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={branding.logoUrl} alt={brandName} className="h-8 w-auto" />
+          <img
+            src={branding.logoUrl}
+            alt={brandName}
+            className="h-8 w-auto max-w-32 object-contain sm:max-w-none"
+          />
         ) : (
           <Link
             href={`/${locale}/tickets`}
@@ -196,8 +211,22 @@ export function WorkspaceHeader({
             {brandName}
           </Link>
         )}
-        <div className="flex items-center gap-4 text-sm text-ink-muted">
-          <span>{t("signedInAs", { name: user.fullName })}</span>
+        {/* Story 173 — `flex-wrap` here too, not just on the `<header>`.
+            Measured with a branch switcher present at 320px: wrapping the
+            header alone still overflowed (360px EN, 372px AR), because this
+            cluster's own children cannot compress — two `<select>`s and a
+            `Button` whose `whitespace-nowrap` is correct and deliberately
+            not overridden. Letting the cluster wrap is what actually makes
+            the multi-membership case fit. `gap-4` stays the column gap;
+            `gap-y-inline` applies only between wrapped lines, so an
+            unwrapped row is unchanged. */}
+        <div className="flex min-w-0 flex-wrap items-center gap-4 gap-y-inline text-sm text-ink-muted">
+          {/* `min-w-0` and `truncate` together, never one alone: `truncate`
+              sets `white-space: nowrap`, which would raise this item's
+              automatic minimum width to the whole string and make the row
+              wider than before. This is the one genuinely elastic item, so
+              it is the one that yields. */}
+          <span className="min-w-0 truncate">{t("signedInAs", { name: user.fullName })}</span>
           {memberships.length > 1 && (
             <select
               aria-label={t("branchSwitcher.label")}
