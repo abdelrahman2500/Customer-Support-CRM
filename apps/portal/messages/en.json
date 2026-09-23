@@ -35,7 +35,25 @@
     "password": "Password",
     "signIn": "Sign in",
     "signingIn": "Signing in...",
-    "loginFailed": "Sign-in failed. Check your email and password and try again."
+    "loginFailed": "Sign-in failed. Check your email and password and try again.",
+    "marketing": {
+      "headline": "Get help and follow it through.",
+      "subheadline": "Send a request, watch its progress, and find answers on your own.",
+      "features": {
+        "tickets": {
+          "title": "Track your requests",
+          "description": "See status changes and replies as they happen."
+        },
+        "knowledge": {
+          "title": "Find answers fast",
+          "description": "Browse help articles before you even need to ask."
+        },
+        "notifications": {
+          "title": "Stay informed",
+          "description": "Get notified the moment something changes."
+        }
+      }
+    }
   },
   "home": {
     "signedInAs": "Signed in as {name}",

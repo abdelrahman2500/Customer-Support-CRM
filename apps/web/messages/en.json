@@ -52,7 +52,25 @@
     "password": "Password",
     "signIn": "Sign in",
     "signingIn": "Signing in...",
-    "loginFailed": "Sign-in failed. Check your email and password and try again."
+    "loginFailed": "Sign-in failed. Check your email and password and try again.",
+    "marketing": {
+      "headline": "Support your customers from one place.",
+      "subheadline": "Track every ticket, reply faster, and keep your whole team aligned.",
+      "features": {
+        "ticketing": {
+          "title": "Unified ticketing",
+          "description": "Every conversation, from every channel, in one queue."
+        },
+        "knowledge": {
+          "title": "Knowledge base",
+          "description": "Answer once and reuse it, in Arabic and English."
+        },
+        "insights": {
+          "title": "Live insights",
+          "description": "SLA timers and reports that show what needs attention now."
+        }
+      }
+    }
   },
   "workspace": {
     "appName": "Customer Support CRM",

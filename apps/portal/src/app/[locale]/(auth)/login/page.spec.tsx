@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import LoginPage from "./page";
 import { setAccessToken } from "@/lib/api";
 
@@ -23,6 +23,9 @@ vi.mock("@/lib/api", async () => {
     setAccessToken: vi.fn(),
   };
 });
+
+/** Story 175 — mirrors the page component's own FEATURES order. */
+const FEATURE_KEYS = ["tickets", "knowledge", "notifications"] as const;
 
 describe("LoginPage (portal)", () => {
   beforeEach(() => {
@@ -237,10 +240,17 @@ describe("LoginPage (portal)", () => {
       expect(headings[0]).toHaveTextContent("title");
     });
 
+    /** Story 175 — the product name now appears twice in the DOM: once in
+     * the form column (`lg:hidden`, the only identity on a phone) and once in
+     * the brand panel (`hidden lg:flex`, which owns it from `lg` up). Exactly
+     * one is ever visible; jsdom applies no media queries, so both are here. */
     it("shows the product name as the screen's identity", () => {
-      render(<LoginPage />);
+      const { container } = render(<LoginPage />);
 
-      expect(screen.getByText("appName")).toBeInTheDocument();
+      const names = screen.getAllByText("appName");
+      expect(names).toHaveLength(2);
+      expect(names[0]).toHaveClass("lg:hidden");
+      expect(container.querySelector("aside")).toContainElement(names[1]!);
     });
 
     describe("pre-auth locale switcher", () => {
@@ -315,6 +325,52 @@ describe("LoginPage (portal)", () => {
         );
         expect(classes.some((c) => /^border-[lr]-/.test(c))).toBe(false);
       }
+    });
+  });
+
+  /**
+   * Story 175 — the split composition. The brand panel is real content, not
+   * decoration, so it is not `aria-hidden`; below `lg` it is simply not
+   * rendered. jsdom applies no media queries, so the panel IS in the test
+   * DOM and its text is queryable — visibility is therefore asserted at
+   * class level, never by absence.
+   */
+  describe("split composition (Story 175)", () => {
+    it("introduces the product with a headline and a supporting line", () => {
+      render(<LoginPage />);
+
+      expect(screen.getByText("marketing.headline")).toBeInTheDocument();
+      expect(screen.getByText("marketing.subheadline")).toBeInTheDocument();
+    });
+
+    it("lists exactly three capabilities, each with a title and a description", () => {
+      render(<LoginPage />);
+
+      for (const key of FEATURE_KEYS) {
+        expect(screen.getByText(`marketing.features.${key}.title`)).toBeInTheDocument();
+        expect(screen.getByText(`marketing.features.${key}.description`)).toBeInTheDocument();
+      }
+      const list = screen.getByRole("list");
+      expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+    });
+
+    it("hides the brand panel below lg and shows it from lg up", () => {
+      const { container } = render(<LoginPage />);
+
+      const panel = container.querySelector("aside")!;
+      expect(panel).toHaveClass("hidden");
+      expect(panel).toHaveClass("lg:flex");
+    });
+
+    /** The headline must not compete with the form for the page's single
+     * level-1 heading — it is an `h2`, and `auth.title` stays the `h1`. */
+    it("keeps the sign-in title as the only level-1 heading", () => {
+      render(<LoginPage />);
+
+      const h1s = screen.getAllByRole("heading", { level: 1 });
+      expect(h1s).toHaveLength(1);
+      expect(h1s[0]).toHaveTextContent("title");
+      expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("marketing.headline");
     });
   });
 });

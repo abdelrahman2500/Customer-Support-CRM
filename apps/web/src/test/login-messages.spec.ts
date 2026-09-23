@@ -50,6 +50,18 @@ describe("login messages", () => {
         nonEmpty(messages.workspace.languageSwitcher.options.ar);
       });
 
+      /** Story 175 — the split composition's product messaging. A key missing
+       * from one catalogue would render its raw path on the product's front
+       * door, which no render test in this repo would catch. */
+      it("has every marketing key the brand panel renders", () => {
+        nonEmpty(messages.auth.marketing.headline);
+        nonEmpty(messages.auth.marketing.subheadline);
+        for (const key of ["ticketing", "knowledge", "insights"] as const) {
+          nonEmpty(messages.auth.marketing.features[key].title);
+          nonEmpty(messages.auth.marketing.features[key].description);
+        }
+      });
+
       it("distinguishes the idle and pending submit labels", () => {
         expect(messages.auth.signIn).not.toBe(messages.auth.signingIn);
       });
@@ -58,5 +70,11 @@ describe("login messages", () => {
 
   it("translates the product name, rather than leaving the English one in place", () => {
     expect(en.common.appName).not.toBe(ar.common.appName);
+  });
+
+  /** Catches an untranslated copy-paste of the marketing block. */
+  it("translates the marketing headline and subheadline", () => {
+    expect(en.auth.marketing.headline).not.toBe(ar.auth.marketing.headline);
+    expect(en.auth.marketing.subheadline).not.toBe(ar.auth.marketing.subheadline);
   });
 });
