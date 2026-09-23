@@ -193,7 +193,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
             <h1 className="sr-only">{article.title}</h1>
             <Input
               autoFocus
-              className="w-full max-w-md text-lg font-semibold"
+              className="w-full max-w-md text-title"
               // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
               // rejected edit can be explicitly reverted, mirroring
               // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern.
@@ -225,7 +225,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
           </>
         ) : (
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-lg font-semibold text-ink">{article.title}</h1>
+            <h1 className="text-title text-ink">{article.title}</h1>
             <Button
               type="button"
               variant="ghost"

@@ -11,6 +11,19 @@ describe("PageHeader", () => {
     expect(headings[0]).toHaveTextContent("Tickets");
   });
 
+  /**
+   * Story 170 — the page title spends Story 134's `title` step (1.5rem/600)
+   * instead of the `text-lg font-semibold` pair Story 140 froze. The negative
+   * assertion pins the migration, not just the current class.
+   */
+  it("types the page title at the named title step", () => {
+    render(<PageHeader title="Tickets" />);
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveClass("text-title", "text-ink");
+    expect(heading).not.toHaveClass("text-lg");
+  });
+
   it("renders inside a header landmark", () => {
     render(<PageHeader title="Tickets" />);
 

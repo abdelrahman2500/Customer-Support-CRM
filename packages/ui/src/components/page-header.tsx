@@ -11,10 +11,19 @@ import { cn } from "../lib/cn";
  * `flex items-center justify-between` row, and most had no room for an action
  * at all — so "the primary thing you do on this page" had no consistent home.
  *
- * `text-lg` is kept as the canonical size: it is what the large majority
- * already used, so standardising on it is a consistency fix rather than a
- * re-scaling of 28 screens. Revisiting the type scale itself is a separate,
- * deliberate decision.
+ * `text-lg` was kept as the canonical size by that story: it is what the
+ * large majority already used, so standardising on it was a consistency fix
+ * rather than a re-scaling of 28 screens. Revisiting the type scale itself
+ * was left as "a separate, deliberate decision".
+ *
+ * Story 170 is that decision. The title now renders at `text-title` — the
+ * 1.5rem step Story 134 named for exactly this and never spent. The recon
+ * that commissioned that scale found page titles at `text-lg` and section
+ * titles at body size, only one small step apart, "which is why pages read
+ * flat"; this is the half of the fix that lives here, `CardTitle`'s
+ * `text-subhead` is the other. `font-semibold` is gone because the `title`
+ * step declares `fontWeight: 600` in its own `fontSize` tuple — stating the
+ * weight twice is how the two drift apart later.
  *
  * ## Layout
  *
@@ -55,7 +64,7 @@ export function PageHeader({ title, description, actions, className }: PageHeade
       )}
     >
       <div className="min-w-0">
-        <h1 className="text-lg font-semibold text-ink">{title}</h1>
+        <h1 className="text-title text-ink">{title}</h1>
         {description && <p className="mt-1 text-sm text-ink-subtle">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-inline">{actions}</div>}

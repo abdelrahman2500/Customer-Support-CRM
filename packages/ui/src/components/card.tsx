@@ -93,8 +93,16 @@ export interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement>
 }
 
 /**
- * `text-sm font-semibold` — the size and weight this app's section headings
- * already use.
+ * `text-subhead` — 1rem/600, the step Story 134 named for a section heading.
+ *
+ * Story 154 shipped this as `text-sm font-semibold`, the size and weight the
+ * 49 hand-written section headings already used, because standardising on
+ * what existed was that story's job. Story 170 changed it: body size for a
+ * section heading is half of the "pages read flat" finding the type scale
+ * was defined to fix (`PageHeader`'s `text-title` is the other half), and a
+ * heading that measures the same as the paragraph under it is not a
+ * hierarchy. `font-semibold` is gone because `subhead` declares
+ * `fontWeight: 600` in its own `fontSize` tuple.
  *
  * Why `as` and not this package's usual `asChild`: `asChild` delegates the
  * whole element, so a caller would write
@@ -105,7 +113,7 @@ export interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement>
  * overlap. `Card`, `Button` and `Select` keep `asChild` for what it is for.
  */
 export function CardTitle({ className, as: Heading = "h3", ...props }: CardTitleProps) {
-  return <Heading className={cn("text-sm font-semibold text-ink", className)} {...props} />;
+  return <Heading className={cn("text-subhead text-ink", className)} {...props} />;
 }
 
 export function CardDescription({

@@ -570,7 +570,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               <h1 className="sr-only">{customer.displayName}</h1>
               <Input
                 autoFocus
-                className="w-56 text-lg font-semibold"
+                className="w-56 text-title"
                 // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
                 // rejected edit can be explicitly reverted, mirroring
                 // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern.
@@ -602,7 +602,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
             </>
           ) : (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="text-lg font-semibold text-ink">{customer.displayName}</h1>
+              <h1 className="text-title text-ink">{customer.displayName}</h1>
               <Button
                 type="button"
                 variant="ghost"

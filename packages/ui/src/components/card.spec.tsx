@@ -102,13 +102,30 @@ describe("CardTitle heading level (Story 154)", () => {
     expect(screen.getByRole("heading", { level: 4, name: "Section" })).toBeInTheDocument();
   });
 
+  /**
+   * Story 170 — the size moved from `text-sm` (body size) to the named
+   * `subhead` step, and `font-semibold` went with it because the step's own
+   * `fontSize` tuple declares the weight. The negative assertion is what
+   * makes this a regression test rather than a restatement of the class.
+   */
   it("keeps its token classes at every level", () => {
     render(<CardTitle as="h2">Section</CardTitle>);
 
     const heading = screen.getByRole("heading", { level: 2 });
-    expect(heading).toHaveClass("text-sm", "font-semibold", "text-ink");
+    expect(heading).toHaveClass("text-subhead", "text-ink");
+    expect(heading).not.toHaveClass("text-sm");
     // Never a raw palette class — the repo's token guards forbid it.
     expect(heading.className).not.toMatch(/text-(slate|gray|zinc)-\d{3}/);
+  });
+
+  /** The 29 files that render a section through `SectionCard` rather than
+   * `CardTitle` directly must inherit the same step. */
+  it("types a SectionCard's own heading at the same named step", () => {
+    render(<SectionCard title="Recent tickets">body</SectionCard>);
+
+    expect(screen.getByRole("heading", { level: 2, name: "Recent tickets" })).toHaveClass(
+      "text-subhead",
+    );
   });
 
   it("merges a caller's className rather than dropping it", () => {
@@ -119,7 +136,11 @@ describe("CardTitle heading level (Story 154)", () => {
     );
 
     const heading = screen.getByRole("heading", { level: 2 });
-    expect(heading).toHaveClass("mt-2", "font-semibold");
+    // Story 170 — the component's own class to survive the merge is now the
+    // named size step; `font-semibold` is gone because `subhead` declares the
+    // weight itself. Same assertion, same intent: the caller adds, it does
+    // not replace.
+    expect(heading).toHaveClass("mt-2", "text-subhead");
   });
 });
 
