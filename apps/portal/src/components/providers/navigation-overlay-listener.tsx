@@ -6,119 +6,122 @@ import { useTranslations } from "next-intl";
 import { NavigationOverlay } from "@crm/ui";
 
 /**
- * UX audit — mirrors
+ * UX audit — the global route-navigation overlay's detection half (the
+ * visual half is `NavigationOverlay`, `@crm/ui`). Mirrors
  * `apps/web/src/components/providers/navigation-overlay-listener.tsx`
- * exactly (same reasoning as this app's own `auth-recovery-listener.tsx`
- * mirroring its `apps/web` counterpart) — see that file's own doc comment
- * for the full detection design: why a `pushState`/`replaceState`/
- * `popstate` patch rather than a `<Link>`-click listener, the HMR-safe
- * patch-once guard, why every listener dispatch is deferred to a microtask
- * (a synchronous dispatch can trip React's "useInsertionEffect must not
- * schedule updates" warning — Next.js calls `pushState`/`replaceState` from
- * inside one for some transitions), the try/catch dispatch hardening, how
- * completion is detected via `usePathname()`, the "destination already
- * committed" short-circuit that resolves an A -> B -> A round-trip without
- * ever touching the 10s failsafe, and the show-delay/failsafe timing. The
- * one thing genuinely specific to this app: the row-click `router.push`
- * call sites this also has to cover without an edit include
- * `ticket-list-view.tsx`, `article-list-view.tsx`, and `chat-widget.tsx`.
+ * line-for-line below this comment; read that file for the full design
+ * rationale, which applies here unchanged.
+ *
+ * ## Story 171 — why this file was rewritten
+ *
+ * This app kept the ORIGINAL detection mechanism after `apps/web` replaced
+ * it: a patch over `window.history.pushState`/`replaceState`. `apps/web`'s
+ * own doc comment records why that was abandoned, measured in a real
+ * browser rather than in tests — Next.js's App Router installs its own
+ * wrapper on those same two methods, `window.history.pushState.toString()`
+ * in a running page shows Next's minified function carrying none of our
+ * marker state, and whichever patch "wins" is an implementation-order
+ * accident. In practice Next's wins, so the wrapper never ran for any real
+ * `<Link>` or `router.push()` navigation and this app's overlay never
+ * appeared.
+ *
+ * The portal's unit tests did not catch that, and could not: they called
+ * `window.history.pushState` directly, which exercises our patch in
+ * isolation because no Next.js runtime is present in jsdom to install a
+ * competing one. The tests were right about the code and wrong about the
+ * browser.
+ *
+ * So this file now uses the same three mechanisms `apps/web` does, none of
+ * which patch a global a framework also patches:
+ *
+ *   - **`<Link>` clicks** — one bubble-phase `click` listener on
+ *     `document`, acting only when `event.defaultPrevented` is already true
+ *     (Next's own anchor handler calls `preventDefault()` exactly when it
+ *     takes over), so none of its modifier-key/target/download rules are
+ *     reimplemented here.
+ *   - **`router.push()`/`replace()`** — `useNavigatingRouter`
+ *     (`@/hooks/use-navigating-router`), which calls
+ *     `notifyNavigationStart` before delegating. Call-site opt-in, not
+ *     another global patch. Unlike `apps/web`, this app has no
+ *     `url-filters.ts`, so there is no same-pathname filter-sync
+ *     `replace()` to exclude: all eight navigating files import the hook.
+ *   - **Back/Forward** — the `popstate` *event*, a plain subscription that
+ *     cannot silently replace another listener.
+ *
+ * Completion detection (`usePathname()`), the already-committed
+ * short-circuit, the microtask dispatch, the show-delay and the failsafe are
+ * all unchanged from the previous implementation and identical to
+ * `apps/web`'s.
  */
 const SHOW_DELAY_MS = 150;
 const FAILSAFE_TIMEOUT_MS = 10_000;
 
-type NavigationListener = (change: { from: string; to: string }) => void;
+type NavigationListener = (to: string) => void;
 
-interface HistoryPatchState {
-  listeners: Set<NavigationListener>;
-}
+const listeners = new Set<NavigationListener>();
 
-type MarkedFunction = ((...args: never[]) => unknown) & { __navOverlay?: HistoryPatchState };
-
-function resolvePathname(url: string | URL | null | undefined): string | null {
-  if (!url) {
-    return null;
-  }
+function resolvePathname(href: string): string | null {
   try {
-    return new URL(url, window.location.href).pathname;
+    return new URL(href, window.location.href).pathname;
   } catch {
     return null;
   }
 }
 
-function ensureHistoryPatched(): Set<NavigationListener> {
-  const existing = (window.history.pushState as MarkedFunction).__navOverlay;
-  if (existing) {
-    return existing.listeners;
+/**
+ * Notifies every mounted `NavigationOverlayListener` that a client-side
+ * navigation to `href` is starting. Called from this file's own `click`
+ * listener (`<Link>`s) and from `useNavigatingRouter` (`router.push()`/
+ * `replace()`) — see this file's own doc comment for why neither goes
+ * through `history.pushState`/`replaceState`.
+ */
+export function notifyNavigationStart(href: string): void {
+  const pathname = resolvePathname(href);
+  if (pathname === null) {
+    return;
   }
+  listeners.forEach((listener) => {
+    queueMicrotask(() => {
+      try {
+        listener(pathname);
+      } catch {
+        // A bug in a listener must never break the real navigation this
+        // call is guarding.
+      }
+    });
+  });
+}
 
-  const listeners = new Set<NavigationListener>();
-  let currentPathname = window.location.pathname;
+function isPlainLeftClick(event: MouseEvent): boolean {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
 
-  const originalPushState = window.history.pushState.bind(window.history);
-  const originalReplaceState = window.history.replaceState.bind(window.history);
+function findNavigableAnchor(target: EventTarget | null): HTMLAnchorElement | null {
+  if (!(target instanceof Element)) {
+    return null;
+  }
+  return target.closest("a[href]");
+}
 
-  function notify(nextPathname: string | null): void {
-    if (nextPathname === null || nextPathname === currentPathname) {
-      // Unparseable/unchanged URL, or a same-pathname update (query/hash
-      // only) — not a route change, e.g. url-filters.ts's filter sync.
+function installLinkClickListener(): () => void {
+  function handleClick(event: MouseEvent): void {
+    // Bubble phase (this function's own registration below, not capture):
+    // by the time a `document`-level bubble listener sees the event,
+    // Next's own `<Link>` click handler (attached lower in the tree, on
+    // the anchor itself) has already run and already called
+    // `preventDefault()` if and only if it decided to take over — the one
+    // reliable "a soft navigation is starting" signal available here.
+    if (!event.defaultPrevented || !isPlainLeftClick(event)) {
       return;
     }
-    const from = currentPathname;
-    currentPathname = nextPathname;
-    listeners.forEach((listener) => {
-      // Deferred to a microtask — not called synchronously here. This
-      // patch runs inside whatever call stack invoked `pushState`/
-      // `replaceState`/`popstate`, and Next.js's own App Router does that
-      // from inside a `useInsertionEffect` for some transitions (confirmed
-      // empirically: rendering a component that calls `pushState` from its
-      // own `useInsertionEffect`, on an update after this patch's listener
-      // is already registered, reproduces React's
-      // "useInsertionEffect must not schedule updates" warning). React
-      // forbids scheduling *any* state update, on *any* component, while
-      // *any* insertion effect anywhere is still running — a global
-      // invariant, not one scoped to this component — so a listener that
-      // calls a state setter synchronously here can trip it regardless of
-      // which component's insertion effect is on the stack. `queueMicrotask`
-      // moves the dispatch to right after the current synchronous work
-      // (including that insertion-effect commit) finishes, which is
-      // functionally instantaneous — no delay perceptible against the
-      // 150ms show-delay — while fully escaping that restricted phase.
-      queueMicrotask(() => {
-        try {
-          listener({ from, to: nextPathname });
-        } catch {
-          // A bug in a listener must never break the real navigation this
-          // dispatch was scheduled from.
-        }
-      });
-    });
+    const anchor = findNavigableAnchor(event.target);
+    if (!anchor || (anchor.target && anchor.target !== "_self")) {
+      return;
+    }
+    notifyNavigationStart(anchor.href);
   }
-
-  type PushStateArgs = Parameters<History["pushState"]>;
-  type ReplaceStateArgs = Parameters<History["replaceState"]>;
-
-  const patchedPushState = function patchedPushState(...args: PushStateArgs): void {
-    notify(resolvePathname(args[2]));
-    originalPushState(...args);
-  };
-  const patchedReplaceState = function patchedReplaceState(...args: ReplaceStateArgs): void {
-    notify(resolvePathname(args[2]));
-    originalReplaceState(...args);
-  };
-
-  window.history.pushState = patchedPushState;
-  window.history.replaceState = patchedReplaceState;
-  // Back/Forward: the browser has already moved `window.location` by the
-  // time this fires, so — unlike the two patches above — there is no
-  // "before" left to intercept; reading it here is the target, not the
-  // origin, which is exactly what `notify`'s own `currentPathname` closure
-  // supplies as `from`.
-  window.addEventListener("popstate", () => {
-    notify(window.location.pathname);
-  });
-
-  (patchedPushState as unknown as MarkedFunction).__navOverlay = { listeners };
-  return listeners;
+  document.addEventListener("click", handleClick);
+  return () => document.removeEventListener("click", handleClick);
 }
 
 export function NavigationOverlayListener() {
@@ -136,25 +139,30 @@ export function NavigationOverlayListener() {
     committedPathnameRef.current = pathname;
   }, [pathname]);
 
+  useEffect(() => installLinkClickListener(), []);
+
   useEffect(() => {
-    const listeners = ensureHistoryPatched();
-    const listener: NavigationListener = ({ from, to }) => {
+    function handlePopState(): void {
+      // Back/Forward: the browser has already moved `window.location` by
+      // the time this fires, so the target is simply wherever we are now.
+      notifyNavigationStart(window.location.pathname);
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const listener: NavigationListener = (to) => {
       // The one case the pathname-diff effect below structurally cannot
       // detect on its own: a navigation whose destination is already the
-      // committed route — e.g. A -> B -> A before B ever committed. React
-      // never re-fires `usePathname()` for a value it already holds (a
-      // no-op state update triggers no re-render), so there is no "it
-      // changed" signal to wait for; the only correct answer is to resolve
-      // this right here, one microtask tick after the triggering
-      // `pushState`/`replaceState`/`popstate`, well before the show-delay
-      // timer would ever fire, rather than let it sit pending until the
-      // failsafe.
+      // committed route — e.g. A -> B -> A before B ever committed. See
+      // this file's own doc comment.
       if (to === committedPathnameRef.current) {
         pendingSincePathnameRef.current = null;
         setPending(false);
         return;
       }
-      pendingSincePathnameRef.current = from;
+      pendingSincePathnameRef.current = committedPathnameRef.current;
       setPending(true);
     };
     listeners.add(listener);
@@ -164,7 +172,11 @@ export function NavigationOverlayListener() {
   }, []);
 
   useEffect(() => {
-    if (pending && pendingSincePathnameRef.current !== null && pathname !== pendingSincePathnameRef.current) {
+    if (
+      pending &&
+      pendingSincePathnameRef.current !== null &&
+      pathname !== pendingSincePathnameRef.current
+    ) {
       pendingSincePathnameRef.current = null;
       setPending(false);
     }

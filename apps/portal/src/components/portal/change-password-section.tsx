@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTranslations } from "next-intl";
 import { Alert, Button, Card, FormField, Input, SectionCard } from "@crm/ui";
 import { useChangePasswordMutation } from "@/hooks/use-change-password";

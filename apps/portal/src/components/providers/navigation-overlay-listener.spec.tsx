@@ -1,7 +1,19 @@
+/**
+ * Story 171 — ported wholesale from
+ * `apps/web/src/components/providers/navigation-overlay-listener.spec.tsx`,
+ * because this app's listener is now that file's implementation.
+ *
+ * The suite it replaces tested the abandoned mechanism: it called
+ * `window.history.pushState` directly and asserted the patch fired. Those
+ * tests passed for the whole time the feature was broken in a real browser,
+ * because jsdom has no Next.js App Router installing a competing patch on
+ * the same method — they were right about the code and wrong about the
+ * world. Nothing here touches `history.pushState`.
+ */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { useInsertionEffect } from "react";
-import { NavigationOverlayListener } from "./navigation-overlay-listener";
+import { NavigationOverlayListener, notifyNavigationStart } from "./navigation-overlay-listener";
 
 const mockedUsePathname = vi.fn(() => "/en/tickets");
 
@@ -20,24 +32,35 @@ function isBusy(): boolean {
   return screen.getByRole("status").getAttribute("aria-busy") === "true";
 }
 
-/** Every listener dispatch is deferred via `queueMicrotask` (see
- * navigation-overlay-listener.tsx's own doc comment on `notify` for why —
- * synchronous dispatch can trip React's "useInsertionEffect must not
- * schedule updates" warning). `vi.useFakeTimers()` does not fake
- * microtasks, so a real microtask checkpoint is needed after any
- * `pushState`/`replaceState`/`popstate` for its effect to be observable. */
+/** Simulates a real `<Link>` click exactly as Next.js's own click handler
+ * leaves it by the time it reaches this file's `document`-level bubble
+ * listener: `defaultPrevented` already `true` (Next took over), fired on
+ * an `<a href>` in the document. */
+function clickLink(
+  href: string,
+  options: { defaultPrevented?: boolean; target?: string } = {},
+): void {
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  if (options.target) {
+    anchor.target = options.target;
+  }
+  document.body.appendChild(anchor);
+  const event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  if (options.defaultPrevented !== false) {
+    event.preventDefault();
+  }
+  anchor.dispatchEvent(event);
+  anchor.remove();
+}
+
 async function flushMicrotasks(): Promise<void> {
   await Promise.resolve();
 }
 
-describe("NavigationOverlayListener", () => {
+describe("NavigationOverlayListener (portal)", () => {
   beforeEach(() => {
     mockedUsePathname.mockReturnValue("/en/tickets");
-    // Keeps jsdom's real `window.location` in sync with the mocked
-    // `usePathname()` value above — the history patch tracks its own
-    // pathname starting from `window.location.pathname`, so the two must
-    // agree for these tests to exercise the same comparisons production
-    // does.
     window.history.pushState({}, "", "/en/tickets");
     vi.useFakeTimers();
   });
@@ -52,11 +75,25 @@ describe("NavigationOverlayListener", () => {
     expect(isBusy()).toBe(false);
   });
 
+  it("mounts and installs its click listener (a click on an internal <Link>-style anchor is observed)", async () => {
+    render(<NavigationOverlayListener />);
+
+    await act(async () => {
+      clickLink("/en/customers");
+      await flushMicrotasks();
+    });
+    act(() => {
+      vi.advanceTimersByTime(SHOW_DELAY_MS);
+    });
+
+    expect(isBusy()).toBe(true);
+  });
+
   it("does not show immediately on navigation start — only after the show-delay elapses", async () => {
     render(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.pushState({}, "", "/en/customers");
+      clickLink("/en/customers");
       await flushMicrotasks();
     });
     expect(isBusy()).toBe(false);
@@ -67,12 +104,12 @@ describe("NavigationOverlayListener", () => {
     expect(isBusy()).toBe(true);
   });
 
-  // Case 1 — A -> B.
+  // Case 1 — A -> B via <Link>.
   it("A -> B: shows while in flight, hides once B commits", async () => {
     const { rerender } = render(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.pushState({}, "", "/en/customers");
+      clickLink("/en/customers");
       await flushMicrotasks();
     });
     act(() => {
@@ -85,17 +122,16 @@ describe("NavigationOverlayListener", () => {
     expect(isBusy()).toBe(false);
   });
 
-  // Case 2 / Case 11 — A -> B -> C in quick succession (superseded/concurrent).
+  // Case 2 / superseded — A -> B -> C in quick succession.
   it("A -> B -> C: a fast second navigation supersedes the first, hides once C (not B) commits", async () => {
     const { rerender } = render(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.pushState({}, "", "/en/customers");
+      clickLink("/en/customers");
       await flushMicrotasks();
     });
     await act(async () => {
-      // Superseded before "customers" ever committed.
-      window.history.pushState({}, "", "/en/reports");
+      clickLink("/en/reports");
       await flushMicrotasks();
     });
     act(() => {
@@ -108,23 +144,20 @@ describe("NavigationOverlayListener", () => {
     expect(isBusy()).toBe(false);
   });
 
-  // Case 3 — the previously-suspected "known limitation": A -> B in flight,
-  // then back to A before B commits. usePathname() would never re-fire for
-  // "A" (it never actually left it — a same-value state update is a no-op
-  // in React), so the pathname-diff mechanism alone genuinely cannot detect
-  // this; the synchronous "destination already committed" check in the
-  // listener is what resolves it instead — immediately, at click time, not
-  // via the 10s failsafe, and (since it fires before the show-delay timer
-  // even starts) without ever showing the overlay at all.
-  it("A -> B -> A (before B commits): never shows at all — resolved synchronously, not via the failsafe", async () => {
+  // Case 3 — A -> B -> A before B commits. usePathname() would never
+  // re-fire for "A" (it never actually left it), so the pathname-diff
+  // mechanism alone genuinely cannot detect this; the "destination already
+  // committed" check in the listener resolves it instead, synchronously
+  // (well, one microtask tick), before the show-delay even starts.
+  it("A -> B -> A (before B commits): never shows at all, resolved instantly, not via the failsafe", async () => {
     render(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.pushState({}, "", "/en/customers"); // A -> B
+      clickLink("/en/customers");
       await flushMicrotasks();
     });
     await act(async () => {
-      window.history.pushState({}, "", "/en/tickets"); // back to A, B never committed
+      clickLink("/en/tickets"); // back to A, B never committed
       await flushMicrotasks();
     });
     act(() => {
@@ -132,25 +165,20 @@ describe("NavigationOverlayListener", () => {
     });
     expect(isBusy()).toBe(false);
 
-    // Not because 10s happened to pass, either.
     act(() => {
       vi.advanceTimersByTime(FAILSAFE_TIMEOUT_MS);
     });
     expect(isBusy()).toBe(false);
   });
 
-  // Case 4 — B redirects server-side to C (e.g. an auth guard). Next
-  // reflects the final URL with its own history call before the segment
-  // tree commits; this must resolve against C, not the originally-clicked B.
+  // Case 4 — B redirects server-side to C. Whatever the final commit turns
+  // out to be, the overlay must resolve against *that*, not the originally
+  // clicked destination.
   it("A -> B redirects to C: hides once C commits, not stuck on B", async () => {
     const { rerender } = render(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.pushState({}, "", "/en/customers"); // click -> B
-      await flushMicrotasks();
-    });
-    await act(async () => {
-      window.history.replaceState({}, "", "/en/login"); // server redirect -> C
+      clickLink("/en/customers");
       await flushMicrotasks();
     });
     act(() => {
@@ -158,25 +186,41 @@ describe("NavigationOverlayListener", () => {
     });
     expect(isBusy()).toBe(true);
 
+    // The redirect itself is just a different final pathname commit.
     mockedUsePathname.mockReturnValue("/en/login");
     rerender(<NavigationOverlayListener />);
     expect(isBusy()).toBe(false);
   });
 
-  // Case 5/6 — router.push()/router.replace() firing while another
-  // navigation is already in flight is exactly the pushState/replaceState
-  // sequencing already covered above (both go through the same patch); this
-  // spells out the replace-during-push and push-during-replace orderings
-  // explicitly.
-  it("a replace() while a push() is in flight resolves against the replace's destination", async () => {
+  // Case 5/6 — router.push()/router.replace(), via notifyNavigationStart
+  // directly (what useNavigatingRouter calls) rather than a <Link> click —
+  // same underlying mechanism, exercised the way the wrapped hook uses it.
+  it("router.push()-style notifyNavigationStart() shows the overlay the same way a <Link> click does", async () => {
     const { rerender } = render(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.pushState({}, "", "/en/customers");
+      notifyNavigationStart("/en/customers");
+      await flushMicrotasks();
+    });
+    act(() => {
+      vi.advanceTimersByTime(SHOW_DELAY_MS);
+    });
+    expect(isBusy()).toBe(true);
+
+    mockedUsePathname.mockReturnValue("/en/customers");
+    rerender(<NavigationOverlayListener />);
+    expect(isBusy()).toBe(false);
+  });
+
+  it("a router.replace() while a router.push() is in flight resolves against the replace's destination", async () => {
+    const { rerender } = render(<NavigationOverlayListener />);
+
+    await act(async () => {
+      notifyNavigationStart("/en/customers");
       await flushMicrotasks();
     });
     await act(async () => {
-      window.history.replaceState({}, "", "/en/reports");
+      notifyNavigationStart("/en/reports");
       await flushMicrotasks();
     });
     act(() => {
@@ -188,29 +232,23 @@ describe("NavigationOverlayListener", () => {
     expect(isBusy()).toBe(false);
   });
 
-  // Case 7 — Back/Forward. jsdom maintains a real history stack, so
-  // history.back() both moves window.location and fires a real popstate,
-  // exactly like a real browser.
-  it("Back/Forward browser navigation shows and clears the overlay", async () => {
+  // Case 7 — Back/Forward via the native popstate event.
+  it("Back/Forward browser navigation (popstate) shows and clears the overlay", async () => {
     const { rerender } = render(<NavigationOverlayListener />);
 
-    await act(async () => {
-      window.history.pushState({}, "", "/en/customers");
-      await flushMicrotasks();
-    });
+    // Simulate having actually navigated to "customers" first (a real
+    // commit), then going back to "tickets" via popstate.
+    window.history.pushState({}, "", "/en/customers");
     mockedUsePathname.mockReturnValue("/en/customers");
     rerender(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.back();
-      // jsdom dispatches `popstate` asynchronously (a queued task), not
-      // synchronously within `back()` itself — advancing by 0ms is not
-      // sufficient to flush that queued dispatch, confirmed empirically.
-      await vi.advanceTimersByTimeAsync(1);
+      window.history.pushState({}, "", "/en/tickets");
+      window.dispatchEvent(new PopStateEvent("popstate"));
       await flushMicrotasks();
     });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(SHOW_DELAY_MS);
+    act(() => {
+      vi.advanceTimersByTime(SHOW_DELAY_MS);
     });
     expect(isBusy()).toBe(true);
 
@@ -219,13 +257,65 @@ describe("NavigationOverlayListener", () => {
     expect(isBusy()).toBe(false);
   });
 
-  // Case 8 — same-pathname replace (e.g. url-filters.ts's filter/pagination
-  // sync) must never trigger the overlay.
-  it("does not trigger for a same-pathname replace (e.g. url-filters.ts's filter/pagination sync)", async () => {
+  // Case 8 — same-pathname link (query/hash only) must never trigger it.
+  it("does not trigger for a same-pathname link (e.g. a filter/pagination href)", async () => {
     render(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.replaceState({}, "", "/en/tickets?status=open");
+      clickLink("/en/tickets?status=open");
+      await flushMicrotasks();
+    });
+    act(() => {
+      vi.advanceTimersByTime(SHOW_DELAY_MS);
+    });
+
+    expect(isBusy()).toBe(false);
+  });
+
+  it("does not trigger for a modified click (ctrl/cmd/shift/alt, or a non-primary button)", async () => {
+    render(<NavigationOverlayListener />);
+
+    const anchor = document.createElement("a");
+    anchor.href = "/en/customers";
+    document.body.appendChild(anchor);
+    await act(async () => {
+      const event = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        ctrlKey: true,
+      });
+      event.preventDefault();
+      anchor.dispatchEvent(event);
+      await flushMicrotasks();
+    });
+    anchor.remove();
+    act(() => {
+      vi.advanceTimersByTime(SHOW_DELAY_MS);
+    });
+
+    expect(isBusy()).toBe(false);
+  });
+
+  it("does not trigger for a click Next never took over (defaultPrevented left false — e.g. a plain external <a>)", async () => {
+    render(<NavigationOverlayListener />);
+
+    await act(async () => {
+      clickLink("/en/customers", { defaultPrevented: false });
+      await flushMicrotasks();
+    });
+    act(() => {
+      vi.advanceTimersByTime(SHOW_DELAY_MS);
+    });
+
+    expect(isBusy()).toBe(false);
+  });
+
+  it("does not trigger for a target=_blank anchor", async () => {
+    render(<NavigationOverlayListener />);
+
+    await act(async () => {
+      clickLink("/en/customers", { target: "_blank" });
       await flushMicrotasks();
     });
     act(() => {
@@ -241,10 +331,9 @@ describe("NavigationOverlayListener", () => {
     const { rerender } = render(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.pushState({}, "", "/en/customers");
+      clickLink("/en/customers");
       await flushMicrotasks();
     });
-    // Commits well within the delay window — no timer advance at all yet.
     mockedUsePathname.mockReturnValue("/en/customers");
     rerender(<NavigationOverlayListener />);
     expect(isBusy()).toBe(false);
@@ -261,7 +350,7 @@ describe("NavigationOverlayListener", () => {
     render(<NavigationOverlayListener />);
 
     await act(async () => {
-      window.history.pushState({}, "", "/en/customers");
+      clickLink("/en/customers");
       await flushMicrotasks();
     });
     act(() => {
@@ -275,30 +364,36 @@ describe("NavigationOverlayListener", () => {
     expect(isBusy()).toBe(false);
   });
 
-  it("patches window.history.pushState exactly once, even if mounted more than once", () => {
+  it("removes its click and popstate listeners on unmount", async () => {
     const { unmount } = render(<NavigationOverlayListener />);
-    const patchedOnce = window.history.pushState;
-
     unmount();
-    render(<NavigationOverlayListener />);
-    const patchedTwice = window.history.pushState;
 
-    expect(patchedTwice).toBe(patchedOnce);
+    // No listener registered any more — dispatching should be inert
+    // (nothing throws, nothing left listening to assert against, but a
+    // fresh render should start hidden regardless of the events below).
+    await act(async () => {
+      clickLink("/en/customers");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      await flushMicrotasks();
+    });
+
+    render(<NavigationOverlayListener />);
+    expect(isBusy()).toBe(false);
   });
 
-  // Reproduces the exact runtime bug found in the browser: Next.js can call
+  // Reproduces the exact runtime bug found in the browser during an
+  // earlier (history-patching) version of this mechanism: Next.js can call
   // pushState/replaceState from inside its own useInsertionEffect during a
-  // transition. A synchronous state update scheduled from *any* component
-  // while *any* insertion effect anywhere is running trips React's
-  // "useInsertionEffect must not schedule updates" warning — reproduced
-  // here by rendering a component that calls pushState from its own
-  // useInsertionEffect, on an update (not the initial mount, when this
-  // listener isn't registered yet — insertion effects fire before the
-  // passive effect that registers it).
-  it("does not trip React's 'useInsertionEffect must not schedule updates' warning when pushState is called from inside one", () => {
+  // transition, and a synchronous state update scheduled from *any*
+  // component while *any* insertion effect anywhere is running trips
+  // React's "useInsertionEffect must not schedule updates" warning. This
+  // version no longer patches those two functions at all, but the
+  // dispatch is still deferred to a microtask as cheap insurance — this
+  // test keeps proving that guarantee holds.
+  it("does not trip React's 'useInsertionEffect must not schedule updates' warning", () => {
     function SimulatedInsertionEffectNavigator({ to }: { to: string }) {
       useInsertionEffect(() => {
-        window.history.pushState({}, "", to);
+        notifyNavigationStart(to);
       }, [to]);
       return null;
     }

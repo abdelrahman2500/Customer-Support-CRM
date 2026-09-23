@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTranslations } from "next-intl";
 import { Alert, Button, Card, FormField, Input } from "@crm/ui";
 import { getApiBaseUrl, setAccessToken } from "@/lib/api";
@@ -33,15 +34,12 @@ import { getApiBaseUrl, setAccessToken } from "@/lib/api";
  * what distinguishes this screen from the agent one: no logo asset, no
  * branding endpoint, no new translation key.
  *
- * Deliberately still `next/navigation`'s `useRouter`, not a portal
- * `useNavigatingRouter`: `apps/web`'s hook depends on
- * `notifyNavigationStart`, which this app's own
- * `navigation-overlay-listener.tsx` does not export — it still detects
- * navigation by patching `history.pushState`/`replaceState`, the mechanism
- * `apps/web`'s listener documents as measured non-functional. Porting that
- * redesign is portal-wide infrastructure work, not a Login change. The
- * feedback this screen actually shows — the submit button held pending past
- * `push` until unmount — is identical in both apps and is preserved below.
+ * Story 171 — now `useNavigatingRouter`, matching `apps/web`'s login page.
+ * Story 168 had to leave this as the plain `next/navigation` `useRouter`
+ * and document why: this app's overlay listener exposed no
+ * `notifyNavigationStart` to call. Story 171 rebuilt that listener on
+ * `apps/web`'s mechanism, so the hook now exists here and this screen
+ * reports its own `push` like every other navigating call site in the app.
  *
  * Nothing about authentication moved: same `POST /portal/auth/login`, same
  * `credentials: "include"`, same `setAccessToken`, same `/{locale}/home`

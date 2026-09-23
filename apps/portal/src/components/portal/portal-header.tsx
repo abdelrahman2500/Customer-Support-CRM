@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
+import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedContact } from "@crm/shared";
@@ -167,7 +168,9 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   return (
     <>
       <header
-        style={{ "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties}
+        style={
+          { "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties
+        }
         className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
       >
         <div className="flex items-center gap-2">
@@ -175,10 +178,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto" />
           )}
-          <Link
-            href={`/${locale}/home`}
-            className="rounded-md px-2 py-1.5 font-semibold text-ink"
-          >
+          <Link href={`/${locale}/home`} className="rounded-md px-2 py-1.5 font-semibold text-ink">
             {t("signedInAs", { name: contact.fullName })}
           </Link>
           {/* RM-11 — the hamburger toggle only, below `sm`; the flat `<nav>`
@@ -193,7 +193,10 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
               <DropdownMenuContent align="start">
                 {navItems.map((item) => (
                   <DropdownMenuItem key={item.href} asChild>
-                    <Link href={item.href} aria-current={isActiveHref(item.href) ? "page" : undefined}>
+                    <Link
+                      href={item.href}
+                      aria-current={isActiveHref(item.href) ? "page" : undefined}
+                    >
                       {item.label}
                       {item.badge && (
                         <Badge variant="destructive" aria-label={item.badge.ariaLabel}>
