@@ -140,6 +140,7 @@ function KbCategoryRow({ category }: { category: KbCategory }) {
       <TableCell label={t("columns.name")}>
         <Input
           className="min-w-[10rem]"
+          aria-label={t("columns.name")}
           value={nameDraft}
           onChange={(event) => setNameDraft(event.target.value)}
           onBlur={commitName}

@@ -258,6 +258,7 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
       <TableCell label={t("departments.columns.name")}>
         <Input
           className="min-w-[10rem]"
+          aria-label={t("departments.columns.name")}
           value={nameDraft}
           onChange={(event) => setNameDraft(event.target.value)}
           onBlur={commitName}

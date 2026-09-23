@@ -668,4 +668,21 @@ describe("RoleListView", () => {
       expect(screen.getByText("دور نظامي")).toBeInTheDocument();
     });
   });
+
+  // Story 164 — `TableCell`'s `label` prop renders a VISIBLE `sm:hidden`
+  // span, so at `sm` and up it is display:none and names nothing. The
+  // control needs a name of its own, and reuses the same column key.
+  it("gives the inline role-name input an accessible name", () => {
+    mockedUseManagedRolesQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: [{ id: "role-1", name: "Viewer", permissions: [], isActive: true }],
+      }) as never,
+    );
+
+    renderView();
+
+    const input = screen.getByDisplayValue("Viewer");
+    expect(screen.getAllByRole("textbox", { name: "Role" })).toContain(input);
+  });
 });

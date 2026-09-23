@@ -66,9 +66,10 @@ describe("KbCategoriesView", () => {
     mockedUseManagedKbCategoriesQuery.mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
-    mockedUseCreateKbCategoryMutation.mockReturnValue(
-      { mutateAsync: vi.fn(), isPending: false } as never,
-    );
+    mockedUseCreateKbCategoryMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
     mockedUseUpdateKbCategoryMutation.mockReturnValue(mutationResult() as never);
   });
 
@@ -105,7 +106,10 @@ describe("KbCategoriesView", () => {
     mockedUseManagedKbCategoriesQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [baseCategory, { id: "category-2", branchId: "branch-1", name: "Technical", isActive: false }],
+        data: [
+          baseCategory,
+          { id: "category-2", branchId: "branch-1", name: "Technical", isActive: false },
+        ],
       }) as never,
     );
 
@@ -211,7 +215,9 @@ describe("KbCategoriesView", () => {
 
       renderView();
 
-      expect(screen.getByText("That change couldn't be saved. Please try again.")).toBeInTheDocument();
+      expect(
+        screen.getByText("That change couldn't be saved. Please try again."),
+      ).toBeInTheDocument();
     });
   });
 
@@ -245,7 +251,9 @@ describe("KbCategoriesView", () => {
     it("shows the backend's own message inline on a rejected submission and preserves the entered value", async () => {
       const mutateAsync = vi
         .fn()
-        .mockRejectedValue(new ApiError("A Knowledge Base category with this name already exists", 409));
+        .mockRejectedValue(
+          new ApiError("A Knowledge Base category with this name already exists", 409),
+        );
       mockedUseCreateKbCategoryMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
 
       renderView();
@@ -262,9 +270,10 @@ describe("KbCategoriesView", () => {
     });
 
     it("shows a pending/disabled state while the create-category mutation is in flight", () => {
-      mockedUseCreateKbCategoryMutation.mockReturnValue(
-        { mutateAsync: vi.fn(), isPending: true } as never,
-      );
+      mockedUseCreateKbCategoryMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: true,
+      } as never);
 
       renderView();
 
@@ -284,5 +293,14 @@ describe("KbCategoriesView", () => {
 
       expect(screen.getByText("فئات قاعدة المعرفة")).toBeInTheDocument();
     });
+  });
+
+  // Story 164 — `TableCell`'s `label` prop renders a VISIBLE `sm:hidden`
+  // span, so at `sm` and up it is display:none and names nothing. The
+  // control needs a name of its own, and reuses the same column key.
+  it("gives the inline category-name input an accessible name", async () => {
+    renderView();
+
+    expect(await screen.findByRole("textbox", { name: "Name" })).toBeInTheDocument();
   });
 });

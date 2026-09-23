@@ -160,6 +160,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
           <Input
             className="w-40"
             type="password"
+            aria-label={t("detail.portalPasswordLabel")}
             placeholder={t("detail.portalPasswordPlaceholder")}
             value={portalPasswordDraft}
             onChange={(event) => {

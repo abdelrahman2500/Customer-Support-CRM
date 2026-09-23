@@ -1189,4 +1189,29 @@ describe("UserListView", () => {
       expect(push).not.toHaveBeenCalled();
     });
   });
+
+  // Story 164 — `TableCell`'s `label` prop renders a VISIBLE `sm:hidden`
+  // span, so at `sm` and up it is display:none and names nothing. The
+  // control needs a name of its own, and reuses the same column key.
+  // The password field is named by an adjacent visual span, which is not
+  // an accessible name either; `placeholder` is not one at all.
+  it("gives each inline user control an accessible name", () => {
+    mockedUseUsersQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
+    );
+
+    renderView();
+
+    // The same elements the spec already asserts on by display value are now
+    // reachable by an accessible name.
+    expect(screen.getAllByRole("textbox", { name: "Email" })).toContain(
+      screen.getByDisplayValue("agent@example.com"),
+    );
+    expect(screen.getAllByRole("textbox", { name: "Name" })).toContain(
+      screen.getByDisplayValue("Ada Lovelace"),
+    );
+
+    // A password input exposes no role, so it is located by its label.
+    expect(screen.getAllByLabelText("New password").length).toBeGreaterThan(0);
+  });
 });

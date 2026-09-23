@@ -116,6 +116,7 @@ function RoleRow({
           ) : (
             <Input
               className="min-w-[10rem]"
+              aria-label={t("list.columns.name")}
               value={nameDraft}
               onChange={(event) => setNameDraft(event.target.value)}
               onBlur={commitName}

@@ -80,9 +80,10 @@ describe("BranchDepartmentsView", () => {
       queryResult({ data: [], isSuccess: true }) as never,
     );
     mockedUseUpdateBranchMutation.mockReturnValue(mutationResult() as never);
-    mockedUseCreateDepartmentMutation.mockReturnValue(
-      { mutateAsync: vi.fn(), isPending: false } as never,
-    );
+    mockedUseCreateDepartmentMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
     mockedUseUpdateDepartmentMutation.mockReturnValue(mutationResult() as never);
   });
 
@@ -147,7 +148,10 @@ describe("BranchDepartmentsView", () => {
     mockedUseManagedDepartmentsQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [baseDepartment, { id: "dept-2", branchId: "branch-1", name: "Billing", isActive: false }],
+        data: [
+          baseDepartment,
+          { id: "dept-2", branchId: "branch-1", name: "Billing", isActive: false },
+        ],
       }) as never,
     );
 
@@ -298,7 +302,9 @@ describe("BranchDepartmentsView", () => {
 
       renderView();
 
-      expect(screen.getByText("That change couldn't be saved. Please try again.")).toBeInTheDocument();
+      expect(
+        screen.getByText("That change couldn't be saved. Please try again."),
+      ).toBeInTheDocument();
     });
 
     it("renders a 403-specific message when a department-update mutation is rejected with 403", () => {
@@ -326,7 +332,9 @@ describe("BranchDepartmentsView", () => {
 
       renderView();
 
-      expect(screen.getByText("That change couldn't be saved. Please try again.")).toBeInTheDocument();
+      expect(
+        screen.getByText("That change couldn't be saved. Please try again."),
+      ).toBeInTheDocument();
     });
   });
 
@@ -358,7 +366,9 @@ describe("BranchDepartmentsView", () => {
     });
 
     it("shows the backend's own message inline on a rejected submission and preserves the entered value", async () => {
-      const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Department name already exists", 409));
+      const mutateAsync = vi
+        .fn()
+        .mockRejectedValue(new ApiError("Department name already exists", 409));
       mockedUseCreateDepartmentMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
 
       renderView();
@@ -389,7 +399,10 @@ describe("BranchDepartmentsView", () => {
     });
 
     it("shows a pending/disabled state while the create-department mutation is in flight", () => {
-      mockedUseCreateDepartmentMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: true } as never);
+      mockedUseCreateDepartmentMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: true,
+      } as never);
 
       renderView();
 
@@ -411,5 +424,30 @@ describe("BranchDepartmentsView", () => {
       expect(screen.getByText("فرعي")).toBeInTheDocument();
       expect(screen.getByText("الأقسام")).toBeInTheDocument();
     });
+  });
+
+  // Story 164 — `TableCell`'s `label` prop renders a VISIBLE `sm:hidden`
+  // span, so at `sm` and up it is display:none and names nothing. The
+  // control needs a name of its own, and reuses the same column key.
+  it("gives the inline department-name input an accessible name", () => {
+    const mutate = vi.fn();
+    mockedUseManagedDepartmentsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [baseDepartment] }) as never,
+    );
+    mockedUseUpdateDepartmentMutation.mockReturnValue(mutationResult({ mutate }) as never);
+
+    renderView();
+
+    // The same element the spec's rename test drives by display value is
+    // now reachable by its accessible name, and still commits on blur.
+    const input = screen.getByDisplayValue("Support");
+    expect(screen.getAllByRole("textbox", { name: "Name" })).toContain(input);
+
+    fireEvent.change(input, { target: { value: "Support EMEA" } });
+    fireEvent.blur(input);
+    expect(mutate).toHaveBeenCalledWith(
+      { name: "Support EMEA" },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
   });
 });

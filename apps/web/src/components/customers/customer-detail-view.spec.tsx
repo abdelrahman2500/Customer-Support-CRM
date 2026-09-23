@@ -1214,4 +1214,26 @@ describe("CustomerDetailView", () => {
       expect(screen.getByText("detail.anonymizedRetentionNote")).toBeInTheDocument();
     });
   });
+
+  // Story 164 — the portal-password field was named only by an adjacent
+  // visual span and a placeholder, neither of which is an accessible name.
+  it("gives the contact portal-password input an accessible name", () => {
+    mockedUseCustomerQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: {
+          id: "customer-1",
+          displayName: "Acme Inc.",
+          isActive: true,
+          contacts: [
+            { id: "contact-1", fullName: "Jane Doe", email: "jane@acme.test", isPrimary: true },
+          ],
+        },
+      }) as never,
+    );
+
+    render(<CustomerDetailView customerId="customer-1" />);
+
+    expect(screen.getByLabelText("detail.portalPasswordLabel")).toBeInTheDocument();
+  });
 });

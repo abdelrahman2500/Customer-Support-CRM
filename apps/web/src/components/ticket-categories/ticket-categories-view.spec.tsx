@@ -66,14 +66,17 @@ describe("TicketCategoriesView", () => {
     mockedUseManagedTicketCategoriesQuery.mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
-    mockedUseCreateTicketCategoryMutation.mockReturnValue(
-      { mutateAsync: vi.fn(), isPending: false } as never,
-    );
+    mockedUseCreateTicketCategoryMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
     mockedUseUpdateTicketCategoryMutation.mockReturnValue(mutationResult() as never);
   });
 
   it("shows a loading state while the categories query is pending", () => {
-    mockedUseManagedTicketCategoriesQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+    mockedUseManagedTicketCategoriesQuery.mockReturnValue(
+      queryResult({ isLoading: true }) as never,
+    );
 
     renderView();
 
@@ -105,7 +108,10 @@ describe("TicketCategoriesView", () => {
     mockedUseManagedTicketCategoriesQuery.mockReturnValue(
       queryResult({
         isSuccess: true,
-        data: [baseCategory, { id: "category-2", branchId: "branch-1", name: "Technical", isActive: false }],
+        data: [
+          baseCategory,
+          { id: "category-2", branchId: "branch-1", name: "Technical", isActive: false },
+        ],
       }) as never,
     );
 
@@ -211,7 +217,9 @@ describe("TicketCategoriesView", () => {
 
       renderView();
 
-      expect(screen.getByText("That change couldn't be saved. Please try again.")).toBeInTheDocument();
+      expect(
+        screen.getByText("That change couldn't be saved. Please try again."),
+      ).toBeInTheDocument();
     });
   });
 
@@ -230,7 +238,10 @@ describe("TicketCategoriesView", () => {
 
     it("submits exactly { name } on the create-category form", async () => {
       const mutateAsync = vi.fn().mockResolvedValue({ id: "category-99" });
-      mockedUseCreateTicketCategoryMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
+      mockedUseCreateTicketCategoryMutation.mockReturnValue({
+        mutateAsync,
+        isPending: false,
+      } as never);
 
       renderView();
 
@@ -246,7 +257,10 @@ describe("TicketCategoriesView", () => {
       const mutateAsync = vi
         .fn()
         .mockRejectedValue(new ApiError("A ticket category with this name already exists", 409));
-      mockedUseCreateTicketCategoryMutation.mockReturnValue({ mutateAsync, isPending: false } as never);
+      mockedUseCreateTicketCategoryMutation.mockReturnValue({
+        mutateAsync,
+        isPending: false,
+      } as never);
 
       renderView();
 
@@ -262,9 +276,10 @@ describe("TicketCategoriesView", () => {
     });
 
     it("shows a pending/disabled state while the create-category mutation is in flight", () => {
-      mockedUseCreateTicketCategoryMutation.mockReturnValue(
-        { mutateAsync: vi.fn(), isPending: true } as never,
-      );
+      mockedUseCreateTicketCategoryMutation.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: true,
+      } as never);
 
       renderView();
 
@@ -284,5 +299,14 @@ describe("TicketCategoriesView", () => {
 
       expect(screen.getByText("فئات التذاكر")).toBeInTheDocument();
     });
+  });
+
+  // Story 164 — `TableCell`'s `label` prop renders a VISIBLE `sm:hidden`
+  // span, so at `sm` and up it is display:none and names nothing. The
+  // control needs a name of its own, and reuses the same column key.
+  it("gives the inline category-name input an accessible name", async () => {
+    renderView();
+
+    expect(await screen.findByRole("textbox", { name: "Name" })).toBeInTheDocument();
   });
 });

@@ -451,4 +451,139 @@ describe("S-1 design tokens", () => {
       ]),
     ).toEqual([]);
   });
+  /**
+   * Story 164 — a form control inside a table cell with no accessible name.
+   *
+   * `TableCell`'s `label` prop (Story 150) renders a **visible** span that is
+   * `sm:hidden`. Below `sm` it stands in for the `<th>` the responsive table
+   * hides; at `sm` and up it is `display:none` and therefore absent from the
+   * accessibility tree entirely. It was never an accessible name, and a `<th>`
+   * does not name a form control nested inside its column either.
+   *
+   * So six inline-edit inputs — a department name, two category names, a
+   * user's email and full name, a role name — were announced as nothing but
+   * "edit text" with their current value. The `label` prop sitting right there
+   * made them look handled, which is why they survived six accessibility
+   * stories.
+   *
+   * Scoped to controls inside a `TableCell`, which is exactly the pattern this
+   * audit found and exactly where the mobile-label convention misleads. It is
+   * not a blanket "every input needs `aria-label`" rule: a control named
+   * through `<label>`, `<Label>`, `FormField`, `aria-labelledby` or an `id` a
+   * label points at is already named, and all of those are accepted here.
+   *
+   * The portal has no editable table cells today, but renders through the same
+   * shared `TableCell`, so the same trap opens the moment it adds one — hence
+   * the parallel guard there, matching this file's own convention.
+   */
+  const CELL_CONTROL = /<(?:Input|Textarea|SelectTrigger)\b/;
+  const HAS_ACCESSIBLE_NAME = /aria-label=|aria-labelledby=|\bid=/;
+  const NAMING_WRAPPER = /<FormField|<Label\b|<label\b/;
+
+  /** Offending line numbers (1-based) for one file's lines. */
+  function findUnnamedCellControls(lines: string[]): number[] {
+    const hits: number[] = [];
+    let cellDepth = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      const trimmed = line.trim();
+      if (trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+        continue;
+      }
+
+      if (/<TableCell\b/.test(line)) cellDepth++;
+      if (/<\/TableCell>/.test(line)) cellDepth = Math.max(0, cellDepth - 1);
+      if (cellDepth === 0) continue;
+      if (!CELL_CONTROL.test(line)) continue;
+
+      // The control's whole opening tag, which may span lines.
+      let tag = "";
+      for (let k = i; k < lines.length && k < i + 16; k++) {
+        tag += (lines[k] ?? "") + "\n";
+        if (/\/>\s*$/.test(lines[k] ?? "") || /^\s*>\s*$/.test(lines[k] ?? "")) break;
+      }
+      if (HAS_ACCESSIBLE_NAME.test(tag)) continue;
+      if (NAMING_WRAPPER.test(lines.slice(Math.max(0, i - 6), i).join("\n"))) continue;
+
+      hits.push(i + 1);
+    }
+
+    return hits;
+  }
+
+  it("gives every form control inside a table cell an accessible name", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const lines = readFileSync(file, "utf8").split(/\r?\n/);
+      for (const line of findUnnamedCellControls(lines)) {
+        offenders.push(`${file.slice(SRC.length + 1)}:${line}`);
+      }
+    }
+
+    expect(
+      offenders,
+      `TableCell's \`label\` is sm:hidden and names nothing — add aria-label:\n${offenders.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("accepts every naming mechanism, and flags only a genuinely unnamed cell control", () => {
+    // The defect: the cell's `label` looks like a name but is not one.
+    expect(
+      findUnnamedCellControls([
+        '      <TableCell label={t("columns.name")}>',
+        "        <Input",
+        '          className="min-w-[10rem]"',
+        "          value={nameDraft}",
+        "        />",
+        "      </TableCell>",
+      ]),
+    ).toEqual([2]);
+
+    // Named on the control itself.
+    for (const attr of [
+      'aria-label={t("columns.name")}',
+      'aria-labelledby="x"',
+      'id="role-name"',
+    ]) {
+      expect(
+        findUnnamedCellControls([
+          '      <TableCell label={t("columns.name")}>',
+          "        <Input",
+          "          " + attr,
+          "        />",
+          "      </TableCell>",
+        ]),
+      ).toEqual([]);
+    }
+
+    // Named by a wrapper just above.
+    expect(
+      findUnnamedCellControls([
+        "      <TableCell>",
+        '        <FormField label={t("columns.name")}>',
+        "          <Input value={nameDraft} />",
+        "        </FormField>",
+        "      </TableCell>",
+      ]),
+    ).toEqual([]);
+
+    // Outside a table cell this guard says nothing — those controls are named
+    // through their own form's label, and are covered by component tests.
+    expect(findUnnamedCellControls(["      <Input value={draft} />"])).toEqual([]);
+
+    // A closed cell does not leak into the next sibling.
+    expect(
+      findUnnamedCellControls([
+        "      <TableCell>{role.name}</TableCell>",
+        "      <Input value={draft} />",
+      ]),
+    ).toEqual([]);
+
+    // Commented-out code must not count.
+    expect(
+      findUnnamedCellControls(["      <TableCell>", "        // <Input value={x} />"]),
+    ).toEqual([]);
+  });
 });

@@ -320,6 +320,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
           <Input
             className="min-w-[10rem]"
             type="email"
+            aria-label={t("list.columns.email")}
             value={emailDraft}
             onChange={(event) => setEmailDraft(event.target.value)}
             onBlur={commitEmail}
@@ -338,6 +339,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
             <Input
               className="min-w-[10rem]"
               type="password"
+              aria-label={t("list.passwordResetLabel")}
               placeholder={t("list.passwordResetPlaceholder")}
               value={newPasswordDraft}
               onChange={(event) => {
@@ -387,6 +389,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
       <TableCell label={t("list.columns.fullName")}>
         <Input
           className="min-w-[10rem]"
+          aria-label={t("list.columns.fullName")}
           value={fullNameDraft}
           onChange={(event) => setFullNameDraft(event.target.value)}
           onBlur={commitFullName}

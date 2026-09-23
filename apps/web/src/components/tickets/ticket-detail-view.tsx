@@ -903,6 +903,7 @@ function AddNoteForm({ ticketId }: { ticketId: string }) {
       <Textarea
         rows={3}
         value={body}
+        aria-label={t("detail.notesPlaceholder")}
         placeholder={t("detail.notesPlaceholder")}
         onChange={(event) => {
           setSuggestionsDismissed(false);

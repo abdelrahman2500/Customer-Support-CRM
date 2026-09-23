@@ -145,7 +145,7 @@ export function PortalHomeView() {
                     </Link>
                     <span className="flex shrink-0 items-center gap-2 text-ink-subtle">
                       <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
-                        {ticket.status}
+                        {tTickets(`status.${ticket.status}` as Parameters<typeof tTickets>[0])}
                       </Badge>
                       <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
                     </span>

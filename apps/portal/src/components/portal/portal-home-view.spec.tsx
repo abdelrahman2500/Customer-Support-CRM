@@ -183,7 +183,10 @@ describe("PortalHomeView (Story 136)", () => {
         "href",
         "/en/tickets/ticket-1",
       );
-      expect(screen.getByText("RESOLVED")).toBeInTheDocument();
+      // Story 164 — the badge renders the localized status, not the raw
+      // enum a customer would otherwise read as `RESOLVED`.
+      expect(screen.getByText("status.RESOLVED")).toBeInTheDocument();
+      expect(screen.queryByText("RESOLVED")).not.toBeInTheDocument();
     });
   });
 

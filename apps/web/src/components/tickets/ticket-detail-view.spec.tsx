@@ -325,9 +325,7 @@ describe("TicketDetailView", () => {
 
     // Story 156 — the subject is a visible heading again, editable behind
     // an explicit Edit affordance rather than being a permanent input.
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Cannot log in" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Cannot log in" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "detail.subjectEdit" })).toBeInTheDocument();
     expect(screen.getByText(/Acme Inc\./)).toBeInTheDocument();
   });
@@ -445,9 +443,7 @@ describe("TicketDetailView", () => {
       // heading rather than a test-only attribute added to production code.
       const chat = screen.getByText("detail.chatHeading");
       const history = screen.getByText("detail.historyHeading");
-      expect(
-        chat.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      expect(chat.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("gives the page exactly one h1, carrying the subject", () => {
@@ -995,7 +991,10 @@ describe("TicketDetailView", () => {
 
       fireEvent.click(within(screen.getByRole("alertdialog")).getByText("sla.placeOnHold"));
 
-      expect(mutate).toHaveBeenCalledWith(undefined, expect.objectContaining({ onSuccess: expect.any(Function) }));
+      expect(mutate).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      );
     });
 
     it("renders the on-hold badge and a 'resume' action (no confirmation) for a held target", () => {
@@ -1133,6 +1132,23 @@ describe("TicketDetailView", () => {
       render(<TicketDetailView ticketId="ticket-1" />);
 
       expect(screen.getByText("user-unknown")).toBeInTheDocument();
+    });
+
+    // Story 164 — the note field was named only by its placeholder, which is
+    // not an accessible name; the same key now also names the control.
+    it("gives the add-note textarea an accessible name", () => {
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const textarea = screen.getByRole("textbox", { name: "detail.notesPlaceholder" });
+      expect(textarea).toBe(screen.getByPlaceholderText("detail.notesPlaceholder"));
+
+      // Typing still drives the same submit-enabling behaviour.
+      fireEvent.change(textarea, { target: { value: "A new note" } });
+      expect(screen.getByText("detail.notesSubmit")).not.toBeDisabled();
     });
 
     it("disables the submit button until the note body is non-empty", () => {
