@@ -31,6 +31,12 @@ import {
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
+/** Story 167 — the shared `name` is what makes the browser treat the five
+ * rating inputs as one radio group: one tab stop, arrow-key movement with
+ * selection following focus, wrapping, and direction-correct arrows under
+ * `dir="rtl"`. Nothing in this file implements any of that. */
+const CSAT_RATING_NAME = "csat-rating";
+
 /**
  * Story 53 — mirrors `apps/web`'s `TicketDetailView`'s loading/not-found/
  * generic-error convention and its History card's exact shape, read-only
@@ -258,22 +264,45 @@ function CsatForm({ ticketId }: { ticketId: string }) {
   return (
     <form className="mt-2 flex flex-col gap-3" onSubmit={handleSubmit}>
       <p className="text-sm text-ink-strong">{t("detail.csatPrompt")}</p>
+      {/* Story 167 — native radios, so the browser supplies the ARIA radio
+          group keyboard pattern the hand-built `role="radio"` buttons never
+          had. Applies the decision `branding-view.tsx` already recorded
+          (Story 129): a small radio group uses native inputs rather than a
+          new shared primitive.
+
+          The `<div role="radiogroup">` and its label are deliberately kept
+          over a `<fieldset>`/`<legend>`: this group's name is invisible (the
+          visible prompt is `csatPrompt` above), and radios group by their
+          shared `name`, not by a fieldset, so the keyboard behaviour is the
+          same either way. */}
       <div role="radiogroup" aria-label={t("detail.csatRatingSelectLabel")} className="flex gap-2">
         {[1, 2, 3, 4, 5].map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={rating === value}
-            onClick={() => setRating(value)}
-            className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm font-medium focus-ring ${
-              rating === value
-                ? "border-accent bg-accent text-accent-foreground"
-                : "border-rule-strong bg-surface text-ink-strong hover:bg-surface-sunk"
-            }`}
-          >
-            {value}
-          </button>
+          <label key={value} className="cursor-pointer">
+            {/* `sr-only`, never `hidden`/`display:none`: the input stays
+                focusable and in the accessibility tree, and the visible box
+                below is styled from it through `peer`. `.focus-ring` cannot
+                be used here because the focused element is the input while
+                the painted element is the span — these are that utility's own
+                declarations, restated as `peer-focus-visible:` variants over
+                the same tokens. */}
+            <input
+              type="radio"
+              name={CSAT_RATING_NAME}
+              value={value}
+              checked={rating === value}
+              onChange={() => setRating(value)}
+              className="peer sr-only"
+            />
+            <span
+              className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm font-medium peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-surface ${
+                rating === value
+                  ? "border-accent bg-accent text-accent-foreground"
+                  : "border-rule-strong bg-surface text-ink-strong hover:bg-surface-sunk"
+              }`}
+            >
+              {value}
+            </span>
+          </label>
         ))}
       </div>
       <label className="flex flex-col gap-1 text-sm text-ink-strong">

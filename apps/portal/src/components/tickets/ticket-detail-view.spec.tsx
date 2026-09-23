@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { TicketDetailView } from "./ticket-detail-view";
 import {
   useMyTicketCsatQuery,
@@ -277,6 +278,220 @@ describe("TicketDetailView", () => {
     render(<TicketDetailView ticketId="ticket-1" />);
 
     expect(screen.getByText("detail.csatSubmit").closest("button")).toBeDisabled();
+  });
+
+  // Story 167 — the rating was five hand-built role="radio" buttons with no
+  // tabIndex management and no arrow-key handling, so all five were separate
+  // tab stops and arrows did nothing. Native radios now supply the whole
+  // pattern; these tests assert the pattern, never the component's state.
+  describe("CSAT rating keyboard pattern (Story 167)", () => {
+    function renderResolved() {
+      vi.mocked(useMyTicketQuery).mockReturnValue(
+        queryResult({ data: { ...baseTicket, status: "RESOLVED" }, isSuccess: true }) as never,
+      );
+      render(<TicketDetailView ticketId="ticket-1" />);
+      return screen.getAllByRole("radio");
+    }
+
+    function submitButton() {
+      return screen.getByText("detail.csatSubmit").closest("button");
+    }
+
+    function checkedRatings(radios: HTMLElement[]) {
+      return radios.filter((radio) => (radio as HTMLInputElement).checked);
+    }
+
+    /** Tab forward from wherever focus is until it enters the rating group.
+     * The group sits well down the page (the back link, the chat card and the
+     * attachments card all precede it), so its entry point cannot be reached
+     * by a fixed number of Tabs. */
+    async function tabIntoGroup(
+      user: ReturnType<typeof userEvent.setup>,
+      radios: HTMLElement[],
+    ): Promise<Element | null> {
+      for (let step = 0; step < 50; step += 1) {
+        await user.tab();
+        if (radios.includes(document.activeElement as HTMLElement)) {
+          return document.activeElement;
+        }
+      }
+      throw new Error("Tab never reached the rating group");
+    }
+
+    it("exposes five named radios in a labelled group, none checked initially", () => {
+      const radios = renderResolved();
+
+      expect(
+        screen.getByRole("radiogroup", { name: "detail.csatRatingSelectLabel" }),
+      ).toBeInTheDocument();
+      expect(radios).toHaveLength(5);
+      for (const value of [1, 2, 3, 4, 5]) {
+        expect(screen.getByRole("radio", { name: String(value) })).toBeInTheDocument();
+      }
+      expect(checkedRatings(radios)).toHaveLength(0);
+    });
+
+    // The defect this story fixes: previously each of the five was its own tab
+    // stop, so this Tab landed on rating 2 instead of leaving the group.
+    it("forms a single tab stop rather than five", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      radios[0]!.focus();
+      await user.tab();
+
+      expect(radios).not.toContain(document.activeElement);
+    });
+
+    it("enters the group at the first rating when none is checked", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      expect(await tabIntoGroup(user, radios)).toBe(radios[0]);
+    });
+
+    it("enters the group at the checked rating once one is chosen", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      await user.click(radios[2]!);
+      (document.activeElement as HTMLElement | null)?.blur();
+
+      expect(await tabIntoGroup(user, radios)).toBe(radios[2]);
+    });
+
+    it("moves to and selects the next rating on Right and Down", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      radios[0]!.focus();
+      await user.keyboard("{ArrowRight}");
+      expect(document.activeElement).toBe(radios[1]);
+      expect(radios[1]).toBeChecked();
+      expect(radios[0]).not.toBeChecked();
+
+      await user.keyboard("{ArrowDown}");
+      expect(document.activeElement).toBe(radios[2]);
+      expect(radios[2]).toBeChecked();
+      expect(radios[1]).not.toBeChecked();
+    });
+
+    it("moves to and selects the previous rating on Left and Up", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      radios[2]!.focus();
+      await user.keyboard("{ArrowLeft}");
+      expect(document.activeElement).toBe(radios[1]);
+      expect(radios[1]).toBeChecked();
+
+      await user.keyboard("{ArrowUp}");
+      expect(document.activeElement).toBe(radios[0]);
+      expect(radios[0]).toBeChecked();
+      expect(radios[1]).not.toBeChecked();
+    });
+
+    it("wraps from the first rating to the last and from the last to the first", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      radios[0]!.focus();
+      await user.keyboard("{ArrowLeft}");
+      expect(document.activeElement).toBe(radios[4]);
+      expect(radios[4]).toBeChecked();
+
+      await user.keyboard("{ArrowRight}");
+      expect(document.activeElement).toBe(radios[0]);
+      expect(radios[0]).toBeChecked();
+      expect(radios[4]).not.toBeChecked();
+    });
+
+    it("selects the focused rating on Space", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      radios[2]!.focus();
+      expect(radios[2]).not.toBeChecked();
+
+      await user.keyboard(" ");
+      expect(radios[2]).toBeChecked();
+    });
+
+    it("keeps exactly one rating checked as the selection moves", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      await user.click(radios[1]!);
+      expect(checkedRatings(radios)).toHaveLength(1);
+
+      await user.keyboard("{ArrowRight}");
+      await user.keyboard("{ArrowRight}");
+
+      const checked = checkedRatings(radios);
+      expect(checked).toHaveLength(1);
+      expect(checked[0]).toBe(radios[3]);
+    });
+
+    it("enables submission after a keyboard-only rating selection", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      expect(submitButton()).toBeDisabled();
+
+      await tabIntoGroup(user, radios);
+      await user.keyboard("{ArrowRight}");
+
+      expect(radios[1]).toBeChecked();
+      expect(submitButton()).not.toBeDisabled();
+    });
+
+    it("still selects a rating by mouse", async () => {
+      const user = userEvent.setup();
+      const radios = renderResolved();
+
+      await user.click(radios[3]!);
+
+      expect(radios[3]).toBeChecked();
+      expect(submitButton()).not.toBeDisabled();
+    });
+
+    // Design decision 3 — focus lands on the visually-clipped input, so the
+    // visible box is ringed through `peer`. No behavioural test can reach this,
+    // and dropping it would leave a keyboard user with no visible focus at all.
+    it("rings the visible box from the input through peer", () => {
+      const radios = renderResolved();
+
+      for (const radio of radios) {
+        expect(radio).toHaveClass("peer");
+        expect(radio).toHaveClass("sr-only");
+
+        const box = radio.nextElementSibling;
+        expect(box).not.toBeNull();
+        expect(box).toHaveClass("peer-focus-visible:ring-2");
+        expect(box).toHaveClass("peer-focus-visible:ring-focus");
+      }
+    });
+
+    /* RTL arrow mirroring is deliberately NOT asserted here. Measured in this
+       repository's own environment: under `dir="rtl"`, user-event v14 moves
+       {ArrowLeft} backward, identically to LTR, where a real browser moves it
+       forward. Asserting the mirrored behaviour would fail; asserting the LTR
+       result would pin the wrong contract as if it were correct. The criterion
+       is met structurally instead — the group delegates every directional
+       decision to the browser, which is what this test pins. */
+    it("delegates all keyboard behaviour to native radios, adding none of its own", () => {
+      const radios = renderResolved();
+
+      for (const radio of radios) {
+        expect(radio.tagName).toBe("INPUT");
+        expect(radio).toHaveAttribute("type", "radio");
+        expect(radio).toHaveAttribute("name", "csat-rating");
+        // A roving-tabindex or hand-rolled ARIA implementation would show here.
+        expect(radio).not.toHaveAttribute("tabindex");
+        expect(radio).not.toHaveAttribute("role");
+        expect(radio).not.toHaveAttribute("aria-checked");
+      }
+    });
   });
 
   // Story 165 — the early-return loading state announces itself. The
