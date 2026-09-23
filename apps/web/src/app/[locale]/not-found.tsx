@@ -19,7 +19,7 @@ export default async function LocaleNotFound() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface-sunk p-8">
       <div className="w-full max-w-sm rounded-lg border border-rule bg-surface p-8 text-center shadow-sm">
-        <h1 className="text-xl font-semibold text-ink">{t("notFound.title")}</h1>
+        <h1 className="text-title text-ink">{t("notFound.title")}</h1>
         <p className="mt-2 text-sm text-ink-muted">{t("notFound.description")}</p>
         <Link
           href={`/${locale}/tickets`}

@@ -15,4 +15,26 @@ describe("RootNotFound (Story 96)", () => {
     expect(screen.getByText("Page not found")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go back home" })).toHaveAttribute("href", "/en");
   });
+
+  /**
+   * Story 176 — Story 170 put every page title on the named `title` step and
+   * scoped itself to `PageHeader`/`CardTitle` plus three detail views, which
+   * left the six error/not-found shells at `text-xl`. The product rendered
+   * page titles at two sizes; this pins the one that is correct.
+   *
+   * `font-semibold` is deliberately absent: the `title` step declares
+   * `fontWeight: 600` in its own `fontSize` tuple, so stating it twice is how
+   * the two drift apart later — the same reasoning Story 170 recorded.
+   *
+   * Class-level because jsdom loads no Tailwind CSS; the rendered size is
+   * confirmed in a browser instead.
+   */
+  it("types the heading at the named title step, not the old text-xl", () => {
+    render(<RootNotFound />);
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveClass("text-title");
+    expect(heading).not.toHaveClass("text-xl");
+    expect(heading).not.toHaveClass("font-semibold");
+  });
 });
