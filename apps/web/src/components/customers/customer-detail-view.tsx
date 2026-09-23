@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -476,6 +476,30 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
   const [displayNameDraft, setDisplayNameDraft] = useState<string | null>(null);
   /** Story 159 — the display name is a heading until an agent chooses to edit it. */
   const [editingName, setEditingName] = useState(false);
+  /** Story 166 — the `Input` unmounts on both keyboard exits (Escape, and
+   * Enter via `blur()`), so without this focus lands on `document.body`.
+   * Guarded on `document.body`: a blur caused by clicking another control has
+   * already moved focus somewhere valid and must not be overridden. Mirrors
+   * `ConfirmDialog`'s own hand-rolled capture-and-restore (Story 94). */
+  const displayNameEditTriggerRef = useRef<HTMLButtonElement>(null);
+  /** Latches on the first entry into edit mode, so the effect's own initial
+   * run — which also sees `editingName === false`, on a page where nothing is
+   * focused yet — cannot steal focus on load. */
+  const displayNameWasEditingRef = useRef(false);
+
+  useEffect(() => {
+    if (editingName) {
+      displayNameWasEditingRef.current = true;
+      return;
+    }
+    if (!displayNameWasEditingRef.current) return;
+    displayNameWasEditingRef.current = false;
+    const active = document.activeElement;
+    if (active === null || active === document.body) {
+      displayNameEditTriggerRef.current?.focus();
+    }
+  }, [editingName]);
+
   // RM-02 — Customer Notes.
   const notesQuery = useCustomerNotesQuery(customerId);
   const usersQuery = useUsersQuery();
@@ -579,7 +603,13 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           ) : (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold text-ink">{customer.displayName}</h1>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setEditingName(true)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                ref={displayNameEditTriggerRef}
+                onClick={() => setEditingName(true)}
+              >
                 {t("detail.displayNameEdit")}
               </Button>
             </div>

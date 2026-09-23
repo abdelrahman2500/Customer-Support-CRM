@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import {
@@ -189,12 +189,34 @@ export function ReportsView() {
   const [range, setRange] = useState<ReportDateRange>({});
   const [selectedDashboardId, setSelectedDashboardId] = useState<string | null>(null);
   const [showSaveForm, setShowSaveForm] = useState(false);
+  /** Story 166 — both buttons inside the save form unmount the form that
+   * contains them, so the activated control removes itself and focus falls to
+   * `document.body`. The persistent "Save current view" trigger is the
+   * disclosure's owner and the correct successor. The `document.body` guard
+   * matters more here than on the detail pages: `handleSaveCurrentView` closes
+   * the form only after its `await`, by which time focus may legitimately have
+   * moved. */
+  const saveViewTriggerRef = useRef<HTMLButtonElement>(null);
+  const saveFormWasOpenRef = useRef(false);
   const [newDashboardName, setNewDashboardName] = useState("");
   const [newDashboardShared, setNewDashboardShared] = useState(false);
   // Deleting a saved dashboard is irreversible and — when shared — removes it
   // for the whole branch, so it goes through the same `ConfirmDialog` gate
   // every other destructive action in this app already uses (Story 94).
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    if (showSaveForm) {
+      saveFormWasOpenRef.current = true;
+      return;
+    }
+    if (!saveFormWasOpenRef.current) return;
+    saveFormWasOpenRef.current = false;
+    const active = document.activeElement;
+    if (active === null || active === document.body) {
+      saveViewTriggerRef.current?.focus();
+    }
+  }, [showSaveForm]);
 
   const ticketVolumeQuery = useTicketVolumeQuery(range);
   const slaComplianceQuery = useSlaComplianceQuery(range);
@@ -682,7 +704,12 @@ export function ReportsView() {
             </SelectContent>
           </Select>
         </label>
-        <Button variant="outline" size="sm" onClick={() => setShowSaveForm(true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          ref={saveViewTriggerRef}
+          onClick={() => setShowSaveForm(true)}
+        >
           {t("dashboards.saveCurrentView")}
         </Button>
         {selectedDashboard?.isOwner && (

@@ -978,6 +978,49 @@ describe("ReportsView", () => {
         "dashboards.allReports",
       );
     });
+
+    // Story 166 — both buttons inside the save form unmount the form that
+    // contains them, so the activated control removed itself and focus fell to
+    // `document.body`. The persistent trigger is the disclosure's owner.
+    describe("save-form focus restoration (Story 166)", () => {
+      it("returns focus to the save-current-view trigger after saving", async () => {
+        const mutateAsync = vi.fn().mockResolvedValue({ id: "new-dashboard" });
+        mockedUseCreateDashboardMutation.mockReturnValue({
+          mutateAsync,
+          isPending: false,
+        } as never);
+
+        render(<ReportsView />);
+        const trigger = screen.getByRole("button", { name: "dashboards.saveCurrentView" });
+        fireEvent.click(trigger);
+        fireEvent.change(screen.getByLabelText("dashboards.nameLabel"), {
+          target: { value: "New dashboard" },
+        });
+        fireEvent.click(screen.getByText("dashboards.save"));
+
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
+        expect(screen.queryByLabelText("dashboards.nameLabel")).not.toBeInTheDocument();
+      });
+
+      it("returns focus to the save-current-view trigger after cancelling", () => {
+        render(<ReportsView />);
+        const trigger = screen.getByRole("button", { name: "dashboards.saveCurrentView" });
+        fireEvent.click(trigger);
+        fireEvent.click(screen.getByText("dashboards.cancel"));
+
+        expect(document.activeElement).toBe(trigger);
+        expect(screen.queryByLabelText("dashboards.nameLabel")).not.toBeInTheDocument();
+      });
+
+      it("does not focus the save-current-view trigger on first render", () => {
+        render(<ReportsView />);
+
+        expect(
+          screen.getByRole("button", { name: "dashboards.saveCurrentView" }),
+        ).toBeInTheDocument();
+        expect(document.activeElement).toBe(document.body);
+      });
+    });
   });
 
   // Story 125 — Reporting Export.

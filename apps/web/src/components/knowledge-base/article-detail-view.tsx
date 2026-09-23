@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -90,12 +90,34 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
   const articleQuery = useArticleQuery(articleId);
   const mutation = useUpdateArticleMutation(articleId);
   const categoriesQuery = useKbCategoriesQuery();
-
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [bodyDraft, setBodyDraft] = useState<string | null>(null);
   /** Story 159 — the title is a heading until an author chooses to edit it. */
   const [editingTitle, setEditingTitle] = useState(false);
+  /** Story 166 — the `Input` unmounts on both keyboard exits (Escape, and
+   * Enter via `blur()`), so without this focus lands on `document.body`.
+   * Guarded on `document.body`: a blur caused by clicking another control has
+   * already moved focus somewhere valid and must not be overridden. Mirrors
+   * `ConfirmDialog`'s own hand-rolled capture-and-restore (Story 94). */
+  const titleEditTriggerRef = useRef<HTMLButtonElement>(null);
+  /** Latches on the first entry into edit mode, so the effect's own initial
+   * run — which also sees `editingTitle === false`, on a page where nothing is
+   * focused yet — cannot steal focus on load. */
+  const titleWasEditingRef = useRef(false);
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
+
+  useEffect(() => {
+    if (editingTitle) {
+      titleWasEditingRef.current = true;
+      return;
+    }
+    if (!titleWasEditingRef.current) return;
+    titleWasEditingRef.current = false;
+    const active = document.activeElement;
+    if (active === null || active === document.body) {
+      titleEditTriggerRef.current?.focus();
+    }
+  }, [editingTitle]);
 
   if (articleQuery.isLoading) {
     return (
@@ -204,7 +226,13 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
         ) : (
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold text-ink">{article.title}</h1>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingTitle(true)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              ref={titleEditTriggerRef}
+              onClick={() => setEditingTitle(true)}
+            >
               {t("detail.titleEdit")}
             </Button>
           </div>

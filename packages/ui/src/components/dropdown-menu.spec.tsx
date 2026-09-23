@@ -123,4 +123,29 @@ describe("DropdownMenu", () => {
     expect(item).toHaveClass("text-danger-foreground");
     expect(item.className).not.toMatch(/red-\d/);
   });
+
+  // Story 166 — the item's focus indicator was `focus:bg-surface-muted` alone,
+  // 1.10:1 against the panel's own `--surface`. The ring is inherited from the
+  // shared `menuItemClassName`, so neither this component nor `Select` was
+  // edited to gain it; this asserts the inheritance actually reaches the
+  // rendered element.
+  it("gives every item the shared always-on focus ring", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: "Actions" }));
+    const item = await screen.findByRole("menuitem", { name: "Edit" });
+    expect(item).toHaveClass("focus-ring-always");
+    expect(item).toHaveClass("focus:bg-surface-muted");
+    expect(item.className).not.toMatch(/slate-\d/);
+  });
+
+  it("keeps the focus ring on a destructive item too", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: "Actions" }));
+    const item = await screen.findByRole("menuitem", { name: "Delete" });
+    expect(item).toHaveClass("focus-ring-always");
+  });
 });

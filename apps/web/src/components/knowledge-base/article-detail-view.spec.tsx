@@ -506,6 +506,103 @@ describe("ArticleDetailView", () => {
    * `defaultValue`, so every test above renders exactly as it did before
    * this story; these cover the Arabic panel specifically.
    */
+  // Story 166 — same defect and same fix as ticket and customer detail.
+  describe("title edit focus restoration (Story 166)", () => {
+    it("returns focus to the title edit trigger after Escape", () => {
+      vi.mocked(useArticleQuery).mockReturnValue(
+        queryResult({ data: baseArticle, isSuccess: true }) as never,
+      );
+      vi.mocked(useUpdateArticleMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<ArticleDetailView articleId="article-1" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "detail.titleEdit" }));
+      const input = screen.getByDisplayValue("How to reset a password");
+      expect(document.activeElement).toBe(input);
+
+      fireEvent.keyDown(input, { key: "Escape" });
+
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "detail.titleEdit" }),
+      );
+    });
+
+    it("returns focus to the title edit trigger after Enter commits", () => {
+      vi.mocked(useArticleQuery).mockReturnValue(
+        queryResult({ data: baseArticle, isSuccess: true }) as never,
+      );
+      const mutate = vi.fn();
+      vi.mocked(useUpdateArticleMutation).mockReturnValue({
+        mutate,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<ArticleDetailView articleId="article-1" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "detail.titleEdit" }));
+      const input = screen.getByDisplayValue("How to reset a password");
+      fireEvent.change(input, { target: { value: "How to reset your password" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+
+      expect(mutate).toHaveBeenCalledWith(
+        { title: "How to reset your password" },
+        expect.objectContaining({ onError: expect.any(Function) }),
+      );
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "detail.titleEdit" }),
+      );
+    });
+
+    it("does not steal focus when the edit is left by focusing another control", () => {
+      vi.mocked(useArticleQuery).mockReturnValue(
+        queryResult({ data: baseArticle, isSuccess: true }) as never,
+      );
+      vi.mocked(useUpdateArticleMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<ArticleDetailView articleId="article-1" />);
+
+      fireEvent.click(screen.getByRole("button", { name: "detail.titleEdit" }));
+      const input = screen.getByDisplayValue("How to reset a password");
+
+      const elsewhere = document.createElement("button");
+      document.body.appendChild(elsewhere);
+      elsewhere.focus();
+      fireEvent.blur(input);
+
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    });
+
+    it("does not focus the title edit trigger on first render", () => {
+      vi.mocked(useArticleQuery).mockReturnValue(
+        queryResult({ data: baseArticle, isSuccess: true }) as never,
+      );
+      vi.mocked(useUpdateArticleMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<ArticleDetailView articleId="article-1" />);
+
+      expect(screen.getByRole("button", { name: "detail.titleEdit" })).toBeInTheDocument();
+      expect(document.activeElement).toBe(document.body);
+    });
+  });
+
   describe("Arabic translation tab (Story 137)", () => {
     const arTranslation = {
       id: "translation-1",

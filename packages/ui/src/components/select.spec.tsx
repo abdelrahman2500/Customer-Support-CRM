@@ -146,4 +146,18 @@ describe("Select", () => {
     expect(trigger).toHaveClass("focus-ring-always");
     expect(trigger.className).not.toMatch(/slate-\d/);
   });
+
+  // Story 166 — the trigger has had the ring since Story S-1; the options in
+  // the panel it opens had only a 1.10:1 background tint. They now share the
+  // one treatment, inherited from `menuItemClassName`.
+  it("gives an option the same focus treatment as the trigger", async () => {
+    const user = userEvent.setup();
+    renderSelect(["Low", "High"]);
+
+    await user.click(screen.getByRole("combobox", { name: "Assigned agent" }));
+    const option = await screen.findByRole("option", { name: "Low" });
+    expect(option).toHaveClass("focus-ring-always");
+    expect(option).toHaveClass("focus:bg-surface-muted");
+    expect(option.className).not.toMatch(/slate-\d/);
+  });
 });

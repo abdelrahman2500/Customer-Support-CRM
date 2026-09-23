@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -228,6 +228,17 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const [subjectDraft, setSubjectDraft] = useState<string | null>(null);
   /** Story 156 — the subject is a heading until an agent chooses to edit it. */
   const [editingSubject, setEditingSubject] = useState(false);
+  /** Story 166 — the `Input` unmounts on both keyboard exits (Escape, and
+   * Enter via `blur()`), so without this focus lands on `document.body`.
+   * Guarded on `document.body`: a blur caused by clicking another control has
+   * already moved focus somewhere valid and must not be overridden. Mirrors
+   * `ConfirmDialog`'s own hand-rolled capture-and-restore (Story 94) rather
+   * than introducing a shared focus-management hook for four call sites. */
+  const subjectEditTriggerRef = useRef<HTMLButtonElement>(null);
+  /** Latches on the first entry into edit mode, so the effect's own initial
+   * run — which also sees `editingSubject === false`, on a page where nothing
+   * is focused yet — cannot steal focus on load. */
+  const subjectWasEditingRef = useRef(false);
   const [aiCategoryNoMatch, setAiCategoryNoMatch] = useState<string | null>(null);
   const [confirmHoldOpen, setConfirmHoldOpen] = useState(false);
 
@@ -243,6 +254,19 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   // `userIds`/`useAgentPresence` pattern exactly.
   const userIds = useMemo(() => (usersQuery.data ?? []).map((user) => user.id), [usersQuery.data]);
   const presence = useAgentPresence(userIds);
+
+  useEffect(() => {
+    if (editingSubject) {
+      subjectWasEditingRef.current = true;
+      return;
+    }
+    if (!subjectWasEditingRef.current) return;
+    subjectWasEditingRef.current = false;
+    const active = document.activeElement;
+    if (active === null || active === document.body) {
+      subjectEditTriggerRef.current?.focus();
+    }
+  }, [editingSubject]);
 
   if (ticketQuery.isLoading) {
     return (
@@ -337,7 +361,13 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold text-ink">{ticket.subject}</h1>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setEditingSubject(true)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              ref={subjectEditTriggerRef}
+              onClick={() => setEditingSubject(true)}
+            >
               {t("detail.subjectEdit")}
             </Button>
           </div>

@@ -534,6 +534,73 @@ describe("CustomerDetailView", () => {
 
       expect(screen.getByText("detail.actionFailed")).toBeInTheDocument();
     });
+
+    // Story 166 — same defect and same fix as ticket detail's own subject edit.
+    describe("focus restoration (Story 166)", () => {
+      it("returns focus to the display-name edit trigger after Escape", () => {
+        mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate: vi.fn() }) as never);
+
+        render(<CustomerDetailView customerId="customer-1" />);
+
+        fireEvent.click(screen.getByRole("button", { name: "detail.displayNameEdit" }));
+        const input = screen.getByDisplayValue("Acme Inc.");
+        expect(document.activeElement).toBe(input);
+
+        fireEvent.keyDown(input, { key: "Escape" });
+
+        expect(document.activeElement).toBe(
+          screen.getByRole("button", { name: "detail.displayNameEdit" }),
+        );
+      });
+
+      it("returns focus to the display-name edit trigger after Enter commits", () => {
+        const mutate = vi.fn();
+        mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
+
+        render(<CustomerDetailView customerId="customer-1" />);
+
+        fireEvent.click(screen.getByRole("button", { name: "detail.displayNameEdit" }));
+        const input = screen.getByDisplayValue("Acme Inc.");
+        fireEvent.change(input, { target: { value: "Acme Corp." } });
+        fireEvent.keyDown(input, { key: "Enter" });
+
+        expect(mutate).toHaveBeenCalledWith(
+          { displayName: "Acme Corp." },
+          expect.objectContaining({ onError: expect.any(Function) }),
+        );
+        expect(document.activeElement).toBe(
+          screen.getByRole("button", { name: "detail.displayNameEdit" }),
+        );
+      });
+
+      it("does not steal focus when the edit is left by focusing another control", () => {
+        mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate: vi.fn() }) as never);
+
+        render(<CustomerDetailView customerId="customer-1" />);
+
+        fireEvent.click(screen.getByRole("button", { name: "detail.displayNameEdit" }));
+        const input = screen.getByDisplayValue("Acme Inc.");
+
+        const elsewhere = document.createElement("button");
+        document.body.appendChild(elsewhere);
+        elsewhere.focus();
+        fireEvent.blur(input);
+
+        expect(document.activeElement).toBe(elsewhere);
+        elsewhere.remove();
+      });
+
+      it("does not focus the display-name edit trigger on first render", () => {
+        mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate: vi.fn() }) as never);
+
+        render(<CustomerDetailView customerId="customer-1" />);
+
+        expect(
+          screen.getByRole("button", { name: "detail.displayNameEdit" }),
+        ).toBeInTheDocument();
+        expect(document.activeElement).toBe(document.body);
+      });
+    });
   });
 
   describe("contact editing (Story 30)", () => {

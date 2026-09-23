@@ -553,6 +553,105 @@ describe("TicketDetailView", () => {
 
       expect(mutate).not.toHaveBeenCalled();
     });
+
+    // Story 166 — both keyboard exits unmount the focused `Input`, which left
+    // focus on `document.body`. The persistent "Edit" trigger is the successor.
+    describe("focus restoration (Story 166)", () => {
+      it("returns focus to the subject edit trigger after Escape", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isError: false,
+        error: null,
+      } as never);
+
+        render(<TicketDetailView ticketId="ticket-1" />);
+
+        const trigger = screen.getByRole("button", { name: "detail.subjectEdit" });
+        fireEvent.click(trigger);
+        const input = screen.getByDisplayValue("Cannot log in");
+        expect(document.activeElement).toBe(input);
+
+        fireEvent.keyDown(input, { key: "Escape" });
+
+        expect(document.activeElement).toBe(
+          screen.getByRole("button", { name: "detail.subjectEdit" }),
+        );
+      });
+
+      it("returns focus to the subject edit trigger after Enter commits", () => {
+        vi.mocked(useTicketQuery).mockReturnValue(
+          queryResult({ data: baseTicket, isSuccess: true }) as never,
+        );
+        const mutate = vi.fn();
+        vi.mocked(useUpdateTicketMutation).mockReturnValue({
+          mutate,
+          isError: false,
+          error: null,
+        } as never);
+
+        render(<TicketDetailView ticketId="ticket-1" />);
+
+        fireEvent.click(screen.getByRole("button", { name: "detail.subjectEdit" }));
+        const input = screen.getByDisplayValue("Cannot log in");
+        fireEvent.change(input, { target: { value: "Cannot log in anymore" } });
+        fireEvent.keyDown(input, { key: "Enter" });
+
+        // The existing Enter-commits-through-blur path is unchanged...
+        expect(mutate).toHaveBeenCalledWith(
+          { subject: "Cannot log in anymore" },
+          expect.objectContaining({ onError: expect.any(Function) }),
+        );
+        // ...and focus no longer falls to the body.
+        expect(document.activeElement).toBe(
+          screen.getByRole("button", { name: "detail.subjectEdit" }),
+        );
+      });
+
+      it("does not steal focus when the edit is left by focusing another control", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isError: false,
+        error: null,
+      } as never);
+
+        render(<TicketDetailView ticketId="ticket-1" />);
+
+        fireEvent.click(screen.getByRole("button", { name: "detail.subjectEdit" }));
+        const input = screen.getByDisplayValue("Cannot log in");
+
+        // A mouse user clicking elsewhere: focus has already moved somewhere
+        // valid by the time `onBlur` fires, so it must be left alone.
+        const elsewhere = document.createElement("button");
+        document.body.appendChild(elsewhere);
+        elsewhere.focus();
+        fireEvent.blur(input);
+
+        expect(document.activeElement).toBe(elsewhere);
+        elsewhere.remove();
+      });
+
+      it("does not focus the subject edit trigger on first render", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isError: false,
+        error: null,
+      } as never);
+
+        render(<TicketDetailView ticketId="ticket-1" />);
+
+        expect(screen.getByRole("button", { name: "detail.subjectEdit" })).toBeInTheDocument();
+        expect(document.activeElement).toBe(document.body);
+      });
+    });
   });
 
   // Story 42 — department reassignment.
