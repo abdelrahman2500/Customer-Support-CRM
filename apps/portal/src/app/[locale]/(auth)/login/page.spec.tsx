@@ -61,16 +61,26 @@ describe("LoginPage (portal)", () => {
       render(<LoginPage />);
       expect(screen.getByText("errors.unauthorized")).toBeInTheDocument();
 
-      fireEvent.change(screen.getByText("email").querySelector("input")!, {
+      fireEvent.change(screen.getByLabelText("email"), {
         target: { value: "jane@example.com" },
       });
-      fireEvent.change(screen.getByText("password").querySelector("input")!, {
+      fireEvent.change(screen.getByLabelText("password"), {
         target: { value: "wrong-password" },
       });
       fireEvent.click(screen.getByText("signIn"));
 
       expect(await screen.findByText("loginFailed")).toBeInTheDocument();
       expect(screen.queryByText("errors.unauthorized")).not.toBeInTheDocument();
+    });
+
+    // Story 168 — it used to be a hand-rolled `<p>`, which is silent to a
+    // screen reader. `Alert`'s default variant carries `role="status"`.
+    it("announces the session-expired message through the shared Alert", () => {
+      searchParams = new URLSearchParams("reason=session-expired");
+
+      render(<LoginPage />);
+
+      expect(screen.getByRole("status")).toHaveTextContent("errors.unauthorized");
     });
   });
 
@@ -81,10 +91,10 @@ describe("LoginPage (portal)", () => {
     } as Response);
 
     render(<LoginPage />);
-    fireEvent.change(screen.getByText("email").querySelector("input")!, {
+    fireEvent.change(screen.getByLabelText("email"), {
       target: { value: "jane@example.com" },
     });
-    fireEvent.change(screen.getByText("password").querySelector("input")!, {
+    fireEvent.change(screen.getByLabelText("password"), {
       target: { value: "correct-password" },
     });
     fireEvent.click(screen.getByText("signIn"));
@@ -114,10 +124,10 @@ describe("LoginPage (portal)", () => {
     } as Response);
 
     render(<LoginPage />);
-    fireEvent.change(screen.getByText("email").querySelector("input")!, {
+    fireEvent.change(screen.getByLabelText("email"), {
       target: { value: "jane@example.com" },
     });
-    fireEvent.change(screen.getByText("password").querySelector("input")!, {
+    fireEvent.change(screen.getByLabelText("password"), {
       target: { value: "correct-password" },
     });
     fireEvent.click(screen.getByText("signIn"));
@@ -132,10 +142,10 @@ describe("LoginPage (portal)", () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
 
     render(<LoginPage />);
-    fireEvent.change(screen.getByText("email").querySelector("input")!, {
+    fireEvent.change(screen.getByLabelText("email"), {
       target: { value: "jane@example.com" },
     });
-    fireEvent.change(screen.getByText("password").querySelector("input")!, {
+    fireEvent.change(screen.getByLabelText("password"), {
       target: { value: "wrong-password" },
     });
     fireEvent.click(screen.getByText("signIn"));
@@ -148,14 +158,161 @@ describe("LoginPage (portal)", () => {
     vi.mocked(fetch).mockRejectedValue(new Error("network down"));
 
     render(<LoginPage />);
-    fireEvent.change(screen.getByText("email").querySelector("input")!, {
+    fireEvent.change(screen.getByLabelText("email"), {
       target: { value: "jane@example.com" },
     });
-    fireEvent.change(screen.getByText("password").querySelector("input")!, {
+    fireEvent.change(screen.getByLabelText("password"), {
       target: { value: "whatever" },
     });
     fireEvent.click(screen.getByText("signIn"));
 
     expect(await screen.findByText("loginFailed")).toBeInTheDocument();
+  });
+
+  /**
+   * Story 168 — the redesign. Mirrors `apps/web`'s own login spec; every
+   * test is about behaviour the redesign introduced or must preserve.
+   */
+  describe("redesigned sign-in screen (Story 168)", () => {
+    it("focuses the email field on load", () => {
+      render(<LoginPage />);
+
+      expect(screen.getByLabelText("email")).toHaveFocus();
+    });
+
+    it("associates both labels with their controls through FormField", () => {
+      render(<LoginPage />);
+
+      const emailInput = screen.getByLabelText("email");
+      const passwordInput = screen.getByLabelText("password");
+
+      expect(emailInput).toHaveAttribute("type", "email");
+      expect(emailInput).toHaveAttribute("autocomplete", "email");
+      expect(emailInput).toBeRequired();
+      expect(passwordInput).toHaveAttribute("type", "password");
+      expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
+      expect(passwordInput).toBeRequired();
+    });
+
+    it("marks the submit button busy and disabled while the request is in flight", async () => {
+      vi.mocked(fetch).mockReturnValue(new Promise(() => {}) as Promise<Response>);
+
+      render(<LoginPage />);
+      fireEvent.change(screen.getByLabelText("email"), { target: { value: "jane@example.com" } });
+      fireEvent.change(screen.getByLabelText("password"), { target: { value: "pw" } });
+      fireEvent.click(screen.getByText("signIn"));
+
+      const button = (await screen.findByText("signingIn")).closest("button")!;
+      expect(button).toHaveAttribute("aria-busy", "true");
+      expect(button).toBeDisabled();
+    });
+
+    /**
+     * See `apps/web`'s own copy of this test: `Button`'s `isLoading` hides
+     * the label with `visibility: hidden`, which a real browser excludes
+     * from the accessible name. jsdom cannot observe that, so this asserts
+     * the attribute rather than querying by role name.
+     */
+    it("names the submit button explicitly while pending, and only while pending", async () => {
+      vi.mocked(fetch).mockReturnValue(new Promise(() => {}) as Promise<Response>);
+
+      render(<LoginPage />);
+      expect(screen.getByText("signIn").closest("button")).not.toHaveAttribute("aria-label");
+
+      fireEvent.change(screen.getByLabelText("email"), { target: { value: "jane@example.com" } });
+      fireEvent.change(screen.getByLabelText("password"), { target: { value: "pw" } });
+      fireEvent.click(screen.getByText("signIn"));
+
+      const button = (await screen.findByText("signingIn")).closest("button")!;
+      expect(button).toHaveAttribute("aria-label", "signingIn");
+    });
+
+    it("keeps a single level-1 heading for the page", () => {
+      render(<LoginPage />);
+
+      const headings = screen.getAllByRole("heading", { level: 1 });
+      expect(headings).toHaveLength(1);
+      expect(headings[0]).toHaveTextContent("title");
+    });
+
+    it("shows the product name as the screen's identity", () => {
+      render(<LoginPage />);
+
+      expect(screen.getByText("appName")).toBeInTheDocument();
+    });
+
+    describe("pre-auth locale switcher", () => {
+      it("renders a labelled switcher set to the current locale, with both locales", () => {
+        render(<LoginPage />);
+
+        const select = screen.getByRole("combobox", { name: "languageSwitcher.label" });
+        expect(select).toHaveValue("en");
+        expect(screen.getAllByRole("option")).toHaveLength(2);
+      });
+
+      it("navigates to the target locale's login route", () => {
+        render(<LoginPage />);
+
+        fireEvent.change(screen.getByRole("combobox", { name: "languageSwitcher.label" }), {
+          target: { value: "ar" },
+        });
+
+        expect(push).toHaveBeenCalledWith("/ar/login");
+      });
+
+      it("preserves the query string, so the session-expired banner survives the switch", () => {
+        searchParams = new URLSearchParams("reason=session-expired");
+
+        render(<LoginPage />);
+
+        fireEvent.change(screen.getByRole("combobox", { name: "languageSwitcher.label" }), {
+          target: { value: "ar" },
+        });
+
+        expect(push).toHaveBeenCalledWith("/ar/login?reason=session-expired");
+      });
+
+      it("does nothing when the current locale is selected", () => {
+        render(<LoginPage />);
+
+        fireEvent.change(screen.getByRole("combobox", { name: "languageSwitcher.label" }), {
+          target: { value: "en" },
+        });
+
+        expect(push).not.toHaveBeenCalled();
+      });
+
+      // Nobody is signed in here, so there is no preference to persist and
+      // `updatePreferredLocale` would 401. This is the test that catches
+      // someone copying `portal-header.tsx`'s handler wholesale.
+      it("persists nothing — no request is made when switching locale", () => {
+        render(<LoginPage />);
+
+        fireEvent.change(screen.getByRole("combobox", { name: "languageSwitcher.label" }), {
+          target: { value: "ar" },
+        });
+
+        expect(fetch).not.toHaveBeenCalled();
+      });
+    });
+
+    /**
+     * RTL safety. Copies the idiom from `apps/web`'s
+     * `workspace-sidebar.spec.tsx`: the one class-level assertion here,
+     * because it guards a criterion
+     * (`docs/architecture/12-risks-tradeoffs-and-scope.md`'s risk #1) that
+     * no behavioural assertion can reach.
+     */
+    it("uses only logical-direction classes", () => {
+      const { container } = render(<LoginPage />);
+
+      for (const element of container.querySelectorAll("[class]")) {
+        const classes = element.className.toString().split(/\s+/);
+        expect(classes.some((c) => /^(ml|mr|pl|pr|left|right|text-left|text-right)-/.test(c))).toBe(
+          false,
+        );
+        expect(classes.some((c) => /^border-[lr]-/.test(c))).toBe(false);
+      }
+    });
   });
 });

@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Alert, Button, Input } from "@crm/ui";
+import { Alert, Button, Card, FormField, Input } from "@crm/ui";
 import { getApiBaseUrl, setAccessToken } from "@/lib/api";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 
@@ -30,10 +30,32 @@ import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router"
  * gives every `useErrorMessage()` caller for a 401 — rather than adding a
  * second, near-duplicate string. A real login failure (wrong credentials)
  * takes priority and replaces this banner once the user actually submits.
+ *
+ * Story 168 — the first screen of the CRM UI/UX redesign. The hand-rolled
+ * surface, the hand-rolled field rows and the disabled/text-swap submit are
+ * gone; this now composes `Card` (raised, with a decorative accent rail),
+ * `FormField`, `Input`, `Button size="lg" isLoading` and `Alert` over the
+ * Story 134 token vocabulary — including the first use anywhere of its
+ * named type scale (`text-title`). Identity comes from `common.appName`,
+ * which already exists in both locales: no logo asset, no branding
+ * endpoint, no new translation key. A pre-auth locale switcher was added,
+ * reusing Story 119's `workspace.languageSwitcher` keys and deliberately
+ * NOT persisting a preference (nobody is signed in here).
+ *
+ * Nothing about authentication moved: same `POST /auth/login`, same
+ * `credentials: "include"`, same `setAccessToken`, same `/{locale}/tickets`
+ * destination, same two error paths, same pending-past-push behaviour.
  */
+
+/** Story 119's own list, restated here rather than imported: `workspace-header.tsx`
+ * keeps it module-private and this screen must not depend on an authenticated
+ * component. Same source of truth — `apps/web/src/i18n/routing.ts`. */
+const LOCALES = ["en", "ar"] as const;
+
 export default function LoginPage() {
   const t = useTranslations("auth");
   const tCommon = useTranslations("common");
+  const tWorkspace = useTranslations("workspace");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const searchParams = useSearchParams();
@@ -42,6 +64,24 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * Story 168 — the pre-auth locale switch. Deliberately NOT
+   * `workspace-header.tsx`'s `handleSwitchLocale`: that one calls
+   * `updatePreferredLocale(...)` first, which is an authenticated request and
+   * would 401 here. Nobody is signed in on this screen, so there is no
+   * preference to persist — the route change alone is the whole behaviour.
+   *
+   * The query string is carried across so Story 95's
+   * `?reason=session-expired` banner survives a language change.
+   */
+  function handleSwitchLocale(targetLocale: string): void {
+    if (targetLocale === locale) {
+      return;
+    }
+    const query = searchParams.toString();
+    router.push(`/${targetLocale}/login${query ? `?${query}` : ""}`);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -82,38 +122,83 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-surface-sunk p-8">
-      <div className="w-full max-w-sm rounded-lg border border-rule bg-surface p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-ink">{t("title")}</h1>
-        {sessionExpired && !error && (
-          <Alert className="mt-4">{tCommon("errors.unauthorized")}</Alert>
-        )}
-        <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
-          <label className="flex flex-col gap-1 text-sm text-ink-strong">
-            {t("email")}
-            <Input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              autoComplete="email"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-ink-strong">
-            {t("password")}
-            <Input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </label>
-          {error && <Alert variant="destructive">{error}</Alert>}
-          <Button type="submit" disabled={submitting}>
-            {submitting ? t("signingIn") : t("signIn")}
-          </Button>
-        </form>
+    <main className="flex min-h-screen flex-col bg-surface-sunk px-surface py-shell sm:px-shell">
+      {/* The locale switcher sits on the page, not inside the panel: it is a
+          property of how you read this screen, not a field you fill in.
+          `justify-end` is logical, so it lands on the correct edge in both
+          directions without a single `ml-*`/`mr-*`. */}
+      <div className="flex justify-end">
+        <select
+          aria-label={tWorkspace("languageSwitcher.label")}
+          className="focus-ring h-9 rounded-surface border border-rule-strong bg-surface px-2 text-sm text-ink"
+          value={locale}
+          onChange={(event) => handleSwitchLocale(event.target.value)}
+        >
+          {LOCALES.map((localeOption) => (
+            <option key={localeOption} value={localeOption}>
+              {tWorkspace(`languageSwitcher.options.${localeOption}`)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-1 items-center justify-center">
+        <div className="w-full max-w-sm">
+          {/* Identity block, outside the panel. Two steps of one hierarchy:
+              which product this is, then what you are doing in it. */}
+          <div className="mb-stack flex flex-col gap-tight text-center">
+            <span className="text-sm font-medium text-ink-muted">{tCommon("appName")}</span>
+            <h1 className="text-title text-ink">{t("title")}</h1>
+          </div>
+
+          <Card elevation="raised" className="overflow-hidden">
+            {/* The one piece of deliberate product chrome on this screen.
+                Decorative and `aria-hidden`; it carries no information and is
+                not reachable. `bg-accent` is the existing primary token, so a
+                future branding colour repoints it with no edit here. */}
+            <div aria-hidden className="h-1 w-full bg-accent" />
+            <div className="flex flex-col gap-stack p-surface sm:p-shell">
+              {sessionExpired && !error && <Alert>{tCommon("errors.unauthorized")}</Alert>}
+              <form className="flex flex-col gap-stack" onSubmit={handleSubmit}>
+                <FormField density="comfortable" label={t("email")}>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                    autoComplete="email"
+                    autoFocus
+                  />
+                </FormField>
+                <FormField density="comfortable" label={t("password")}>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                </FormField>
+                {error && <Alert variant="destructive">{error}</Alert>}
+                <Button
+                  type="submit"
+                  size="lg"
+                  isLoading={submitting}
+                  /* `isLoading` renders the label inside `<span class="invisible">`,
+                   * and `visibility: hidden` content is excluded from the accessible
+                   * name computation — so in a real browser this button would lose
+                   * its name for the whole pending window. jsdom does not model that
+                   * (no Tailwind CSS is loaded), so no test can catch it; this names
+                   * the button explicitly for exactly that window, using the string
+                   * it already displays. No new key. */
+                  aria-label={submitting ? t("signingIn") : undefined}
+                >
+                  {submitting ? t("signingIn") : t("signIn")}
+                </Button>
+              </form>
+            </div>
+          </Card>
+        </div>
       </div>
     </main>
   );
