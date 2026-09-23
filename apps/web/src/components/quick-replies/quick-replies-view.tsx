@@ -192,7 +192,7 @@ function AddQuickReplyForm() {
             onChange={(event) => setTitle(event.target.value)}
             required
             minLength={1}
-            className="w-72"
+            className="w-full sm:w-72"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">

@@ -373,7 +373,7 @@ function AddExceptionForm() {
           required
           value={date}
           onChange={(event) => setDate(event.target.value)}
-          className="w-40"
+          className="w-full sm:w-40"
         />
       </label>
       <div className="flex items-center gap-1.5">

@@ -110,7 +110,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
           }}
         />
         <Input
-          className="w-40"
+          className="w-full sm:w-40"
           defaultValue={contact.email ?? ""}
           placeholder={t("detail.contactEmailLabel")}
           aria-label={t("detail.contactEmailLabel")}
@@ -158,7 +158,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
         <span className="text-xs text-ink-subtle">{t("detail.portalPasswordLabel")}</span>
         <div className="flex flex-wrap items-center gap-2">
           <Input
-            className="w-40"
+            className="w-full sm:w-40"
             type="password"
             aria-label={t("detail.portalPasswordLabel")}
             placeholder={t("detail.portalPasswordPlaceholder")}
@@ -300,7 +300,11 @@ function AddContactForm({ customerId }: { customerId: string }) {
       </label>
       <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("detail.contactEmailLabel")}
-        <Input className="w-40" value={email} onChange={(event) => setEmail(event.target.value)} />
+        <Input
+          className="w-full sm:w-40"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
       </label>
       <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("detail.contactPhoneLabel")}
@@ -570,7 +574,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               <h1 className="sr-only">{customer.displayName}</h1>
               <Input
                 autoFocus
-                className="w-56 text-title"
+                className="w-full sm:w-56 text-title"
                 // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
                 // rejected edit can be explicitly reverted, mirroring
                 // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern.

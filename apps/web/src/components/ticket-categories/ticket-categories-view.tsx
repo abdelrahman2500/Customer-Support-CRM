@@ -224,7 +224,7 @@ function AddTicketCategoryForm() {
           onChange={(event) => setName(event.target.value)}
           required
           minLength={1}
-          className="w-56"
+          className="w-full sm:w-56"
         />
       </label>
       <Button type="submit" size="sm" disabled={mutation.isPending || !name.trim()}>

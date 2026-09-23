@@ -168,7 +168,7 @@ function TemplateForm({
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("localeLabel")}
           <Select value={locale} onValueChange={handleLocaleChange}>
-            <SelectTrigger className="w-48" aria-label={t("localeLabel")}>
+            <SelectTrigger className="w-full sm:w-48" aria-label={t("localeLabel")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

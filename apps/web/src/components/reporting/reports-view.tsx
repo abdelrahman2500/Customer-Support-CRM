@@ -597,7 +597,7 @@ export function ReportsView() {
             onChange={(event) =>
               setRange((prev) => ({ ...prev, from: event.target.value || undefined }))
             }
-            className="w-40"
+            className="w-full sm:w-40"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
@@ -608,7 +608,7 @@ export function ReportsView() {
             onChange={(event) =>
               setRange((prev) => ({ ...prev, to: event.target.value || undefined }))
             }
-            className="w-40"
+            className="w-full sm:w-40"
           />
         </label>
         <Button
@@ -743,7 +743,7 @@ export function ReportsView() {
             <Input
               value={newDashboardName}
               onChange={(event) => setNewDashboardName(event.target.value)}
-              className="w-56"
+              className="w-full sm:w-56"
             />
           </label>
           {/* Batch 8 (UX audit) — same shared `Checkbox`/`Label` swap as

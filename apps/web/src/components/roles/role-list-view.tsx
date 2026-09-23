@@ -128,7 +128,7 @@ function RoleRow({
         </TableCell>
         <TableCell label={t("list.columns.visibility")}>
           <Select value={role.ticketVisibilityScope} onValueChange={changeVisibilityScope}>
-            <SelectTrigger className="w-40" aria-label={t("list.columns.visibility")}>
+            <SelectTrigger className="w-full sm:w-40" aria-label={t("list.columns.visibility")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -255,7 +255,7 @@ function AddRoleForm() {
           onChange={(event) => setName(event.target.value)}
           required
           minLength={1}
-          className="w-56"
+          className="w-full sm:w-56"
         />
       </label>
       <Button type="submit" size="sm" disabled={mutation.isPending || !name.trim()}>

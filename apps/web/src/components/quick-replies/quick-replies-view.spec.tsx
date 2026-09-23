@@ -209,4 +209,28 @@ describe("QuickRepliesView", () => {
 
     await screen.findByText("Bad request");
   });
+
+  /**
+   * Story 174 — this input was `w-72` (288px) inside a `SectionCard` whose
+   * content box measures 272px at a 320px viewport, so it overflowed its own
+   * card and pushed the document to 329px — the last measured horizontal
+   * overflow in the agent workspace, identical in EN and AR.
+   *
+   * Asserted at class level because jsdom loads no Tailwind CSS: a width or
+   * `scrollWidth` assertion here returns the same value before and after the
+   * fix and would pass against the bug. Same constraint recorded in
+   * `packages/ui/src/lib/cn.spec.ts` and Stories 169/173; the real proof is
+   * the 320px browser sweep.
+   */
+  it("lets the create-form title input shrink below sm, keeping its width above it", () => {
+    mockedUseQuickRepliesQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
+
+    render(<QuickRepliesView />);
+
+    const titleInput = screen.getByLabelText("titleLabel");
+    expect(titleInput).toHaveClass("w-full");
+    expect(titleInput).toHaveClass("sm:w-72");
+    // The bare fixed width is what overflowed; it must not come back.
+    expect(titleInput.className.split(/\s+/)).not.toContain("w-72");
+  });
 });

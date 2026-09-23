@@ -154,7 +154,7 @@ export function AuditLogView() {
           {t("filterFrom")}
           <Input
             type="date"
-            className="w-40"
+            className="w-full sm:w-40"
             value={filters.from ?? ""}
             onChange={(event) => updateFilter("from", event.target.value)}
           />
@@ -163,7 +163,7 @@ export function AuditLogView() {
           {t("filterTo")}
           <Input
             type="date"
-            className="w-40"
+            className="w-full sm:w-40"
             value={filters.to ?? ""}
             onChange={(event) => updateFilter("to", event.target.value)}
           />

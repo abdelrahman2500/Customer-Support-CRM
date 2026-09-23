@@ -255,7 +255,7 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
     <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
       {activeQuickReplies.length > 0 && (
         <Select value={selectedQuickReplyId} onValueChange={insertQuickReply}>
-          <SelectTrigger className="w-64" aria-label={t("detail.quickReplyPlaceholder")}>
+          <SelectTrigger className="w-full sm:w-64" aria-label={t("detail.quickReplyPlaceholder")}>
             <SelectValue placeholder={t("detail.quickReplyPlaceholder")} />
           </SelectTrigger>
           <SelectContent>
