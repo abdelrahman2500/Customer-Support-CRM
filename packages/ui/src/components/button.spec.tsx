@@ -54,6 +54,25 @@ describe("Button", () => {
       expect(screen.getByRole("button")).toHaveTextContent("Save changes");
     });
 
+    /**
+     * Story 169 — the label must stay in the accessibility tree too, not just
+     * in the DOM. It used to be hidden with `invisible`
+     * (`visibility: hidden`), which the accessible-name computation excludes
+     * — so a pending button announced as "busy" with no name at all.
+     * `opacity: 0` is visually identical and is not an exclusion criterion.
+     *
+     * Asserted at class level deliberately: jsdom loads no Tailwind CSS, so
+     * `invisible` computes to nothing here and an accessible-name assertion
+     * would pass against the very bug this pins.
+     */
+    it("hides the label with opacity, never with visibility, so it keeps its accessible name", () => {
+      render(<Button isLoading>Save changes</Button>);
+
+      const label = screen.getByText("Save changes");
+      expect(label).toHaveClass("opacity-0");
+      expect(label).not.toHaveClass("invisible");
+    });
+
     it("is not busy or disabled when not loading", () => {
       render(<Button>Save</Button>);
 

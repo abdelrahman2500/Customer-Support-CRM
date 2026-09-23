@@ -180,19 +180,7 @@ export default function LoginPage() {
                   />
                 </FormField>
                 {error && <Alert variant="destructive">{error}</Alert>}
-                <Button
-                  type="submit"
-                  size="lg"
-                  isLoading={submitting}
-                  /* `isLoading` renders the label inside `<span class="invisible">`,
-                   * and `visibility: hidden` content is excluded from the accessible
-                   * name computation — so in a real browser this button would lose
-                   * its name for the whole pending window. jsdom does not model that
-                   * (no Tailwind CSS is loaded), so no test can catch it; this names
-                   * the button explicitly for exactly that window, using the string
-                   * it already displays. No new key. */
-                  aria-label={submitting ? t("signingIn") : undefined}
-                >
+                <Button type="submit" size="lg" isLoading={submitting}>
                   {submitting ? t("signingIn") : t("signIn")}
                 </Button>
               </form>

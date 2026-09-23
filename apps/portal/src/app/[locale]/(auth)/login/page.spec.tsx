@@ -208,12 +208,13 @@ describe("LoginPage (portal)", () => {
     });
 
     /**
-     * See `apps/web`'s own copy of this test: `Button`'s `isLoading` hides
-     * the label with `visibility: hidden`, which a real browser excludes
-     * from the accessible name. jsdom cannot observe that, so this asserts
-     * the attribute rather than querying by role name.
+     * Story 169 fixed this in the primitive: `Button`'s `isLoading` now hides
+     * its label with `opacity-0` instead of `invisible`, so the pending button
+     * keeps its accessible name without any per-call-site help. Story 168 had
+     * carried a local `aria-label` workaround here; this asserts it is gone
+     * and does not come back — the primitive owns this, not the screen.
      */
-    it("names the submit button explicitly while pending, and only while pending", async () => {
+    it("carries no local aria-label workaround on the submit button", async () => {
       vi.mocked(fetch).mockReturnValue(new Promise(() => {}) as Promise<Response>);
 
       render(<LoginPage />);
@@ -224,7 +225,8 @@ describe("LoginPage (portal)", () => {
       fireEvent.click(screen.getByText("signIn"));
 
       const button = (await screen.findByText("signingIn")).closest("button")!;
-      expect(button).toHaveAttribute("aria-label", "signingIn");
+      expect(button).not.toHaveAttribute("aria-label");
+      expect(button).toHaveTextContent("signingIn");
     });
 
     it("keeps a single level-1 heading for the page", () => {

@@ -86,18 +86,34 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {loading ? (
           <>
             {/*
-             * The label stays in the DOM, merely `invisible`, and the spinner
+             * The label stays in the DOM, merely transparent, and the spinner
              * is absolutely centred over it. That is what holds the button's
              * width and height fixed while loading — swapping the label out
              * for a spinner would resize the button mid-click and shift
              * everything beside it. `inline-flex … gap-2` on the wrapper
              * preserves the spacing of a caller that passes an icon plus
              * text.
+             *
+             * Story 169 — `opacity-0`, NOT `invisible`. The two look
+             * identical, but `visibility: hidden` removes a subtree from the
+             * accessibility tree, so every one of the 13 `isLoading` call
+             * sites had a button with NO accessible name for the whole
+             * duration of its own pending state — a screen reader announced
+             * "button, busy" and nothing else, on exactly the control the
+             * user had just activated. `opacity: 0` is not an exclusion
+             * criterion in the accessible-name computation: the label stays
+             * exposed, so the button is still "Save changes, busy".
+             *
+             * Not observable under test here: jsdom loads no Tailwind CSS, so
+             * `invisible` computes to nothing and `toHaveAccessibleName`
+             * passes either way. The guard is therefore the class-level
+             * assertion in this component's own spec, which is the only place
+             * the distinction is expressible.
              */}
             <span className="absolute inset-0 flex items-center justify-center">
               <Spinner />
             </span>
-            <span className="invisible inline-flex items-center gap-2">{children}</span>
+            <span className="inline-flex items-center gap-2 opacity-0">{children}</span>
           </>
         ) : (
           children
