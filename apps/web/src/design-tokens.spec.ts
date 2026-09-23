@@ -333,6 +333,7 @@ describe("S-1 design tokens", () => {
    */
   const QUERY_LOADING_BRANCH = /\{\w*Query\.(?:isLoading|isPending) &&/;
   const ACCESSIBLE_LOADING = /LoadingStatus|QueryStateCard|role="status"/;
+  const EARLY_RETURN_LOADING = /if \(\w*Query\.(?:isLoading|isPending)\)/;
 
   /** Offending line numbers (1-based) for one file's lines. */
   function findUnannouncedQueryLoading(lines: string[]): number[] {
@@ -364,7 +365,44 @@ describe("S-1 design tokens", () => {
       hits.push(i + 1);
     }
 
-    return hits;
+    /**
+     * Story 165 — the same defect written as an early return:
+     *
+     *     if (ticketQuery.isLoading) {
+     *       return <TicketDetailSkeleton />;
+     *     }
+     *
+     * Nine of these existed, and the JSX-branch scan above could not see
+     * them. The placeholder here is often a whole skeleton *component*, so
+     * this arm accepts any `<…Skeleton` as well as a bare `<Skeleton`.
+     *
+     * It cannot match route-level `loading.tsx`, which returns its skeleton
+     * unconditionally rather than from a query branch, nor a mutation: the
+     * opener requires a `…Query` receiver.
+     */
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? "";
+      const trimmed = line.trim();
+      if (trimmed.startsWith("*") || trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+        continue;
+      }
+      if (!EARLY_RETURN_LOADING.test(line)) continue;
+
+      // The block runs to the `}` at the `if`'s own indentation.
+      const indent = line.match(/^\s*/)?.[0] ?? "";
+      let end = i;
+      for (let k = i + 1; k < lines.length && k < i + 25; k++) {
+        end = k;
+        if (lines[k] === indent + "}") break;
+      }
+
+      const block = lines.slice(i, end + 1).join("\n");
+      if (!/<\w*Skeleton\b/.test(block)) continue;
+      if (ACCESSIBLE_LOADING.test(block)) continue;
+      hits.push(i + 1);
+    }
+
+    return hits.sort((a, b) => a - b);
   }
 
   it("announces every query loading state that renders a bare skeleton", () => {
@@ -444,6 +482,70 @@ describe("S-1 design tokens", () => {
         '        {rowsQuery.isLoading && <SkeletonText lines={3} barClassName="h-10" />}',
       ]),
     ).toEqual([]);
+    // Story 165 — the early-return form, which the JSX-branch arm cannot see.
+    expect(
+      findUnannouncedQueryLoading([
+        "  if (ticketQuery.isLoading) {",
+        "    return <TicketDetailSkeleton />;",
+        "  }",
+      ]),
+    ).toEqual([1]);
+    expect(
+      findUnannouncedQueryLoading([
+        "  if (branchQuery.isLoading) {",
+        "    return (",
+        '      <div className="flex flex-col gap-3">',
+        '        <Skeleton className="h-6 w-1/3" />',
+        "      </div>",
+        "    );",
+        "  }",
+      ]),
+    ).toEqual([1]);
+
+    // Announced early returns, in both compositions this story used.
+    expect(
+      findUnannouncedQueryLoading([
+        "  if (ticketQuery.isLoading) {",
+        "    return (",
+        '      <LoadingStatus label={tCommon("loading")} placeholderHidden={false}>',
+        "        <TicketDetailSkeleton />",
+        "      </LoadingStatus>",
+        "    );",
+        "  }",
+      ]),
+    ).toEqual([]);
+    expect(
+      findUnannouncedQueryLoading([
+        "  if (attemptsQuery.isLoading) {",
+        "    return (",
+        '      <LoadingStatus label={tCommon("loading")} asChild>',
+        '        <Skeleton className="h-16 w-full" />',
+        "      </LoadingStatus>",
+        "    );",
+        "  }",
+      ]),
+    ).toEqual([]);
+
+    // Route-level `loading.tsx` returns its skeleton unconditionally, so it
+    // is never matched — the recorded decision that a route transition does
+    // not announce stays intact.
+    expect(
+      findUnannouncedQueryLoading([
+        "export default function Loading() {",
+        "  return <TicketDetailSkeleton />;",
+        "}",
+      ]),
+    ).toEqual([]);
+
+    // A mutation's pending state is not a query loading state.
+    expect(
+      findUnannouncedQueryLoading([
+        "  if (saveMutation.isPending) {",
+        '    return <Skeleton className="h-4 w-16" />;',
+        "  }",
+      ]),
+    ).toEqual([]);
+
     // Commented-out or documented code must not count.
     expect(
       findUnannouncedQueryLoading([

@@ -488,7 +488,11 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
   }, [usersQuery.data]);
 
   if (customerQuery.isLoading) {
-    return <CustomerDetailSkeleton />;
+    return (
+      <LoadingStatus label={tCommon("loading")} placeholderHidden={false}>
+        <CustomerDetailSkeleton />
+      </LoadingStatus>
+    );
   }
 
   if (customerQuery.isError) {

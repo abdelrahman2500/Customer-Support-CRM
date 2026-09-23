@@ -78,7 +78,10 @@ describe("WebhookSubscriptionsView", () => {
       queryResult({ data: undefined, isLoading: true }) as never,
     );
     mockedUseWebhookInboundLogsQuery.mockReturnValue(
-      queryResult({ data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 }, isSuccess: true }) as never,
+      queryResult({
+        data: { items: [], total: 0, page: 1, pageSize: 25, totalPages: 1 },
+        isSuccess: true,
+      }) as never,
     );
   });
 
@@ -368,5 +371,28 @@ describe("WebhookSubscriptionsView", () => {
       fireEvent.click(screen.getByText("retry"));
       expect(refetch).toHaveBeenCalledOnce();
     });
+  });
+
+  // Story 165 — the early-return loading state announces itself. The
+  // announcement lives at the call site, never inside the shared skeleton:
+  // route-level `loading.tsx` renders that same component and deliberately
+  // does not announce (see `RouteLoadingSkeleton`).
+  it("announces the delivery-attempts loading state without adding a wrapper", () => {
+    mockedUseWebhookSubscriptionsQuery.mockReturnValue(
+      queryResult({ data: [SUBSCRIPTION], isSuccess: true }) as never,
+    );
+    mockedUseWebhookDeliveryAttemptsQuery.mockReturnValue(
+      queryResult({ data: undefined, isLoading: true }) as never,
+    );
+
+    render(<WebhookSubscriptionsView />);
+    fireEvent.click(screen.getByRole("button", { name: "viewDeliveries" }));
+
+    const status = screen.getByRole("status", { name: "loading" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+    // `asChild`: the Skeleton itself is the hidden placeholder.
+    expect(status.children).toHaveLength(1);
+    expect(status.firstElementChild).toHaveAttribute("aria-hidden", "true");
+    expect(status.firstElementChild).toHaveClass("animate-pulse", "h-16", "w-full");
   });
 });

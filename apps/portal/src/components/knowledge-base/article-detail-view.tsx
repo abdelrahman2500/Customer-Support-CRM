@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Alert, Card, PageHeader, Skeleton } from "@crm/ui";
+import { Alert, Card, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
 import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
 import type { KbLocale } from "@/lib/knowledge-base-api";
@@ -14,7 +14,7 @@ import type { KbLocale } from "@/lib/knowledge-base-api";
  * `TicketDetailSkeleton`'s own precedent exactly. */
 export function ArticleDetailSkeleton() {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" aria-hidden="true">
       <Skeleton className="h-8 w-1/2" />
       <Skeleton className="h-32 w-full" />
     </div>
@@ -28,11 +28,16 @@ export function ArticleDetailSkeleton() {
  * is passed through the same way. */
 export function ArticleDetailView({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
+  const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
   const articleQuery = usePublishedArticleQuery(articleId, locale.toUpperCase() as KbLocale);
 
   if (articleQuery.isLoading) {
-    return <ArticleDetailSkeleton />;
+    return (
+      <LoadingStatus label={tCommon("loading")} placeholderHidden={false}>
+        <ArticleDetailSkeleton />
+      </LoadingStatus>
+    );
   }
 
   if (articleQuery.isError) {

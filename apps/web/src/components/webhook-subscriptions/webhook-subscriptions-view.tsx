@@ -315,7 +315,11 @@ function DeliveryAttemptsLog({ subscriptionId }: { subscriptionId: string }) {
   const attemptsQuery = useWebhookDeliveryAttemptsQuery(subscriptionId, page, true);
 
   if (attemptsQuery.isLoading) {
-    return <Skeleton className="h-16 w-full" />;
+    return (
+      <LoadingStatus label={tCommon("loading")} asChild>
+        <Skeleton className="h-16 w-full" />
+      </LoadingStatus>
+    );
   }
 
   if (attemptsQuery.isError) {

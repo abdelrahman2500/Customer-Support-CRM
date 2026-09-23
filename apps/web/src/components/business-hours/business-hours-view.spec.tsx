@@ -24,10 +24,18 @@ vi.mock("@/hooks/use-business-hours", () => ({
 }));
 
 const mockedUseBusinessHoursCalendarQuery = vi.mocked(useBusinessHoursCalendarQuery);
-const mockedUseCreateBusinessHoursCalendarMutation = vi.mocked(useCreateBusinessHoursCalendarMutation);
-const mockedUseUpdateBusinessHoursCalendarMutation = vi.mocked(useUpdateBusinessHoursCalendarMutation);
-const mockedUseCreateBusinessHoursExceptionMutation = vi.mocked(useCreateBusinessHoursExceptionMutation);
-const mockedUseUpdateBusinessHoursExceptionMutation = vi.mocked(useUpdateBusinessHoursExceptionMutation);
+const mockedUseCreateBusinessHoursCalendarMutation = vi.mocked(
+  useCreateBusinessHoursCalendarMutation,
+);
+const mockedUseUpdateBusinessHoursCalendarMutation = vi.mocked(
+  useUpdateBusinessHoursCalendarMutation,
+);
+const mockedUseCreateBusinessHoursExceptionMutation = vi.mocked(
+  useCreateBusinessHoursExceptionMutation,
+);
+const mockedUseUpdateBusinessHoursExceptionMutation = vi.mocked(
+  useUpdateBusinessHoursExceptionMutation,
+);
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -64,7 +72,13 @@ const populatedCalendar = {
     { weekday: 6, isOpen: false, startMinute: null, endMinute: null },
   ],
   exceptions: [
-    { id: "exc-1", date: "2026-12-25", isClosed: true, overrideStartMinute: null, overrideEndMinute: null },
+    {
+      id: "exc-1",
+      date: "2026-12-25",
+      isClosed: true,
+      overrideStartMinute: null,
+      overrideEndMinute: null,
+    },
   ],
 };
 
@@ -108,7 +122,9 @@ describe("BusinessHoursView", () => {
 
   it("submits the pre-filled default schedule via the real POST endpoint when creating a calendar", async () => {
     const mutateAsync = vi.fn().mockResolvedValue({ id: "calendar-1", days: [], exceptions: [] });
-    mockedUseCreateBusinessHoursCalendarMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+    mockedUseCreateBusinessHoursCalendarMutation.mockReturnValue(
+      idleMutation({ mutateAsync }) as never,
+    );
     mockedUseBusinessHoursCalendarQuery.mockReturnValue(
       queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,
     );
@@ -119,7 +135,9 @@ describe("BusinessHoursView", () => {
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledOnce());
     const submittedDays = mutateAsync.mock.calls[0]?.[0].days;
     expect(submittedDays).toHaveLength(7);
-    expect(submittedDays.find((d: { weekday: number }) => d.weekday === 0)).toMatchObject({ isOpen: false });
+    expect(submittedDays.find((d: { weekday: number }) => d.weekday === 0)).toMatchObject({
+      isOpen: false,
+    });
     expect(submittedDays.find((d: { weekday: number }) => d.weekday === 1)).toMatchObject({
       isOpen: true,
       startMinute: 540,
@@ -132,7 +150,9 @@ describe("BusinessHoursView", () => {
   // `useErrorMessage()`, matching every other form in this codebase.
   it("shows the generic fallback, not the raw 500 body, when creating a calendar fails", async () => {
     const mutateAsync = vi.fn().mockRejectedValue(new ApiError("stack trace-ish internals", 500));
-    mockedUseCreateBusinessHoursCalendarMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+    mockedUseCreateBusinessHoursCalendarMutation.mockReturnValue(
+      idleMutation({ mutateAsync }) as never,
+    );
     mockedUseBusinessHoursCalendarQuery.mockReturnValue(
       queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,
     );
@@ -146,7 +166,9 @@ describe("BusinessHoursView", () => {
 
   it("shows the shared forbidden text for a 403 create-calendar failure", async () => {
     const mutateAsync = vi.fn().mockRejectedValue(new ApiError("Forbidden", 403));
-    mockedUseCreateBusinessHoursCalendarMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+    mockedUseCreateBusinessHoursCalendarMutation.mockReturnValue(
+      idleMutation({ mutateAsync }) as never,
+    );
     mockedUseBusinessHoursCalendarQuery.mockReturnValue(
       queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,
     );
@@ -178,13 +200,17 @@ describe("BusinessHoursView", () => {
 
     it("saves the full 7-day draft via the real PATCH endpoint when 'Save schedule' is clicked", () => {
       const mutate = vi.fn();
-      mockedUseUpdateBusinessHoursCalendarMutation.mockReturnValue(idleMutation({ mutate }) as never);
+      mockedUseUpdateBusinessHoursCalendarMutation.mockReturnValue(
+        idleMutation({ mutate }) as never,
+      );
 
       render(<BusinessHoursView />);
       fireEvent.click(screen.getByText("saveButton"));
 
       expect(mutate).toHaveBeenCalledWith(
-        expect.objectContaining({ days: expect.arrayContaining([expect.objectContaining({ weekday: 1 })]) }),
+        expect.objectContaining({
+          days: expect.arrayContaining([expect.objectContaining({ weekday: 1 })]),
+        }),
       );
       expect(mutate.mock.calls[0]?.[0].days).toHaveLength(7);
     });
@@ -201,7 +227,9 @@ describe("BusinessHoursView", () => {
 
     it("toggles an exception from closed to overridden-hours via the real PATCH exception endpoint", () => {
       const mutate = vi.fn();
-      mockedUseUpdateBusinessHoursExceptionMutation.mockReturnValue(idleMutation({ mutate }) as never);
+      mockedUseUpdateBusinessHoursExceptionMutation.mockReturnValue(
+        idleMutation({ mutate }) as never,
+      );
 
       render(<BusinessHoursView />);
       fireEvent.click(screen.getByText("markOverriddenButton"));
@@ -222,7 +250,9 @@ describe("BusinessHoursView", () => {
         overrideStartMinute: null,
         overrideEndMinute: null,
       });
-      mockedUseCreateBusinessHoursExceptionMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+      mockedUseCreateBusinessHoursExceptionMutation.mockReturnValue(
+        idleMutation({ mutateAsync }) as never,
+      );
 
       render(<BusinessHoursView />);
       fireEvent.change(screen.getByLabelText("dateLabel"), { target: { value: "2026-01-01" } });
@@ -262,5 +292,22 @@ describe("BusinessHoursView", () => {
 
       expect(await screen.findByText("actionForbidden")).toBeInTheDocument();
     });
+  });
+
+  // Story 165 — the early-return loading state announces itself. The
+  // announcement lives at the call site, never inside the shared skeleton:
+  // route-level `loading.tsx` renders that same component and deliberately
+  // does not announce (see `RouteLoadingSkeleton`).
+  it("announces the calendar loading state and hides its placeholder bars", () => {
+    mockedUseBusinessHoursCalendarQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = render(<BusinessHoursView />);
+
+    const status = screen.getByRole("status", { name: "loading" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+
+    const placeholder = status.querySelector("[aria-hidden='true']");
+    expect(placeholder).toHaveClass("flex", "flex-col", "gap-3");
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(2);
   });
 });

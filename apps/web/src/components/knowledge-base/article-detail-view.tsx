@@ -74,7 +74,7 @@ import {
  * states. */
 export function ArticleDetailSkeleton() {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" aria-hidden="true">
       <Skeleton className="h-8 w-1/2" />
       <Skeleton className="h-32 w-full" />
     </div>
@@ -83,6 +83,7 @@ export function ArticleDetailSkeleton() {
 
 export function ArticleDetailView({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const { locale } = useParams<{ locale: string }>();
 
@@ -97,7 +98,11 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
 
   if (articleQuery.isLoading) {
-    return <ArticleDetailSkeleton />;
+    return (
+      <LoadingStatus label={tCommon("loading")} placeholderHidden={false}>
+        <ArticleDetailSkeleton />
+      </LoadingStatus>
+    );
   }
 
   if (articleQuery.isError) {
@@ -396,6 +401,7 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
  */
 function ArticleTranslationEditor({ articleId }: { articleId: string }) {
   const t = useTranslations("knowledgeBase");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
 
   const translationsQuery = useArticleTranslationsQuery(articleId);
@@ -414,7 +420,11 @@ function ArticleTranslationEditor({ articleId }: { articleId: string }) {
   const body = bodyDraft ?? existing?.body ?? "";
 
   if (translationsQuery.isLoading) {
-    return <Skeleton className="h-32 w-full" />;
+    return (
+      <LoadingStatus label={tCommon("loading")} asChild>
+        <Skeleton className="h-32 w-full" />
+      </LoadingStatus>
+    );
   }
 
   if (translationsQuery.isError) {

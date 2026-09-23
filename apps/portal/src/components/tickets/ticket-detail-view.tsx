@@ -86,7 +86,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const historyQuery = useMyTicketHistoryQuery(ticketId);
 
   if (ticketQuery.isLoading) {
-    return <TicketDetailSkeleton />;
+    return (
+      <LoadingStatus label={tCommon("loading")} placeholderHidden={false}>
+        <TicketDetailSkeleton />
+      </LoadingStatus>
+    );
   }
 
   if (ticketQuery.isError) {

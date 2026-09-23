@@ -24,6 +24,7 @@ import {
   Checkbox,
   Input,
   Label,
+  LoadingStatus,
   PageHeader,
   SectionCard,
   Skeleton,
@@ -452,14 +453,15 @@ function ExceptionsSection({ calendar }: { calendar: BusinessHoursCalendar }) {
  */
 export function BusinessHoursView() {
   const t = useTranslations("businessHours");
+  const tCommon = useTranslations("common");
   const calendarQuery = useBusinessHoursCalendarQuery();
 
   if (calendarQuery.isLoading) {
     return (
-      <div className="flex flex-col gap-3">
+      <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-3">
         <Skeleton className="h-8 w-1/2" />
         <Skeleton className="h-64 w-full" />
-      </div>
+      </LoadingStatus>
     );
   }
 

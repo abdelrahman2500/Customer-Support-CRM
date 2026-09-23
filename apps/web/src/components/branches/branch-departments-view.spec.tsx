@@ -450,4 +450,23 @@ describe("BranchDepartmentsView", () => {
       expect.objectContaining({ onError: expect.any(Function) }),
     );
   });
+
+  // Story 165 — the early-return loading state announces itself. The
+  // announcement lives at the call site, never inside the shared skeleton:
+  // route-level `loading.tsx` renders that same component and deliberately
+  // does not announce (see `RouteLoadingSkeleton`).
+  it("announces the branch loading state and hides its placeholder bars", () => {
+    mockedUseManagedBranchQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = renderView();
+
+    const status = screen.getByRole("status", { name: "Loading..." });
+    expect(status).toHaveAttribute("aria-busy", "true");
+
+    // The placeholder keeps the wrapper's own classes and bar count.
+    const placeholder = status.querySelector("[aria-hidden='true']");
+    expect(placeholder).toHaveClass("flex", "flex-col", "gap-3");
+    expect(placeholder?.querySelectorAll(".animate-pulse")).toHaveLength(2);
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(2);
+  });
 });

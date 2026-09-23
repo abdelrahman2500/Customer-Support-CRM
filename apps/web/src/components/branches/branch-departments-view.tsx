@@ -53,14 +53,15 @@ export function BranchDepartmentsView() {
 
 function MyBranchSection() {
   const t = useTranslations("branches");
+  const tCommon = useTranslations("common");
   const branchQuery = useManagedBranchQuery();
 
   if (branchQuery.isLoading) {
     return (
-      <div className="flex flex-col gap-3">
+      <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-3">
         <Skeleton className="h-6 w-1/3" />
         <Skeleton className="h-16 w-full" />
-      </div>
+      </LoadingStatus>
     );
   }
 

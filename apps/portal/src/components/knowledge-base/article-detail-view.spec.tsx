@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { ArticleDetailView } from "./article-detail-view";
+import { ArticleDetailSkeleton, ArticleDetailView } from "./article-detail-view";
 import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
 
@@ -46,9 +46,7 @@ describe("ArticleDetailView", () => {
   });
 
   it("renders a loading skeleton while the article query is pending", () => {
-    vi.mocked(usePublishedArticleQuery).mockReturnValue(
-      queryResult({ isLoading: true }) as never,
-    );
+    vi.mocked(usePublishedArticleQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
 
     const { container } = render(<ArticleDetailView articleId="article-1" />);
 
@@ -57,9 +55,7 @@ describe("ArticleDetailView", () => {
 
   // Story 109 — Multi-locale content.
   it("passes the active locale, uppercased, through to usePublishedArticleQuery", () => {
-    vi.mocked(usePublishedArticleQuery).mockReturnValue(
-      queryResult({ isLoading: true }) as never,
-    );
+    vi.mocked(usePublishedArticleQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
 
     render(<ArticleDetailView articleId="article-1" />);
 
@@ -107,5 +103,43 @@ describe("ArticleDetailView", () => {
     );
 
     expect(() => render(<ArticleDetailView articleId="article-1" />)).not.toThrow();
+  });
+
+  // Story 165 — the early-return loading state announces itself. The
+  // announcement lives at the call site, never inside the shared skeleton:
+  // route-level `loading.tsx` renders that same component and deliberately
+  // does not announce (see `RouteLoadingSkeleton`).
+  // `placeholderHidden={false}` here: ArticleDetailSkeleton already carries
+  // `aria-hidden` on its own root, so the wrapper must not add a second.
+  it("announces the detail loading state while the skeleton hides itself", () => {
+    vi.mocked(usePublishedArticleQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = render(<ArticleDetailView articleId="article-1" />);
+
+    const status = screen.getByRole("status", { name: "loading" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+
+    // The wrapper adds no aria-hidden of its own...
+    expect(status.firstElementChild).not.toHaveAttribute("aria-hidden");
+    // ...because the skeleton already hides its whole subtree.
+    expect(status.querySelector("[aria-hidden='true']")).toBeInTheDocument();
+
+    // The skeleton's own visuals are unchanged.
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+  });
+
+  // Story 165 — the skeleton is decorative, and its two siblings
+  // (TicketDetailSkeleton, CustomerDetailSkeleton) always hid themselves.
+  // This also covers the route-level `loading.tsx` path, which renders the
+  // skeleton on its own and deliberately does not announce.
+  it("hides the article detail skeleton from assistive technology", () => {
+    const { container } = render(<ArticleDetailSkeleton />);
+
+    const root = container.firstElementChild;
+    expect(root).toHaveAttribute("aria-hidden", "true");
+    // Unchanged visually: same wrapper classes, same two bars.
+    expect(root).toHaveClass("flex", "flex-col", "gap-3");
+    expect(root?.querySelectorAll(".animate-pulse")).toHaveLength(2);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

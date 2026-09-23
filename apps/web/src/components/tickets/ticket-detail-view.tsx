@@ -245,7 +245,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const presence = useAgentPresence(userIds);
 
   if (ticketQuery.isLoading) {
-    return <TicketDetailSkeleton />;
+    return (
+      <LoadingStatus label={tCommon("loading")} placeholderHidden={false}>
+        <TicketDetailSkeleton />
+      </LoadingStatus>
+    );
   }
 
   if (ticketQuery.isError) {

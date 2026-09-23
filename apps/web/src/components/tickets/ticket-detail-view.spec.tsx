@@ -1651,4 +1651,27 @@ describe("TicketDetailView", () => {
       expect(screen.queryByText("detail.optionsLoading")).not.toBeInTheDocument();
     });
   });
+
+  // Story 165 — the early-return loading state announces itself. The
+  // announcement lives at the call site, never inside the shared skeleton:
+  // route-level `loading.tsx` renders that same component and deliberately
+  // does not announce (see `RouteLoadingSkeleton`).
+  // `placeholderHidden={false}` here: TicketDetailSkeleton already carries
+  // `aria-hidden` on its own root, so the wrapper must not add a second.
+  it("announces the detail loading state while the skeleton hides itself", () => {
+    vi.mocked(useTicketQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { container } = render(<TicketDetailView ticketId="ticket-1" />);
+
+    const status = screen.getByRole("status", { name: "loading" });
+    expect(status).toHaveAttribute("aria-busy", "true");
+
+    // The wrapper adds no aria-hidden of its own...
+    expect(status.firstElementChild).not.toHaveAttribute("aria-hidden");
+    // ...because the skeleton already hides its whole subtree.
+    expect(status.querySelector("[aria-hidden='true']")).toBeInTheDocument();
+
+    // The skeleton's own visuals are unchanged.
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+  });
 });
