@@ -2,15 +2,30 @@ import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
 
 /**
- * Story 96 — Navigation & Route Robustness.
+ * Story 96 — the LOCALISED not-found boundary.
  *
- * Handles the common case: a valid locale (`[locale]/layout.tsx` already
- * rendered successfully, so this is nested inside its `<html>`/`<body>`/
- * `NextIntlClientProvider` — no document tags needed here) with no matching
- * route, e.g. `/en/does-not-exist`. `getTranslations` resolves via the
- * ambient request locale exactly like every other server component in this
- * tree. See `apps/web/src/app/not-found.tsx` for the separate root boundary
- * that handles a genuinely invalid locale segment.
+ * Story 177 corrected what this file covers. Story 96 described it as handling
+ * "the common case: a valid locale with no matching route, e.g.
+ * `/en/does-not-exist`" — that is **not** what happens. Unmatched URLs are
+ * served by Next from `/_not-found`, which sits outside `[locale]`, so they
+ * reach `app/not-found.tsx` instead and never arrive here. Measured directly.
+ *
+ * What genuinely reaches this boundary is a **descendant `notFound()`** — a
+ * page or layout inside `[locale]` calling it explicitly. That was verified by
+ * experiment: a component inside the segment calling `notFound()` renders this
+ * file, correctly localised, nested in `[locale]/layout.tsx`. So this is live
+ * code for that path, not dead code, even though nothing in either app calls
+ * `notFound()` today.
+ *
+ * It renders no document tags on purpose: `[locale]/layout.tsx` above it owns
+ * the single `<html>`/`<body>`.
+ *
+ * **Known limitation, deliberately not fixed here.** A `notFound()` raised
+ * inside `[locale]` renders this UI with an HTTP **200**, not 404: the async
+ * `[locale]/layout.tsx` has already begun streaming by the time the descendant
+ * throws, so the status can no longer be changed. A real 404 status can only
+ * come from Next's own `/_not-found` route. That is precisely why unmatched
+ * URLs are handled by the root boundary rather than being routed through here.
  */
 export default async function LocaleNotFound() {
   const t = await getTranslations("common");

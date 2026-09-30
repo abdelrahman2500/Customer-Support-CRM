@@ -25,6 +25,12 @@ export default async function LocaleLayout({
 }) {
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) {
+    // Story 177 — unreachable in practice, and kept deliberately as a guard.
+    // next-intl's middleware prefixes the default locale before an invalid
+    // segment ever reaches this layout (measured: `/xx/tickets` → 307 →
+    // `/en/xx/tickets`), so this branch does not fire for a bad locale in a
+    // URL. It stays as a type-narrowing invariant and a backstop if the
+    // middleware matcher ever stops covering a path.
     notFound();
   }
 
