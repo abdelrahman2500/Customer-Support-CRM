@@ -8,6 +8,7 @@ import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import type { AttachmentOwner } from "@/lib/attachments-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
+import { formatDateTime } from "@crm/ui";
 
 /** Every string this shared component needs, supplied by the caller's own
  * `next-intl` namespace (`tickets.detail.attachments*` or
@@ -88,8 +89,7 @@ export function AttachmentsCard({
                 {attachment.filename}
               </button>
               <span className="text-ink-subtle">
-                {formatFileSize(attachment.size)} ·{" "}
-                {new Date(attachment.createdAt).toLocaleString(locale)}
+                {formatFileSize(attachment.size)} · {formatDateTime(attachment.createdAt, locale)}
               </span>
             </li>
           ))}

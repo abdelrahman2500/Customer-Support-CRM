@@ -10,6 +10,7 @@ import {
 } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Button, LoadingStatus, SectionCard, Skeleton, Textarea } from "@crm/ui";
+import { formatTime } from "@crm/ui";
 
 /**
  * Story 78 — Live Chat UI (Customer Portal side). Reads
@@ -83,10 +84,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
                 </div>
                 <span className="text-xs text-ink-subtle">
                   {isMine ? t("detail.chatYouLabel") : t("detail.chatAgentLabel")} ·{" "}
-                  {new Date(message.createdAt).toLocaleTimeString(locale, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {formatTime(message.createdAt, locale)}
                   {message.direction === "OUTBOUND" && message.deliveryStatus !== "DELIVERED" && (
                     <>
                       {" · "}

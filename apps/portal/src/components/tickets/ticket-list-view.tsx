@@ -25,6 +25,7 @@ import {
   showSuccessToast,
   Skeleton,
 } from "@crm/ui";
+import { formatDate } from "@crm/ui";
 
 /** Story 148 — the four statuses a customer can filter by, in the order
  * a ticket actually moves through them. `TicketStatus` has exactly these
@@ -233,7 +234,7 @@ export function TicketListView() {
                 </Link>
                 <span className="flex shrink-0 items-center gap-2 text-ink-subtle">
                   <TicketStatusBadge status={ticket.status} />
-                  <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
+                  <span>{formatDate(ticket.createdAt, locale)}</span>
                 </span>
               </li>
             ))}

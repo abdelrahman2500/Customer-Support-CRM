@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@crm/ui";
+import { formatDateTime } from "@crm/ui";
 
 const TICKET_UPDATED_EVENT = "ticket.updated";
 
@@ -222,7 +223,7 @@ export function NotificationHistoryView() {
                     </Link>
                   </TableCell>
                   <TableCell label={t("history.columns.loggedAt")} className="text-ink-subtle">
-                    {new Date(notification.loggedAt).toLocaleString(locale)}
+                    {formatDateTime(notification.loggedAt, locale)}
                   </TableCell>
                 </TableRow>
               ))}

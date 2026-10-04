@@ -30,6 +30,8 @@ import {
   TableRow,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { formatDateTime } from "@crm/ui";
+import { useParams } from "next/navigation";
 
 /** "active" | "revoked" | "expired" — computed client-side from
  * `revokedAt`/`expiresAt`, mirroring how `WebhookDeliveryAttemptSummary`'s
@@ -111,6 +113,9 @@ export function ApiKeysView() {
  * `SubscriptionRows`' Rules-of-Hooks convention. */
 function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
   const t = useTranslations("apiKeys");
+  // Story 194 (RD-1.17, recon RTL-02) — dates follow the UI locale, not the
+  // browser's. Null-safe: outside a route (specs) the runtime default applies.
+  const locale = useParams<{ locale?: string }>()?.locale;
   const errorMessage = useErrorMessage();
   const mutation = useRevokeApiKeyMutation();
   const [confirmRevokeOpen, setConfirmRevokeOpen] = useState(false);
@@ -149,7 +154,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
         </Badge>
       </TableCell>
       <TableCell label={t("columns.lastUsedAt")} className="text-ink-subtle">
-        {apiKey.lastUsedAt ? new Date(apiKey.lastUsedAt).toLocaleString() : t("neverUsed")}
+        {apiKey.lastUsedAt ? formatDateTime(apiKey.lastUsedAt, locale) : t("neverUsed")}
       </TableCell>
       <TableCell>
         <Button

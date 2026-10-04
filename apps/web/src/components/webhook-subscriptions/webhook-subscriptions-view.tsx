@@ -34,6 +34,8 @@ import {
   TableRow,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { formatDateTime } from "@crm/ui";
+import { useParams } from "next/navigation";
 
 /**
  * RM-20 — Webhook Subscriptions + Outbound Event Dispatch. Mirrors
@@ -108,6 +110,9 @@ export function WebhookSubscriptionsView() {
  * navigation. */
 function InboundWebhookLog() {
   const t = useTranslations("webhookSubscriptions");
+  // Story 194 (RD-1.17, recon RTL-02) — dates follow the UI locale, not the
+  // browser's. Null-safe: outside a route (specs) the runtime default applies.
+  const locale = useParams<{ locale?: string }>()?.locale;
   const tCommon = useTranslations("common");
   const [page, setPage] = useState(1);
   const logsQuery = useWebhookInboundLogsQuery(page);
@@ -163,7 +168,7 @@ function InboundWebhookLog() {
                     </Badge>
                   </TableCell>
                   <TableCell label={t("inboundColumns.receivedAt")} className="text-ink-subtle">
-                    {new Date(log.receivedAt).toLocaleString()}
+                    {formatDateTime(log.receivedAt, locale)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -310,6 +315,9 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
  * convention. */
 function DeliveryAttemptsLog({ subscriptionId }: { subscriptionId: string }) {
   const t = useTranslations("webhookSubscriptions");
+  // Story 194 (RD-1.17, recon RTL-02) — dates follow the UI locale, not the
+  // browser's. Null-safe: outside a route (specs) the runtime default applies.
+  const locale = useParams<{ locale?: string }>()?.locale;
   const tCommon = useTranslations("common");
   const [page, setPage] = useState(1);
   const attemptsQuery = useWebhookDeliveryAttemptsQuery(subscriptionId, page, true);
@@ -352,7 +360,7 @@ function DeliveryAttemptsLog({ subscriptionId }: { subscriptionId: string }) {
                 </Badge>
               </TableCell>
               <TableCell label={t("deliveryColumns.attemptedAt")} className="text-ink-subtle">
-                {new Date(attempt.attemptedAt).toLocaleString()}
+                {formatDateTime(attempt.attemptedAt, locale)}
               </TableCell>
             </TableRow>
           ))}

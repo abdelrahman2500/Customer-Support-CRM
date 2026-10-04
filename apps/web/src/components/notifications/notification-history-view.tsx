@@ -22,6 +22,7 @@ import {
 } from "@crm/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 import { NotificationPreferencesSection } from "./notification-preferences-section";
+import { formatDateTime } from "@crm/ui";
 
 /** The real, backend-defined event-type strings this history can ever show
  * (`SLA_AT_RISK_EVENT`/`SLA_BREACHED_EVENT`/`TICKET_ESCALATED_EVENT` —
@@ -115,14 +116,14 @@ function NotificationRow({
           <>
             {targetTypeLabelKey ? t(targetTypeLabelKey) : notification.targetType}
             {" · "}
-            {new Date(notification.targetAt).toLocaleString(locale)}
+            {formatDateTime(notification.targetAt, locale)}
           </>
         ) : (
           <span className="text-ink-subtle">{t("noTarget")}</span>
         )}
       </TableCell>
       <TableCell label={t("columns.loggedAt")} className="text-ink-subtle">
-        {new Date(notification.loggedAt).toLocaleString(locale)}
+        {formatDateTime(notification.loggedAt, locale)}
       </TableCell>
     </TableRow>
   );

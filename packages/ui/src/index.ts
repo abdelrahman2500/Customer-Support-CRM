@@ -28,6 +28,8 @@
 
 // --- Utilities -------------------------------------------------------------
 export { cn } from "./lib/cn";
+export { formatDate, formatDateTime, formatRelative, formatTime } from "./lib/format-date";
+export type { DateInput } from "./lib/format-date";
 export { contrastRatio, hexToRgb, parseChannels, relativeLuminance, toChannels } from "./lib/color";
 export type { Rgb } from "./lib/color";
 export {

@@ -25,6 +25,7 @@ import {
   Textarea,
 } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
+import { formatTime } from "@crm/ui";
 
 /**
  * Story 78 — Live Chat UI (agent side). Reads `GET /tickets/:id/messages`
@@ -155,11 +156,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
                   {message.body}
                 </div>
                 <span className="text-xs text-ink-subtle">
-                  {senderLabel} ·{" "}
-                  {new Date(message.createdAt).toLocaleTimeString(locale, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {senderLabel} · {formatTime(message.createdAt, locale)}
                   {message.direction === "OUTBOUND" && message.deliveryStatus !== "DELIVERED" && (
                     <>
                       {" · "}

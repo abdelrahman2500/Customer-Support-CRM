@@ -9,6 +9,7 @@ import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Badge, Button, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
+import { formatDateTime } from "@crm/ui";
 
 /**
  * Story 124 — Session/Device Management. Lists the caller's own active
@@ -95,10 +96,10 @@ function SessionRow({ session }: { session: SessionSummary }) {
         {session.ipAddress ?? "—"}
       </TableCell>
       <TableCell label={t("columns.lastActive")}>
-        {new Date(session.lastActiveAt).toLocaleString(locale)}
+        {formatDateTime(session.lastActiveAt, locale)}
       </TableCell>
       <TableCell label={t("columns.signedInSince")}>
-        {new Date(session.sessionCreatedAt).toLocaleString(locale)}
+        {formatDateTime(session.sessionCreatedAt, locale)}
       </TableCell>
       <TableCell>
         {!session.isCurrent && (

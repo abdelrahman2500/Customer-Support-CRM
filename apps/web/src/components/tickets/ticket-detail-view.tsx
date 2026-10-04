@@ -49,6 +49,7 @@ import { BackLink } from "@crm/ui";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { formatDateTime } from "@crm/ui";
 
 const STATUS_OPTIONS: TicketStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
@@ -453,7 +454,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                         {userNameById.get(note.authorUserId) ?? note.authorUserId}
                       </span>
                       <span className="text-ink-subtle">
-                        {new Date(note.createdAt).toLocaleString(locale)}
+                        {formatDateTime(note.createdAt, locale)}
                       </span>
                     </div>
                     <p className="mt-1 whitespace-pre-wrap text-ink-strong">{note.body}</p>
@@ -771,7 +772,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                         {targetTypeLabelKey ? t(targetTypeLabelKey) : escalation.targetType}
                       </span>
                       <span className="text-ink-subtle">
-                        {new Date(escalation.escalatedAt).toLocaleString(locale)}
+                        {formatDateTime(escalation.escalatedAt, locale)}
                       </span>
                     </li>
                   );
@@ -805,7 +806,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                       {t(`detail.historyEvent.${historyEventKey(entry.eventType)}`)}
                     </span>
                     <span className="text-ink-subtle">
-                      {new Date(entry.createdAt).toLocaleString(locale)}
+                      {formatDateTime(entry.createdAt, locale)}
                     </span>
                   </li>
                 ))}

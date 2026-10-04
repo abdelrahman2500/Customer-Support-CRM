@@ -30,6 +30,7 @@ import {
   Textarea,
 } from "@crm/ui";
 import { BackLink } from "@crm/ui";
+import { formatDateTime } from "@crm/ui";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
@@ -175,9 +176,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 <span className="font-medium text-ink-strong">
                   {t(`detail.historyEvent.${historyEventKey(entry.eventType)}`)}
                 </span>
-                <span className="text-ink-subtle">
-                  {new Date(entry.createdAt).toLocaleString(locale)}
-                </span>
+                <span className="text-ink-subtle">{formatDateTime(entry.createdAt, locale)}</span>
               </li>
             ))}
           </ol>

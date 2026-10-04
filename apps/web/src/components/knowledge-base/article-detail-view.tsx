@@ -46,6 +46,7 @@ import {
   TabsTrigger,
   Textarea,
 } from "@crm/ui";
+import { formatDateTime } from "@crm/ui";
 
 /**
  * Story 51 — Article Detail/Edit. Mirrors `TicketDetailView`'s
@@ -393,7 +394,7 @@ function ArticleVersionHistory({ articleId }: { articleId: string }) {
                 </TableCell>
                 <TableCell label={t("detail.versions.columns.title")}>{version.title}</TableCell>
                 <TableCell label={t("detail.versions.columns.publishedAt")}>
-                  {new Date(version.publishedAt).toLocaleString(locale)}
+                  {formatDateTime(version.publishedAt, locale)}
                 </TableCell>
               </TableRow>
             ))}

@@ -40,6 +40,7 @@ import { BackLink } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/ticket-badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
+import { formatDate, formatDateTime } from "@crm/ui";
 
 /**
  * Story 30 — one existing contact's inline-editable fields. A dedicated
@@ -685,7 +686,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
                       <TicketStatusBadge status={ticket.status} />
                       <TicketPriorityBadge priority={ticket.priority} />
                       <span className="text-ink-subtle">
-                        {new Date(ticket.createdAt).toLocaleDateString(locale)}
+                        {formatDate(ticket.createdAt, locale)}
                       </span>
                     </span>
                   </li>
@@ -735,7 +736,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
                         {userNameById.get(note.authorUserId) ?? note.authorUserId}
                       </span>
                       <span className="text-ink-subtle">
-                        {new Date(note.createdAt).toLocaleString(locale)}
+                        {formatDateTime(note.createdAt, locale)}
                       </span>
                     </div>
                     <p className="mt-1 whitespace-pre-wrap text-ink-strong">{note.body}</p>
@@ -823,7 +824,7 @@ function AnonymizeCustomerCard({
       <SectionCard title={t("detail.anonymizeHeading")}>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
           <Badge variant="secondary">{t("detail.anonymizedBadge")}</Badge>
-          <span className="text-ink-subtle">{new Date(anonymizedAt).toLocaleString(locale)}</span>
+          <span className="text-ink-subtle">{formatDateTime(anonymizedAt, locale)}</span>
         </div>
         <p className="mt-2 text-sm text-ink-subtle">{t("detail.anonymizedRetentionNote")}</p>
       </SectionCard>

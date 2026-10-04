@@ -8,6 +8,7 @@ import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import { TicketStatusBadge } from "@/components/tickets/ticket-status-badge";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 import { Alert, Button, Card, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
+import { formatDate } from "@crm/ui";
 
 /**
  * Story 136 — the Customer Portal's real landing page.
@@ -145,7 +146,7 @@ export function PortalHomeView() {
                     </Link>
                     <span className="flex shrink-0 items-center gap-2 text-ink-subtle">
                       <TicketStatusBadge status={ticket.status} />
-                      <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
+                      <span>{formatDate(ticket.createdAt, locale)}</span>
                     </span>
                   </li>
                 ))}

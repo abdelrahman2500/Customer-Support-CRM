@@ -28,6 +28,8 @@ import {
   Skeleton,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { formatDateTime } from "@crm/ui";
+import { useParams } from "next/navigation";
 
 const PRIORITIES: TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
@@ -109,6 +111,9 @@ function isOverdue(task: TaskSummary, now: Date): boolean {
  * `UnclaimedTicketRow`'s own Rules-of-Hooks convention. */
 function TaskRow({ task }: { task: TaskSummary }) {
   const t = useTranslations("dashboard");
+  // Story 194 (RD-1.17, recon RTL-02) — dates follow the UI locale, not the
+  // browser's. Null-safe: outside a route (specs) the runtime default applies.
+  const locale = useParams<{ locale?: string }>()?.locale;
   const errorMessage = useErrorMessage();
   const completeMutation = useUpdateTaskMutation(task.id);
   const deleteMutation = useDeleteTaskMutation(task.id);
@@ -125,7 +130,7 @@ function TaskRow({ task }: { task: TaskSummary }) {
               isOverdue(task, now) ? "text-xs text-danger-foreground" : "text-xs text-ink-subtle"
             }
           >
-            {new Date(task.dueAt).toLocaleString()}
+            {formatDateTime(task.dueAt, locale)}
           </span>
         )}
         {completeMutation.isError && (

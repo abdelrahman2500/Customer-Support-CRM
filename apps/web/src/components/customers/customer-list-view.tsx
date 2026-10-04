@@ -33,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@crm/ui";
+import { formatDateTime } from "@crm/ui";
 
 const ALL_VALUE = "__all__";
 
@@ -251,7 +252,7 @@ function CustomerListViewContent() {
                   </Badge>
                 </TableCell>
                 <TableCell label={t("list.columns.createdAt")} className="text-ink-subtle">
-                  {new Date(customer.createdAt).toLocaleString(locale)}
+                  {formatDateTime(customer.createdAt, locale)}
                 </TableCell>
               </TableRow>
             ))}

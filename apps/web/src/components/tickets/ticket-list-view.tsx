@@ -32,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@crm/ui";
+import { formatDateTime } from "@crm/ui";
 
 const STATUS_OPTIONS = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
 const PRIORITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
@@ -364,10 +365,10 @@ function TicketListViewContent() {
                   <SlaIndicator target={ticket.slaTarget} createdAt={ticket.createdAt} />
                 </TableCell>
                 <TableCell label={t("list.columns.createdAt")} className="text-ink-subtle">
-                  {new Date(ticket.createdAt).toLocaleString(locale)}
+                  {formatDateTime(ticket.createdAt, locale)}
                 </TableCell>
                 <TableCell label={t("list.columns.updatedAt")} className="text-ink-subtle">
-                  {new Date(ticket.updatedAt).toLocaleString(locale)}
+                  {formatDateTime(ticket.updatedAt, locale)}
                 </TableCell>
               </TableRow>
             ))}

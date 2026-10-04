@@ -10,6 +10,7 @@ import {
 import { getMyTicketAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
+import { formatDateTime } from "@crm/ui";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -66,8 +67,7 @@ export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
                 {attachment.filename}
               </button>
               <span className="text-ink-subtle">
-                {formatFileSize(attachment.size)} ·{" "}
-                {new Date(attachment.createdAt).toLocaleString(locale)}
+                {formatFileSize(attachment.size)} · {formatDateTime(attachment.createdAt, locale)}
               </span>
             </li>
           ))}

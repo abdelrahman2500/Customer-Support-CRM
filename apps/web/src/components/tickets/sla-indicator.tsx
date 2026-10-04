@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge, ErrorIcon, WarningIcon, cn } from "@crm/ui";
 import { deriveSlaStatus, splitDuration, type TicketSlaTarget } from "@/lib/sla";
+import { formatDateTime } from "@crm/ui";
 
 /**
  * Story 192 (RD-1.15) — the one way a ticket's SLA state is shown. Replaces
@@ -54,7 +55,7 @@ export function SlaIndicator({
     return (
       <Badge variant="secondary" className={cn(detail && "mt-2", className)}>
         {detail
-          ? t("sla.onHoldSince", { time: status.onHoldSince.toLocaleString(locale) })
+          ? t("sla.onHoldSince", { time: formatDateTime(status.onHoldSince, locale) })
           : t("sla.onHold")}
       </Badge>
     );
@@ -68,7 +69,7 @@ export function SlaIndicator({
         {detail
           ? t("sla.breachedTargetAt", {
               target: targetLabel,
-              time: status.targetAt.toLocaleString(locale),
+              time: formatDateTime(status.targetAt, locale),
             })
           : t("sla.breachedTarget", { target: targetLabel })}
       </Badge>

@@ -19,6 +19,7 @@ import {
   Skeleton,
 } from "@crm/ui";
 import { EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
+import { formatDateTime } from "@crm/ui";
 
 function DiffCell({ diff }: { diff: unknown }) {
   const t = useTranslations("auditLogs");
@@ -227,7 +228,7 @@ export function AuditLogView() {
                       header row is hidden and these eight values would
                       otherwise stack as anonymous lines. */}
                   <TableCell label={t("columns.createdAt")} className="text-ink-subtle">
-                    {new Date(log.createdAt).toLocaleString(locale)}
+                    {formatDateTime(log.createdAt, locale)}
                   </TableCell>
                   <TableCell label={t("columns.actor")}>
                     <ActorCell actorId={log.actorId} nameById={actorNameById} />
