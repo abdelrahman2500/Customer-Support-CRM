@@ -81,6 +81,10 @@
     --surface: 255 255 255; /* was: white — cards, inputs, header */
     --surface-sunk: 248 250 252; /* was: slate-50 — the page behind cards */
     --surface-muted: 241 245 249; /* was: slate-100 — hover, active nav, inset */
+    /* Story 178 (RD-1.1) — floating and sticky surfaces (menus, dialogs,
+     * sticky bars). White in light mode, a lighter step than `--surface`
+     * in dark mode, where depth comes from surface lightness. */
+    --surface-raised: 255 255 255;
 
     /* ---------------------------------------------------------------
      * Ink — text, in descending emphasis. Contrast ratios are against
@@ -91,7 +95,11 @@
     --ink: 15 23 42; /* was: slate-900 — 16.9:1 */
     --ink-strong: 30 41 59; /* was: slate-800 — 13.9:1 */
     --ink-muted: 71 85 105; /* was: slate-600 —  7.0:1 */
-    --ink-subtle: 100 116 139; /* was: slate-500 —  4.8:1, the lowest AA step */
+    /* Story 178 (RD-1.1) — was slate-500 (4.76:1 on white, but 4.34:1 on
+     * `--surface-muted` and 4.26:1 on `--accent-surface`, so meta text on a
+     * hovered or selected row failed AA). Now 5.40:1 on white and ≥ 4.83:1
+     * on every light surface. */
+    --ink-subtle: 94 107 128;
 
     /* ---------------------------------------------------------------
      * Rules — borders and dividers.
@@ -99,18 +107,28 @@
     --rule: 226 232 240; /* was: slate-200 — card borders, table header */
     --rule-strong: 203 213 225; /* was: slate-300 — input borders */
     --rule-subtle: 241 245 249; /* was: slate-100 — row dividers */
+    /* Story 178 (RD-1.1) — the boundary of a form control (input, select,
+     * checkbox). `--rule-strong` is 1.48:1 on white, under the 3:1 WCAG
+     * 1.4.11 asks of a control's visual boundary; this is 3.51:1 on
+     * `--surface` and 3.35:1 on `--surface-sunk`. Card borders stay soft. */
+    --rule-control: 123 138 160;
 
     /* ---------------------------------------------------------------
-     * Accent — the primary interactive colour. This app's accent has
-     * always been its darkest neutral (the primary button is
-     * `bg-slate-900`), not a brand hue; naming it `accent` rather than
-     * `slate-900` is what lets Story S-15 point it at a branch's
-     * configured `primaryColor` without touching a single component.
+     * Accent — the primary interactive colour.
+     *
+     * Story 178 (RD-1.1) — the core identity is indigo (it was slate-900,
+     * the darkest neutral). Indigo stays clear of every semantic hue
+     * (success green, warning amber, danger red) and leaves sky free for
+     * `info` and the OPEN ticket status, so a primary action never reads
+     * as a state. See docs/architecture/13-design-language.md. A branch's
+     * `primaryColor` may replace this family only through the contrast
+     * gates in `packages/ui/src/lib/brand.ts`.
      * ------------------------------------------------------------- */
-    --accent: 15 23 42; /* was: slate-900 */
-    --accent-hover: 51 65 85; /* was: slate-700 */
+    --accent: 79 70 229; /* indigo-600 — white text 6.29:1, 6.29:1 on --surface */
+    --accent-hover: 67 56 202; /* indigo-700 — 7.90:1 */
+    --accent-active: 55 48 163; /* indigo-800 — pressed */
     --accent-foreground: 255 255 255; /* text on top of --accent */
-    --accent-surface: 241 245 249; /* was: slate-100 — quiet accent tint */
+    --accent-surface: 238 242 255; /* indigo-50 — selected tint; --accent-hover text 7.07:1 on it */
 
     /* The modal scrim. Its own role rather than a step of --ink: it was
      * `slate-950/40`, a shade darker than any text colour, and it is the
@@ -126,8 +144,12 @@
      * `--surface` and 6.0:1 on `--surface-sunk`, and reads as "focused"
      * rather than as one more grey border. Always paired with an offset
      * (see the `.focus-ring` utility) so it clears dark controls too.
+     *
+     * Story 178 (RD-1.1) — indigo-700 (7.90:1 on --surface, 7.55:1 on
+     * --surface-sunk) so the ring belongs to the accent family. Never
+     * branch-overridden.
      * ------------------------------------------------------------- */
-    --focus: 29 78 216; /* blue-700 */
+    --focus: 67 56 202; /* indigo-700 */
 
     /* ---------------------------------------------------------------
      * Semantic states. Four families, each with the same four roles, so a
@@ -147,26 +169,41 @@
     --warning-subtle: 255 251 235; /* was: amber-50 */
     --warning-surface: 254 243 199; /* was: amber-100 */
     --warning-border: 253 230 138; /* was: amber-200 */
-    --warning-solid: 217 119 6; /* was: amber-600 */
+    /* Story 178 (RD-1.1) — was amber-600, 3.19:1 as an icon on white;
+     * amber-700 is 5.02:1. */
+    --warning-solid: 180 83 9;
     --warning-foreground: 146 64 14; /* was: amber-800 — 6.5:1 on -surface */
 
     --danger-subtle: 254 242 242; /* was: red-50 */
     --danger-surface: 254 226 226; /* was: red-100 */
     --danger-border: 254 202 202; /* was: red-200 */
     --danger-solid: 220 38 38; /* was: red-600 */
-    --danger-solid-hover: 239 68 68; /* was: red-500 */
+    /* Story 178 (RD-1.1) — was red-500, which carried white text at only
+     * 3.76:1 on hover; red-700 is 6.47:1. Hover now darkens. */
+    --danger-solid-hover: 185 28 28;
     --danger-foreground: 153 27 27; /* was: red-800 — 6.9:1 on -surface */
 
     /* `info` had no palette before this story — the one blue in the app
      * was a bare `text-blue-600` link on the locale index page. It is
      * defined here so an informational state has somewhere to go instead
      * of borrowing `--accent` (which means "primary action") or
-     * `--warning` (which means "attention"). */
-    --info-subtle: 239 246 255; /* blue-50 */
-    --info-surface: 219 234 254; /* blue-100 */
-    --info-border: 191 219 254; /* blue-200 */
-    --info-solid: 37 99 235; /* blue-600 */
-    --info-foreground: 30 64 175; /* blue-800 */
+     * `--warning` (which means "attention").
+     *
+     * Story 178 (RD-1.1) — moved from blue to sky so it no longer sits next
+     * to the indigo accent. */
+    --info-subtle: 240 249 255; /* sky-50 */
+    --info-surface: 224 242 254; /* sky-100 */
+    --info-border: 186 230 253; /* sky-200 */
+    --info-solid: 2 132 199; /* sky-600 — 4.10:1 on --surface */
+    --info-foreground: 7 89 133; /* sky-800 — 6.59:1 on -surface */
+    /* Story 178 (RD-1.1) — `progress`: the "work in progress" tone (ticket
+     * IN_PROGRESS). A fifth hue so the four ticket statuses get four
+     * distinct, non-alarming tones; statuses never use warning/danger. */
+    --progress-subtle: 245 243 255; /* violet-50 */
+    --progress-surface: 237 233 254; /* violet-100 */
+    --progress-border: 221 214 254; /* violet-200 */
+    --progress-solid: 124 58 237; /* violet-600 */
+    --progress-foreground: 91 33 182; /* violet-800 — 7.57:1 on -surface */
 
     /* ---------------------------------------------------------------
      * Radius. Exposed as a token so it is nameable, but Tailwind's own
@@ -241,39 +278,10 @@
     --elevation-resting: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --elevation-overlay: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 
-    /* ---------------------------------------------------------------
-     * shadcn/ui compatibility aliases. `components.json` now declares
-     * `cssVariables: true`, so anything scaffolded by the shadcn CLI later
-     * will emit `bg-background`, `text-muted-foreground`, `border-input`,
-     * `ring-ring`. These map that vocabulary onto the tokens above so
-     * generated components work without hand-editing.
-     *
-     * One deliberate divergence: shadcn's `--accent` means "quiet hover
-     * tint" while this app's design API uses `accent` for the primary
-     * interactive colour (per the story's own token list). Rather than
-     * redefine `accent` to mean two things, shadcn's hover role is mapped
-     * to `--muted` below and shadcn's `--accent`/`--accent-foreground`
-     * are intentionally not aliased. A scaffolded component using
-     * `bg-accent` will therefore get this app's primary colour; that is
-     * the documented behaviour here, not an oversight.
-     * ------------------------------------------------------------- */
-    --background: var(--surface-sunk);
-    --foreground: var(--ink);
-    --card: var(--surface);
-    --card-foreground: var(--ink);
-    --popover: var(--surface);
-    --popover-foreground: var(--ink);
-    --primary: var(--accent);
-    --primary-foreground: var(--accent-foreground);
-    --secondary: var(--surface-muted);
-    --secondary-foreground: var(--ink);
-    --muted: var(--surface-muted);
-    --muted-foreground: var(--ink-muted);
-    --destructive: var(--danger-solid);
-    --destructive-foreground: 255 255 255;
-    --border: var(--rule);
-    --input: var(--rule-strong);
-    --ring: var(--focus);
+    /* Story 178 (RD-1.1) — the shadcn/ui alias block (`--primary`,
+     * `--muted-foreground`, `--background`, …) was removed: the preset never
+     * mapped those names to Tailwind utilities, so nothing could consume them
+     * (0 uses). Scaffold output must be written onto the semantic tokens. */
   }
 
   /**

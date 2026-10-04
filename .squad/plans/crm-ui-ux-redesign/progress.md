@@ -16,3 +16,6 @@ Visual evidence is captured with an ad-hoc Playwright harness kept outside the r
 
 | Track ID | Story | Summary | Verification | Commit | Push | Deferred |
 |---|---|---|---|---|---|---|
+| RD-0.1 | 177 Design language doc | Recon, overview, progress tracker; `docs/architecture/13-design-language.md`; RTL-06 doc drift fixed | Docs only | `65b3daa` | ✅ | — |
+| RD-0.2 | (no commit) Visual baseline | 120 baseline shots (16 screens × 320/768/1280 × en/ar, light) captured outside the repo by design. Automated flags confirm recon: portal chat has no `h1` (A11Y-03), Reports overflows 6px at 1280 | Harness report | — (evidence only) | — | — |
+| RD-1.1 | 178 Colour tokens v2 (light) | Indigo accent/focus, sky info, `progress` family, `surface-raised`, `rule-control`, `accent-active`; contrast fixes for ink-subtle, warning solid, danger hover; dead shadcn aliases removed; `color.ts` WCAG helpers + token-contrast guard | ui 317 ✓ · web 1330 ✓ · typecheck/lint ✓ · before/after shots | (pending) | (pending) | — |

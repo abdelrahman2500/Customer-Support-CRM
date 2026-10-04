@@ -28,6 +28,8 @@
 
 // --- Utilities -------------------------------------------------------------
 export { cn } from "./lib/cn";
+export { contrastRatio, hexToRgb, parseChannels, relativeLuminance, toChannels } from "./lib/color";
+export type { Rgb } from "./lib/color";
 
 // --- Icon vocabulary (Story S-5) -------------------------------------------
 // Semantic role names over glyph names, so "delete" is one decision made

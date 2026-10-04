@@ -61,6 +61,7 @@ const sharedThemeExtend = {
       DEFAULT: token("surface"),
       sunk: token("surface-sunk"),
       muted: token("surface-muted"),
+      raised: token("surface-raised"),
     },
     ink: {
       DEFAULT: token("ink"),
@@ -72,10 +73,12 @@ const sharedThemeExtend = {
       DEFAULT: token("rule"),
       strong: token("rule-strong"),
       subtle: token("rule-subtle"),
+      control: token("rule-control"),
     },
     accent: {
       DEFAULT: token("accent"),
       hover: token("accent-hover"),
+      active: token("accent-active"),
       foreground: token("accent-foreground"),
       surface: token("accent-surface"),
     },
@@ -111,6 +114,13 @@ const sharedThemeExtend = {
       border: token("info-border"),
       solid: token("info-solid"),
       foreground: token("info-foreground"),
+    },
+    progress: {
+      subtle: token("progress-subtle"),
+      surface: token("progress-surface"),
+      border: token("progress-border"),
+      solid: token("progress-solid"),
+      foreground: token("progress-foreground"),
     },
   },
 
