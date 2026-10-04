@@ -147,13 +147,19 @@ const sharedThemeExtend = {
    * job (NAV-2), and `text-sm` remains the body size until then.
    */
   fontSize: {
-    caption: ["0.75rem", { lineHeight: "1.4" }],
-    label: ["0.75rem", { lineHeight: "1.3333", letterSpacing: "0.06em", fontWeight: "600" }],
-    "body-sm": ["0.8125rem", { lineHeight: "1.5" }],
-    body: ["0.875rem", { lineHeight: "1.5714" }],
-    subhead: ["1rem", { lineHeight: "1.5", fontWeight: "600" }],
-    heading: ["1.125rem", { lineHeight: "1.4", letterSpacing: "-0.005em", fontWeight: "600" }],
-    title: ["1.5rem", { lineHeight: "1.25", letterSpacing: "-0.015em", fontWeight: "600" }],
+    // Story 179 (RD-1.2) — the design-language scale (docs/architecture/
+    // 13-design-language.md). `body-lg` (reading surfaces) and `display`
+    // (KPIs) are new; `label` tracking drops to 0.02em. Arabic resets all
+    // letter-spacing via `:lang(ar)` in tailwind-tokens.css.
+    caption: ["0.75rem", { lineHeight: "1rem" }],
+    label: ["0.75rem", { lineHeight: "1rem", letterSpacing: "0.02em", fontWeight: "600" }],
+    "body-sm": ["0.8125rem", { lineHeight: "1.25rem" }],
+    body: ["0.875rem", { lineHeight: "1.375rem" }],
+    "body-lg": ["1rem", { lineHeight: "1.625rem" }],
+    subhead: ["1rem", { lineHeight: "1.5rem", fontWeight: "600" }],
+    heading: ["1.125rem", { lineHeight: "1.625rem", letterSpacing: "-0.005em", fontWeight: "600" }],
+    title: ["1.5rem", { lineHeight: "2rem", letterSpacing: "-0.015em", fontWeight: "600" }],
+    display: ["1.875rem", { lineHeight: "2.25rem", letterSpacing: "-0.02em", fontWeight: "600" }],
   },
 
   /**
@@ -177,6 +183,9 @@ const sharedThemeExtend = {
     stack: "var(--space-stack)",
     surface: "var(--space-surface)",
     shell: "var(--space-shell)",
+    section: "var(--space-section)",
+    "page-x": "var(--space-page-x)",
+    "page-y": "var(--space-page-y)",
     "field-x": "var(--space-field-x)",
     "field-y": "var(--space-field-y)",
   },
@@ -190,6 +199,7 @@ const sharedThemeExtend = {
    * `tailwind-tokens.css`'s radius comment warns about.
    */
   borderRadius: {
+    control: "var(--radius-control)",
     surface: "var(--radius-surface)",
     inner: "var(--radius-inner)",
     pill: "var(--radius-pill)",
@@ -206,7 +216,32 @@ const sharedThemeExtend = {
    */
   boxShadow: {
     resting: "var(--elevation-resting)",
+    raised: "var(--elevation-raised)",
     overlay: "var(--elevation-overlay)",
+  },
+
+  // Story 179 (RD-1.2) — motion. Durations/easing are CSS variables so a
+  // single `prefers-reduced-motion` rule in tailwind-tokens.css can neutralise
+  // them; keyframes live here so no animation plugin dependency is needed.
+  transitionDuration: {
+    fast: "var(--duration-fast)",
+    base: "var(--duration-base)",
+    slow: "var(--duration-slow)",
+  },
+  transitionTimingFunction: {
+    standard: "var(--ease-standard)",
+  },
+  keyframes: {
+    "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
+    "fade-out": { from: { opacity: "1" }, to: { opacity: "0" } },
+    "zoom-in": { from: { opacity: "0", transform: "scale(0.96)" }, to: { opacity: "1", transform: "scale(1)" } },
+    "zoom-out": { from: { opacity: "1", transform: "scale(1)" }, to: { opacity: "0", transform: "scale(0.96)" } },
+  },
+  animation: {
+    "fade-in": "fade-in var(--duration-base) var(--ease-standard)",
+    "fade-out": "fade-out var(--duration-fast) var(--ease-standard)",
+    "zoom-in": "zoom-in var(--duration-base) var(--ease-standard)",
+    "zoom-out": "zoom-out var(--duration-fast) var(--ease-standard)",
   },
 };
 

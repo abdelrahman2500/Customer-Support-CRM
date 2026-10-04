@@ -76,6 +76,20 @@ describe("design token contrast (light)", () => {
     expect(contrastRatio(get(foreground), get(background))).toBeGreaterThanOrEqual(minimum);
   });
 
+  it("resets letter-spacing on every tracked type step for Arabic (Story 179)", () => {
+    const source = readFileSync(TOKENS, "utf8");
+    for (const step of ["label", "heading", "title", "display"]) {
+      expect(source).toContain(`:lang(ar) .text-${step}`);
+    }
+  });
+
+  it("neutralises animation and transition under prefers-reduced-motion (Story 179)", () => {
+    const source = readFileSync(TOKENS, "utf8");
+    const rule = source.slice(source.indexOf("@media (prefers-reduced-motion: reduce)"));
+    expect(rule).toContain("animation-duration: 0.01ms !important");
+    expect(rule).toContain("transition-duration: 0.01ms !important");
+  });
+
   it("carries white text on the destructive fill and its hover", () => {
     expect(contrastRatio(WHITE, get("danger-solid"))).toBeGreaterThanOrEqual(AA_TEXT);
     expect(contrastRatio(WHITE, get("danger-solid-hover"))).toBeGreaterThanOrEqual(AA_TEXT);

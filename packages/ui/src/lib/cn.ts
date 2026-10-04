@@ -49,10 +49,31 @@ import { extendTailwindMerge } from "tailwind-merge";
  * and forgotten here surfaces as a failing merge rather than as an invisible
  * missing or duplicated class.
  */
-const TEXT_SCALE = ["caption", "label", "body-sm", "body", "subhead", "heading", "title"];
-const SPACING_SCALE = ["tight", "inline", "stack", "surface", "shell", "field-x", "field-y"];
-const RADIUS_SCALE = ["surface", "inner", "pill"];
-const SHADOW_SCALE = ["resting", "overlay"];
+const TEXT_SCALE = [
+  "caption",
+  "label",
+  "body-sm",
+  "body",
+  "body-lg",
+  "subhead",
+  "heading",
+  "title",
+  "display",
+];
+const SPACING_SCALE = [
+  "tight",
+  "inline",
+  "stack",
+  "surface",
+  "section",
+  "shell",
+  "page-x",
+  "page-y",
+  "field-x",
+  "field-y",
+];
+const RADIUS_SCALE = ["control", "surface", "inner", "pill"];
+const SHADOW_SCALE = ["resting", "raised", "overlay"];
 
 const twMerge = extendTailwindMerge({
   extend: {

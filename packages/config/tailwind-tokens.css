@@ -225,8 +225,12 @@
      * rounded-md 150, rounded-sm 34, rounded-full 14, rounded-lg 8.
      * These name the first three; `lg` has no distinct role yet.
      * ------------------------------------------------------------- */
-    --radius-surface: 0.375rem; /* cards, panels, inputs — matches rounded-md (150) */
-    --radius-inner: 0.125rem; /* nested items inside a surface — matches rounded-sm (34) */
+    /* Story 179 (RD-1.2) — the design-language shape scale: controls 8px,
+     * surfaces 12px, nested items 6px (was .375rem / .125rem, a mirror of
+     * rounded-md / rounded-sm; the redesign deliberately changes them). */
+    --radius-control: 0.5rem; /* buttons, inputs, selects */
+    --radius-surface: 0.75rem; /* cards, panels, dialogs, sheets, popovers */
+    --radius-inner: 0.375rem; /* nested items: menu items, chips, list rows, logo plate */
     --radius-pill: 9999px; /* badges, avatars — matches rounded-full (14) */
 
     /* ---------------------------------------------------------------
@@ -255,6 +259,10 @@
     --space-stack: 0.75rem;
     --space-surface: 1rem;
     --space-shell: 2rem;
+    --space-section: 1.5rem; /* Story 179 — gap between page sections */
+    /* Story 179 — responsive page padding (1rem → 1.5rem at sm → 2rem at lg). */
+    --space-page-x: 1rem;
+    --space-page-y: 1rem;
     --space-field-x: 0.75rem;
     --space-field-y: 0.5rem;
 
@@ -275,8 +283,17 @@
      * `token()` helper in tailwind-preset.js wraps colour channels as
      * `rgb(... / <alpha-value>)` and must not be used for these.
      * ------------------------------------------------------------- */
-    --elevation-resting: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --elevation-overlay: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    /* Story 179 (RD-1.2) — three levels: resting (cards), raised (menus,
+     * popovers, sticky bars), overlay (dialogs, sheets, toasts). Tinted with
+     * the ink hue rather than pure black so they read softer on light grounds. */
+    --elevation-resting: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+    --elevation-raised: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+    --elevation-overlay: 0 16px 40px -8px rgb(15 23 42 / 0.18);
+    /* Story 179 (RD-1.2) — motion. Neutralised under prefers-reduced-motion. */
+    --duration-fast: 120ms;
+    --duration-base: 180ms;
+    --duration-slow: 240ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
     /* Story 178 (RD-1.1) — the shadcn/ui alias block (`--primary`,
      * `--muted-foreground`, `--background`, …) was removed: the preset never
@@ -291,6 +308,47 @@
    * existing page pixel-identical instead of tinting the handful
    * (`not-found`, `error`, the locale index) that never set a background.
    */
+  @media (min-width: 640px) {
+    :root {
+      --space-page-x: 1.5rem;
+      --space-page-y: 1.5rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    :root {
+      --space-page-x: 2rem;
+      --space-page-y: 2rem;
+    }
+  }
+  /**
+   * Story 179 (RD-1.2) — Arabic typography. Letter-spacing breaks the joined
+   * Arabic script, so every tracked step of the type scale resets it under
+   * `:lang(ar)` (the pseudo-class outranks the single-class utility), and
+   * running text gets a slightly taller line for Plex Sans Arabic's ascenders.
+   */
+  :lang(ar) .text-label,
+  :lang(ar) .text-heading,
+  :lang(ar) .text-title,
+  :lang(ar) .text-display {
+    letter-spacing: 0;
+  }
+  :lang(ar) .text-body {
+    line-height: 1.5rem;
+  }
+  :lang(ar) .text-body-lg {
+    line-height: 1.75rem;
+  }
+  /** Story 179 (RD-1.2) — motion never runs for users who asked it not to. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
   body {
     background-color: rgb(var(--surface));
     color: rgb(var(--ink));

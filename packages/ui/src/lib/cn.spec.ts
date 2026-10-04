@@ -19,18 +19,31 @@ import { cn } from "./cn";
  * registered lists, so a step added to `tailwind-preset.js` and forgotten in
  * `cn.ts` fails here instead of shipping as an invisible class bug.
  */
-const TEXT_SCALE = ["caption", "label", "body-sm", "body", "subhead", "heading", "title"] as const;
+const TEXT_SCALE = [
+  "caption",
+  "label",
+  "body-sm",
+  "body",
+  "body-lg",
+  "subhead",
+  "heading",
+  "title",
+  "display",
+] as const;
 const SPACING_SCALE = [
   "tight",
   "inline",
   "stack",
   "surface",
+  "section",
   "shell",
+  "page-x",
+  "page-y",
   "field-x",
   "field-y",
 ] as const;
-const RADIUS_SCALE = ["surface", "inner", "pill"] as const;
-const SHADOW_SCALE = ["resting", "overlay"] as const;
+const RADIUS_SCALE = ["control", "surface", "inner", "pill"] as const;
+const SHADOW_SCALE = ["resting", "raised", "overlay"] as const;
 
 describe("cn", () => {
   it("still merges Tailwind's own conflicting classes, last one winning", () => {
@@ -103,6 +116,7 @@ describe("cn", () => {
 
     it("lets one named step override another", () => {
       expect(cn("rounded-surface", "rounded-pill")).toBe("rounded-pill");
+      expect(cn("rounded-control", "rounded-surface")).toBe("rounded-surface");
     });
   });
 
@@ -113,6 +127,7 @@ describe("cn", () => {
 
     it("lets one named step override another", () => {
       expect(cn("shadow-resting", "shadow-overlay")).toBe("shadow-overlay");
+      expect(cn("shadow-raised", "shadow-resting")).toBe("shadow-resting");
     });
   });
 });
