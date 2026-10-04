@@ -251,7 +251,7 @@ direct cross-module database writes.
 | Object storage | S3-compatible via `@aws-sdk/client-s3` (MinIO locally) |
 | AI | `@anthropic-ai/sdk` ^0.122 behind a shared `AiProvider` interface (`packages/ai`), with a disabled no-op fallback |
 | Frontend (both apps) | Next.js ^15.5 (App Router), React ^18.3, TanStack Query ^5.10, Zustand ^5.0, `next-intl` ^4.13 (Arabic/English, RTL), `socket.io-client` ^4.8 |
-| Frontend (Agent Workspace) | Tailwind CSS ^3.4, Radix UI primitives, `class-variance-authority`, `lucide-react` |
+| Frontend (Agent Workspace) | Tailwind CSS ^3.4, Radix UI primitives, `class-variance-authority`, `lucide-react` — visual language in [`docs/architecture/13-design-language.md`](./docs/architecture/13-design-language.md) |
 | Testing | Vitest ^4.1 (unit + component, every package), Supertest ^7.2 (API e2e) |
 | Local infra | Docker Compose — Postgres, Redis, MinIO, MailHog |
 | API docs | Swagger/OpenAPI, generated in non-production environments |

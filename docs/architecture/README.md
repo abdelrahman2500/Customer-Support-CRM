@@ -16,6 +16,7 @@ This folder is the single source of truth for the platform's technical foundatio
 10. [Internationalization & RTL](./10-i18n-and-rtl.md) — Arabic/English and RTL strategy.
 11. [Quality & Operations](./11-quality-and-operations.md) — testing, observability, deployment/environments.
 12. [Risks, Trade-offs & Scope](./12-risks-tradeoffs-and-scope.md) — known risks, trade-offs, and explicit non-goals.
+13. [Design Language](./13-design-language.md) — UI tokens, theming (light/dark), branch branding, status semantics, typography and motion.
 
 ## Status
 

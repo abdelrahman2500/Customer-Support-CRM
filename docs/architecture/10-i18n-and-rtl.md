@@ -11,7 +11,7 @@
 - The root layout sets `dir="rtl"` for `ar` and `dir="ltr"` otherwise, driven by `next-intl`.
 - Tailwind uses logical utilities (`ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`) instead of physical left/right utilities.
 - shadcn/ui and Radix components inherit RTL behavior from the ancestor `dir` attribute.
-- Directional icons are flipped with a scoped `[dir="rtl"]` rule as each component requires.
+- Directional icons (back, chevrons, send) are flipped with Tailwind's `rtl:` variant (e.g. `rtl:rotate-180`); non-directional icons are never flipped. See [Design Language](./13-design-language.md#iconography).
 
 ## Formatting
 
