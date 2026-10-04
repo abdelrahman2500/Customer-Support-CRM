@@ -7,12 +7,11 @@ import { useTranslations } from "next-intl";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
 import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
-import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
 import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/ticket-badges";
+import { SlaIndicator } from "@/components/tickets/sla-indicator";
 import { ApiError } from "@/lib/api";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -80,26 +79,6 @@ function StatTile({
   );
 }
 
-function SlaPresentation({ ticket, now }: { ticket: TicketListItem; now: Date }) {
-  const t = useTranslations("tickets");
-  const status = deriveSlaStatus(ticket.slaTarget, now);
-  if (status.kind === "none") {
-    return <span className="text-ink-subtle">{t("sla.none")}</span>;
-  }
-  if (status.kind === "breached") {
-    return <Badge variant="destructive">{t("sla.breached")}</Badge>;
-  }
-  // RM-25 — SLA Pause/Resume.
-  if (status.kind === "on-hold") {
-    return <Badge variant="secondary">{t("sla.onHold")}</Badge>;
-  }
-  return (
-    <span className="text-ink-strong">
-      {t("sla.remaining", { time: formatRemaining(status.remainingMs) })}
-    </span>
-  );
-}
-
 /**
  * Story 29 — one row of the "Unclaimed tickets" section. A dedicated
  * component (not inline in a `.map()`) because `useUpdateTicketMutation(id)`
@@ -160,7 +139,7 @@ function UnclaimedTicketRow({
       <span className="flex flex-wrap items-center gap-2">
         <TicketStatusBadge status={ticket.status} />
         <TicketPriorityBadge priority={ticket.priority} />
-        <SlaPresentation ticket={ticket} now={now} />
+        <SlaIndicator target={ticket.slaTarget} createdAt={ticket.createdAt} now={now} />
         <Button
           size="sm"
           disabled={mutation.isPending}
@@ -259,12 +238,12 @@ export function DashboardView({ userId }: { userId: string }) {
 
   // `now` is computed once per fetched result, alongside the filter/sort
   // that depends on it, so the ordering and the on-screen remaining-time
-  // text (rendered from the same `now`, passed to `SlaPresentation` below)
+  // text (rendered from the same `now`, passed to `SlaIndicator` below)
   // can never disagree with each other.
   const { openTickets, now } = useMemo(() => {
     // Story S-9 — the rows arrive already narrowed and already ranked. `now`
     // is still computed once per result, because the remaining-time text
-    // `SlaPresentation` renders is derived from it and must not disagree
+    // `SlaIndicator` renders is derived from it and must not disagree
     // with itself across a row.
     const now = new Date();
     return { openTickets: myTicketsQuery.data?.items ?? [], now };
@@ -370,7 +349,7 @@ export function DashboardView({ userId }: { userId: string }) {
                 <span className="flex flex-wrap items-center gap-2">
                   <TicketStatusBadge status={ticket.status} />
                   <TicketPriorityBadge priority={ticket.priority} />
-                  <SlaPresentation ticket={ticket} now={now} />
+                  <SlaIndicator target={ticket.slaTarget} createdAt={ticket.createdAt} now={now} />
                 </span>
               </li>
             ))}

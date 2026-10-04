@@ -44,6 +44,11 @@
       "MEDIUM": "Medium",
       "HIGH": "High",
       "URGENT": "Urgent"
+    },
+    "duration": {
+      "hoursMinutes": "{hours, number}h {minutes, number}m",
+      "minutes": "{minutes, number}m",
+      "lessThanMinute": "<1m"
     }
   },
   "auth": {
@@ -273,6 +278,14 @@
       "remaining": "{time} remaining",
       "onHold": "On hold",
       "onHoldSince": "On hold since {time}",
+      "target": {
+        "response": "Response",
+        "resolution": "Resolution"
+      },
+      "dueIn": "{target} due in {time}",
+      "breachedTarget": "{target} breached",
+      "breachedTargetAt": "{target} breached at {time}",
+      "atRisk": "At risk:",
       "placeOnHold": "Place on hold",
       "resume": "Resume",
       "holdConfirmTitle": "Place this ticket on hold?",

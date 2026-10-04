@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveSlaStatus, formatRemaining } from "./sla";
+import { deriveSlaStatus, formatRemaining, splitDuration } from "./sla";
 
 const now = new Date("2024-01-01T12:00:00.000Z");
 
@@ -84,5 +84,81 @@ describe("formatRemaining", () => {
   it("formats a non-positive duration as '<1m'", () => {
     expect(formatRemaining(0)).toBe("<1m");
     expect(formatRemaining(-1000)).toBe("<1m");
+  });
+});
+
+/** Story 192 (RD-1.15) — which target governs, and the D3 at-risk tier. */
+describe("deriveSlaStatus — governing target and at-risk tier", () => {
+  const MIN = 60_000;
+  const at = (ms: number) => new Date(now.getTime() + ms).toISOString();
+
+  it("names the earlier target as governing (response, resolution, and response on a tie)", () => {
+    const response = deriveSlaStatus(
+      { responseTargetAt: at(5 * 60 * MIN), resolutionTargetAt: at(9 * 60 * MIN) },
+      now,
+    );
+    const resolution = deriveSlaStatus(
+      { responseTargetAt: at(9 * 60 * MIN), resolutionTargetAt: at(5 * 60 * MIN) },
+      now,
+    );
+    const tie = deriveSlaStatus(
+      { responseTargetAt: at(5 * 60 * MIN), resolutionTargetAt: at(5 * 60 * MIN) },
+      now,
+    );
+    expect(response.kind === "on-track" && response.governing).toBe("response");
+    expect(resolution.kind === "on-track" && resolution.governing).toBe("resolution");
+    expect(tie.kind === "on-track" && tie.governing).toBe("response");
+  });
+
+  it("names the governing target of a breach", () => {
+    const result = deriveSlaStatus(
+      { responseTargetAt: at(9 * 60 * MIN), resolutionTargetAt: at(-MIN) },
+      now,
+    );
+    expect(result).toMatchObject({ kind: "breached", governing: "resolution" });
+  });
+
+  it("is at risk at 60 minutes remaining but not at 61 (no creation time)", () => {
+    const sixty = deriveSlaStatus(
+      { responseTargetAt: at(60 * MIN), resolutionTargetAt: at(600 * MIN) },
+      now,
+    );
+    const sixtyOne = deriveSlaStatus(
+      { responseTargetAt: at(61 * MIN), resolutionTargetAt: at(600 * MIN) },
+      now,
+    );
+    expect(sixty).toMatchObject({ kind: "on-track", atRisk: true });
+    expect(sixtyOne).toMatchObject({ kind: "on-track", atRisk: false });
+  });
+
+  it("is at risk at 25% of the window measured from creation, not just above it", () => {
+    // A 10h window: created 7h30m ago with 2h30m left is exactly 25%.
+    const target = { responseTargetAt: at(150 * MIN), resolutionTargetAt: at(1000 * MIN) };
+    const atQuarter = deriveSlaStatus(target, now, { createdAt: at(-450 * MIN) });
+    // Created 7h29m ago: a 9h59m window, 2h30m left is just above 25%.
+    const aboveQuarter = deriveSlaStatus(target, now, { createdAt: at(-449 * MIN) });
+    expect(atQuarter).toMatchObject({ kind: "on-track", atRisk: true });
+    expect(aboveQuarter).toMatchObject({ kind: "on-track", atRisk: false });
+  });
+
+  it("applies only the 60-minute rule without a creation time or with a non-positive window", () => {
+    const target = { responseTargetAt: at(150 * MIN), resolutionTargetAt: at(1000 * MIN) };
+    expect(deriveSlaStatus(target, now)).toMatchObject({ atRisk: false });
+    expect(deriveSlaStatus(target, now, { createdAt: at(200 * MIN) })).toMatchObject({
+      atRisk: false,
+    });
+  });
+});
+
+describe("splitDuration", () => {
+  it("splits whole hours and minutes and returns null under a minute", () => {
+    expect(splitDuration(2 * 60 * 60_000 + 15 * 60_000 + 59_000)).toEqual({
+      hours: 2,
+      minutes: 15,
+    });
+    expect(splitDuration(45 * 60_000)).toEqual({ hours: 0, minutes: 45 });
+    expect(splitDuration(59_999)).toBeNull();
+    expect(splitDuration(0)).toBeNull();
+    expect(splitDuration(-1)).toBeNull();
   });
 });

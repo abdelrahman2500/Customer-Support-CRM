@@ -44,6 +44,11 @@
       "MEDIUM": "متوسطة",
       "HIGH": "عالية",
       "URGENT": "عاجلة"
+    },
+    "duration": {
+      "hoursMinutes": "{hours, number} س {minutes, number} د",
+      "minutes": "{minutes, number} د",
+      "lessThanMinute": "أقل من دقيقة"
     }
   },
   "auth": {
@@ -273,6 +278,14 @@
       "remaining": "الوقت المتبقي: {time}",
       "onHold": "معلّق",
       "onHoldSince": "معلّق منذ {time}",
+      "target": {
+        "response": "الاستجابة",
+        "resolution": "الحل"
+      },
+      "dueIn": "{target}: متبقٍ {time}",
+      "breachedTarget": "تم خرق هدف {target}",
+      "breachedTargetAt": "تم خرق هدف {target} في {time}",
+      "atRisk": "معرّض للخطر:",
       "placeOnHold": "تعليق",
       "resume": "استئناف",
       "holdConfirmTitle": "هل تريد تعليق هذه التذكرة؟",

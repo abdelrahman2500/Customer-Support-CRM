@@ -7,12 +7,11 @@ import { useTranslations } from "next-intl";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTicketsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
-import type { ListTicketsFilters, TicketListItem } from "@/lib/tickets-api";
-import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
+import type { ListTicketsFilters } from "@/lib/tickets-api";
 import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/ticket-badges";
+import { SlaIndicator } from "@/components/tickets/sla-indicator";
 import { useUrlFilters } from "@/lib/url-filters";
 import {
-  Badge,
   Button,
   FetchingIndicator,
   FilterBar,
@@ -74,26 +73,6 @@ function serializeTicketFilters(filters: ListTicketsFilters): URLSearchParams {
   if (filters.sortDir && filters.sortDir !== "desc") params.set("sortDir", filters.sortDir);
   if (filters.page) params.set("page", String(filters.page));
   return params;
-}
-
-function SlaCell({ ticket }: { ticket: TicketListItem }) {
-  const t = useTranslations("tickets");
-  const status = deriveSlaStatus(ticket.slaTarget);
-  if (status.kind === "none") {
-    return <span className="text-ink-subtle">{t("sla.none")}</span>;
-  }
-  if (status.kind === "breached") {
-    return <Badge variant="destructive">{t("sla.breached")}</Badge>;
-  }
-  // RM-25 — SLA Pause/Resume.
-  if (status.kind === "on-hold") {
-    return <Badge variant="secondary">{t("sla.onHold")}</Badge>;
-  }
-  return (
-    <span className="text-ink-strong">
-      {t("sla.remaining", { time: formatRemaining(status.remainingMs) })}
-    </span>
-  );
 }
 
 /**
@@ -378,7 +357,7 @@ function TicketListViewContent() {
                     : t("list.unassigned")}
                 </TableCell>
                 <TableCell label={t("list.columns.sla")}>
-                  <SlaCell ticket={ticket} />
+                  <SlaIndicator target={ticket.slaTarget} createdAt={ticket.createdAt} />
                 </TableCell>
                 <TableCell label={t("list.columns.createdAt")} className="text-ink-subtle">
                   {new Date(ticket.createdAt).toLocaleString(locale)}

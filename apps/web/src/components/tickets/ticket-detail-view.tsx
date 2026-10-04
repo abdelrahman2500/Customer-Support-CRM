@@ -28,7 +28,8 @@ import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
 import { TicketKbReferencesCard } from "@/components/tickets/ticket-kb-references-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { useAgentPresence } from "@/hooks/use-agent-presence";
-import { deriveSlaStatus, formatRemaining } from "@/lib/sla";
+import { deriveSlaStatus } from "@/lib/sla";
+import { SlaIndicator } from "@/components/tickets/sla-indicator";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
@@ -688,26 +689,15 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 <Skeleton className="mt-2 h-5 w-40" />
               </LoadingStatus>
             )}
-            {slaTargetQuery.isSuccess && slaStatus.kind === "none" && (
-              <p className="mt-1 text-sm text-ink-subtle">{t("sla.none")}</p>
-            )}
-            {slaTargetQuery.isSuccess && slaStatus.kind === "breached" && (
-              <Badge variant="destructive" className="mt-2">
-                {t("sla.breachedAt", { time: new Date(slaStatus.targetAt).toLocaleString(locale) })}
-              </Badge>
-            )}
-            {slaTargetQuery.isSuccess && slaStatus.kind === "on-track" && (
-              <p className="mt-1 text-sm text-ink-strong">
-                {t("sla.remaining", { time: formatRemaining(slaStatus.remainingMs) })}
-              </p>
-            )}
-            {/* RM-25 — SLA Pause/Resume. Shown instead of a ticking countdown
-                while held: the clock genuinely isn't advancing, so a countdown
-                here would misrepresent it. */}
-            {slaTargetQuery.isSuccess && slaStatus.kind === "on-hold" && (
-              <Badge variant="secondary" className="mt-2">
-                {t("sla.onHoldSince", { time: slaStatus.onHoldSince.toLocaleString(locale) })}
-              </Badge>
+            {/* Story 192 (RD-1.15) — SlaIndicator: governing target, the
+                at-risk tier and a localized duration. RM-25: while held it
+                shows "on hold since", never a countdown for a paused clock. */}
+            {slaTargetQuery.isSuccess && (
+              <SlaIndicator
+                variant="detail"
+                target={slaTargetQuery.data ?? null}
+                createdAt={ticket.createdAt}
+              />
             )}
             {slaTargetQuery.isSuccess && slaStatus.kind !== "none" && (
               <div className="mt-2">
