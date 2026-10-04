@@ -41,6 +41,14 @@ import { cn } from "../lib/cn";
  * Renders a real `<header>` landmark, and the `<h1>` is the page's single
  * level-1 heading — several screens previously had none at all, or hid one
  * with `sr-only` because their visible title was an input.
+ *
+ * ## Slots (Story 197, RD-2.3)
+ *
+ * `back` (a `BackLink`) sits above the title row, `meta` (badges, ids,
+ * timestamps) wraps under the title and description, and `tabs` spans the
+ * full width below. None may contain a heading above `h2` — the title stays
+ * the page's only `h1`. Without `back` and `tabs` the rendered tree is
+ * exactly the pre-slot one, so existing pages are unchanged.
  */
 export interface PageHeaderProps {
   /** The page's own name. Rendered as the single `<h1>`. */
@@ -52,22 +60,49 @@ export interface PageHeaderProps {
    * Pass the buttons themselves; spacing and wrapping are handled here.
    */
   actions?: React.ReactNode;
+  /** Story 197 — a way back (typically `BackLink`), above the title row. */
+  back?: React.ReactNode;
+  /** Story 197 — a wrapping row of page facts under the title/description. */
+  meta?: React.ReactNode;
+  /** Story 197 — section tabs, full width below the title row. */
+  tabs?: React.ReactNode;
   className?: string;
 }
 
-export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
-  return (
-    <header
-      className={cn(
-        "flex flex-col gap-inline sm:flex-row sm:items-start sm:justify-between",
-        className,
-      )}
-    >
+const ROW = "flex flex-col gap-inline sm:flex-row sm:items-start sm:justify-between";
+
+export function PageHeader({
+  title,
+  description,
+  actions,
+  back,
+  meta,
+  tabs,
+  className,
+}: PageHeaderProps) {
+  const row = (
+    <>
       <div className="min-w-0">
         <h1 className="text-title text-ink">{title}</h1>
         {description && <p className="mt-1 text-sm text-ink-subtle">{description}</p>}
+        {meta && (
+          <div className="mt-2 flex flex-wrap items-center gap-inline text-sm text-ink-muted">
+            {meta}
+          </div>
+        )}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-inline">{actions}</div>}
+    </>
+  );
+
+  if (!back && !tabs) {
+    return <header className={cn(ROW, className)}>{row}</header>;
+  }
+  return (
+    <header className={cn("flex flex-col gap-stack", className)}>
+      {back && <div className="flex">{back}</div>}
+      <div className={ROW}>{row}</div>
+      {tabs && <div className="min-w-0">{tabs}</div>}
     </header>
   );
 }

@@ -152,6 +152,8 @@ describe("WorkspaceShell", () => {
         renderShell();
 
         expect(screen.getByRole("main")).toHaveClass("min-w-0");
+        // Story 197 (RD-2.3) — the responsive page gutters (16/24/32px).
+        expect(screen.getByRole("main")).toHaveClass("px-page-x", "py-page-y");
       });
     }
   });

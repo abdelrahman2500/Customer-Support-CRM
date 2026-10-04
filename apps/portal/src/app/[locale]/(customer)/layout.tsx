@@ -39,7 +39,7 @@ export default async function CustomerLayout({
       </a>
       <PortalHeader contact={contact} />
       <PortalNotifications customerId={contact.customerId} />
-      <main id="main-content" className="flex-1 p-6">
+      <main id="main-content" className="flex-1 px-page-x py-page-y">
         {children}
       </main>
       {/* Story 94 — one generic success-feedback renderer for the whole

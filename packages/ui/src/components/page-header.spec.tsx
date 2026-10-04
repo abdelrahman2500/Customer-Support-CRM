@@ -80,4 +80,59 @@ describe("PageHeader", () => {
     const { container } = render(<PageHeader title="Tickets" className="mt-stack" />);
     expect(container.firstElementChild).toHaveClass("mt-stack");
   });
+
+  describe("slots (Story 197)", () => {
+    function renderAll() {
+      return render(
+        <PageHeader
+          title="Ticket 42"
+          description="Opened by Ada"
+          back={<a href="/tickets">Back to tickets</a>}
+          meta={<span>Open</span>}
+          actions={<button type="button">Resolve</button>}
+          tabs={<div role="tablist" aria-label="Sections" />}
+          className="mt-stack"
+        />,
+      );
+    }
+
+    it("puts back above the title, meta after the description, and tabs after the row", () => {
+      const { container } = renderAll();
+      const order = [...container.querySelectorAll("a, h1, p, span, button, [role=tablist]")].map(
+        (el) =>
+          el.tagName.toLowerCase() +
+          (el.getAttribute("role") ? `[${el.getAttribute("role")}]` : ""),
+      );
+      expect(order).toEqual(["a", "h1", "p", "span", "button", "div[tablist]"]);
+    });
+
+    it("keeps meta inside the title block, as a wrapping row", () => {
+      renderAll();
+      const meta = screen.getByText("Open").parentElement!;
+      expect(meta).toHaveClass("flex", "flex-wrap");
+      expect(meta.parentElement).toContainElement(screen.getByRole("heading", { level: 1 }));
+    });
+
+    it("still renders exactly one h1, stacks the regions, and keeps className on the root", () => {
+      const { container } = renderAll();
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      const root = container.firstElementChild as HTMLElement;
+      expect(root.tagName).toBe("HEADER");
+      expect(root).toHaveClass("flex-col", "gap-stack", "mt-stack");
+      // The title row inside keeps the responsive row contract.
+      expect(root.children[1]).toHaveClass("flex-col", "sm:flex-row", "sm:justify-between");
+    });
+
+    it("keeps the pre-slot structure when only meta is added", () => {
+      const { container } = render(<PageHeader title="Tickets" meta={<span>12 open</span>} />);
+      const root = container.firstElementChild as HTMLElement;
+      expect(root).toHaveClass("sm:flex-row");
+      expect(root).not.toHaveClass("gap-stack");
+    });
+
+    it("uses no physical-direction utility with every slot", () => {
+      const { container } = renderAll();
+      expect(container.innerHTML).not.toMatch(/\b(ml|mr|pl|pr|text-left|text-right)-/);
+    });
+  });
 });

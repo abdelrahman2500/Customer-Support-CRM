@@ -90,7 +90,7 @@ export function WorkspaceShell({
      in the navbar branch, where `<main>` is a flex *column* child and the
      cross-axis was never the constrained one. */
   const main = (
-    <main id="main-content" className="min-w-0 flex-1 p-6">
+    <main id="main-content" className="min-w-0 flex-1 px-page-x py-page-y">
       <div className="mx-auto w-full max-w-screen-2xl">{children}</div>
     </main>
   );
