@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import type { ToastTone } from "./toast";
 
 /**
  * Story 94 — a small, generic, in-memory success-feedback store — the same
@@ -28,22 +29,29 @@ export interface SuccessToast {
    * other translated string this codebase passes across a component
    * boundary (e.g. `ConfirmDialog`'s own `title`/`description` props). */
   message: string;
+  /** Story 190 (RD-1.13) — "success" unless a caller of `showToast` says
+   * otherwise. */
+  tone: ToastTone;
 }
+
+/** Story 190 — the store holds every tone now; `SuccessToast` stays the
+ * name existing imports use. */
+export type Toast = SuccessToast;
 
 interface ToastState {
   toasts: SuccessToast[];
-  add: (message: string) => void;
+  add: (message: string, tone?: ToastTone) => void;
   dismiss: (id: string) => void;
 }
 
 export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
-  add: (message) => {
+  add: (message, tone = "success") => {
     const id =
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
-    set((state) => ({ toasts: [{ id, message }, ...state.toasts].slice(0, MAX_VISIBLE) }));
+    set((state) => ({ toasts: [{ id, message, tone }, ...state.toasts].slice(0, MAX_VISIBLE) }));
     if (typeof window !== "undefined") {
       window.setTimeout(() => {
         set((state) => ({ toasts: state.toasts.filter((toast) => toast.id !== id) }));
@@ -56,5 +64,11 @@ export const useToastStore = create<ToastState>((set) => ({
 /** Convenience for call sites that just want to fire a success toast
  * (typically a mutation's `onSuccess`) without subscribing to the store. */
 export function showSuccessToast(message: string): void {
-  useToastStore.getState().add(message);
+  useToastStore.getState().add(message, "success");
+}
+
+/** Story 190 (RD-1.13) — the same, for any tone. Error toasts are announced
+ * assertively (`role="alert"`); the rest politely. */
+export function showToast(message: string, options: { tone?: ToastTone } = {}): void {
+  useToastStore.getState().add(message, options.tone ?? "success");
 }

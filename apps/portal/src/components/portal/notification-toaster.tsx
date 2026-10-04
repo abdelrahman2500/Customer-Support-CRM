@@ -3,7 +3,15 @@
 import { useParams } from "next/navigation";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTranslations } from "next-intl";
-import { Button, CloseIcon } from "@crm/ui";
+import {
+  Button,
+  CloseIcon,
+  cn,
+  toastCardClassName,
+  toastListClassName,
+  toastRegionClassName,
+  toastToneClassName,
+} from "@crm/ui";
 import { usePortalNotificationsStore } from "@/lib/notifications-store";
 import type {
   ChannelMessageNotificationPayload,
@@ -43,6 +51,11 @@ function ticketIdFor(notification: PortalNotification): string {
  * not `right-*`), purely presentational — no persistence, no read/unread
  * state, no notification-template substitution (Non-Goal, unlike
  * `apps/web`'s own later Story 63 enhancement).
+ *
+ * Story 190 (RD-1.13) — the shared toast region/card (`lib/toast.ts` in
+ * @crm/ui): 320px-safe, and the labelled region with its polite live list
+ * stays mounted while empty so the first notification is announced.
+ * Portal notifications are informational, so cards use the info border.
  */
 export function NotificationToaster() {
   const t = useTranslations("notifications");
@@ -51,59 +64,51 @@ export function NotificationToaster() {
   const notifications = usePortalNotificationsStore((state) => state.notifications);
   const dismiss = usePortalNotificationsStore((state) => state.dismiss);
 
-  if (notifications.length === 0) {
-    return null;
-  }
-
   return (
-    <div
-      role="region"
-      aria-label={t("regionLabel")}
-      className="pointer-events-none fixed top-4 end-4 z-50 flex w-full max-w-sm flex-col gap-2"
-    >
-      {notifications.map((notification) => {
-        const ticketId = ticketIdFor(notification);
-        return (
-          <div
-            key={notification.id}
-            role="status"
-            aria-live="polite"
-            className="pointer-events-auto flex flex-col gap-2 rounded-md border border-rule bg-surface p-3 shadow-md"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-sm font-semibold text-ink">
-                {t(
-                  `eventLabel.${notification.eventType === "ticket.updated" ? "ticketUpdated" : "newReply"}`,
-                )}
-              </span>
-              <button
-                type="button"
-                aria-label={t("dismiss")}
-                onClick={() => dismiss(notification.id)}
-                className="focus-ring rounded-sm text-ink-subtle hover:text-ink-muted"
-              >
-                {/* Story S-5: the shared close glyph, matching Dialog and
+    <div role="region" aria-label={t("regionLabel")} className={cn(toastRegionClassName, "top-4")}>
+      <ol aria-live="polite" className={toastListClassName}>
+        {notifications.map((notification) => {
+          const ticketId = ticketIdFor(notification);
+          return (
+            <li
+              key={notification.id}
+              className={cn(toastCardClassName, "flex-col gap-2", toastToneClassName.info)}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-sm font-semibold text-ink">
+                  {t(
+                    `eventLabel.${notification.eventType === "ticket.updated" ? "ticketUpdated" : "newReply"}`,
+                  )}
+                </span>
+                <button
+                  type="button"
+                  aria-label={t("dismiss")}
+                  onClick={() => dismiss(notification.id)}
+                  className="focus-ring rounded-inner text-ink-subtle hover:text-ink"
+                >
+                  {/* Story S-5: the shared close glyph, matching Dialog and
                     SuccessToaster. The button carries aria-label, so the
                     icon is decorative. */}
-                <CloseIcon className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-            <p className="text-sm text-ink-strong">{messageFor(notification, t)}</p>
-            <Button
-              type="button"
-              onClick={() => {
-                dismiss(notification.id);
-                router.push(`/${locale}/tickets/${ticketId}`);
-              }}
-              variant="outline"
-              size="sm"
-              className="w-fit self-start text-sm"
-            >
-              {t("viewTicket")}
-            </Button>
-          </div>
-        );
-      })}
+                  <CloseIcon className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              <p className="text-sm text-ink-strong">{messageFor(notification, t)}</p>
+              <Button
+                type="button"
+                onClick={() => {
+                  dismiss(notification.id);
+                  router.push(`/${locale}/tickets/${ticketId}`);
+                }}
+                variant="outline"
+                size="sm"
+                className="w-fit self-start text-sm"
+              >
+                {t("viewTicket")}
+              </Button>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

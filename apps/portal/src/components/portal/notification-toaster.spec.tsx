@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { NotificationToaster } from "./notification-toaster";
 import { usePortalNotificationsStore } from "@/lib/notifications-store";
@@ -25,13 +25,23 @@ describe("NotificationToaster", () => {
     usePortalNotificationsStore.setState({ notifications: [] });
   });
 
-  it("renders nothing when there are no notifications", () => {
-    const { container } = render(
+  // Story 190 (RD-1.13, recon A11Y-10) — the labelled region and its polite
+  // live list stay mounted while empty, so the first notification is
+  // inserted into a live region that already exists and is announced.
+  it("renders an empty, labelled live region when there are no notifications", () => {
+    render(
       <NextIntlClientProvider locale="en" messages={enMessages}>
         <NotificationToaster />
       </NextIntlClientProvider>,
     );
-    expect(container).toBeEmptyDOMElement();
+    const region = screen.getByRole("region", { name: "Notifications" });
+    const list = within(region).getByRole("list");
+    expect(list).toHaveAttribute("aria-live", "polite");
+    expect(within(list).queryAllByRole("listitem")).toHaveLength(0);
+    // 320px-safe position (recon RS-01): a gutter on both edges on phones,
+    // a 24rem column at the end edge from sm.
+    expect(region).toHaveClass("inset-x-4", "sm:end-4", "sm:w-96", "top-4");
+    expect(region).not.toHaveClass("w-full");
   });
 
   it("renders a real, translated message for ticket.updated (English)", () => {

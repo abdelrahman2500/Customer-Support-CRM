@@ -107,8 +107,15 @@ export { SortIndicator } from "./components/sort-indicator";
 export type { SortIndicatorProps, SortDirection } from "./components/sort-indicator";
 
 // --- Feedback state --------------------------------------------------------
-export { useToastStore, showSuccessToast } from "./lib/toast-store";
-export type { SuccessToast } from "./lib/toast-store";
+export { useToastStore, showSuccessToast, showToast } from "./lib/toast-store";
+export type { SuccessToast, Toast } from "./lib/toast-store";
+export {
+  toastRegionClassName,
+  toastListClassName,
+  toastCardClassName,
+  toastToneClassName,
+} from "./lib/toast";
+export type { ToastTone } from "./lib/toast";
 
 // --- Primitives ------------------------------------------------------------
 export {
@@ -120,7 +127,12 @@ export {
   CardFooter,
   SectionCard,
 } from "./components/card";
-export type { CardProps, CardTitleProps, CardTitleLevel, SectionCardProps } from "./components/card";
+export type {
+  CardProps,
+  CardTitleProps,
+  CardTitleLevel,
+  SectionCardProps,
+} from "./components/card";
 
 export { Alert } from "./components/alert";
 export type { AlertProps } from "./components/alert";

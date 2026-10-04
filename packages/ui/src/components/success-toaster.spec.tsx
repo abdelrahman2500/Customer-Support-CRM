@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { SuccessToaster } from "./success-toaster";
-import { useToastStore, showSuccessToast } from "../lib/toast-store";
+import { useToastStore, showSuccessToast, showToast } from "../lib/toast-store";
 
 // The two accessible names are props now, not resolved from a message
 // catalog — the primitive owns no copy. The values below are the same ones
@@ -17,9 +17,14 @@ describe("SuccessToaster", () => {
     useToastStore.setState({ toasts: [] });
   });
 
-  it("renders nothing when there are no toasts", () => {
-    const { container } = renderToaster();
-    expect(container).toBeEmptyDOMElement();
+  // Story 190 (RD-1.13, recon A11Y-10) — the region and its polite live list
+  // are mounted before any toast, so the first toast is announced.
+  it("renders an empty, labelled live region before any toast", () => {
+    renderToaster();
+    const region = screen.getByRole("region", { name: "Success notifications" });
+    const list = within(region).getByRole("list");
+    expect(list).toHaveAttribute("aria-live", "polite");
+    expect(within(list).queryAllByRole("listitem")).toHaveLength(0);
   });
 
   it("renders a translated success message only after a toast is actually added", () => {
@@ -33,13 +38,13 @@ describe("SuccessToaster", () => {
     expect(screen.getByText("Ticket created.")).toBeInTheDocument();
   });
 
-  it("renders the message inside a role=status, aria-live=polite region", () => {
+  it("renders the message inside the polite live list", () => {
     showSuccessToast("Ticket created.");
     renderToaster();
 
-    const status = screen.getByRole("status");
-    expect(status).toHaveAttribute("aria-live", "polite");
-    expect(status).toHaveTextContent("Ticket created.");
+    const list = screen.getByRole("list");
+    expect(list).toHaveAttribute("aria-live", "polite");
+    expect(within(list).getByRole("listitem")).toHaveTextContent("Ticket created.");
   });
 
   it("wraps the toast stack in a labeled region", () => {
@@ -82,7 +87,7 @@ describe("SuccessToaster", () => {
     showSuccessToast("Fourth");
     renderToaster();
 
-    expect(screen.getAllByRole("status")).toHaveLength(3);
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
     expect(screen.queryByText("First")).not.toBeInTheDocument();
   });
 
@@ -100,5 +105,42 @@ describe("SuccessToaster", () => {
 
     fireEvent.click(dismiss);
     expect(screen.queryByText("Ticket created.")).not.toBeInTheDocument();
+  });
+
+  /** Story 190 (RD-1.13) — tones, position and the design-language card. */
+  it("announces error toasts assertively with the danger border and an icon", () => {
+    showToast("Could not save.", { tone: "error" });
+    renderToaster();
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Could not save.");
+    expect(alert).toHaveClass("border-danger-border");
+    expect(alert.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it("gives each tone its semantic border and keeps success the default", () => {
+    showToast("Heads up.", { tone: "info" });
+    showToast("Careful.", { tone: "warning" });
+    showToast("Saved.");
+    renderToaster();
+
+    expect(screen.getByText("Heads up.").closest("li")).toHaveClass("border-info-border");
+    expect(screen.getByText("Careful.").closest("li")).toHaveClass("border-warning-border");
+    expect(screen.getByText("Saved.").closest("li")).toHaveClass("border-success-border");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("sits in a 320px-safe region and uses the raised overlay card", () => {
+    showSuccessToast("Ticket created.");
+    renderToaster();
+
+    const region = screen.getByRole("region", { name: "Success notifications" });
+    expect(region).toHaveClass("inset-x-4", "sm:inset-x-auto", "sm:end-4", "sm:w-96", "bottom-4");
+    expect(region).not.toHaveClass("w-full");
+    expect(screen.getByRole("listitem")).toHaveClass(
+      "rounded-surface",
+      "bg-surface-raised",
+      "shadow-overlay",
+    );
   });
 });
