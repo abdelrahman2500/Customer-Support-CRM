@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { resolveCookieLocale } from "@/i18n/cookie-locale";
 import { localeDirection } from "@/i18n/direction";
 import { fontVariables } from "@/lib/fonts";
+import { ThemeScript } from "@crm/ui";
 
 /**
  * Story 96 — the ROOT not-found boundary.
@@ -48,7 +49,10 @@ export default async function RootNotFound() {
   const t = await getTranslations({ locale, namespace: "common" });
 
   return (
-    <html lang={locale} dir={dir} className={fontVariables}>
+    <html lang={locale} dir={dir} className={fontVariables} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body className="font-sans antialiased">
         <main className="flex min-h-screen items-center justify-center bg-surface-sunk p-8">
           <div className="w-full max-w-sm rounded-lg border border-rule bg-surface p-8 text-center shadow-sm">

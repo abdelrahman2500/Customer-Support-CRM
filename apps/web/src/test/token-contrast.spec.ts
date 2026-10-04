@@ -95,3 +95,49 @@ describe("design token contrast (light)", () => {
     expect(contrastRatio(WHITE, get("danger-solid-hover"))).toBeGreaterThanOrEqual(AA_TEXT);
   });
 });
+
+/**
+ * Story 181 (RD-1.4) — the dark theme. The explicit `[data-theme="dark"]`
+ * block and the `prefers-color-scheme` ("system") copy must carry identical
+ * values, and every pair the light theme promises must hold in dark too.
+ */
+describe("design token contrast (dark)", () => {
+  const source = readFileSync(TOKENS, "utf8");
+  const dark = readThemeBlock(source, ':root[data-theme="dark"]');
+  const system = readThemeBlock(source, ':root:not([data-theme="light"])');
+  const get = (name: string): Rgb => {
+    const value = dark.get(name);
+    if (!value) {
+      throw new Error(`Token --${name} is not defined in the dark block`);
+    }
+    return value;
+  };
+
+  it("defines the system-preference block identically to the explicit dark block", () => {
+    expect(dark.size).toBeGreaterThan(40);
+    expect(Object.fromEntries(system)).toEqual(Object.fromEntries(dark));
+  });
+
+  it("redefines every colour token the light theme defines, except the constant logo plate", () => {
+    const light = readThemeBlock(source, ":root");
+    const missing = [...light.keys()].filter((name) => name !== "logo-plate" && !dark.has(name));
+    expect(missing).toEqual([]);
+  });
+
+  it.each(LIGHT_PAIRS)("--%s on --%s meets %s:1", (foreground, background, minimum) => {
+    expect(contrastRatio(get(foreground), get(background))).toBeGreaterThanOrEqual(minimum);
+  });
+
+  it("keeps the accent readable on raised surfaces (menus, dialogs)", () => {
+    expect(contrastRatio(get("accent"), get("surface-raised"))).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(contrastRatio(get("focus"), get("surface-raised"))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    expect(contrastRatio(get("rule-control"), get("surface-raised"))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+  });
+
+  it("carries the destructive foreground on the fill and its hover", () => {
+    expect(contrastRatio(get("danger-solid-foreground"), get("danger-solid"))).toBeGreaterThanOrEqual(AA_TEXT);
+    expect(contrastRatio(get("danger-solid-foreground"), get("danger-solid-hover"))).toBeGreaterThanOrEqual(
+      AA_TEXT,
+    );
+  });
+});

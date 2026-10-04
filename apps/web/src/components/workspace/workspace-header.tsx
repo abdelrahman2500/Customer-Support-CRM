@@ -198,7 +198,7 @@ export function WorkspaceHeader({
           <img
             src={branding.logoUrl}
             alt={brandName}
-            className="h-8 w-auto max-w-32 object-contain sm:max-w-none"
+            className="h-8 w-auto max-w-32 rounded-inner bg-logo-plate object-contain p-0.5 sm:max-w-none"
           />
         ) : (
           <Link

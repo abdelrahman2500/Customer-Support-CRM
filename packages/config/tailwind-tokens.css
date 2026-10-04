@@ -27,10 +27,11 @@
  * exactly that (it was `bg-slate-950/40`). A token holding `#0f172a` would
  * break every `/nn` suffix silently.
  *
- * Light theme only, deliberately. Dark mode is explicitly out of scope for
- * this story; the point of putting the palette behind tokens now is that
- * adding it later is a second `:root` block rather than a sweep through
- * every component. See the recon's §11.
+ * Themes. S-1 shipped light only so that dark mode could later be "a second
+ * `:root` block rather than a sweep through every component" — Story 181
+ * (RD-1.4) is exactly that: the light values below, plus a dark block further
+ * down selected by `[data-theme="dark"]` or by the OS preference. Components
+ * never branch on theme. See docs/architecture/13-design-language.md.
  *
  * ---------------------------------------------------------------------
  * THE WHOLE VOCABULARY, IN ONE PLACE (Story 134)
@@ -85,6 +86,10 @@
      * sticky bars). White in light mode, a lighter step than `--surface`
      * in dark mode, where depth comes from surface lightness. */
     --surface-raised: 255 255 255;
+    /* Story 181 (RD-1.4) — the light plate an uploaded branch logo sits on.
+     * Deliberately NOT redefined for dark: logos are arbitrary uploads, often
+     * dark-on-transparent, and would vanish on a dark header (00-overview D10). */
+    --logo-plate: 255 255 255;
 
     /* ---------------------------------------------------------------
      * Ink — text, in descending emphasis. Contrast ratios are against
@@ -297,6 +302,7 @@
     --duration-base: 180ms;
     --duration-slow: 240ms;
     --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    color-scheme: light;
 
     /* Story 178 (RD-1.1) — the shadcn/ui alias block (`--primary`,
      * `--muted-foreground`, `--background`, …) was removed: the preset never
@@ -311,6 +317,122 @@
    * existing page pixel-identical instead of tinting the handful
    * (`not-found`, `error`, the locale index) that never set a background.
    */
+  /**
+   * Story 181 (RD-1.4) — DARK THEME. Tuned values, not an inversion: depth
+   * comes from surface lightness (sunk < surface < raised), shadows darken.
+   * Two selectors carry the SAME values (the guard spec asserts they match):
+   *   - [data-theme="dark"]: the explicit choice (crm-theme cookie, applied
+   *     before paint by ThemeScript from @crm/ui);
+   *   - prefers-color-scheme: dark without [data-theme="light"]: "system",
+   *     which needs no script and therefore never flashes.
+   * Every documented pair is asserted in apps/web/src/test/token-contrast.spec.ts.
+   */
+  :root[data-theme="dark"] {
+    --surface: 15 23 42; /* #0F172A */
+    --surface-sunk: 2 6 23; /* #020617 */
+    --surface-muted: 39 52 73; /* #273449 */
+    --surface-raised: 30 41 59; /* #1E293B */
+    --ink: 241 245 249; /* #F1F5F9 */
+    --ink-strong: 226 232 240; /* #E2E8F0 */
+    --ink-muted: 180 191 207; /* #B4BFCF */
+    --ink-subtle: 148 163 184; /* #94A3B8 */
+    --rule: 30 41 59; /* #1E293B */
+    --rule-strong: 51 65 85; /* #334155 */
+    --rule-subtle: 23 32 51; /* #172033 */
+    --rule-control: 100 116 139; /* #64748B */
+    --accent: 129 140 248; /* #818CF8 */
+    --accent-hover: 165 180 252; /* #A5B4FC */
+    --accent-active: 199 210 254; /* #C7D2FE */
+    --accent-foreground: 15 23 42; /* #0F172A */
+    --accent-surface: 30 27 75; /* #1E1B4B */
+    --overlay: 0 0 0; /* #000000 */
+    --focus: 165 180 252; /* #A5B4FC */
+    --success-subtle: 3 31 24; /* #031F18 */
+    --success-surface: 2 44 34; /* #022C22 */
+    --success-border: 6 95 70; /* #065F46 */
+    --success-solid: 52 211 153; /* #34D399 */
+    --success-foreground: 110 231 183; /* #6EE7B7 */
+    --warning-subtle: 42 18 3; /* #2A1203 */
+    --warning-surface: 59 26 4; /* #3B1A04 */
+    --warning-border: 146 64 14; /* #92400E */
+    --warning-solid: 251 191 36; /* #FBBF24 */
+    --warning-foreground: 252 211 77; /* #FCD34D */
+    --danger-subtle: 43 11 13; /* #2B0B0D */
+    --danger-surface: 63 18 20; /* #3F1214 */
+    --danger-border: 153 27 27; /* #991B1B */
+    --danger-solid: 220 38 38; /* #DC2626 */
+    --danger-solid-hover: 185 28 28; /* #B91C1C */
+    --danger-solid-foreground: 255 255 255; /* #FFFFFF */
+    --danger-foreground: 252 165 165; /* #FCA5A5 */
+    --info-subtle: 6 26 43; /* #061A2B */
+    --info-surface: 8 47 73; /* #082F49 */
+    --info-border: 7 89 133; /* #075985 */
+    --info-solid: 56 189 248; /* #38BDF8 */
+    --info-foreground: 125 211 252; /* #7DD3FC */
+    --progress-subtle: 28 11 61; /* #1C0B3D */
+    --progress-surface: 46 16 101; /* #2E1065 */
+    --progress-border: 91 33 182; /* #5B21B6 */
+    --progress-solid: 167 139 250; /* #A78BFA */
+    --progress-foreground: 196 181 253; /* #C4B5FD */
+    --elevation-resting: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --elevation-raised: 0 4px 12px -2px rgb(0 0 0 / 0.5);
+    --elevation-overlay: 0 16px 40px -8px rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: 15 23 42; /* #0F172A */
+      --surface-sunk: 2 6 23; /* #020617 */
+      --surface-muted: 39 52 73; /* #273449 */
+      --surface-raised: 30 41 59; /* #1E293B */
+      --ink: 241 245 249; /* #F1F5F9 */
+      --ink-strong: 226 232 240; /* #E2E8F0 */
+      --ink-muted: 180 191 207; /* #B4BFCF */
+      --ink-subtle: 148 163 184; /* #94A3B8 */
+      --rule: 30 41 59; /* #1E293B */
+      --rule-strong: 51 65 85; /* #334155 */
+      --rule-subtle: 23 32 51; /* #172033 */
+      --rule-control: 100 116 139; /* #64748B */
+      --accent: 129 140 248; /* #818CF8 */
+      --accent-hover: 165 180 252; /* #A5B4FC */
+      --accent-active: 199 210 254; /* #C7D2FE */
+      --accent-foreground: 15 23 42; /* #0F172A */
+      --accent-surface: 30 27 75; /* #1E1B4B */
+      --overlay: 0 0 0; /* #000000 */
+      --focus: 165 180 252; /* #A5B4FC */
+      --success-subtle: 3 31 24; /* #031F18 */
+      --success-surface: 2 44 34; /* #022C22 */
+      --success-border: 6 95 70; /* #065F46 */
+      --success-solid: 52 211 153; /* #34D399 */
+      --success-foreground: 110 231 183; /* #6EE7B7 */
+      --warning-subtle: 42 18 3; /* #2A1203 */
+      --warning-surface: 59 26 4; /* #3B1A04 */
+      --warning-border: 146 64 14; /* #92400E */
+      --warning-solid: 251 191 36; /* #FBBF24 */
+      --warning-foreground: 252 211 77; /* #FCD34D */
+      --danger-subtle: 43 11 13; /* #2B0B0D */
+      --danger-surface: 63 18 20; /* #3F1214 */
+      --danger-border: 153 27 27; /* #991B1B */
+      --danger-solid: 220 38 38; /* #DC2626 */
+      --danger-solid-hover: 185 28 28; /* #B91C1C */
+      --danger-solid-foreground: 255 255 255; /* #FFFFFF */
+      --danger-foreground: 252 165 165; /* #FCA5A5 */
+      --info-subtle: 6 26 43; /* #061A2B */
+      --info-surface: 8 47 73; /* #082F49 */
+      --info-border: 7 89 133; /* #075985 */
+      --info-solid: 56 189 248; /* #38BDF8 */
+      --info-foreground: 125 211 252; /* #7DD3FC */
+      --progress-subtle: 28 11 61; /* #1C0B3D */
+      --progress-surface: 46 16 101; /* #2E1065 */
+      --progress-border: 91 33 182; /* #5B21B6 */
+      --progress-solid: 167 139 250; /* #A78BFA */
+      --progress-foreground: 196 181 253; /* #C4B5FD */
+      --elevation-resting: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+      --elevation-raised: 0 4px 12px -2px rgb(0 0 0 / 0.5);
+      --elevation-overlay: 0 16px 40px -8px rgb(0 0 0 / 0.6);
+      color-scheme: dark;
+    }
+  }
   @media (min-width: 640px) {
     :root {
       --space-page-x: 1.5rem;

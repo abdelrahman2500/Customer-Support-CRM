@@ -6,6 +6,7 @@ import { localeDirection } from "@/i18n/direction";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { fontVariables } from "@/lib/fonts";
 import "../globals.css";
+import { ThemeScript } from "@crm/ui";
 
 export function generateStaticParams(): Array<{ locale: string }> {
   return routing.locales.map((locale) => ({ locale }));
@@ -36,7 +37,10 @@ export default async function LocaleLayout({
     // Story S-1 — mirrors apps/web's own locale layout: font variables on
     // <html> so portalled content inherits them, `font-sans` on <body> to
     // resolve the Latin→Arabic fallback chain.
-    <html lang={locale} dir={dir} className={fontVariables}>
+    <html lang={locale} dir={dir} className={fontVariables} suppressHydrationWarning>
+      <head>
+        <ThemeScript />
+      </head>
       <body className="font-sans antialiased">
         <NextIntlClientProvider>
           <QueryProvider>{children}</QueryProvider>

@@ -55,6 +55,14 @@ const DARK_VARIANT = new RegExp(`${BOUNDARY_BEFORE}dark:`);
 const SOLID_AS_TEXT = new RegExp(
   `${BOUNDARY_BEFORE}(?:[\\w-]+:)*text-(?:success|warning|danger|info|progress)-solid${BOUNDARY_AFTER}`,
 );
+/**
+ * Story 181 (RD-1.4, QA-01) — an opacity-reduced foreground (`text-accent-
+ * foreground/80`) is a contrast pair the token guard cannot see: it passed on
+ * slate-900, measured 4.62:1 on indigo and fails in dark. Text stays opaque.
+ */
+const TRANSLUCENT_FOREGROUND = new RegExp(
+  `${BOUNDARY_BEFORE}(?:[\\w-]+:)*text-[\\w-]*foreground\\/\\d{1,3}${BOUNDARY_AFTER}`,
+);
 /** Files whose `text-*-solid` colours an icon-only control (non-text, 3:1). */
 const SOLID_AS_TEXT_ALLOWED = new Set([
   // The dismiss button renders only CloseIcon, with an aria-label.
@@ -150,6 +158,12 @@ describe("style guard patterns", () => {
     expect(SOLID_AS_TEXT.test('className="bg-danger-solid"')).toBe(false);
   });
 
+  it("flags translucent foreground text but not translucent fills", () => {
+    expect(TRANSLUCENT_FOREGROUND.test('className="text-accent-foreground/80"')).toBe(true);
+    expect(TRANSLUCENT_FOREGROUND.test('className="bg-accent-foreground/10"')).toBe(false);
+    expect(TRANSLUCENT_FOREGROUND.test('className="text-accent-foreground"')).toBe(false);
+  });
+
   it("flags a dark: variant", () => {
     expect(DARK_VARIANT.test('className="dark:bg-surface"')).toBe(true);
     expect(DARK_VARIANT.test("const darkMode = true")).toBe(false);
@@ -173,6 +187,10 @@ describe("design-language style guard", () => {
 
   it("keeps dark: variants inside packages/ui", () => {
     expect(violations(DARK_VARIANT, ["apps/web/src", "apps/portal/src"])).toEqual([]);
+  });
+
+  it("never makes a foreground text colour translucent", () => {
+    expect(violations(TRANSLUCENT_FOREGROUND, ROOTS)).toEqual([]);
   });
 
   it("colours text with -foreground, never a -solid step", () => {

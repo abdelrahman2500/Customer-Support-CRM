@@ -176,7 +176,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
         <div className="flex items-center gap-2">
           {brandingQuery.data?.logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto" />
+            <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto rounded-inner bg-logo-plate p-0.5" />
           )}
           <Link href={`/${locale}/home`} className="rounded-md px-2 py-1.5 font-semibold text-ink">
             {t("signedInAs", { name: contact.fullName })}

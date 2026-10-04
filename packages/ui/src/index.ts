@@ -30,6 +30,16 @@
 export { cn } from "./lib/cn";
 export { contrastRatio, hexToRgb, parseChannels, relativeLuminance, toChannels } from "./lib/color";
 export type { Rgb } from "./lib/color";
+export {
+  THEME_COOKIE,
+  THEME_INIT_SCRIPT,
+  THEME_PREFERENCES,
+  applyThemePreference,
+  isThemePreference,
+  readThemePreference,
+} from "./lib/theme";
+export type { ThemePreference } from "./lib/theme";
+export { ThemeScript } from "./components/theme-script";
 
 // --- Icon vocabulary (Story S-5) -------------------------------------------
 // Semantic role names over glyph names, so "delete" is one decision made

@@ -38,7 +38,7 @@ Statuses never use `warning`/`danger`; priorities never use `info`/`progress`. *
 ## Theme
 
 - Light, dark and **system** (default). Mechanism: `:root` (light), `:root[data-theme="dark"]`, and `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`; `color-scheme` follows the theme.
-- Preference: the `crm-theme` cookie (`light` | `dark` | `system`), read server-side in each app's `[locale]/layout.tsx` to set `data-theme` before paint. No per-user database preference.
+- Preference: the `crm-theme` cookie (`light` | `dark` | `system`). An explicit light/dark is put on `<html>` before first paint by a blocking inline `ThemeScript` (`@crm/ui`) in each root `<head>`; "system" needs no script. The cookie is deliberately not read on the server, which would make the statically generated `[locale]` layouts dynamic. No per-user database preference.
 - Depth in dark mode comes from lighter surfaces (`sunk` < `surface` < `raised`), not shadows.
 - Uploaded branch logos sit on a light logo plate in dark mode.
 - `dark:` utilities are a last resort and confined to `packages/ui`.

@@ -242,7 +242,7 @@ export default function LoginPage() {
               insets so the composition mirrors under RTL. */}
           <div
             aria-hidden
-            className="pointer-events-none absolute -top-24 -start-24 h-80 w-80 rounded-pill bg-accent-foreground/20 blur-3xl"
+            className="pointer-events-none absolute -top-24 -start-24 h-80 w-80 rounded-pill bg-accent-foreground/10 blur-3xl"
           />
           <div
             aria-hidden
@@ -250,11 +250,11 @@ export default function LoginPage() {
           />
 
           <div className="relative flex max-w-lg flex-col gap-stack">
-            <span className="text-sm font-medium text-accent-foreground/80">
+            <span className="text-sm font-medium text-accent-foreground">
               {tCommon("appName")}
             </span>
             <h2 className="text-title">{t("marketing.headline")}</h2>
-            <p className="text-sm text-accent-foreground/80">{t("marketing.subheadline")}</p>
+            <p className="text-sm text-accent-foreground">{t("marketing.subheadline")}</p>
 
             <ul className="mt-stack flex flex-col gap-stack">
               {FEATURES.map(({ key, Icon }) => (
@@ -269,7 +269,7 @@ export default function LoginPage() {
                     <span className="text-sm font-semibold">
                       {t(`marketing.features.${key}.title`)}
                     </span>
-                    <span className="text-sm text-accent-foreground/80">
+                    <span className="text-sm text-accent-foreground">
                       {t(`marketing.features.${key}.description`)}
                     </span>
                   </span>

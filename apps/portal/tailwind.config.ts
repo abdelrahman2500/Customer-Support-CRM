@@ -23,6 +23,17 @@ const config: Config = {
   // only emits utilities it finds in `content`, so without this glob every
   // package-only class is silently dropped from the stylesheet.
   content: ["./src/**/*.{ts,tsx}", "../../packages/ui/src/**/*.{ts,tsx}"],
+  // Story 181 (RD-1.4) — `dark:` matches exactly what selects the dark
+  // tokens in @crm/config/tailwind-tokens.css: an explicit data-theme="dark",
+  // or the OS preference unless data-theme="light" opts out. Themes come from
+  // tokens; `dark:` is a last resort and the style guard keeps it in @crm/ui.
+  darkMode: [
+    "variant",
+    [
+      "@media (prefers-color-scheme: dark) { &:not(:where([data-theme=light], [data-theme=light] *)) }",
+      "&:where([data-theme=dark], [data-theme=dark] *)",
+    ],
+  ],
   theme: {
     extend: sharedThemeExtend,
   },

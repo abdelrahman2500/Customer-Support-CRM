@@ -83,6 +83,7 @@ const sharedThemeExtend = {
       surface: token("accent-surface"),
     },
     overlay: token("overlay"),
+    "logo-plate": token("logo-plate"),
     focus: token("focus"),
     success: {
       subtle: token("success-subtle"),
