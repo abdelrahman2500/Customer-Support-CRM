@@ -81,6 +81,15 @@
     "appName": "Customer Support CRM",
     "signedInAs": "Signed in as {name}",
     "signOut": "Sign out",
+    "header": {
+      "newTicket": "New ticket",
+      "notifications": "Notifications",
+      "notificationsUnread": "Notifications, {count} unread"
+    },
+    "userMenu": {
+      "label": "Account",
+      "trigger": "Account menu for {name}"
+    },
     "realtimeReconnecting": "Live updates are disconnected. Reconnecting…",
     "branchSwitcher": {
       "label": "Switch branch",

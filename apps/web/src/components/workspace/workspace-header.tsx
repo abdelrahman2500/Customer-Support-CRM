@@ -11,7 +11,10 @@ import { useMentionNotifications } from "@/hooks/use-mention-notifications";
 import { useRealtimeConnectionIssue } from "@/lib/realtime-connection";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
+  AddIcon,
   Alert,
+  Avatar,
+  Badge,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +24,11 @@ import {
   DropdownMenuTrigger,
   MenuIcon,
   NativeSelect,
+  NotificationsIcon,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Separator,
   ThemeSwitcher,
 } from "@crm/ui";
 import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
@@ -62,6 +70,15 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  *    navbar and the sidebar cannot each open their own query and cannot
  *    disagree about the answer.
  * 2. Story 129's `appName` override, below.
+ *
+ * Story 195 (RD-2.1) — header v2: one row of [hamburger below sm] [brand] …
+ * [New ticket] [notifications bell] [user menu]. The identity, branch
+ * switcher, language, theme, My sessions, Settings and Sign out moved into
+ * the user menu; their behaviour (the handlers below) is unchanged. The menu
+ * is a Popover, not a DropdownMenu: it holds native selects, and a Radix
+ * menu's roving focus and typeahead would capture their keys. The hamburger
+ * joined the header row instead of a third stacked bar (recon NAV-04), and
+ * the bell's accessible name carries the unread count (A11Y-11).
  */
 export function WorkspaceHeader({
   user,
@@ -178,102 +195,196 @@ export function WorkspaceHeader({
     router.push(buildLocalePath(pathname ?? `/${locale}`, locale, targetLocale));
   }
 
+  const activeMembership = memberships.find((m) => m.isActive);
+  const hasUnread = unreadCountKnown && unreadCount > 0;
+
   return (
     <>
-      <header
-        // Story 173 — `flex-wrap` + `gap-y-inline`. Below `sm` this row's own
-        // content exceeds a 320px viewport (measured: 354px EN, 367px AR),
-        // and it had no responsive treatment at all while RM-10/RM-11 gave
-        // both navigation surfaces theirs. Mirrors `apps/portal`'s header,
-        // which already carries `flex flex-wrap … gap-y-2` for exactly this;
-        // `gap-y-inline` is the same 0.5rem spelled as Story 134's token.
-        // Wrapping, never hiding: every control below stays operable.
-        className="flex flex-wrap items-center justify-between gap-y-inline border-b-2 border-brand bg-surface px-6 py-3"
-      >
-        {branding?.logoUrl ? (
-          // `max-w-32 … sm:max-w-none` — a configured logo is unbounded free
-          // content, the same hazard the text brand below already guards with
-          // `truncate`; it claimed 57px of the 320px budget. Capped only
-          // below `sm`, so the natural desktop presentation is untouched.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={branding.logoUrl}
-            alt={brandName}
-            className="h-8 w-auto max-w-32 rounded-inner bg-logo-plate object-contain p-0.5 sm:max-w-none"
-          />
-        ) : (
-          <Link
-            href={`/${locale}/tickets`}
-            // `truncate` — Story 129's `appName` is free text capped at 60
-            // characters, which is still long enough to push the header's
-            // controls off-screen on a narrow viewport if left unbounded.
-            className="truncate text-sm font-semibold text-ink-strong"
-          >
-            {brandName}
+      <header className="flex items-center gap-2 border-b-2 border-brand bg-surface px-4 py-3 sm:gap-3 sm:px-6">
+        {/* RM-11 — the hamburger, below `sm` only. Story 129 — at `sm` and up
+            the branch's chosen presentation (navbar or sidebar) takes over,
+            and both are `hidden sm:flex`, so exactly one navigation surface
+            is ever visible. Story 195 — moved into the header row (NAV-04). */}
+        <div className="sm:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon-sm" aria-label={t("nav.menuLabel")}>
+                <MenuIcon className="h-4 w-4" aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {NAV_GROUPS.map((group, groupIndex) => (
+                <Fragment key={group.groupKey}>
+                  {groupIndex > 0 && <DropdownMenuSeparator />}
+                  <DropdownMenuLabel>{t(`nav.groups.${group.groupKey}`)}</DropdownMenuLabel>
+                  {group.items.map((item) => {
+                    const href = `/${locale}/${item.href}`;
+                    const isActive = isNavItemActive(pathname, href);
+                    return (
+                      <DropdownMenuItem key={item.href} asChild>
+                        <Link href={href} aria-current={isActive ? "page" : undefined}>
+                          <NavItemLabel
+                            item={item}
+                            t={t}
+                            unreadCount={unreadCount}
+                            unreadCountKnown={unreadCountKnown}
+                            // A `DropdownMenuItem` in BOTH layouts — this
+                            // hamburger is the only navigation below `sm`
+                            // whether the branch chose navbar or sidebar.
+                            inMenu
+                          />
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* `min-w-0` — the brand is the one elastic item in the row. */}
+        <div className="flex min-w-0 flex-1 items-center">
+          {branding?.logoUrl ? (
+            // `max-w-32 … sm:max-w-none` — a configured logo is unbounded free
+            // content, the same hazard the text brand below already guards with
+            // `truncate`. Capped only below `sm`, so the natural desktop
+            // presentation is untouched.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={branding.logoUrl}
+              alt={brandName}
+              className="h-8 w-auto max-w-32 rounded-inner bg-logo-plate object-contain p-0.5 sm:max-w-none"
+            />
+          ) : (
+            <Link
+              href={`/${locale}/tickets`}
+              // `truncate` — Story 129's `appName` is free text capped at 60
+              // characters, long enough to push the header's controls
+              // off-screen on a narrow viewport if left unbounded.
+              className="focus-ring min-w-0 truncate rounded-inner text-sm font-semibold text-ink-strong"
+            >
+              {brandName}
+            </Link>
+          )}
+        </div>
+
+        {/* New ticket — the primary action on every page. Icon-only below
+            `sm` (its label stays the accessible name via `sr-only`). */}
+        <Button asChild size="sm" className="w-8 shrink-0 px-0 sm:w-auto sm:px-3">
+          <Link href={`/${locale}/tickets/new`}>
+            <AddIcon className="h-4 w-4" aria-hidden />
+            <span className="sr-only sm:not-sr-only">{t("header.newTicket")}</span>
           </Link>
-        )}
-        {/* Story 173 — `flex-wrap` here too, not just on the `<header>`.
-            Measured with a branch switcher present at 320px: wrapping the
-            header alone still overflowed (360px EN, 372px AR), because this
-            cluster's own children cannot compress — two `<select>`s and a
-            `Button` whose `whitespace-nowrap` is correct and deliberately
-            not overridden. Letting the cluster wrap is what actually makes
-            the multi-membership case fit. `gap-4` stays the column gap;
-            `gap-y-inline` applies only between wrapped lines, so an
-            unwrapped row is unchanged. */}
-        <div className="flex min-w-0 flex-wrap items-center gap-4 gap-y-inline text-sm text-ink-muted">
-          {/* `min-w-0` and `truncate` together, never one alone: `truncate`
-              sets `white-space: nowrap`, which would raise this item's
-              automatic minimum width to the whole string and make the row
-              wider than before. This is the one genuinely elastic item, so
-              it is the one that yields. */}
-          <span className="min-w-0 truncate">{t("signedInAs", { name: user.fullName })}</span>
-          {memberships.length > 1 && (
-            // Story 182 (RD-1.5) — the shared NativeSelect: same native
-            // control, now with the token focus ring and control border.
+        </Button>
+
+        {/* The count is part of the link's accessible name; the visual badge
+            is aria-hidden so it is not announced twice (A11Y-11). */}
+        <Button asChild variant="ghost" size="icon-sm" className="relative shrink-0">
+          <Link
+            href={`/${locale}/notifications`}
+            aria-label={
+              hasUnread
+                ? t("header.notificationsUnread", { count: unreadCount })
+                : t("header.notifications")
+            }
+          >
+            <NotificationsIcon className="h-4 w-4" aria-hidden />
+            {hasUnread && (
+              <Badge
+                variant="destructive"
+                size="sm"
+                aria-hidden="true"
+                className="absolute -end-1 -top-1 min-w-4 justify-center px-1 tabular-nums"
+              >
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </Badge>
+            )}
+          </Link>
+        </Button>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t("userMenu.trigger", { name: user.fullName })}
+              className="min-w-0 shrink-0 gap-2 px-1 sm:px-2"
+            >
+              <Avatar name={user.fullName} size="sm" decorative />
+              <span className="hidden max-w-40 truncate sm:inline">{user.fullName}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            aria-label={t("userMenu.label")}
+            className="flex flex-col gap-3"
+          >
+            {/* `min-w-0` and `truncate` together: the identity is the one
+                elastic line in the menu. */}
+            <p className="min-w-0 truncate text-sm text-ink-muted">
+              {t("signedInAs", { name: user.fullName })}
+            </p>
+            {memberships.length > 1 && (
+              // Story 182 (RD-1.5) — the shared NativeSelect.
+              <NativeSelect
+                aria-label={t("branchSwitcher.label")}
+                className="w-full"
+                value={`${activeMembership?.branchId ?? ""}::${activeMembership?.departmentId ?? ""}`}
+                onValueChange={(value) => void handleSwitchBranch(value)}
+                options={memberships.map((membership) => ({
+                  value: `${membership.branchId}::${membership.departmentId ?? ""}`,
+                  label: membership.departmentId
+                    ? t("branchSwitcher.branchAndDepartment", {
+                        branch: membership.branchName,
+                        department: membership.departmentName ?? "",
+                      })
+                    : membership.branchName,
+                }))}
+              />
+            )}
+            {branchSwitchError && (
+              <span role="alert" className="text-sm text-danger-foreground">
+                {branchSwitchError}
+              </span>
+            )}
             <NativeSelect
-              aria-label={t("branchSwitcher.label")}
-              value={`${memberships.find((m) => m.isActive)?.branchId ?? ""}::${
-                memberships.find((m) => m.isActive)?.departmentId ?? ""
-              }`}
-              onValueChange={(value) => void handleSwitchBranch(value)}
-              options={memberships.map((membership) => ({
-                value: `${membership.branchId}::${membership.departmentId ?? ""}`,
-                label: membership.departmentId
-                  ? t("branchSwitcher.branchAndDepartment", {
-                      branch: membership.branchName,
-                      department: membership.departmentName ?? "",
-                    })
-                  : membership.branchName,
+              aria-label={t("languageSwitcher.label")}
+              className="w-full"
+              value={locale}
+              onValueChange={(value) => void handleSwitchLocale(value)}
+              options={LOCALES.map((localeOption) => ({
+                value: localeOption,
+                label: t(`languageSwitcher.options.${localeOption}`),
               }))}
             />
-          )}
-          {branchSwitchError && (
-            <span role="alert" className="text-danger-foreground">
-              {branchSwitchError}
-            </span>
-          )}
-          <NativeSelect
-            aria-label={t("languageSwitcher.label")}
-            value={locale}
-            onValueChange={(value) => void handleSwitchLocale(value)}
-            options={LOCALES.map((localeOption) => ({
-              value: localeOption,
-              label: t(`languageSwitcher.options.${localeOption}`),
-            }))}
-          />
-          <ThemeSwitcher
-            label={t("themeSwitcher.label")}
-            optionLabels={{
-              system: t("themeSwitcher.options.system"),
-              light: t("themeSwitcher.options.light"),
-              dark: t("themeSwitcher.options.dark"),
-            }}
-          />
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
-            {t("signOut")}
-          </Button>
-        </div>
+            <ThemeSwitcher
+              label={t("themeSwitcher.label")}
+              className="w-full"
+              optionLabels={{
+                system: t("themeSwitcher.options.system"),
+                light: t("themeSwitcher.options.light"),
+                dark: t("themeSwitcher.options.dark"),
+              }}
+            />
+            <Separator />
+            <div className="flex flex-col">
+              {(["my-sessions", "settings"] as const).map((href) => (
+                <Link
+                  key={href}
+                  href={`/${locale}/${href}`}
+                  className="focus-ring rounded-inner px-2 py-1.5 text-sm text-ink hover:bg-surface-muted"
+                >
+                  {t(href === "settings" ? "nav.settings" : "nav.mySessions")}
+                </Link>
+              ))}
+            </div>
+            <Separator />
+            <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut}>
+              {t("signOut")}
+            </Button>
+          </PopoverContent>
+        </Popover>
       </header>
       {/* Batch 7 (UX audit) — a non-destructive banner while the shared
           realtime connection is down after having been up (see
@@ -286,49 +397,6 @@ export function WorkspaceHeader({
           {t("realtimeReconnecting")}
         </Alert>
       )}
-      {/* RM-11 — the hamburger toggle only, below `sm`. Story 129 — at `sm`
-          and up the branch's chosen presentation (navbar or sidebar) takes
-          over, and both of those are `hidden sm:flex`, so exactly one
-          navigation surface is ever visible and this one hamburger serves
-          both layouts. That is also why the sidebar rail can never occupy
-          a phone's width. */}
-      <div className="border-b border-rule bg-surface px-6 py-2 sm:hidden">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" aria-label={t("nav.menuLabel")}>
-              <MenuIcon className="h-4 w-4" aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {NAV_GROUPS.map((group, groupIndex) => (
-              <Fragment key={group.groupKey}>
-                {groupIndex > 0 && <DropdownMenuSeparator />}
-                <DropdownMenuLabel>{t(`nav.groups.${group.groupKey}`)}</DropdownMenuLabel>
-                {group.items.map((item) => {
-                  const href = `/${locale}/${item.href}`;
-                  const isActive = isNavItemActive(pathname, href);
-                  return (
-                    <DropdownMenuItem key={item.href} asChild>
-                      <Link href={href} aria-current={isActive ? "page" : undefined}>
-                        <NavItemLabel
-                          item={item}
-                          t={t}
-                          unreadCount={unreadCount}
-                          unreadCountKnown={unreadCountKnown}
-                          // A `DropdownMenuItem` in BOTH layouts — this
-                          // hamburger is the only navigation below `sm`
-                          // whether the branch chose navbar or sidebar.
-                          inMenu
-                        />
-                      </Link>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </Fragment>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
     </>
   );
 }

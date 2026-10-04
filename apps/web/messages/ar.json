@@ -81,6 +81,15 @@
     "appName": "نظام إدارة خدمة العملاء",
     "signedInAs": "مسجّل الدخول باسم {name}",
     "signOut": "تسجيل الخروج",
+    "header": {
+      "newTicket": "تذكرة جديدة",
+      "notifications": "الإشعارات",
+      "notificationsUnread": "الإشعارات، {count} غير مقروءة"
+    },
+    "userMenu": {
+      "label": "الحساب",
+      "trigger": "قائمة الحساب الخاصة بـ {name}"
+    },
     "realtimeReconnecting": "الاتصال اللحظي منقطع. جارٍ إعادة المحاولة…",
     "branchSwitcher": {
       "label": "تبديل الفرع",

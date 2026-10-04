@@ -127,6 +127,15 @@ function renderHeader(
   );
 }
 
+/** Story 195 (RD-2.1) — the identity, branch switcher, language, theme,
+ * My sessions, Settings and Sign out live in the user menu now, so a test
+ * that drives one of them opens the menu first. The behaviour under test is
+ * unchanged. */
+const userMenuTriggerName = `userMenu.trigger:${JSON.stringify({ name: user.fullName })}`;
+function openUserMenu() {
+  fireEvent.click(screen.getByRole("button", { name: userMenuTriggerName }));
+}
+
 describe("WorkspaceHeader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -154,6 +163,7 @@ describe("WorkspaceHeader", () => {
 
   it("renders the app name and the signed-in user's name", () => {
     renderHeader();
+    openUserMenu();
 
     expect(screen.getByText("appName")).toBeInTheDocument();
     expect(
@@ -172,6 +182,7 @@ describe("WorkspaceHeader", () => {
 
   it("calls the real logout, then clears the local token and query cache, and redirects to login, on sign-out", async () => {
     renderHeader();
+    openUserMenu();
 
     fireEvent.click(screen.getByText("signOut"));
 
@@ -187,6 +198,7 @@ describe("WorkspaceHeader", () => {
     mockedLogout.mockRejectedValue(new Error("network down"));
 
     renderHeader();
+    openUserMenu();
 
     fireEvent.click(screen.getByText("signOut"));
 
@@ -203,6 +215,7 @@ describe("WorkspaceHeader", () => {
     );
 
     renderHeader();
+    openUserMenu();
     fireEvent.click(screen.getByText("signOut"));
 
     // Let any already-queued microtasks run while the logout promise is
@@ -220,6 +233,7 @@ describe("WorkspaceHeader", () => {
 
   it("still renders the app-name link and sign-out button unchanged, alongside the signed-in text", () => {
     renderHeader();
+    openUserMenu();
 
     expect(screen.getByRole("link", { name: "appName" })).toHaveAttribute("href", "/en/tickets");
     expect(screen.getByRole("button", { name: "signOut" })).toBeInTheDocument();
@@ -510,6 +524,7 @@ describe("WorkspaceHeader", () => {
 
     it("renders no switcher for a user with only one membership", () => {
       renderHeader();
+      openUserMenu();
 
       expect(screen.queryByLabelText("branchSwitcher.label")).not.toBeInTheDocument();
     });
@@ -518,6 +533,7 @@ describe("WorkspaceHeader", () => {
       mockedUseMyBranchMembershipsQuery.mockReturnValue({ data: twoMemberships } as never);
 
       renderHeader();
+      openUserMenu();
 
       const select = screen.getByLabelText("branchSwitcher.label") as HTMLSelectElement;
       expect(select).toHaveValue("branch-1::");
@@ -530,6 +546,7 @@ describe("WorkspaceHeader", () => {
       mockedSwitchBranch.mockResolvedValue("new-access-token");
 
       renderHeader();
+      openUserMenu();
       fireEvent.change(screen.getByLabelText("branchSwitcher.label"), {
         target: { value: "branch-2::" },
       });
@@ -557,6 +574,7 @@ describe("WorkspaceHeader", () => {
       mockedSwitchBranch.mockResolvedValue("new-access-token");
 
       renderHeader();
+      openUserMenu();
       fireEvent.change(screen.getByLabelText("branchSwitcher.label"), {
         target: { value: "branch-2::dept-2" },
       });
@@ -572,6 +590,7 @@ describe("WorkspaceHeader", () => {
       mockedSwitchBranch.mockRejectedValue(new ApiError("Forbidden", 403));
 
       renderHeader();
+      openUserMenu();
       fireEvent.change(screen.getByLabelText("branchSwitcher.label"), {
         target: { value: "branch-2::" },
       });
@@ -586,6 +605,7 @@ describe("WorkspaceHeader", () => {
       mockedSwitchBranch.mockRejectedValue(new ApiError("Server error", 500));
 
       renderHeader();
+      openUserMenu();
       fireEvent.change(screen.getByLabelText("branchSwitcher.label"), {
         target: { value: "branch-2::" },
       });
@@ -598,6 +618,7 @@ describe("WorkspaceHeader", () => {
       mockedSwitchBranch.mockRejectedValueOnce(new ApiError("Server error", 500));
 
       renderHeader();
+      openUserMenu();
       const select = screen.getByLabelText("branchSwitcher.label");
       fireEvent.change(select, { target: { value: "branch-2::" } });
       await screen.findByRole("alert");
@@ -647,36 +668,28 @@ describe("WorkspaceHeader", () => {
       },
     ];
 
-    it("lets the header row wrap instead of overflowing", () => {
+    /**
+     * Story 195 (RD-2.1) — header v2 replaces Story 173's wrapping rows with a
+     * single row that fits 320px by construction: the user's controls moved
+     * into the user menu, and the brand is the one elastic item. The
+     * mechanism is pinned here; the 320px behaviour is proven in a browser.
+     */
+    it("keeps the header to one row whose brand is the only elastic item", () => {
       const { container } = renderHeader();
 
       const header = container.querySelector("header")!;
-      expect(header).toHaveClass("flex-wrap");
-      expect(header).toHaveClass("gap-y-inline");
-      expect(header).not.toHaveClass("flex-nowrap");
-    });
-
-    /**
-     * The guard for the multi-membership case. Wrapping the `<header>` alone
-     * was measured insufficient (360px EN / 372px AR with a branch switcher
-     * present) because this cluster's own children cannot compress.
-     */
-    it("lets the controls cluster itself wrap, and lets it shrink", () => {
-      const { container } = renderHeader();
-
-      const cluster = container.querySelector("header")!.children[1];
-      expect(cluster).toHaveClass("min-w-0");
-      expect(cluster).toHaveClass("flex-wrap");
-      expect(cluster).toHaveClass("gap-y-inline");
-      // The column gap is unchanged.
-      expect(cluster).toHaveClass("gap-4");
+      expect(header).toHaveClass("flex", "items-center");
+      expect(header).not.toHaveClass("flex-wrap");
+      const brandLink = screen.getByRole("link", { name: "appName" });
+      expect(brandLink).toHaveClass("min-w-0", "truncate");
+      expect(brandLink.parentElement).toHaveClass("min-w-0", "flex-1");
     });
 
     /** Both classes asserted together — `truncate` without `min-w-0` raises
-     * the item's automatic minimum width to the whole string and makes the
-     * overflow worse, so a partial application must fail this test. */
-    it("makes the signed-in identity the elastic, truncatable item", () => {
+     * the item's automatic minimum width to the whole string. */
+    it("makes the signed-in identity in the user menu the elastic, truncatable item", () => {
       renderHeader();
+      openUserMenu();
 
       const identity = screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`);
       expect(identity).toHaveClass("min-w-0");
@@ -705,19 +718,31 @@ describe("WorkspaceHeader", () => {
     it("keeps every control present in the multi-membership case, hiding nothing", () => {
       mockedUseMyBranchMembershipsQuery.mockReturnValue({ data: twoMemberships } as never);
 
-      const { container } = renderHeader();
+      renderHeader();
+      const trigger = screen.getByRole("button", { name: userMenuTriggerName });
+      const newTicket = screen.getByRole("link", { name: "header.newTicket" });
+      const bell = screen.getByRole("link", { name: "header.notifications" });
+      openUserMenu();
 
       const identity = screen.getByText(`signedInAs:${JSON.stringify({ name: user.fullName })}`);
       const branchSwitcher = screen.getByLabelText("branchSwitcher.label");
       const languageSwitcher = screen.getByLabelText("languageSwitcher.label");
+      const themeSwitcher = screen.getByLabelText("themeSwitcher.label");
       const signOut = screen.getByRole("button", { name: "signOut" });
 
-      for (const control of [identity, branchSwitcher, languageSwitcher, signOut]) {
+      for (const control of [
+        trigger,
+        newTicket,
+        bell,
+        identity,
+        branchSwitcher,
+        languageSwitcher,
+        themeSwitcher,
+        signOut,
+      ]) {
         expect(control).toBeInTheDocument();
         expect(control.className.split(/\s+/)).not.toContain("hidden");
       }
-      const cluster = container.querySelector("header")!.children[1]!;
-      expect(cluster.className.split(/\s+/)).not.toContain("hidden");
     });
 
     /**
@@ -733,8 +758,14 @@ describe("WorkspaceHeader", () => {
         branding: branding({ logoUrl: "https://example.com/logo.png" }),
       });
 
+      openUserMenu();
       const header = container.querySelector("header")!;
-      for (const element of [header, ...header.querySelectorAll("[class]")]) {
+      const menu = screen.getByRole("dialog");
+      for (const element of [
+        header,
+        ...header.querySelectorAll("[class]"),
+        ...menu.querySelectorAll("[class]"),
+      ]) {
         const classes = element.className.toString().split(/\s+/);
         expect(classes.some((c) => /^(ml|mr|pl|pr|left|right|text-left|text-right)-/.test(c))).toBe(
           false,
@@ -744,16 +775,108 @@ describe("WorkspaceHeader", () => {
     });
   });
 
+  // Story 195 (RD-2.1) — header v2: New ticket, the notifications bell and
+  // the user menu.
+  describe("header v2 (Story 195)", () => {
+    it("links New ticket to the create page under the active locale", () => {
+      const { unmount } = renderHeader();
+      expect(screen.getByRole("link", { name: "header.newTicket" })).toHaveAttribute(
+        "href",
+        "/en/tickets/new",
+      );
+      unmount();
+
+      locale = "ar";
+      try {
+        renderHeader();
+        expect(screen.getByRole("link", { name: "header.newTicket" })).toHaveAttribute(
+          "href",
+          "/ar/tickets/new",
+        );
+      } finally {
+        locale = "en";
+      }
+    });
+
+    it("names the notifications bell without a count while it is unknown or zero", () => {
+      const { unmount } = renderHeader({ unreadCount: 4, unreadCountKnown: false });
+      expect(screen.getByRole("link", { name: "header.notifications" })).toHaveAttribute(
+        "href",
+        "/en/notifications",
+      );
+      unmount();
+
+      renderHeader({ unreadCount: 0, unreadCountKnown: true });
+      expect(screen.getByRole("link", { name: "header.notifications" })).toBeInTheDocument();
+    });
+
+    it("puts the unread count in the bell's accessible name and hides the visual badge from assistive tech", () => {
+      renderHeader({ unreadCount: 3, unreadCountKnown: true });
+
+      const bell = screen.getByRole("link", {
+        name: `header.notificationsUnread:${JSON.stringify({ count: 3 })}`,
+      });
+      const badge = within(bell).getByText("3");
+      expect(badge).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("caps the visual count at 99+", () => {
+      renderHeader({ unreadCount: 120, unreadCountKnown: true });
+
+      expect(screen.getByText("99+")).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("opens a labelled account menu holding every account control and link", () => {
+      renderHeader();
+      openUserMenu();
+
+      const menu = screen.getByRole("dialog", { name: "userMenu.label" });
+      expect(within(menu).getByLabelText("languageSwitcher.label")).toBeInTheDocument();
+      expect(within(menu).getByLabelText("themeSwitcher.label")).toBeInTheDocument();
+      expect(within(menu).getByRole("button", { name: "signOut" })).toBeInTheDocument();
+      expect(within(menu).getByRole("link", { name: "nav.mySessions" })).toHaveAttribute(
+        "href",
+        "/en/my-sessions",
+      );
+      expect(within(menu).getByRole("link", { name: "nav.settings" })).toHaveAttribute(
+        "href",
+        "/en/settings",
+      );
+    });
+
+    it("closes the account menu on Escape and returns focus to its trigger", async () => {
+      const ue = userEvent.setup();
+      renderHeader();
+
+      const trigger = screen.getByRole("button", { name: userMenuTriggerName });
+      await ue.click(trigger);
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+      await ue.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(trigger).toHaveFocus();
+    });
+
+    it("puts the hamburger in the header row (NAV-04)", () => {
+      const { container } = renderHeader();
+
+      const toggle = screen.getByRole("button", { name: "nav.menuLabel" });
+      expect(container.querySelector("header")).toContainElement(toggle);
+    });
+  });
+
   // Story 119 — i18n/RTL: Persisted locale preference + language switcher.
   describe("language switcher (Story 119)", () => {
     it("renders a switcher pre-selecting the current URL locale", () => {
       renderHeader();
+      openUserMenu();
 
       expect(screen.getByLabelText("languageSwitcher.label")).toHaveValue("en");
     });
 
     it("persists the new locale and navigates to the same page under the new locale segment", async () => {
       renderHeader();
+      openUserMenu();
 
       fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
         target: { value: "ar" },
@@ -767,6 +890,7 @@ describe("WorkspaceHeader", () => {
       mockedUpdatePreferredLocale.mockRejectedValue(new Error("network down"));
 
       renderHeader();
+      openUserMenu();
       fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
         target: { value: "ar" },
       });
@@ -776,6 +900,7 @@ describe("WorkspaceHeader", () => {
 
     it("does nothing when re-selecting the already-active locale", async () => {
       renderHeader();
+      openUserMenu();
 
       fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
         target: { value: "en" },
@@ -790,6 +915,7 @@ describe("WorkspaceHeader", () => {
       pathname = "/en/tickets/ticket-1";
 
       renderHeader();
+      openUserMenu();
       fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
         target: { value: "ar" },
       });
