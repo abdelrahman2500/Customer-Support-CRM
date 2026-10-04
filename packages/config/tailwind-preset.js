@@ -105,6 +105,7 @@ const sharedThemeExtend = {
       solid: {
         DEFAULT: token("danger-solid"),
         hover: token("danger-solid-hover"),
+        foreground: token("danger-solid-foreground"),
       },
       foreground: token("danger-foreground"),
     },

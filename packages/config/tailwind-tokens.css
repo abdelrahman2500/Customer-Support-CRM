@@ -181,6 +181,9 @@
     /* Story 178 (RD-1.1) — was red-500, which carried white text at only
      * 3.76:1 on hover; red-700 is 6.47:1. Hover now darkens. */
     --danger-solid-hover: 185 28 28;
+    /* Story 180 (RD-1.3) — text on the destructive fill (was a raw text-white
+     * in Button); 4.83:1 on --danger-solid and 6.47:1 on its hover. */
+    --danger-solid-foreground: 255 255 255;
     --danger-foreground: 153 27 27; /* was: red-800 — 6.9:1 on -surface */
 
     /* `info` had no palette before this story — the one blue in the app

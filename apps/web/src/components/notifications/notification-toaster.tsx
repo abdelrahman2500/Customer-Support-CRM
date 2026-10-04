@@ -102,7 +102,7 @@ export function NotificationToaster({
             aria-live="polite"
             className={cn(
               "pointer-events-auto flex flex-col gap-2 rounded-md border bg-surface p-3 shadow-md",
-              notification.eventType === "sla.breached" ? "border-red-200" : "border-rule",
+              notification.eventType === "sla.breached" ? "border-danger-border" : "border-rule",
             )}
           >
             <div className="flex items-start justify-between gap-2">

@@ -534,7 +534,7 @@ export function ReportsView() {
                   ))}
                 </ul>
                 {aiUsageQuery.data.unpricedCallCount > 0 && (
-                  <p className="text-xs text-amber-700">
+                  <p className="text-xs text-warning-foreground">
                     {t("aiUsage.unpricedWarning", { count: aiUsageQuery.data.unpricedCallCount })}
                   </p>
                 )}

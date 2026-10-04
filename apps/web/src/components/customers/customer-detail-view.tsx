@@ -194,7 +194,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
           />
         </div>
         {portalPasswordSuccess && (
-          <p className="text-xs text-emerald-600">{t("detail.portalPasswordSuccess")}</p>
+          <p className="text-xs text-success-foreground">{t("detail.portalPasswordSuccess")}</p>
         )}
         {portalPasswordMutation.isError && (
           <p className="text-xs text-danger-foreground">

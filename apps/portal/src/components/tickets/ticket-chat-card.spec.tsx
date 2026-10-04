@@ -251,7 +251,7 @@ describe("TicketChatCard (portal)", () => {
 
       render(<TicketChatCard ticketId="ticket-1" />);
 
-      expect(screen.getByText("detail.chatDeliveryStatus.FAILED")).toHaveClass("text-red-700");
+      expect(screen.getByText("detail.chatDeliveryStatus.FAILED")).toHaveClass("text-danger-foreground");
     });
   });
 

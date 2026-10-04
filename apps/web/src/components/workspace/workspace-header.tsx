@@ -252,7 +252,7 @@ export function WorkspaceHeader({
             </select>
           )}
           {branchSwitchError && (
-            <span role="alert" className="text-danger-solid">
+            <span role="alert" className="text-danger-foreground">
               {branchSwitchError}
             </span>
           )}

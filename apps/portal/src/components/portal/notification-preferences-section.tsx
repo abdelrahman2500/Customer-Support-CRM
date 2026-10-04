@@ -89,7 +89,7 @@ function PreferenceRow({ preference }: { preference: PortalNotificationPreferenc
         <span
           className={`rounded-full border px-2 py-0.5 text-xs ${
             preference.inAppEnabled
-              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+              ? "border-success-border bg-success-subtle text-success-foreground"
               : "border-rule-strong bg-surface-sunk text-ink-muted"
           }`}
         >

@@ -29,7 +29,7 @@ const buttonVariants = cva(
         default: "bg-accent text-accent-foreground hover:bg-accent-hover",
         outline: "border border-rule-strong bg-surface text-ink hover:bg-surface-sunk",
         ghost: "text-ink-strong hover:bg-surface-muted",
-        destructive: "bg-danger-solid text-white hover:bg-danger-solid-hover",
+        destructive: "bg-danger-solid text-danger-solid-foreground hover:bg-danger-solid-hover",
       },
       size: {
         default: "h-9 px-4 py-2",

@@ -373,7 +373,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
               isPending={resetPasswordMutation.isPending}
             />
             {passwordResetSuccess && (
-              <p className="text-xs text-emerald-600">{t("list.passwordResetSuccess")}</p>
+              <p className="text-xs text-success-foreground">{t("list.passwordResetSuccess")}</p>
             )}
             {resetPasswordMutation.isError && (
               <p className="text-xs text-danger-foreground">

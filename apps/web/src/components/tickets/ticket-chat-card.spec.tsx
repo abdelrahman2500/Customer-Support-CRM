@@ -439,7 +439,7 @@ describe("TicketChatCard", () => {
 
       render(<TicketChatCard ticketId="ticket-1" />);
 
-      expect(screen.getByText("detail.chatDeliveryStatus.FAILED")).toHaveClass("text-danger-solid");
+      expect(screen.getByText("detail.chatDeliveryStatus.FAILED")).toHaveClass("text-danger-foreground");
     });
   });
 

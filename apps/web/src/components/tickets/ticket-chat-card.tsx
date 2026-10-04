@@ -165,7 +165,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
                       {" · "}
                       <span
                         className={
-                          message.deliveryStatus === "FAILED" ? "text-danger-solid" : undefined
+                          message.deliveryStatus === "FAILED" ? "text-danger-foreground" : undefined
                         }
                       >
                         {t(`detail.chatDeliveryStatus.${message.deliveryStatus}`)}

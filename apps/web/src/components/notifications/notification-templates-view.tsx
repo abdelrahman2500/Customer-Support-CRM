@@ -253,7 +253,7 @@ function TemplateLifecycleToggle({ template }: { template: NotificationTemplateS
         />
       </div>
       {mutation.isError && (
-        <p className="text-xs text-danger-solid">
+        <p className="text-xs text-danger-foreground">
           {errorMessage(mutation.error, {
             forbidden: t("saveForbidden"),
             generic: t("saveFailed"),
