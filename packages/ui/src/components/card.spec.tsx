@@ -50,8 +50,9 @@ describe("Card", () => {
 
     const card = container.firstElementChild as HTMLElement;
     // Story 139 — the chrome now comes from the Story 134 tokens. Each is
-    // value-identical to the class it replaced: --radius-surface is
-    // 0.375rem (rounded-md) and --space-surface is 1rem (p-4).
+    // value-identical to the class it replaced at the time (--radius-surface
+    // 0.375rem, --space-surface 1rem). Stories 179 and 187 later moved the
+    // values (12px, 1.25rem); these assertions check the token classes.
     expect(card).toHaveClass("rounded-surface");
     expect(card).toHaveClass("border");
     expect(card).toHaveClass("border-rule");

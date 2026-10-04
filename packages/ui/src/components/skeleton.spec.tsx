@@ -18,7 +18,8 @@ describe("Skeleton", () => {
 
     const element = container.firstElementChild as HTMLElement;
     expect(element).toHaveClass("animate-pulse");
-    expect(element).toHaveClass("rounded-md");
+    // Story 187 — the nested-item radius token (was rounded-md).
+    expect(element).toHaveClass("rounded-inner");
     expect(element).toHaveClass("bg-rule");
   });
 

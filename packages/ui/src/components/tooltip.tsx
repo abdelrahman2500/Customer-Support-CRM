@@ -41,7 +41,7 @@ export const TooltipContent = React.forwardRef<
       // Inverted (ink ground, surface text) so a tooltip reads as an overlay
       // annotation rather than as another card.
       className={cn(
-        "z-50 max-w-xs rounded-md bg-ink px-2.5 py-1.5 text-xs text-surface shadow-md",
+        "z-50 max-w-xs rounded-inner bg-ink px-2.5 py-1.5 text-xs text-surface shadow-raised data-[state=delayed-open]:animate-fade-in data-[state=instant-open]:animate-fade-in data-[state=closed]:animate-fade-out",
         className,
       )}
       {...props}

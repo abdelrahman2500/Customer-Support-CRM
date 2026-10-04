@@ -72,3 +72,23 @@ describe("Tooltip", () => {
     expect(tooltip).toHaveClass("text-surface");
   });
 });
+
+describe("Tooltip design-language surface (Story 187)", () => {
+  it("uses the inner radius and raised shadow, and fades for both open states", async () => {
+    const user = userEvent.setup();
+    renderTooltip();
+
+    await user.tab();
+    const tooltip = await screen.findByRole("tooltip");
+    const styled = tooltip.classList.contains("bg-ink")
+      ? tooltip
+      : (tooltip.closest(".bg-ink") ?? tooltip.parentElement!);
+    expect(styled).toHaveClass(
+      "rounded-inner",
+      "shadow-raised",
+      "data-[state=delayed-open]:animate-fade-in",
+      "data-[state=instant-open]:animate-fade-in",
+      "data-[state=closed]:animate-fade-out",
+    );
+  });
+});

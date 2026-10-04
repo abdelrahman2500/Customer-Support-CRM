@@ -63,3 +63,15 @@ describe("EmptyState", () => {
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
   });
 });
+
+describe("EmptyState design-language surface (Story 187)", () => {
+  it("sits on the surface radius and puts its icon in an aria-hidden tinted disc", () => {
+    const { container } = render(
+      <EmptyState title="No tickets yet." icon={<svg data-testid="glyph" />} />,
+    );
+    expect(container.firstElementChild).toHaveClass("rounded-surface", "px-6", "py-10");
+    const disc = screen.getByTestId("glyph").parentElement;
+    expect(disc).toHaveClass("rounded-pill", "bg-surface-muted");
+    expect(disc).toHaveAttribute("aria-hidden", "true");
+  });
+});

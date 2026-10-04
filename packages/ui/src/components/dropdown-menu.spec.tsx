@@ -149,3 +149,16 @@ describe("DropdownMenu", () => {
     expect(item).toHaveClass("focus-ring-always");
   });
 });
+
+describe("DropdownMenu design-language surface (Story 187)", () => {
+  it("opens on the raised surface, and a plain item reserves no check-mark gutter", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: "Actions" }));
+    expect(await screen.findByRole("menu")).toHaveClass("bg-surface-raised", "shadow-raised");
+    const item = screen.getByRole("menuitem", { name: "Edit" });
+    expect(item).toHaveClass("px-2");
+    expect(item).not.toHaveClass("ps-8");
+  });
+});

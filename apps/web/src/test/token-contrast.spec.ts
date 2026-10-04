@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import sharedThemeExtend from "@crm/config/tailwind-preset";
 import { CORE_PREVIEW_PALETTE, contrastRatio, parseChannels } from "@crm/ui";
 import type { Rgb } from "@crm/ui";
 
@@ -178,5 +179,27 @@ describe("CORE_PREVIEW_PALETTE mirrors the token file", () => {
     })) {
       expect([...palette.accent[key as keyof typeof palette.accent]], key).toEqual(tokens.get(token));
     }
+  });
+});
+
+/**
+ * Story 187 (RD-1.10) — overlay motion and the comfortable card padding.
+ * A dialog is centred with translate(-50%, -50%); a zoom keyframe that
+ * animated `transform` would overwrite that while the dialog opens.
+ */
+describe("surface and overlay tokens (Story 187)", () => {
+  it.each(["zoom-in", "zoom-out"])("%s animates scale and opacity, never transform", (name) => {
+    const frames = (sharedThemeExtend as { keyframes: Record<string, Record<string, object>> })
+      .keyframes[name]!;
+    for (const step of Object.values(frames)) {
+      expect(step).not.toHaveProperty("transform");
+      expect(step).toHaveProperty("scale");
+    }
+  });
+
+  it("gives cards the comfortable 1.25rem padding through --space-surface", () => {
+    const source = readFileSync(TOKENS, "utf8");
+    const light = source.slice(source.indexOf(":root {"), source.indexOf("}", source.indexOf(":root {")));
+    expect(light).toMatch(/--space-surface:\s*1\.25rem;/);
   });
 });

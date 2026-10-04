@@ -161,3 +161,15 @@ describe("Select", () => {
     expect(option.className).not.toMatch(/slate-\d/);
   });
 });
+
+describe("Select design-language surface (Story 187)", () => {
+  it("opens on the raised surface, and its options keep the check-mark gutter", async () => {
+    const user = userEvent.setup();
+    renderSelect(["Low", "High"]);
+
+    await user.click(screen.getByRole("combobox", { name: "Assigned agent" }));
+    const content = await screen.findByRole("listbox");
+    expect(content).toHaveClass("bg-surface-raised", "overflow-y-auto");
+    expect(screen.getByRole("option", { name: "Low" })).toHaveClass("ps-8");
+  });
+});

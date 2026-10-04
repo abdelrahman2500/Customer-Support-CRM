@@ -240,8 +240,11 @@ const sharedThemeExtend = {
   keyframes: {
     "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
     "fade-out": { from: { opacity: "1" }, to: { opacity: "0" } },
-    "zoom-in": { from: { opacity: "0", transform: "scale(0.96)" }, to: { opacity: "1", transform: "scale(1)" } },
-    "zoom-out": { from: { opacity: "1", transform: "scale(1)" }, to: { opacity: "0", transform: "scale(0.96)" } },
+    // Story 187 — the individual `scale` property, NOT `transform`: a centred
+    // dialog positions itself with translate(-50%, -50%), and a transform
+    // keyframe would overwrite that for the duration of the animation.
+    "zoom-in": { from: { opacity: "0", scale: "0.96" }, to: { opacity: "1", scale: "1" } },
+    "zoom-out": { from: { opacity: "1", scale: "1" }, to: { opacity: "0", scale: "0.96" } },
   },
   animation: {
     "fade-in": "fade-in var(--duration-base) var(--ease-standard)",

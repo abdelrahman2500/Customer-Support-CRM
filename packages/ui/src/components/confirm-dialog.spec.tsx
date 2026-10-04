@@ -154,3 +154,11 @@ describe("ConfirmDialog", () => {
     expect(confirmButton.className).not.toContain("bg-danger-solid");
   });
 });
+
+describe("ConfirmDialog design-language surface (Story 187)", () => {
+  it("renders on the raised overlay panel with a title on the type scale", () => {
+    renderDialog();
+    expect(screen.getByRole("alertdialog")).toHaveClass("bg-surface-raised", "rounded-surface");
+    expect(screen.getByText("Deactivate this user?")).toHaveClass("text-heading");
+  });
+});

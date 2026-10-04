@@ -9,7 +9,7 @@ import {
   ChevronDownIcon as ChevronDown,
   ChevronUpIcon as ChevronUp,
 } from "../lib/icons";
-import { menuContentClassName, menuItemClassName } from "../lib/menu";
+import { menuCheckableItemClassName, menuContentClassName, menuItemClassName } from "../lib/menu";
 
 export const Select = SelectPrimitive.Root;
 export const SelectValue = SelectPrimitive.Value;
@@ -133,11 +133,16 @@ export const SelectItem = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
-    className={cn(menuItemClassName, "data-[state=checked]:font-medium", className)}
+    className={cn(
+      menuItemClassName,
+      menuCheckableItemClassName,
+      "data-[state=checked]:font-medium",
+      className,
+    )}
     {...props}
   >
     {/* `start-2`, not `left-2`: the check sits at the reading-start edge, so
-        it mirrors under `dir="rtl"` along with `menuItemClassName`'s `ps-8`. */}
+        it mirrors under `dir="rtl"` along with `menuCheckableItemClassName`'s `ps-8`. */}
     <span className="absolute start-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
         <Check className="h-4 w-4" aria-hidden />

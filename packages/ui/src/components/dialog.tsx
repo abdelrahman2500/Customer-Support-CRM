@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { CloseIcon as X } from "../lib/icons";
 import { cn } from "../lib/cn";
-import { overlayClassName, overlayPanelClassName } from "../lib/overlay";
+import { overlayClassName, overlayPanelClassName, overlayPanelSizeClassName } from "../lib/overlay";
+import type { OverlayPanelSize } from "../lib/overlay";
 
 /**
  * Story S-3 — a general-purpose modal, alongside (not replacing)
@@ -56,22 +57,28 @@ export interface DialogContentProps extends React.ComponentPropsWithoutRef<
   /** Set `false` for a dialog whose only exits are its own footer actions.
    * Escape and overlay-click still work; only the corner button is hidden. */
   showClose?: boolean;
+  /** Story 187 (RD-1.10) — panel width: sm 24rem, md 28rem (default), lg 32rem, xl 42rem. */
+  size?: OverlayPanelSize;
 }
 
 export const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, closeLabel, showClose = true, ...props }, ref) => (
+>(({ className, children, closeLabel, showClose = true, size = "md", ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    <DialogPrimitive.Content ref={ref} className={cn(overlayPanelClassName, className)} {...props}>
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(overlayPanelClassName, overlayPanelSizeClassName[size], className)}
+      {...props}
+    >
       {children}
       {showClose && closeLabel ? (
         <DialogPrimitive.Close
           aria-label={closeLabel}
           // `end-4`, not `right-4`: the button follows the reading direction
           // so it lands top-left under `dir="rtl"`.
-          className="focus-ring absolute end-4 top-4 rounded-sm text-ink-subtle transition-colors hover:text-ink"
+          className="focus-ring absolute end-4 top-4 rounded-inner p-1 text-ink-subtle transition-colors duration-fast hover:bg-surface-muted hover:text-ink"
         >
           <X className="h-4 w-4" aria-hidden />
         </DialogPrimitive.Close>
@@ -91,7 +98,7 @@ export const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("text-base font-semibold text-ink", className)}
+    className={cn("text-heading text-ink", className)}
     {...props}
   />
 ));

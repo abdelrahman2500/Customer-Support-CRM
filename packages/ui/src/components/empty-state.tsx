@@ -59,13 +59,18 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-2 rounded-md border border-dashed border-rule-strong p-8 text-center",
+        "flex flex-col items-center gap-2 rounded-surface border border-dashed border-rule-strong px-6 py-10 text-center",
         className,
       )}
       {...props}
     >
+      {/* Story 187 (RD-1.10) — the icon sits in a quiet tinted disc, the
+          design language's empty-state mark. */}
       {icon ? (
-        <span className="text-ink-subtle" aria-hidden="true">
+        <span
+          className="mb-1 flex h-10 w-10 items-center justify-center rounded-pill bg-surface-muted text-ink-muted"
+          aria-hidden="true"
+        >
           {icon}
         </span>
       ) : null}

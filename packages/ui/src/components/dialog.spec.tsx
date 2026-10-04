@@ -168,3 +168,44 @@ describe("ConfirmDialog is unaffected by Dialog sharing its overlay classes", ()
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   });
 });
+
+describe("Dialog design-language surface (Story 187)", () => {
+  function renderSized(size?: "sm" | "md" | "lg" | "xl") {
+    return render(
+      <Dialog defaultOpen>
+        <DialogContent closeLabel="Close" size={size}>
+          <DialogTitle>Assign ticket</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+  }
+
+  it("defaults to today's width (md) on the raised overlay surface", async () => {
+    renderSized();
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveClass("max-w-md", "bg-surface-raised", "rounded-surface", "shadow-overlay");
+  });
+
+  it.each([
+    ["sm", "max-w-sm"],
+    ["lg", "max-w-lg"],
+    ["xl", "max-w-2xl"],
+  ] as const)("applies the %s width instead of the default", async (size, width) => {
+    renderSized(size);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveClass(width);
+    expect(dialog).not.toHaveClass("max-w-md");
+  });
+
+  it("puts the title on the named type scale", async () => {
+    renderSized();
+    expect(await screen.findByText("Assign ticket")).toHaveClass("text-heading");
+  });
+
+  it("keeps the close button named, on the inner radius, with a decorative icon", async () => {
+    renderSized();
+    const close = await screen.findByRole("button", { name: "Close" });
+    expect(close).toHaveClass("rounded-inner", "end-4");
+    expect(close.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+});

@@ -8,7 +8,7 @@ import { Card, CardContent } from "./card";
  * their own height/width and the ones that override the tint.
  */
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("animate-pulse rounded-md bg-rule", className)} {...props} />;
+  return <div className={cn("animate-pulse rounded-inner bg-rule", className)} {...props} />;
 }
 
 /**

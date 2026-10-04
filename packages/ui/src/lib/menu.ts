@@ -3,8 +3,9 @@
  * (`DropdownMenu`, `Popover`, and `Select`'s own content), so a menu, a
  * popover and a select panel are the same object visually.
  *
- * Values match `Select`'s existing content styling from Story 23 exactly, so
- * adopting them changes nothing about how a select already looks.
+ * Story 187 (RD-1.10) — the panel is the design language's raised floating
+ * surface (`surface-raised`, `shadow-raised`, `rounded-control`) with a fade +
+ * slight zoom on open/close, shared by DropdownMenu, Select and Popover.
  */
 
 /** A floating panel: portalled, above page chrome, bounded to the viewport.
@@ -15,10 +16,10 @@
  * scrolls inside the panel instead of growing past the fold. Paired with
  * `overflow-y-auto`, the panel can never extend the page. */
 export const menuContentClassName =
-  "z-50 max-h-[var(--radix-popper-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border border-rule bg-surface p-1 text-ink shadow-md";
+  "z-50 max-h-[var(--radix-popper-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-control border border-rule bg-surface-raised p-1 text-ink shadow-raised data-[state=open]:animate-zoom-in data-[state=closed]:animate-zoom-out";
 
-/** A row inside a menu. `ps-8 pe-2` leaves room at the reading-start edge
- * for a check indicator, matching `SelectItem`'s own geometry.
+/** A row inside a menu. `px-2` on both edges; an item that can show a check
+ * mark (SelectItem) adds `menuCheckableItemClassName` below.
  *
  * Story 166 — `focus:bg-surface-muted` used to be the whole focus indicator,
  * and `--surface` (255 255 255) against `--surface-muted` (241 245 249)
@@ -32,8 +33,15 @@ export const menuContentClassName =
  * `menuContentClassName` above, `Select`'s own `Viewport`), so nothing clips
  * it and neither padding needs to grow. */
 export const menuItemClassName =
-  "focus-ring-always relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 ps-8 pe-2 text-sm outline-none transition-colors focus:bg-surface-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50";
+  "focus-ring-always relative flex w-full cursor-pointer select-none items-center gap-2 rounded-inner px-2 py-1.5 text-sm outline-none transition-colors duration-fast focus:bg-surface-muted data-[disabled]:pointer-events-none data-[disabled]:opacity-50";
 
-export const menuLabelClassName = "px-2 py-1.5 text-xs font-semibold text-ink-subtle";
+/**
+ * Story 187 (RD-1.10) — the start gutter for an item that may show a check
+ * mark (Select). Plain menu items no longer reserve it, so a DropdownMenu
+ * row is not indented for a check mark it can never show (recon §2.3).
+ */
+export const menuCheckableItemClassName = "ps-8";
+
+export const menuLabelClassName = "px-2 py-1.5 text-label text-ink-subtle";
 
 export const menuSeparatorClassName = "-mx-1 my-1 h-px bg-rule";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  menuCheckableItemClassName,
   menuContentClassName,
   menuItemClassName,
   menuLabelClassName,
@@ -30,10 +31,19 @@ describe("menuItemClassName", () => {
     expect(menuItemClassName).not.toMatch(/blue-\d/);
   });
 
-  it("keeps its reading-direction-relative geometry", () => {
-    expect(menuItemClassName).toContain("ps-8");
-    expect(menuItemClassName).toContain("pe-2");
+  // Story 187 (RD-1.10) — a plain menu row no longer reserves the check-mark
+  // gutter (recon §2.3); only checkable rows opt in to it.
+  it("keeps symmetric, direction-neutral geometry without a check gutter", () => {
+    expect(menuItemClassName).toContain("px-2");
+    expect(menuItemClassName).toContain("rounded-inner");
+    expect(menuItemClassName.split(" ")).not.toContain("ps-8");
     expect(menuItemClassName).not.toMatch(/\bpl-|\bpr-/);
+  });
+});
+
+describe("menuCheckableItemClassName (Story 187)", () => {
+  it("is exactly the reading-start check-mark gutter", () => {
+    expect(menuCheckableItemClassName).toBe("ps-8");
   });
 });
 
@@ -47,9 +57,22 @@ describe("the surrounding menu constants", () => {
     expect(menuContentClassName).toContain("p-1");
   });
 
-  it("leaves the label and separator untouched", () => {
-    expect(menuLabelClassName).toBe("px-2 py-1.5 text-xs font-semibold text-ink-subtle");
+  it("puts the label on the named type scale and leaves the separator untouched", () => {
+    // Story 187 — `text-label` replaces the raw `text-xs font-semibold`.
+    expect(menuLabelClassName).toBe("px-2 py-1.5 text-label text-ink-subtle");
     expect(menuSeparatorClassName).toBe("-mx-1 my-1 h-px bg-rule");
+  });
+
+  it("is the raised floating surface with open/close motion (Story 187)", () => {
+    for (const token of [
+      "bg-surface-raised",
+      "shadow-raised",
+      "rounded-control",
+      "data-[state=open]:animate-zoom-in",
+      "data-[state=closed]:animate-zoom-out",
+    ]) {
+      expect(menuContentClassName).toContain(token);
+    }
   });
 
   it("gives neither a focus treatment of its own", () => {

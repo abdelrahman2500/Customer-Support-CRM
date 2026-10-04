@@ -270,7 +270,7 @@
     --space-tight: 0.25rem;
     --space-inline: 0.5rem;
     --space-stack: 0.75rem;
-    --space-surface: 1rem;
+    --space-surface: 1.25rem; /* Story 187 — comfortable card padding (was 1rem) */
     --space-shell: 2rem;
     --space-section: 1.5rem; /* Story 179 — gap between page sections */
     /* Story 179 — responsive page padding (1rem → 1.5rem at sm → 2rem at lg). */
