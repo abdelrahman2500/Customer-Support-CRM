@@ -41,17 +41,15 @@ export function KbCategoriesView() {
 
   return (
     <section className="flex flex-col gap-6">
+      {/* Story 198 (RD-2.4) — the page's h1 heads the page, not a card. */}
+      <PageHeader title={t("heading")} description={t("description")} />
       <Card className="p-surface">
-        <PageHeader title={t("heading")} />
-        <p className="mt-1 text-sm text-ink-subtle">{t("description")}</p>
-
         {/* Story 155 — the hand-rolled four-branch ladder, replaced by the
             shared primitive. Same skeleton, same retry, same empty copy.
             `isError` now also requires `data === undefined`, so a failed
             background refetch keeps the rows on screen instead of throwing
             away readable content (Story S-7's reasoning). */}
         <QueryStateCard
-          className="mt-4"
           isLoading={categoriesQuery.isLoading}
           isError={categoriesQuery.isError && categoriesQuery.data === undefined}
           isEmpty={categoriesQuery.isSuccess && categoriesQuery.data.length === 0}

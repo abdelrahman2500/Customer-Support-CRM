@@ -66,6 +66,13 @@ export interface PageHeaderProps {
   meta?: React.ReactNode;
   /** Story 197 — section tabs, full width below the title row. */
   tabs?: React.ReactNode;
+  /**
+   * Story 198 (RD-2.4, recon A11Y-04) — `2` only for a view hosted under
+   * another page's `h1` (Settings' tabs). It renders an `h2` at the
+   * heading step, in a plain `<div>` rather than a `<header>` landmark,
+   * because it is a section of the host page, not a page of its own.
+   */
+  headingLevel?: 1 | 2;
   className?: string;
 }
 
@@ -78,12 +85,18 @@ export function PageHeader({
   back,
   meta,
   tabs,
+  headingLevel = 1,
   className,
 }: PageHeaderProps) {
+  const Root = headingLevel === 1 ? "header" : "div";
   const row = (
     <>
       <div className="min-w-0">
-        <h1 className="text-title text-ink">{title}</h1>
+        {headingLevel === 1 ? (
+          <h1 className="text-title text-ink">{title}</h1>
+        ) : (
+          <h2 className="text-heading text-ink">{title}</h2>
+        )}
         {description && <p className="mt-1 text-sm text-ink-subtle">{description}</p>}
         {meta && (
           <div className="mt-2 flex flex-wrap items-center gap-inline text-sm text-ink-muted">
@@ -96,13 +109,13 @@ export function PageHeader({
   );
 
   if (!back && !tabs) {
-    return <header className={cn(ROW, className)}>{row}</header>;
+    return <Root className={cn(ROW, className)}>{row}</Root>;
   }
   return (
-    <header className={cn("flex flex-col gap-stack", className)}>
+    <Root className={cn("flex flex-col gap-stack", className)}>
       {back && <div className="flex">{back}</div>}
       <div className={ROW}>{row}</div>
       {tabs && <div className="min-w-0">{tabs}</div>}
-    </header>
+    </Root>
   );
 }

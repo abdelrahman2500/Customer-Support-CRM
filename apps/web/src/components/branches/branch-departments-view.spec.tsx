@@ -93,9 +93,13 @@ describe("BranchDepartmentsView", () => {
 
       renderView();
 
-      // MyBranchSection returns only skeletons while loading — the heading
-      // (rendered only once branch data/error is known) must be absent.
-      expect(screen.queryByText("My Branch")).not.toBeInTheDocument();
+      // Story 198 (RD-2.4) — the page's h1 now heads the page in every state
+      // (it used to render inside the branch card, only once loaded, so the
+      // page had no h1 while loading); the section itself still shows only
+      // its loading skeletons.
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("My Branch");
+      expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
       expect(screen.getAllByRole("generic").length).toBeGreaterThan(0);
     });
 

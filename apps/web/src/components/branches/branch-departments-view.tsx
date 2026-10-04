@@ -43,8 +43,12 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
  * rename + activate/deactivate for the branch, never a timezone field.
  */
 export function BranchDepartmentsView() {
+  const t = useTranslations("branches");
   return (
     <section className="flex flex-col gap-6">
+      {/* Story 198 (RD-2.4) — the page's h1 heads the page in every state;
+          it used to render inside the branch card, only once loaded. */}
+      <PageHeader title={t("myBranch.heading")} />
       <MyBranchSection />
       <DepartmentsSection />
     </section>
@@ -80,11 +84,10 @@ function MyBranchSection() {
 
   return (
     <Card className="p-surface">
-      <PageHeader title={t("myBranch.heading")} />
       {branch ? (
         <MyBranchFields branch={branch} />
       ) : (
-        <p className="mt-2 text-sm text-ink-subtle">{t("myBranch.loadError")}</p>
+        <p className="text-sm text-ink-subtle">{t("myBranch.loadError")}</p>
       )}
     </Card>
   );

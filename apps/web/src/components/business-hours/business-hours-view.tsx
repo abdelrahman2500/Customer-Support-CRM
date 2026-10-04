@@ -451,7 +451,9 @@ function ExceptionsSection({ calendar }: { calendar: BusinessHoursCalendar }) {
  * 404 from other errors — and routed to a create form instead of an error
  * banner.
  */
-export function BusinessHoursView() {
+/** Story 198 (RD-2.4, recon A11Y-04) — `hosted`: rendered inside Settings'
+ * tabs, under that page's own h1, so the title becomes an h2. */
+export function BusinessHoursView({ hosted = false }: { hosted?: boolean } = {}) {
   const t = useTranslations("businessHours");
   const tCommon = useTranslations("common");
   const calendarQuery = useBusinessHoursCalendarQuery();
@@ -478,7 +480,7 @@ export function BusinessHoursView() {
 
   return (
     <section className="flex flex-col gap-6">
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} headingLevel={hosted ? 2 : 1} />
       {!calendar ? (
         <CreateCalendarForm />
       ) : (

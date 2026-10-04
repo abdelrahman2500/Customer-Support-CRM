@@ -123,14 +123,19 @@ export function AuditLogView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <PageHeader title={t("title")} />
-        {/* Story S-8a/S-7 — the rows of the page being left stay on screen
-            while the next page loads, so this is the only signal that a
-            page change is in flight. In the heading's own row, so it adds
-            no height and cannot shift the table. */}
-        <FetchingIndicator active={auditLogsQuery.isPlaceholderData} label={tCommon("updating")} />
-      </div>
+      {/* Story S-8a/S-7 — the rows of the page being left stay on screen
+          while the next page loads, so the indicator is the only signal that
+          a page change is in flight. Story 198 — it sits in PageHeader's
+          `actions`, the title's own row, so it still adds no height. */}
+      <PageHeader
+        title={t("title")}
+        actions={
+          <FetchingIndicator
+            active={auditLogsQuery.isPlaceholderData}
+            label={tCommon("updating")}
+          />
+        }
+      />
 
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1 text-xs text-ink-muted">

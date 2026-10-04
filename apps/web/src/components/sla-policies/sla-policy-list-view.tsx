@@ -52,12 +52,15 @@ export function SlaPolicyListView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <PageHeader title={t("list.title")} />
-        <Button size="sm" asChild>
-          <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
-        </Button>
-      </div>
+      {/* Story 198 (RD-2.4) — the create action in PageHeader's own slot. */}
+      <PageHeader
+        title={t("list.title")}
+        actions={
+          <Button size="sm" asChild>
+            <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
+          </Button>
+        }
+      />
 
       {policiesQuery.isLoading && (
         <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">

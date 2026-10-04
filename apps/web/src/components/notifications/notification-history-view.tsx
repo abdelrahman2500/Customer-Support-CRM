@@ -249,17 +249,20 @@ export function NotificationHistoryView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <PageHeader title={t("title")} />
-        {/* Story S-8b/S-7 — the page being left stays on screen while the
-            next one loads, so this is the only signal a page change is in
-            flight. In the heading's own row, so it adds no height and
-            cannot shift the table. */}
-        <FetchingIndicator
-          active={notificationsQuery.isPlaceholderData}
-          label={tCommon("updating")}
-        />
-      </div>
+      {/* Story S-8b/S-7 — the page being left stays on screen while the
+          next one loads, so the indicator is the only signal a page change
+          is in flight. Story 198 — it sits in PageHeader's `actions`, the
+          title's own row, so it still adds no height and cannot shift the
+          table. */}
+      <PageHeader
+        title={t("title")}
+        actions={
+          <FetchingIndicator
+            active={notificationsQuery.isPlaceholderData}
+            label={tCommon("updating")}
+          />
+        }
+      />
 
       <NotificationPreferencesSection />
 

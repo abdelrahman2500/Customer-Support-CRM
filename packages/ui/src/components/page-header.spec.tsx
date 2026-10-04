@@ -135,4 +135,24 @@ describe("PageHeader", () => {
       expect(container.innerHTML).not.toMatch(/\b(ml|mr|pl|pr|text-left|text-right)-/);
     });
   });
+
+  // Story 198 (RD-2.4, recon A11Y-04) — a view hosted under another page's h1.
+  describe("headingLevel (Story 198)", () => {
+    it("renders an h2 at the heading step, outside any header landmark, at level 2", () => {
+      const { container } = render(
+        <PageHeader title="Branding" description="d" headingLevel={2} />,
+      );
+      expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 2, name: "Branding" })).toHaveClass(
+        "text-heading",
+      );
+      expect(container.querySelector("header")).toBeNull();
+    });
+
+    it("defaults to the page's h1 in a header landmark", () => {
+      const { container } = render(<PageHeader title="Branding" />);
+      expect(screen.getByRole("heading", { level: 1, name: "Branding" })).toBeInTheDocument();
+      expect(container.querySelector("header")).not.toBeNull();
+    });
+  });
 });

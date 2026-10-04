@@ -41,14 +41,16 @@ const APP_NAME_MAX_LENGTH = 60;
  * at `/{locale}/branding`. The existing loading / error / success /
  * forbidden states cover both new fields as they stand.
  */
-export function BrandingView() {
+/** Story 198 (RD-2.4, recon A11Y-04) — `hosted`: rendered inside Settings'
+ * tabs, under that page's own h1, so the title becomes an h2. */
+export function BrandingView({ hosted = false }: { hosted?: boolean } = {}) {
   const t = useTranslations("branding");
   const tCommon = useTranslations("common");
   const brandingQuery = useBrandingQuery();
 
   return (
     <section className="flex flex-col gap-4">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader title={t("title")} description={t("description")} headingLevel={hosted ? 2 : 1} />
 
       {brandingQuery.isLoading && (
         <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">

@@ -148,4 +148,18 @@ describe("AiSettingsView", () => {
 
     expect(await screen.findByText("saveForbidden")).toBeInTheDocument();
   });
+
+  // Story 198 (RD-2.4, recon A11Y-04) — standalone route: the page's h1;
+  // hosted in Settings' tabs: an h2 under Settings' own h1.
+  it("renders its title as the page h1 standalone and as an h2 when hosted", () => {
+    mockedUseAiSettingsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    const { unmount } = render(<AiSettingsView />);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    unmount();
+
+    render(<AiSettingsView hosted />);
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "title" })).toBeInTheDocument();
+  });
 });

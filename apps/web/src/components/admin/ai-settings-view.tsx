@@ -28,14 +28,16 @@ const TOGGLES: { key: ToggleKey; labelKey: string }[] = [
  * intermediate state to protect against, unlike `BrandingForm`'s
  * free-text/color fields.
  */
-export function AiSettingsView() {
+/** Story 198 (RD-2.4, recon A11Y-04) — `hosted`: rendered inside Settings'
+ * tabs, under that page's own h1, so the title becomes an h2. */
+export function AiSettingsView({ hosted = false }: { hosted?: boolean } = {}) {
   const t = useTranslations("aiSettings");
   const tCommon = useTranslations("common");
   const settingsQuery = useAiSettingsQuery();
 
   return (
     <section className="flex flex-col gap-4">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader title={t("title")} description={t("description")} headingLevel={hosted ? 2 : 1} />
 
       {settingsQuery.isLoading && (
         <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">

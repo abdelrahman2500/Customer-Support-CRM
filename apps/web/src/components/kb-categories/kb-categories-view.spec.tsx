@@ -303,4 +303,15 @@ describe("KbCategoriesView", () => {
 
     expect(await screen.findByRole("textbox", { name: "Name" })).toBeInTheDocument();
   });
+
+  // Story 198 (RD-2.4) — the page's h1 heads the page, not a card, and its
+  // description comes through PageHeader's own prop.
+  it("renders one h1 with its description above the card, not inside it", () => {
+    renderView();
+
+    const h1s = screen.getAllByRole("heading", { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]!.closest(".p-surface")).toBeNull();
+    expect(h1s[0]!.closest("header")!.querySelector("p")).not.toBeNull();
+  });
 });

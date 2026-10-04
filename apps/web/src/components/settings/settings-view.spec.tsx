@@ -12,14 +12,23 @@ vi.mock("next-intl", () => ({
 // dedicated, passing spec file covering its own internals; this
 // component's own responsibility is purely the tab composition, so each
 // is stood in for here rather than re-testing its internals.
+//
+// Story 198 — each stand-in records the `hosted` prop it was given, which is
+// what tells the real view to render its title as an h2 under this page's h1.
 vi.mock("@/components/admin/branding-view", () => ({
-  BrandingView: () => <div>branding panel content</div>,
+  BrandingView: ({ hosted }: { hosted?: boolean }) => (
+    <div data-hosted={String(hosted)}>branding panel content</div>
+  ),
 }));
 vi.mock("@/components/admin/ai-settings-view", () => ({
-  AiSettingsView: () => <div>ai panel content</div>,
+  AiSettingsView: ({ hosted }: { hosted?: boolean }) => (
+    <div data-hosted={String(hosted)}>ai panel content</div>
+  ),
 }));
 vi.mock("@/components/business-hours/business-hours-view", () => ({
-  BusinessHoursView: () => <div>business hours panel content</div>,
+  BusinessHoursView: ({ hosted }: { hosted?: boolean }) => (
+    <div data-hosted={String(hosted)}>business hours panel content</div>
+  ),
 }));
 
 describe("SettingsView", () => {
@@ -53,5 +62,19 @@ describe("SettingsView", () => {
     await user.click(screen.getByRole("tab", { name: "tabs.businessHours" }));
 
     expect(screen.getByText("business hours panel content")).toBeInTheDocument();
+  });
+
+  // Story 198 (RD-2.4, recon A11Y-04) — one h1 for the page; every hosted
+  // view is told it is hosted, so its own title renders as an h2.
+  it("has a single h1 and renders every panel as a hosted view", async () => {
+    const user = userEvent.setup();
+    render(<SettingsView />);
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByText("branding panel content")).toHaveAttribute("data-hosted", "true");
+    await user.click(screen.getByRole("tab", { name: "tabs.ai" }));
+    expect(screen.getByText("ai panel content")).toHaveAttribute("data-hosted", "true");
+    await user.click(screen.getByRole("tab", { name: "tabs.businessHours" }));
+    expect(screen.getByText("business hours panel content")).toHaveAttribute("data-hosted", "true");
   });
 });

@@ -48,13 +48,13 @@ export function SettingsView() {
           <TabsTrigger value="businessHours">{t("tabs.businessHours")}</TabsTrigger>
         </TabsList>
         <TabsContent value="branding">
-          <BrandingView />
+          <BrandingView hosted />
         </TabsContent>
         <TabsContent value="ai">
-          <AiSettingsView />
+          <AiSettingsView hosted />
         </TabsContent>
         <TabsContent value="businessHours">
-          <BusinessHoursView />
+          <BusinessHoursView hosted />
         </TabsContent>
       </Tabs>
     </section>
