@@ -1,9 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
-import type { CSSProperties } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedContact } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
@@ -22,6 +22,8 @@ import {
   MenuIcon,
   NativeSelect,
   ThemeSwitcher,
+  BrandScope,
+  deriveBrandTokens,
 } from "@crm/ui";
 
 /** Story 119 — mirrors `apps/web`'s own `WorkspaceNav` constants/helper
@@ -87,6 +89,14 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const pathname = usePathname();
   const { locale } = useParams<{ locale: string }>();
   const brandingQuery = useBrandingQuery();
+  // Story 183 (RD-1.6) — the controlled branding model: Tier 1 brand edge
+  // always, Tier 2 accent only when the derived colours pass their gates.
+  // BrandScope also mirrors the variables onto <html>, so the whole page
+  // (and portalled menus) picks them up, not just this header.
+  const brandTokens = useMemo(
+    () => deriveBrandTokens(brandingQuery.data?.primaryColor, brandingQuery.data?.secondaryColor),
+    [brandingQuery.data?.primaryColor, brandingQuery.data?.secondaryColor],
+  );
   const unreadCountQuery = useUnreadNotificationCountQuery();
   const unreadCount = unreadCountQuery.data?.unreadCount ?? 0;
   // Batch 7 (UX audit) — mirrors `WorkspaceNav`'s own connection banner;
@@ -168,12 +178,9 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   ];
 
   return (
-    <>
+    <BrandScope tokens={brandTokens}>
       <header
-        style={
-          { "--brand-primary": brandingQuery.data?.primaryColor ?? undefined } as CSSProperties
-        }
-        className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
+        className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-brand bg-surface px-6 py-3"
       >
         <div className="flex items-center gap-2">
           {brandingQuery.data?.logoUrl && (
@@ -266,6 +273,6 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
           {t("realtimeReconnecting")}
         </Alert>
       )}
-    </>
+    </BrandScope>
   );
 }

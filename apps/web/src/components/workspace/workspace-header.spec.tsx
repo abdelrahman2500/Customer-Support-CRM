@@ -260,18 +260,17 @@ describe("WorkspaceHeader", () => {
       expect(screen.queryByRole("link", { name: "appName" })).not.toBeInTheDocument();
     });
 
-    it("leaves the header's brand-primary CSS variable unset when no branding is configured", () => {
-      renderHeader();
+    // Story 183 (RD-1.6) — the header no longer owns an ad-hoc
+    // `--brand-primary`; its edge reads the `--brand` token, which
+    // WorkspaceShell's BrandScope sets from the branch (see its spec).
+    it("draws its bottom edge from the brand token, with or without branding", () => {
+      const { unmount } = renderHeader();
+      expect(screen.getByRole("banner")).toHaveClass("border-brand");
+      expect(screen.getByRole("banner").getAttribute("style")).toBeNull();
+      unmount();
 
-      const header = screen.getByRole("banner");
-      expect(header.style.getPropertyValue("--brand-primary")).toBe("");
-    });
-
-    it("sets the header's brand-primary CSS variable once a primaryColor is configured", () => {
       renderHeader({ branding: branding({ primaryColor: "#112233" }) });
-
-      const header = screen.getByRole("banner");
-      expect(header.style.getPropertyValue("--brand-primary")).toBe("#112233");
+      expect(screen.getByRole("banner")).toHaveClass("border-brand");
     });
   });
 

@@ -190,22 +190,26 @@ describe("PortalHeader", () => {
       ).toBeInTheDocument();
     });
 
-    it("leaves the header's brand-primary CSS variable unset when no branding is configured", () => {
+    // Story 183 (RD-1.6) — branding goes through the controlled model:
+    // BrandScope sets the `--brand` token the header's edge reads.
+    it("leaves the brand token unset when no branding is configured", () => {
       render(<PortalHeader contact={contact} />);
 
       const header = screen.getByRole("banner");
-      expect(header.style.getPropertyValue("--brand-primary")).toBe("");
+      expect(header).toHaveClass("border-brand");
+      expect(header.closest(".contents")?.getAttribute("style") ?? null).toBeNull();
     });
 
-    it("sets the header's brand-primary CSS variable once a primaryColor is configured", () => {
+    it("sets the brand token from the branch primaryColor once configured", () => {
       mockedUseBrandingQuery.mockReturnValue({
         data: { logoUrl: null, primaryColor: "#112233", secondaryColor: null },
       } as never);
 
       render(<PortalHeader contact={contact} />);
 
-      const header = screen.getByRole("banner");
-      expect(header.style.getPropertyValue("--brand-primary")).toBe("#112233");
+      const scope = screen.getByRole("banner").closest(".contents") as HTMLElement;
+      expect(scope.style.getPropertyValue("--brand")).toBe("17 34 51");
+      expect(document.documentElement.style.getPropertyValue("--brand")).toBe("17 34 51");
     });
   });
 

@@ -41,6 +41,15 @@ export {
 export type { ThemePreference } from "./lib/theme";
 export { ThemeScript } from "./components/theme-script";
 export { ThemeSwitcher } from "./components/theme-switcher";
+export { BrandScope } from "./components/brand-scope";
+export {
+  accentSetPasses,
+  brandCssVariables,
+  deriveBrandTokens,
+  NEUTRAL_CHROMA,
+  RECOGNISABLE_SHIFT,
+} from "./lib/brand";
+export type { AccentSet, BrandAccentRejection, BrandTokens } from "./lib/brand";
 export type { ThemeSwitcherProps } from "./components/theme-switcher";
 export { NativeSelect } from "./components/native-select";
 export type { NativeSelectOption, NativeSelectProps } from "./components/native-select";

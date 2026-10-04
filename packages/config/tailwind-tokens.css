@@ -90,6 +90,11 @@
      * Deliberately NOT redefined for dark: logos are arbitrary uploads, often
      * dark-on-transparent, and would vanish on a dark header (00-overview D10). */
     --logo-plate: 255 255 255;
+    /* Story 183 (RD-1.6) — Tier 1 branch identity colour, decorative only
+     * (header brand edge, brand panels). Core indigo until a branch sets one;
+     * see packages/ui/src/lib/brand.ts. */
+    --brand: 79 70 229;
+    --brand-secondary: 79 70 229;
 
     /* ---------------------------------------------------------------
      * Ink — text, in descending emphasis. Contrast ratios are against
@@ -345,6 +350,8 @@
     --accent-active: 199 210 254; /* #C7D2FE */
     --accent-foreground: 15 23 42; /* #0F172A */
     --accent-surface: 30 27 75; /* #1E1B4B */
+    --brand: 129 140 248; /* #818CF8 */
+    --brand-secondary: 129 140 248; /* #818CF8 */
     --overlay: 0 0 0; /* #000000 */
     --focus: 165 180 252; /* #A5B4FC */
     --success-subtle: 3 31 24; /* #031F18 */
@@ -398,6 +405,8 @@
       --accent-active: 199 210 254; /* #C7D2FE */
       --accent-foreground: 15 23 42; /* #0F172A */
       --accent-surface: 30 27 75; /* #1E1B4B */
+      --brand: 129 140 248; /* #818CF8 */
+      --brand-secondary: 129 140 248; /* #818CF8 */
       --overlay: 0 0 0; /* #000000 */
       --focus: 165 180 252; /* #A5B4FC */
       --success-subtle: 3 31 24; /* #031F18 */
@@ -431,6 +440,39 @@
       --elevation-raised: 0 4px 12px -2px rgb(0 0 0 / 0.5);
       --elevation-overlay: 0 16px 40px -8px rgb(0 0 0 / 0.6);
       color-scheme: dark;
+    }
+  }
+  /**
+   * Story 183 (RD-1.6) — Tier 2 branch accent. An element carrying
+   * data-brand-accent (the shell wrapper, and <html> after mount so portalled
+   * menus/dialogs match) swaps the accent family for the values derived and
+   * contrast-checked by deriveBrandTokens(). Only the accent family: neutrals,
+   * focus and every semantic family are never overridden. The dark selectors
+   * carry higher specificity (0,3,0) than the light one (0,1,0) on purpose.
+   */
+  [data-brand-accent] {
+    --accent: var(--brand-accent);
+    --accent-hover: var(--brand-accent-hover);
+    --accent-active: var(--brand-accent-active);
+    --accent-foreground: var(--brand-accent-foreground);
+    --accent-surface: var(--brand-accent-surface);
+  }
+  :root[data-theme="dark"][data-brand-accent],
+  :root[data-theme="dark"] [data-brand-accent] {
+    --accent: var(--brand-dark-accent);
+    --accent-hover: var(--brand-dark-accent-hover);
+    --accent-active: var(--brand-dark-accent-active);
+    --accent-foreground: var(--brand-dark-accent-foreground);
+    --accent-surface: var(--brand-dark-accent-surface);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"])[data-brand-accent],
+    :root:not([data-theme="light"]) [data-brand-accent] {
+      --accent: var(--brand-dark-accent);
+      --accent-hover: var(--brand-dark-accent-hover);
+      --accent-active: var(--brand-dark-accent-active);
+      --accent-foreground: var(--brand-dark-accent-foreground);
+      --accent-surface: var(--brand-dark-accent-surface);
     }
   }
   @media (min-width: 640px) {

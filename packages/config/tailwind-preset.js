@@ -84,6 +84,10 @@ const sharedThemeExtend = {
     },
     overlay: token("overlay"),
     "logo-plate": token("logo-plate"),
+    brand: {
+      DEFAULT: token("brand"),
+      secondary: token("brand-secondary"),
+    },
     focus: token("focus"),
     success: {
       subtle: token("success-subtle"),

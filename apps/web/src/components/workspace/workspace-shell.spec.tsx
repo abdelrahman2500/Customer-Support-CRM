@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { WorkspaceShell } from "./workspace-shell";
 import { useBrandingQuery } from "@/hooks/use-branding";
@@ -189,5 +189,56 @@ describe("WorkspaceShell", () => {
       expect(screen.getByText("sidebar content")).toBeInTheDocument();
       expect(screen.queryByText("navbar content")).not.toBeInTheDocument();
     });
+  });
+});
+
+// Story 183 (RD-1.6) — the controlled branding model is applied here, once,
+// around everything the shell renders.
+describe("WorkspaceShell branding", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedUseUnreadNotificationCountQuery.mockReturnValue({
+      data: undefined,
+      isSuccess: false,
+    } as never);
+  });
+
+  afterEach(() => {
+    document.documentElement.removeAttribute("style");
+    document.documentElement.removeAttribute("data-brand-accent");
+  });
+
+  it("applies no brand override for an unbranded branch", () => {
+    mockedUseBrandingQuery.mockReturnValue({ data: branding() } as never);
+
+    const { container } = renderShell();
+
+    const scope = container.firstElementChild as HTMLElement;
+    expect(scope).toHaveClass("contents");
+    expect(scope.getAttribute("style")).toBeNull();
+    expect(scope).not.toHaveAttribute("data-brand-accent");
+  });
+
+  it("brands the shell from the branch primaryColor, server data first", () => {
+    const configured = branding({ primaryColor: "#16A34A" });
+    mockedUseBrandingQuery.mockReturnValue({ data: configured } as never);
+
+    const { container } = renderShell(configured);
+
+    const scope = container.firstElementChild as HTMLElement;
+    expect(scope.style.getPropertyValue("--brand")).toBe("22 163 74");
+    // A green that passes its gates also drives the interactive accent.
+    expect(scope).toHaveAttribute("data-brand-accent");
+    expect(document.documentElement).toHaveAttribute("data-brand-accent");
+  });
+
+  it("keeps the core accent for a red brand, which would read as destructive", () => {
+    mockedUseBrandingQuery.mockReturnValue({ data: branding({ primaryColor: "#DC2626" }) } as never);
+
+    const { container } = renderShell();
+
+    const scope = container.firstElementChild as HTMLElement;
+    expect(scope.style.getPropertyValue("--brand")).toBe("220 38 38");
+    expect(scope).not.toHaveAttribute("data-brand-accent");
   });
 });

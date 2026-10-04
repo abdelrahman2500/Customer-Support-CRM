@@ -94,17 +94,30 @@ function isComment(line: string): boolean {
   );
 }
 
+/** Each root is read once and shared by every scan: the full-suite run is
+ * parallel and I/O-bound, and re-reading ~300 files per rule timed out. */
+const linesByRoot = new Map<string, Array<{ file: string; lines: string[] }>>();
+function sourcesOf(root: string) {
+  let sources = linesByRoot.get(root);
+  if (!sources) {
+    sources = productionFiles(join(REPO, root)).map((file) => ({
+      file,
+      lines: readFileSync(file, "utf8").split(/\r?\n/),
+    }));
+    linesByRoot.set(root, sources);
+  }
+  return sources;
+}
+
 function violations(pattern: RegExp, roots: string[]): string[] {
   const found: string[] = [];
   for (const root of roots) {
-    for (const file of productionFiles(join(REPO, root))) {
-      readFileSync(file, "utf8")
-        .split(/\r?\n/)
-        .forEach((line, index) => {
-          if (!isComment(line) && pattern.test(line)) {
-            found.push(`${relative(REPO, file)}:${index + 1}: ${line.trim()}`);
-          }
-        });
+    for (const { file, lines } of sourcesOf(root)) {
+      lines.forEach((line, index) => {
+        if (!isComment(line) && pattern.test(line)) {
+          found.push(`${relative(REPO, file)}:${index + 1}: ${line.trim()}`);
+        }
+      });
     }
   }
   return found;
@@ -172,7 +185,7 @@ describe("style guard patterns", () => {
   });
 });
 
-describe("design-language style guard", () => {
+describe("design-language style guard", { timeout: 30_000 }, () => {
   it("finds production files in every scanned package", () => {
     for (const root of ROOTS) {
       expect(productionFiles(join(REPO, root)).length).toBeGreaterThan(0);

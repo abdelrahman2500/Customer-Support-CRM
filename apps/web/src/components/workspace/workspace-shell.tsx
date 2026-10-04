@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
+import { BrandScope, deriveBrandTokens } from "@crm/ui";
 import type { AuthenticatedUser } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
@@ -52,6 +53,13 @@ export function WorkspaceShell({
   children: ReactNode;
 }) {
   const brandingQuery = useBrandingQuery(initialBranding ?? undefined);
+  // Story 183 (RD-1.6) — the controlled branding model. `initialBranding`
+  // arrives server-side, so BrandScope paints the shell branded on first
+  // render; it also mirrors the variables onto <html> for portalled menus.
+  const brandTokens = useMemo(
+    () => deriveBrandTokens(brandingQuery.data?.primaryColor, brandingQuery.data?.secondaryColor),
+    [brandingQuery.data?.primaryColor, brandingQuery.data?.secondaryColor],
+  );
   const unreadCountQuery = useUnreadNotificationCountQuery();
   const unreadCount = unreadCountQuery.data?.unreadCount ?? 0;
   const layout = resolveNavigationLayout(brandingQuery.data?.navigationLayout);
@@ -89,7 +97,7 @@ export function WorkspaceShell({
 
   if (layout === "SIDEBAR") {
     return (
-      <>
+      <BrandScope tokens={brandTokens}>
         {header}
         {/* `min-h-0` — without it the flex row refuses to shrink below its
             content's height, and the rail's own `overflow-y-auto` never
@@ -101,15 +109,15 @@ export function WorkspaceShell({
           />
           {main}
         </div>
-      </>
+      </BrandScope>
     );
   }
 
   return (
-    <>
+    <BrandScope tokens={brandTokens}>
       {header}
       <WorkspaceNavbar unreadCount={unreadCount} unreadCountKnown={unreadCountQuery.isSuccess} />
       {main}
-    </>
+    </BrandScope>
   );
 }

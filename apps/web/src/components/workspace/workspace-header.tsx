@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { Fragment, useState, type CSSProperties } from "react";
+import { Fragment, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedUser } from "@crm/shared";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
@@ -181,7 +181,6 @@ export function WorkspaceHeader({
   return (
     <>
       <header
-        style={{ "--brand-primary": branding?.primaryColor ?? undefined } as CSSProperties}
         // Story 173 — `flex-wrap` + `gap-y-inline`. Below `sm` this row's own
         // content exceeds a 320px viewport (measured: 354px EN, 367px AR),
         // and it had no responsive treatment at all while RM-10/RM-11 gave
@@ -189,7 +188,7 @@ export function WorkspaceHeader({
         // which already carries `flex flex-wrap … gap-y-2` for exactly this;
         // `gap-y-inline` is the same 0.5rem spelled as Story 134's token.
         // Wrapping, never hiding: every control below stays operable.
-        className="flex flex-wrap items-center justify-between gap-y-inline border-b-2 border-[var(--brand-primary,rgb(var(--rule)))] bg-surface px-6 py-3"
+        className="flex flex-wrap items-center justify-between gap-y-inline border-b-2 border-brand bg-surface px-6 py-3"
       >
         {branding?.logoUrl ? (
           // `max-w-32 … sm:max-w-none` — a configured logo is unbounded free
