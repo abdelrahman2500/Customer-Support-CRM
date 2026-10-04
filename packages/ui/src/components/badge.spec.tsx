@@ -9,9 +9,10 @@ import { Badge } from "./badge";
  * place; the palette assertions pin each variant to its S-1 token family
  * rather than to a raw slate/emerald/amber step.
  *
- * Deliberately no domain mapping tested here: whether `OPEN` means
- * `warning` is the applications' knowledge, and is tested in
- * `apps/web/src/lib/ticket-badges.spec.ts` and its portal counterpart.
+ * Deliberately no domain mapping tested here: which tone `OPEN` gets is
+ * `@crm/shared`'s `ticket-presentation.ts` (Story 191), tested in
+ * `apps/web/src/lib/ticket-presentation.spec.ts` and the apps' ticket badge
+ * specs.
  */
 describe("Badge", () => {
   it("renders its content", () => {

@@ -369,7 +369,8 @@ describe("CustomerDetailView", () => {
 
       render(<CustomerDetailView customerId="customer-1" />);
 
-      expect(screen.getByText("ticketStatus.OPEN")).toHaveClass("bg-warning-surface");
+      // Story 191 (RD-1.14) — OPEN is the info tone now.
+      expect(screen.getByText("ticketStatus.OPEN")).toHaveClass("bg-info-surface");
       expect(screen.getByText("ticketStatus.RESOLVED")).toHaveClass("bg-success-surface");
     });
 

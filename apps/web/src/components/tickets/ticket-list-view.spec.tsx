@@ -212,11 +212,13 @@ describe("TicketListView", () => {
       };
     }
 
+    // Story 191 (RD-1.14) — the design-language tones: OPEN info,
+    // IN_PROGRESS progress, RESOLVED success, CLOSED neutral.
     it.each([
-      ["OPEN", "bg-warning-surface"],
-      ["IN_PROGRESS", "bg-surface-muted"],
+      ["OPEN", "bg-info-surface"],
+      ["IN_PROGRESS", "bg-progress-surface"],
       ["RESOLVED", "bg-success-surface"],
-      ["CLOSED", "border-rule-strong"],
+      ["CLOSED", "bg-surface-muted"],
     ])("gives %s status a distinct visual treatment", (status, expectedClass) => {
       mockedUseTicketsQuery.mockReturnValue(
         queryResult({ isSuccess: true, data: page([ticketWith(status)]) }) as never,

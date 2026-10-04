@@ -5,9 +5,9 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
-import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
+import { TicketStatusBadge } from "@/components/tickets/ticket-status-badge";
 import type { KbLocale } from "@/lib/knowledge-base-api";
-import { Alert, Badge, Button, Card, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
+import { Alert, Button, Card, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
 
 /**
  * Story 136 — the Customer Portal's real landing page.
@@ -144,9 +144,7 @@ export function PortalHomeView() {
                       {ticket.subject}
                     </Link>
                     <span className="flex shrink-0 items-center gap-2 text-ink-subtle">
-                      <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
-                        {tTickets(`status.${ticket.status}` as Parameters<typeof tTickets>[0])}
-                      </Badge>
+                      <TicketStatusBadge status={ticket.status} />
                       <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
                     </span>
                   </li>

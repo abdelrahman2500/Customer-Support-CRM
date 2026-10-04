@@ -263,8 +263,9 @@ describe("DashboardView", () => {
       // Story 153 — real messages are provided here (not a key-echo stub), so
       // these are the actual labels. The variant still derives from the raw
       // enum, which is what this test asserts.
-      expect(screen.getByText("Open")).toHaveClass("bg-warning-surface");
-      expect(screen.getByText("In progress")).toHaveClass("bg-surface-muted");
+      // Story 191 (RD-1.14) — OPEN info, IN_PROGRESS progress.
+      expect(screen.getByText("Open")).toHaveClass("bg-info-surface");
+      expect(screen.getByText("In progress")).toHaveClass("bg-progress-surface");
     });
 
     it("orders tickets breached-first, then soonest-remaining, then no-target-last", () => {

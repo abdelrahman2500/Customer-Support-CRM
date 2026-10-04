@@ -25,9 +25,10 @@ import { useTranslations } from "next-intl";
  *
  * ## What this does NOT do
  *
- * It never touches `ticketStatusBadgeVariant`/`ticketPriorityBadgeVariant`.
- * Those map colour from the RAW enum and must keep doing so — the label is
- * presentation, the enum is the contract. Likewise a `Select`'s option
+ * It never decides colour or icon: `TicketStatusBadge`/`TicketPriorityBadge`
+ * (Story 191, `components/tickets/ticket-badges.tsx`) map those from the RAW
+ * enum via `@crm/shared` — the label is presentation, the enum is the
+ * contract. Likewise a `Select`'s option
  * `value` stays the raw enum (it is sent to the API); only its visible text
  * comes from here.
  */

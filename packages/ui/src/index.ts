@@ -100,6 +100,14 @@ export {
   SettingsIcon,
   MySessionsIcon,
   SidebarToggleIcon,
+  StatusOpenIcon,
+  StatusInProgressIcon,
+  StatusResolvedIcon,
+  StatusClosedIcon,
+  PriorityLowIcon,
+  PriorityMediumIcon,
+  PriorityHighIcon,
+  PriorityUrgentIcon,
 } from "./lib/icons";
 export type { LucideIcon } from "./lib/icons";
 

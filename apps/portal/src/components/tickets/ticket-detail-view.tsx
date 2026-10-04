@@ -15,11 +15,10 @@ import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import { TicketAttachmentsCard } from "@/components/tickets/ticket-attachments-card";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
+import { TicketStatusBadge } from "@/components/tickets/ticket-status-badge";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   LoadingStatus,
@@ -128,9 +127,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               {/* Story 148 — the same `status.*` keys the list and its
                   status filter read from, so the three can never disagree
                   about what a status is called. */}
-              <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
-                {t(`status.${ticket.status}` as Parameters<typeof t>[0])}
-              </Badge>
+              <TicketStatusBadge status={ticket.status} />
             </dd>
           </div>
           <div>

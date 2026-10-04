@@ -7,11 +7,10 @@ import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router"
 import { useTranslations } from "next-intl";
 import { useCreateMyTicketMutation, useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { ticketStatusBadgeVariant } from "@/lib/ticket-badges";
+import { TicketStatusBadge } from "@/components/tickets/ticket-status-badge";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   FetchingIndicator,
@@ -233,9 +232,7 @@ export function TicketListView() {
                   {ticket.subject}
                 </Link>
                 <span className="flex shrink-0 items-center gap-2 text-ink-subtle">
-                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
-                    {t(`status.${ticket.status}` as Parameters<typeof t>[0])}
-                  </Badge>
+                  <TicketStatusBadge status={ticket.status} />
                   <span>{new Date(ticket.createdAt).toLocaleDateString(locale)}</span>
                 </span>
               </li>

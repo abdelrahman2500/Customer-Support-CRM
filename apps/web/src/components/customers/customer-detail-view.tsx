@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import {
   useAnonymizeCustomerMutation,
@@ -39,7 +38,7 @@ import {
 } from "@crm/ui";
 import { BackLink } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
+import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/ticket-badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /**
@@ -457,7 +456,6 @@ export function CustomerDetailSkeleton() {
 
 export function CustomerDetailView({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");
-  const ticketLabels = useTicketLabels();
   const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const router = useRouter();
@@ -673,7 +671,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
                 {relatedTickets.map((ticket) => (
                   <li
                     key={ticket.id}
-                    className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
+                    className="flex cursor-pointer flex-wrap items-center justify-between gap-2 border-b border-rule-subtle pb-2"
                     onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
                   >
                     <Link
@@ -683,13 +681,9 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
                     >
                       {ticket.subject}
                     </Link>
-                    <span className="flex items-center gap-2">
-                      <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
-                        {ticketLabels.status(ticket.status)}
-                      </Badge>
-                      <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
-                        {ticketLabels.priority(ticket.priority)}
-                      </Badge>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <TicketStatusBadge status={ticket.status} />
+                      <TicketPriorityBadge priority={ticket.priority} />
                       <span className="text-ink-subtle">
                         {new Date(ticket.createdAt).toLocaleDateString(locale)}
                       </span>

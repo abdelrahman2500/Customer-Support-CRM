@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useCustomerQuery, useTicketsQuery } from "@/hooks/use-tickets";
-import { ticketPriorityBadgeVariant, ticketStatusBadgeVariant } from "@/lib/ticket-badges";
-import { Alert, Badge, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
+import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/ticket-badges";
+import { Alert, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
 
 /** Story 28's own "still needs work" definition (`dashboard-view.tsx`'s
  * `OPEN_STATUSES`) — reused here rather than re-invented, so "other open
@@ -44,7 +43,6 @@ export function CustomerContextPanel({
 }) {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
-  const ticketLabels = useTicketLabels();
   const { locale } = useParams<{ locale: string }>();
 
   const ticketsQuery = useTicketsQuery({
@@ -101,12 +99,8 @@ export function CustomerContextPanel({
                   {ticket.subject}
                 </Link>
                 <span className="flex shrink-0 items-center gap-1">
-                  <Badge variant={ticketStatusBadgeVariant(ticket.status)}>
-                    {ticketLabels.status(ticket.status)}
-                  </Badge>
-                  <Badge variant={ticketPriorityBadgeVariant(ticket.priority)}>
-                    {ticketLabels.priority(ticket.priority)}
-                  </Badge>
+                  <TicketStatusBadge status={ticket.status} />
+                  <TicketPriorityBadge priority={ticket.priority} />
                 </span>
               </li>
             ))}

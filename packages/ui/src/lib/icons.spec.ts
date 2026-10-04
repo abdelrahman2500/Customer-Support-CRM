@@ -52,6 +52,14 @@ const ROLES = [
   "ApiKeysIcon",
   "SettingsIcon",
   "MySessionsIcon",
+  "StatusOpenIcon",
+  "StatusInProgressIcon",
+  "StatusResolvedIcon",
+  "StatusClosedIcon",
+  "PriorityLowIcon",
+  "PriorityMediumIcon",
+  "PriorityHighIcon",
+  "PriorityUrgentIcon",
 ] as const;
 
 describe("icon vocabulary", () => {

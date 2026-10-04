@@ -497,8 +497,8 @@ describe("TicketListView", () => {
     // raw enum; this file stubs `useTranslations` to echo the key, so the
     // key is what appears here. `fetch-state-messages.spec.ts` is where
     // the real copy is asserted to exist in both locales. Same two
-    // statuses, same two variants as before.
-    expect(screen.getByText("status.OPEN")).toHaveClass("bg-warning-surface");
+    // statuses. Story 191 (RD-1.14): OPEN is the info tone now.
+    expect(screen.getByText("status.OPEN")).toHaveClass("bg-info-surface");
     expect(screen.getByText("status.RESOLVED")).toHaveClass("bg-success-surface");
   });
 });

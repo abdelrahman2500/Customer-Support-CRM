@@ -109,6 +109,19 @@ export {
   // control's own `aria-expanded` carries the state; the glyph never
   // changes, only its rotation.
   PanelLeftClose as SidebarToggleIcon,
+
+  // Story 191 (RD-1.14) — ticket status and priority. Each value has its own
+  // shape so a badge never relies on its tone alone; all are direction-
+  // neutral. Which value gets which icon is @crm/shared's
+  // `ticket-presentation.ts` decision, not this package's.
+  CircleDot as StatusOpenIcon,
+  CircleDotDashed as StatusInProgressIcon,
+  CircleCheck as StatusResolvedIcon,
+  Archive as StatusClosedIcon,
+  SignalLow as PriorityLowIcon,
+  SignalMedium as PriorityMediumIcon,
+  SignalHigh as PriorityHighIcon,
+  OctagonAlert as PriorityUrgentIcon,
 } from "lucide-react";
 
 /** The shape every icon above satisfies, for a component that accepts one. */

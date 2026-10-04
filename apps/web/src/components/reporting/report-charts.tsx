@@ -1,3 +1,5 @@
+import { ticketStatusPresentation, type PresentationTone } from "@crm/shared";
+
 /**
  * RM-08 — Reporting Charts. Plain, dependency-free inline SVG/CSS — recon
  * confirmed zero charting library exists anywhere in this monorepo
@@ -18,11 +20,9 @@
  * would override for every chart at once) rather than hard-coding a
  * palette nothing could ever re-theme.
  *
- * Ticket-status bar colors mirror `ticket-badges.ts`'s own
- * `ticketStatusBadgeVariant` semantic exactly (OPEN=amber/"needs
- * attention", RESOLVED=green/"good terminal state", CLOSED=quiet neutral,
- * IN_PROGRESS=neutral "owned, no action required") — the same mapping a
- * ticket's own status Badge already uses elsewhere in this app, not a
+ * Ticket-status bar colors come from the same tone a ticket's status
+ * badge uses (Story 191, `@crm/shared` `ticket-presentation.ts`: OPEN
+ * info, IN_PROGRESS progress, RESOLVED success, CLOSED neutral), not a
  * second, independently-invented color scheme.
  */
 
@@ -178,13 +178,18 @@ export function RatingBar({ rating, ariaLabel }: { rating: number; ariaLabel: st
   );
 }
 
-/** Mirrors `ticket-badges.ts`'s own `ticketStatusBadgeVariant` semantic
- * exactly, translated to the solid chart-fill token each Badge variant's
- * surface/foreground pair is built from — see this file's own top doc
- * comment for why. */
+/** Story 191 (RD-1.14) — the status's shared tone as a solid chart fill:
+ * each semantic family's `-solid` step (fills, not text), and the strong
+ * rule for neutral. See this file's own top doc comment for why. */
+const TONE_FILL: Record<PresentationTone, string> = {
+  neutral: "rgb(var(--rule-strong))",
+  info: "rgb(var(--info-solid))",
+  progress: "rgb(var(--progress-solid))",
+  success: "rgb(var(--success-solid))",
+  warning: "rgb(var(--warning-solid))",
+  danger: "rgb(var(--danger-solid))",
+};
+
 export function ticketStatusBarColor(status: string): string {
-  if (status === "OPEN") return "rgb(var(--warning-solid))";
-  if (status === "RESOLVED") return "rgb(var(--success-solid))";
-  if (status === "CLOSED") return "rgb(var(--rule-strong))";
-  return "rgb(var(--ink-subtle))"; // IN_PROGRESS
+  return TONE_FILL[ticketStatusPresentation(status).tone];
 }

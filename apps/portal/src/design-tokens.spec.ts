@@ -714,7 +714,7 @@ describe("S-1 design tokens (portal)", { timeout: 30_000 }, () => {
    * Narrow on purpose. It matches an enum rendered as a JSX **child** — the
    * only position that becomes visible text — and therefore never flags the
    * legitimate attribute uses right beside it,
-   * `variant={ticketStatusBadgeVariant(ticket.status)}` and `value={...}`.
+   * `status={ticket.status}` (Story 191's `TicketStatusBadge`) and `value={...}`.
    * It is not a general enum analyser.
    */
   const RAW_ENUM_CHILD = /^\{\s*\w+\.(?:status|priority)\s*\}$/;

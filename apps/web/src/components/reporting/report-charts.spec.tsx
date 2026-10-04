@@ -207,10 +207,15 @@ describe("RatingBar", () => {
 });
 
 describe("ticketStatusBarColor", () => {
-  it("mirrors ticket-badges.ts's own ticketStatusBadgeVariant semantic (OPEN/RESOLVED/CLOSED distinct, IN_PROGRESS neutral fallback)", () => {
-    expect(ticketStatusBarColor("OPEN")).toBe("rgb(var(--warning-solid))");
+  // Story 191 (RD-1.14) — the status badge's shared tone, as a solid fill.
+  it("uses each status's shared tone (OPEN info, IN_PROGRESS progress, RESOLVED success, CLOSED neutral)", () => {
+    expect(ticketStatusBarColor("OPEN")).toBe("rgb(var(--info-solid))");
+    expect(ticketStatusBarColor("IN_PROGRESS")).toBe("rgb(var(--progress-solid))");
     expect(ticketStatusBarColor("RESOLVED")).toBe("rgb(var(--success-solid))");
     expect(ticketStatusBarColor("CLOSED")).toBe("rgb(var(--rule-strong))");
-    expect(ticketStatusBarColor("IN_PROGRESS")).toBe("rgb(var(--ink-subtle))");
+  });
+
+  it("falls back to the neutral fill for an unknown status", () => {
+    expect(ticketStatusBarColor("ARCHIVED")).toBe("rgb(var(--rule-strong))");
   });
 });

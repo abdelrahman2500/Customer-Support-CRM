@@ -163,7 +163,8 @@ describe("TicketDetailView", () => {
 
     render(<TicketDetailView ticketId="ticket-1" />);
 
-    expect(screen.getByText("status.OPEN")).toHaveClass("bg-warning-surface");
+    // Story 191 (RD-1.14) — OPEN is the info tone now (shared with apps/web).
+    expect(screen.getByText("status.OPEN")).toHaveClass("bg-info-surface");
   });
 
   it("renders the empty history message when there are no entries", () => {
