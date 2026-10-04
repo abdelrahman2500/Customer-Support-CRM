@@ -174,6 +174,16 @@ export {
 
 export { Badge } from "./components/badge";
 export type { BadgeProps } from "./components/badge";
+// Story 189 (RD-1.12) — display primitives.
+export { Avatar, getInitials } from "./components/avatar";
+export type { AvatarPresence, AvatarProps, AvatarSize } from "./components/avatar";
+export { Separator } from "./components/separator";
+export type { SeparatorProps } from "./components/separator";
+export { Kbd } from "./components/kbd";
+export { DescriptionItem, DescriptionList } from "./components/description-list";
+export type { DescriptionItemProps, DescriptionListProps } from "./components/description-list";
+export { BackLink } from "./components/back-link";
+export type { BackLinkProps } from "./components/back-link";
 
 export { Button } from "./components/button";
 export type { ButtonProps } from "./components/button";

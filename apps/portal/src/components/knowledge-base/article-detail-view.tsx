@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Alert, Card, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
+import { BackLink } from "@crm/ui";
 import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
 import type { KbLocale } from "@/lib/knowledge-base-api";
@@ -54,18 +55,10 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
   return (
     <section className="flex flex-col gap-6">
-      <Link
-        href={`/${locale}/knowledge-base`}
-        className="text-sm font-medium text-ink-muted hover:text-ink hover:underline"
-      >
-        {/* `rtl:rotate-180` so "back" points the way back in both
-            directions — a bare `&larr;` points *forward* in Arabic.
-            `aria-hidden`: the adjacent label already names the action. */}
-        <span aria-hidden="true" className="inline-block rtl:rotate-180">
-          &larr;
-        </span>{" "}
-        {t("detail.backToList")}
-      </Link>
+      {/* Story 189 — the shared BackLink: chevron flips in RTL, token focus ring. */}
+      <BackLink asChild>
+        <Link href={`/${locale}/knowledge-base`}>{t("detail.backToList")}</Link>
+      </BackLink>
 
       <Card className="p-surface">
         <PageHeader title={article.title} />

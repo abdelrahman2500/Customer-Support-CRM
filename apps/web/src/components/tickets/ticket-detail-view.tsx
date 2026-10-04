@@ -43,6 +43,7 @@ import {
   Skeleton,
   Textarea,
 } from "@crm/ui";
+import { BackLink } from "@crm/ui";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -291,20 +292,10 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
   return (
     <section className="flex flex-col gap-6">
-      {/* Batch 3 (UX audit) — mirrors the portal's own `detail.backToList`
-          pattern exactly (this screen never had one). `rtl:rotate-180` so
-          "back" points the way back in both directions; `aria-hidden`
-          since the adjacent label already names the action. */}
-
-      <Link
-        href={`/${locale}/tickets`}
-        className="focus-ring self-start rounded-sm text-sm font-medium text-ink-muted hover:text-ink hover:underline"
-      >
-        <span aria-hidden="true" className="inline-block rtl:rotate-180">
-          &larr;
-        </span>{" "}
-        {t("detail.backToList")}
-      </Link>
+      {/* Story 189 — the shared BackLink: chevron flips in RTL, token focus ring. */}
+      <BackLink asChild>
+        <Link href={`/${locale}/tickets`}>{t("detail.backToList")}</Link>
+      </BackLink>
 
       <div>
         {/* Story 156 — a real, visible page title.
