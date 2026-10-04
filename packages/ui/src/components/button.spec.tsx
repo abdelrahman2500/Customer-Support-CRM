@@ -103,3 +103,43 @@ describe("Button", () => {
     });
   });
 });
+
+describe("Button design-language API (Story 185)", () => {
+  it("is comfortable by default: 40px, control radius", () => {
+    render(<Button>Save</Button>);
+    expect(screen.getByRole("button", { name: "Save" })).toHaveClass("h-10", "rounded-control");
+  });
+
+  it.each([
+    ["secondary", "bg-accent-surface"],
+    ["link", "text-accent"],
+  ] as const)("offers the %s variant", (variant, token) => {
+    render(<Button variant={variant}>Go</Button>);
+    expect(screen.getByRole("button", { name: "Go" })).toHaveClass(token);
+  });
+
+  it("keeps a link variant text-only at any size", () => {
+    render(
+      <Button variant="link" size="sm">
+        Details
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "Details" });
+    expect(button).toHaveClass("h-auto", "px-0");
+    expect(button).not.toHaveClass("h-8");
+  });
+
+  it("offers square icon sizes, named by aria-label", () => {
+    render(
+      <Button size="icon" aria-label="Close">
+        <svg aria-hidden="true" />
+      </Button>,
+    );
+    expect(screen.getByRole("button", { name: "Close" })).toHaveClass("h-10", "w-10");
+  });
+
+  it("darkens on press with the accent-active token", () => {
+    render(<Button>Send</Button>);
+    expect(screen.getByRole("button", { name: "Send" })).toHaveClass("active:bg-accent-active");
+  });
+});

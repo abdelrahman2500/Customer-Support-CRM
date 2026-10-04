@@ -22,28 +22,44 @@ import { Spinner } from "./spinner";
  * the `default`/`sm` sizes are byte-identical to before.
  */
 const buttonVariants = cva(
-  "focus-ring inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+  "focus-ring inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control text-sm font-medium transition-colors duration-fast ease-standard disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-accent text-accent-foreground hover:bg-accent-hover",
-        outline: "border border-rule-strong bg-surface text-ink hover:bg-surface-sunk",
-        ghost: "text-ink-strong hover:bg-surface-muted",
-        destructive: "bg-danger-solid text-danger-solid-foreground hover:bg-danger-solid-hover",
+        // Story 185 (RD-1.8) — the design-language action set: one solid
+        // primary, a quiet tinted secondary, a bordered outline, a bare ghost,
+        // a text-only link, and the destructive fill. Pressed states use the
+        // -active step; every colour is a token, so branding and dark mode
+        // apply with no per-variant overrides.
+        default: "bg-accent text-accent-foreground hover:bg-accent-hover active:bg-accent-active",
+        secondary:
+          "bg-accent-surface text-accent-hover hover:bg-surface-muted active:bg-surface-muted",
+        outline:
+          "border border-rule-strong bg-surface text-ink hover:bg-surface-muted active:bg-surface-sunk",
+        ghost: "text-ink-strong hover:bg-surface-muted active:bg-surface-sunk",
+        link: "text-accent underline-offset-4 hover:underline",
+        destructive:
+          "bg-danger-solid text-danger-solid-foreground hover:bg-danger-solid-hover active:bg-danger-solid-hover",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
+        // Story 185 (RD-1.8) — comfortable density: 40px default, 32px sm,
+        // 44px lg (was 36/32/40). Icon sizes are square; an icon-only button
+        // MUST carry an aria-label, since its icon is aria-hidden.
+        default: "h-10 px-4",
+        sm: "h-8 px-3 text-xs",
+        icon: "h-10 w-10 p-0",
+        "icon-sm": "h-8 w-8 p-0",
         /**
-         * Story S-3 — `h-10`, one 4px step above `default`, for a page's
-         * single primary action (a portal "Submit a ticket", a login submit).
-         * Deliberately not applied anywhere yet: introducing the size is this
-         * story's job, deciding which actions deserve it belongs to the
-         * surface stories.
+         * Story S-3 — for a page's single primary action (a portal "Submit a
+         * ticket", a login submit). Story 185 — 44px, one step above the
+         * comfortable default.
          */
-        lg: "h-10 px-6 text-sm",
+        lg: "h-11 px-6 text-sm",
       },
     },
+    // A link is text, not a box: whatever the size, it drops the height and
+    // padding (compound classes are emitted after size classes, so they win).
+    compoundVariants: [{ variant: "link", class: "h-auto px-0" }],
     defaultVariants: { variant: "default", size: "default" },
   },
 );

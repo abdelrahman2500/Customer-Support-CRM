@@ -2,58 +2,78 @@ import * as React from "react";
 import { cva } from "class-variance-authority";
 import type { VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
+import { ErrorIcon, InfoIcon, SuccessIcon, WarningIcon } from "../lib/icons";
+import type { LucideIcon } from "../lib/icons";
 
-const alertVariants = cva("w-full rounded-md border px-4 py-3 text-sm", {
+const alertVariants = cva("w-full rounded-control border px-4 py-3 text-sm", {
   variants: {
     variant: {
       default: "border-rule bg-surface-sunk text-ink-strong",
       destructive: "border-danger-border bg-danger-subtle text-danger-foreground",
-      /** Story 25 — matches `Badge`'s existing `success` palette; used for
-       * a successful creation confirmation. */
       success: "border-success-border bg-success-subtle text-success-foreground",
+      // Story 185 (RD-1.8) — the two semantic families that had tokens but no
+      // Alert: callers were borrowing default/destructive instead.
+      warning: "border-warning-border bg-warning-subtle text-warning-foreground",
+      info: "border-info-border bg-info-subtle text-info-foreground",
     },
   },
   defaultVariants: { variant: "default" },
 });
 
 /**
- * Story S-4 — the default ARIA role now follows the variant.
- *
- * Previously every `Alert` defaulted to `role="alert"`, which is an
- * *assertive* live region: it interrupts whatever a screen reader is
- * currently saying. That is right for the 64 `variant="destructive"` call
- * sites — a submission that just failed should cut in — and wrong for the
- * informational and success ones, where it means a confirmation banner
- * talks over the user mid-sentence.
- *
- * `role="status"` is the polite equivalent: announced at the next natural
- * pause instead of immediately. Both roles carry their own implicit
- * `aria-live` (`assertive` and `polite` respectively), so no explicit
- * `aria-live` is needed and none is added.
- *
- * This is a default, not a rule — an explicit `role` prop still wins, so a
- * caller with a genuinely urgent informational message can ask for
- * `role="alert"`, and one rendering a purely decorative note can pass
- * `role={undefined}` to opt out of live-region semantics entirely.
- *
- * Nothing visual changes: the variants, their palettes, focus behaviour and
- * RTL behaviour are untouched.
+ * Only `destructive` interrupts (role="alert"); every other variant is a
+ * polite status. A caller can still override `role`.
  */
 const ROLE_BY_VARIANT = {
   default: "status",
   success: "status",
+  info: "status",
+  warning: "status",
   destructive: "alert",
 } as const;
 
-export interface AlertProps
-  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof alertVariants> {}
+const ICON_BY_VARIANT: Record<keyof typeof ROLE_BY_VARIANT, LucideIcon> = {
+  default: InfoIcon,
+  info: InfoIcon,
+  success: SuccessIcon,
+  warning: WarningIcon,
+  destructive: ErrorIcon,
+};
 
-export function Alert({ className, variant, role, ...props }: AlertProps) {
+export interface AlertProps
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, "title">,
+    VariantProps<typeof alertVariants> {
+  /**
+   * Story 185 (RD-1.8) — an optional bold first line. Opt-in, like `icon`, so
+   * the ~100 existing alerts (many laying out their own children with flex)
+   * render exactly as before.
+   */
+  title?: React.ReactNode;
+  /** `true` for the variant's own icon, or a specific icon. Decorative. */
+  icon?: boolean | LucideIcon;
+}
+
+export function Alert({ className, variant, role, title, icon, children, ...props }: AlertProps) {
+  const key = variant ?? "default";
+  const Icon = icon === true ? ICON_BY_VARIANT[key] : icon || null;
+  const structured = Boolean(Icon || title);
   return (
     <div
-      role={role ?? ROLE_BY_VARIANT[variant ?? "default"]}
-      className={cn(alertVariants({ variant }), className)}
+      role={role ?? ROLE_BY_VARIANT[key]}
+      className={cn(alertVariants({ variant }), structured && "flex items-start gap-3", className)}
       {...props}
-    />
+    >
+      {structured ? (
+        <>
+          {Icon && <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {title && <p className="font-semibold">{title}</p>}
+            {children}
+          </div>
+        </>
+      ) : (
+        children
+      )}
+    </div>
   );
 }

@@ -64,6 +64,33 @@ describe("Alert", () => {
     const element = screen.getByTestId("a");
     expect(element).toHaveClass("flex");
     // Base classes survive the merge.
-    expect(element).toHaveClass("rounded-md");
+    expect(element).toHaveClass("rounded-control");
+  });
+});
+
+describe("Alert design-language API (Story 185)", () => {
+  it.each([
+    ["warning", "bg-warning-subtle", "status"],
+    ["info", "bg-info-subtle", "status"],
+  ] as const)("offers the %s variant as a polite status", (variant, token, role) => {
+    render(<Alert variant={variant}>Heads up</Alert>);
+    expect(screen.getByRole(role)).toHaveClass(token);
+  });
+
+  it("renders the variant's own icon and a title when asked", () => {
+    render(
+      <Alert variant="destructive" icon title="Could not save">
+        Try again in a moment.
+      </Alert>,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("Could not save")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("Could not saveTry again in a moment.");
+  });
+
+  it("renders children unwrapped when neither icon nor title is given", () => {
+    render(<Alert data-testid="plain">Plain</Alert>);
+    expect(screen.getByTestId("plain").firstChild?.nodeType).toBe(Node.TEXT_NODE);
   });
 });

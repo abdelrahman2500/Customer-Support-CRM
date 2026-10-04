@@ -86,7 +86,27 @@ describe("Badge", () => {
 
     const element = screen.getByTestId("b");
     expect(element).toHaveClass("ms-2");
-    expect(element).toHaveClass("rounded-full");
+    expect(element).toHaveClass("rounded-pill");
     expect(element).toHaveAttribute("title", "Ticket status");
+  });
+});
+
+describe("Badge design-language API (Story 185)", () => {
+  it("offers the progress tone", () => {
+    const { container } = render(<Badge variant="progress">In progress</Badge>);
+    expect(container.firstElementChild).toHaveClass("bg-progress-surface", "text-progress-foreground");
+  });
+
+  it("renders a decorative leading icon before the label", () => {
+    const Icon = (props: React.SVGProps<SVGSVGElement>) => <svg data-testid="icon" {...props} />;
+    render(<Badge icon={Icon as never}>Open</Badge>);
+    const icon = screen.getByTestId("icon");
+    expect(icon).toHaveAttribute("aria-hidden", "true");
+    expect(icon.nextSibling?.textContent).toBe("Open");
+  });
+
+  it("offers a small size", () => {
+    const { container } = render(<Badge size="sm">x</Badge>);
+    expect(container.firstElementChild).toHaveClass("text-caption");
   });
 });

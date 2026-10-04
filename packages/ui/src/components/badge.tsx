@@ -2,6 +2,7 @@ import * as React from "react";
 import { cva } from "class-variance-authority";
 import type { VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
+import type { LucideIcon } from "../lib/icons";
 
 /**
  * Story S-1 — the four status tints moved to the semantic families.
@@ -17,7 +18,7 @@ import { cn } from "../lib/cn";
  * success 6.4:1, warning 6.5:1, danger 6.9:1.
  */
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-pill border font-medium",
   {
     variants: {
       variant: {
@@ -27,27 +28,34 @@ const badgeVariants = cva(
         success: "border-transparent bg-success-surface text-success-foreground",
         warning: "border-transparent bg-warning-surface text-warning-foreground",
         destructive: "border-transparent bg-danger-surface text-danger-foreground",
-        /**
-         * Story S-5 — completes the semantic set. S-1 defined a full `info`
-         * token family (blue-50/100/200/600/800) and nothing ever consumed
-         * it, so an informational state had no badge representation and a
-         * caller wanting one had to reach for a raw palette value. No new
-         * colour is introduced here: these are the S-1 tokens, finally
-         * given the home the other three families already had.
-         *
-         * info-surface on info-foreground is 7.0:1, in line with the
-         * success/warning/danger pairs above.
-         */
         info: "border-transparent bg-info-surface text-info-foreground",
+        // Story 185 (RD-1.8) — the "work in progress" tone (IN_PROGRESS).
+        progress: "border-transparent bg-progress-surface text-progress-foreground",
+      },
+      size: {
+        md: "px-2.5 py-0.5 text-xs",
+        sm: "px-2 py-px text-caption",
       },
     },
-    defaultVariants: { variant: "default" },
+    defaultVariants: { variant: "default", size: "md" },
   },
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {}
+  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {
+  /**
+   * Story 185 (RD-1.8) — an optional leading icon (decorative, aria-hidden).
+   * Status badges pass one so meaning never rests on colour alone; the
+   * badge text still carries the accessible meaning.
+   */
+  icon?: LucideIcon;
+}
 
-export function Badge({ className, variant, ...props }: BadgeProps) {
-  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+export function Badge({ className, variant, size, icon: Icon, children, ...props }: BadgeProps) {
+  return (
+    <span className={cn(badgeVariants({ variant, size }), className)} {...props}>
+      {Icon && <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
+      {children}
+    </span>
+  );
 }

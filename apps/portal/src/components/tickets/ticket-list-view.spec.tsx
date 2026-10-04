@@ -472,9 +472,10 @@ describe("TicketListView", () => {
 
       render(<TicketListView />);
 
-      // `h-10` is `Button`'s `lg`, which Story S-3 introduced for "a page's
-      // single primary action" and left unapplied everywhere.
-      expect(screen.getByRole("button", { name: "list.createSubmit" })).toHaveClass("h-10");
+      // `Button`'s `lg`, which Story S-3 introduced for "a page's single
+      // primary action". Story 185 moved `lg` to 44px (`h-11`), one step
+      // above the new 40px comfortable default.
+      expect(screen.getByRole("button", { name: "list.createSubmit" })).toHaveClass("h-11");
     });
   });
 
