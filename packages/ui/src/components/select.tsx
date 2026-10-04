@@ -2,8 +2,13 @@
 
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "../lib/cn";
+import { controlClassName } from "../lib/control";
+import {
+  CheckIcon as Check,
+  ChevronDownIcon as ChevronDown,
+  ChevronUpIcon as ChevronUp,
+} from "../lib/icons";
 import { menuContentClassName, menuItemClassName } from "../lib/menu";
 
 export const Select = SelectPrimitive.Root;
@@ -17,14 +22,17 @@ export const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "focus-ring-always flex h-9 w-full items-center justify-between gap-2 rounded-md border border-rule-strong bg-surface px-3 py-1 text-sm text-ink shadow-sm disabled:cursor-not-allowed disabled:opacity-50",
+      // Story 186 (RD-1.9) — the shared control look (40px, control radius,
+      // 3:1 border, invalid state), identical to Input.
+      "focus-ring-always flex h-10 items-center justify-between gap-2 px-3 text-start",
+      controlClassName,
       className,
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-50" aria-hidden />
+      <ChevronDown className="h-4 w-4 shrink-0 text-ink-subtle" aria-hidden />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));

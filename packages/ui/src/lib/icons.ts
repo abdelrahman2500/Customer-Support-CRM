@@ -63,6 +63,11 @@ export {
   Menu as MenuIcon,
   X as CloseIcon,
 
+  // Story 186 (RD-1.9) — form-control glyphs (Checkbox, Select), which used
+  // to import lucide directly. Not directional.
+  Check as CheckIcon,
+  Minus as MinusIcon,
+
   // Semantic states. These pair with the matching `Alert`/`Badge` variant
   // and the S-1 semantic token families of the same names.
   CircleCheckBig as SuccessIcon,

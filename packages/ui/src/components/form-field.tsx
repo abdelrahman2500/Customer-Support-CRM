@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "../lib/cn";
+import { ErrorIcon } from "../lib/icons";
 
 /**
  * Story 141 — one shape for "a labelled control, with an optional hint and
@@ -77,6 +78,12 @@ export interface FormFieldProps {
   error?: React.ReactNode;
   density?: "compact" | "comfortable";
   className?: string;
+  /**
+   * Story 186 (RD-1.9) — marks the field as required: a visual asterisk
+   * (aria-hidden) plus `aria-required` on the control. Deliberately NOT the
+   * native `required` attribute, which would change submit behaviour.
+   */
+  required?: boolean;
 }
 
 const DENSITY = {
@@ -93,6 +100,7 @@ const DENSITY = {
 interface ControlAriaProps {
   "aria-describedby"?: string;
   "aria-invalid"?: React.AriaAttributes["aria-invalid"];
+  "aria-required"?: React.AriaAttributes["aria-required"];
 }
 
 export function FormField({
@@ -102,6 +110,7 @@ export function FormField({
   error,
   density = "compact",
   className,
+  required = false,
 }: FormFieldProps) {
   const generatedId = React.useId();
   const hintId = `${generatedId}-hint`;
@@ -125,13 +134,21 @@ export function FormField({
   return (
     <div className={cn("flex flex-col gap-tight", DENSITY[density], className)}>
       <label className="flex flex-col gap-tight">
-        {label}
+        <span>
+          {label}
+          {required && (
+            <span aria-hidden="true" className="ms-0.5 text-danger-foreground">
+              *
+            </span>
+          )}
+        </span>
         {control
           ? React.cloneElement(control, {
               "aria-describedby": describedBy,
               // `??`, not `||`: an explicit `aria-invalid={false}` from the
               // caller is a real answer and must survive.
               "aria-invalid": control.props["aria-invalid"] ?? (error ? true : undefined),
+              "aria-required": control.props["aria-required"] ?? (required || undefined),
             })
           : children}
       </label>
@@ -141,8 +158,13 @@ export function FormField({
         </span>
       )}
       {error && (
-        <span id={errorId} role="status" className="text-xs text-danger-foreground">
-          {error}
+        <span
+          id={errorId}
+          role="status"
+          className="flex items-start gap-1 text-xs text-danger-foreground"
+        >
+          <ErrorIcon className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </span>
       )}
     </div>

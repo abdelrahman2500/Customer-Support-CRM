@@ -52,7 +52,7 @@ describe("Textarea", () => {
     render(<Textarea aria-label="Note" />);
 
     const textarea = screen.getByRole("textbox", { name: "Note" });
-    expect(textarea).toHaveClass("border-rule-strong");
+    expect(textarea).toHaveClass("border-rule-control");
     expect(textarea).toHaveClass("bg-surface");
     expect(textarea.className).not.toMatch(/slate-\d/);
   });

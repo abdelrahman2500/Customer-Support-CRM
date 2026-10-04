@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
-import { Check, Minus } from "lucide-react";
 import { cn } from "../lib/cn";
+import { CheckIcon as Check, MinusIcon as Minus } from "../lib/icons";
 
 /**
  * Story S-3 — neither app had a checkbox of any kind, so there is no existing
@@ -28,7 +28,7 @@ export const Checkbox = React.forwardRef<
   <CheckboxPrimitive.Root
     ref={ref}
     className={cn(
-      "focus-ring peer h-4 w-4 shrink-0 rounded-[0.25rem] border border-rule-strong bg-surface shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[state=indeterminate]:border-accent data-[state=indeterminate]:bg-accent data-[state=indeterminate]:text-accent-foreground",
+      "focus-ring peer h-4 w-4 shrink-0 rounded border border-rule-control bg-surface transition-colors duration-fast disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground data-[state=indeterminate]:border-accent data-[state=indeterminate]:bg-accent data-[state=indeterminate]:text-accent-foreground",
       className,
     )}
     {...props}

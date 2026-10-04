@@ -291,3 +291,37 @@ describe("FormField", () => {
     });
   });
 });
+
+describe("FormField required marker and error icon (Story 186)", () => {
+  it("marks a required field visually and with aria-required, without native validation", () => {
+    render(
+      <FormField label="Subject" required>
+        <input />
+      </FormField>,
+    );
+    const input = screen.getByRole("textbox", { name: "Subject" });
+    expect(input).toHaveAttribute("aria-required", "true");
+    expect(input).not.toHaveAttribute("required");
+    expect(screen.getByText("*")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("does not mark an optional field", () => {
+    render(
+      <FormField label="Category">
+        <input />
+      </FormField>,
+    );
+    expect(screen.getByRole("textbox", { name: "Category" })).not.toHaveAttribute("aria-required");
+  });
+
+  it("prefixes the error text with a decorative icon, keeping the message intact", () => {
+    render(
+      <FormField label="Email" error="Enter a valid email">
+        <input />
+      </FormField>,
+    );
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Enter a valid email");
+    expect(status.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+});

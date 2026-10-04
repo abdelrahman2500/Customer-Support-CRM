@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "../lib/cn";
+import { controlClassName } from "../lib/control";
 
 /**
  * Story S-3 — the multi-line counterpart to `Input`, matching it token for
@@ -29,10 +30,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     <textarea
       ref={ref}
       rows={rows}
-      className={cn(
-        "focus-ring flex w-full rounded-md border border-rule-strong bg-surface px-3 py-2 text-sm text-ink shadow-sm transition-colors placeholder:text-ink-subtle disabled:cursor-not-allowed disabled:opacity-50",
-        className,
-      )}
+      className={cn("focus-ring flex px-3 py-2", controlClassName, className)}
       {...props}
     />
   ),

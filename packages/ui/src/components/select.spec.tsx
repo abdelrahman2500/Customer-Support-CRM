@@ -141,7 +141,7 @@ describe("Select", () => {
     renderSelect(["Low"]);
 
     const trigger = screen.getByRole("combobox", { name: "Assigned agent" });
-    expect(trigger).toHaveClass("border-rule-strong");
+    expect(trigger).toHaveClass("border-rule-control");
     expect(trigger).toHaveClass("bg-surface");
     expect(trigger).toHaveClass("focus-ring-always");
     expect(trigger.className).not.toMatch(/slate-\d/);
