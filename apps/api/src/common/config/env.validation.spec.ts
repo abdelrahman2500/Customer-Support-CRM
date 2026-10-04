@@ -31,7 +31,7 @@ const productionEnv = {
 } as const;
 
 describe("validateEnv", () => {
-  it("applies local MinIO defaults when S3 settings are absent", () => {
+  it("applies local RustFS defaults when S3 settings are absent", () => {
     const env = validateEnv({ ...baseEnv });
 
     expect(env).toMatchObject({
@@ -167,7 +167,7 @@ describe("validateEnv", () => {
       expect(env.S3_BUCKET).toBe("crm-attachments");
     });
 
-    it("keeps the local MinIO defaults outside production", () => {
+    it("keeps the local RustFS defaults outside production", () => {
       const env = validateEnv({ ...baseEnv });
       expect(env.S3_ENDPOINT).toBe("http://localhost:9000");
       expect(env.S3_ACCESS_KEY).toBe("minioadmin");

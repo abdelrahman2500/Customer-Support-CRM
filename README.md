@@ -128,7 +128,7 @@ Outbound webhooks (notifying an org's own external systems of CRM events)
 are a separate, implemented capability — see Integrations below.
 
 ### Attachments — Implemented
-S3-compatible object storage (MinIO locally) for both ticket and customer
+S3-compatible object storage (RustFS locally) for both ticket and customer
 attachments: upload via multipart form data, download via short-lived
 (15-minute) presigned URLs — never a proxied binary or redirect.
 
@@ -248,12 +248,12 @@ direct cross-module database writes.
 | Database | PostgreSQL 16 (`pgvector/pgvector:pg16` image; `pgvector`/`pg_trgm` extensions declared, not yet used) |
 | Jobs / Queue | BullMQ ^6.2 on Redis 7 (`@nestjs/bullmq`, `ioredis`) |
 | Realtime | Socket.IO ^4.8 (`@nestjs/websockets`, `@nestjs/platform-socket.io`, `@socket.io/redis-adapter`) |
-| Object storage | S3-compatible via `@aws-sdk/client-s3` (MinIO locally) |
+| Object storage | S3-compatible via `@aws-sdk/client-s3` (RustFS locally) |
 | AI | `@anthropic-ai/sdk` ^0.122 behind a shared `AiProvider` interface (`packages/ai`), with a disabled no-op fallback |
 | Frontend (both apps) | Next.js ^15.5 (App Router), React ^18.3, TanStack Query ^5.10, Zustand ^5.0, `next-intl` ^4.13 (Arabic/English, RTL), `socket.io-client` ^4.8 |
 | Frontend (Agent Workspace) | Tailwind CSS ^3.4, Radix UI primitives, `class-variance-authority`, `lucide-react` — visual language in [`docs/architecture/13-design-language.md`](./docs/architecture/13-design-language.md) |
 | Testing | Vitest ^4.1 (unit + component, every package), Supertest ^7.2 (API e2e) |
-| Local infra | Docker Compose — Postgres, Redis, MinIO, MailHog |
+| Local infra | Docker Compose — Postgres, Redis, RustFS, MailHog |
 | API docs | Swagger/OpenAPI, generated in non-production environments |
 
 ## Getting Started
@@ -262,7 +262,7 @@ direct cross-module database writes.
 
 - Node.js ≥ 20
 - pnpm 10 (`corepack enable`, or `npm install -g pnpm@10.34.5`)
-- Docker Desktop (for Postgres/Redis/MinIO/MailHog), or your own local
+- Docker Desktop (for Postgres/Redis/RustFS/MailHog), or your own local
   Postgres 16 + Redis if you'd rather not use Docker.
 
 ### 1. Install dependencies
@@ -282,7 +282,7 @@ docker compose up -d
 `docker-compose.yml` maps the `postgres` service to **host port 5433**
 (`5433:5432`) rather than the default 5432, specifically to avoid
 conflicting with a natively-installed PostgreSQL that may already own 5432
-on your machine. Redis is on its default `6379`; MinIO on `9000`
+on your machine. Redis is on its default `6379`; RustFS on `9000`
 (API)/`9001` (console); MailHog on `1025` (SMTP)/`8025` (web UI).
 
 ### 3. Configure environment variables
@@ -319,8 +319,8 @@ pnpm dev
 
 `apps/api` creates its S3 bucket (`S3_BUCKET`, `crm-attachments` by
 default) automatically on startup if it doesn't already exist
-(`S3StorageService.onModuleInit`) — no separate MinIO console step is
-needed for a fresh local MinIO container.
+(`S3StorageService.onModuleInit`) — no separate object-storage console step is
+needed for a fresh local RustFS container.
 
 Confirm the stack is actually up with `curl http://localhost:3001/health/ready`
 — `{"status":"ok",...}` means the API can reach both Postgres and Redis; a
@@ -342,7 +342,7 @@ Values below are read from `apps/api/.env` and `apps/worker/.env` (see
 | `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL` | Access-token signing secret (min 32 chars) and lifetime (default `15m`). |
 | `JWT_REFRESH_SECRET` / `JWT_REFRESH_TTL_DAYS` | Refresh-token signing secret and lifetime in days (default `7`). Must differ from `JWT_ACCESS_SECRET`. |
 | `API_KEY_HASH_SECRET` (optional) | HMAC key `apps/api` hashes agent API keys with; falls back to `JWT_REFRESH_SECRET` when unset. |
-| `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` | Object storage config for attachments (defaults match the local MinIO container; all four required explicitly in production). |
+| `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` | Object storage config for attachments (defaults match the local RustFS container; all four required explicitly in production). |
 | `CORS_ORIGINS` | Comma-separated allowed browser origins for the REST API and Socket.IO gateway. Unset = no cross-origin access allowed. |
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | Read only by `prisma/seed.ts`, to create the initial SuperAdmin. |
 | `ANTHROPIC_API_KEY` (optional) | Enables the real Anthropic AI provider (`apps/worker`). Absent = AI features fall back to a no-op "disabled" provider that still logs the request but never calls out. Not present in `.env.example` — add it yourself to enable AI. |
@@ -374,7 +374,7 @@ Values below are read from `apps/api/.env` and `apps/worker/.env` (see
 | `apps/worker` | no HTTP port — background process, logs to console |
 | PostgreSQL (Docker) | localhost:5433 (see port note above) |
 | Redis (Docker) | localhost:6379 |
-| MinIO API / Console (Docker) | localhost:9000 / localhost:9001 |
+| RustFS API / Console (Docker) | localhost:9000 / localhost:9001 |
 | MailHog Web UI (Docker) | localhost:8025 |
 
 ## Development Commands
@@ -426,7 +426,7 @@ not this sentence.
 
 CI (`.github/workflows/ci.yml`) runs on every PR and push to `main`:
 install → Prisma generate → lint → typecheck → build → unit tests
-(`pnpm test`) → API e2e tests against real Postgres/Redis/MinIO service
+(`pnpm test`) → API e2e tests against real Postgres/Redis/RustFS service
 containers. A separate `browser-e2e` job then builds `apps/api`/`apps/web`/
 `apps/portal`, installs Chromium, and runs `pnpm --filter @crm/e2e test`
 (pre-built apps only — `apps/api` boots via `node dist/main.js`, not `nest

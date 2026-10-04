@@ -14,7 +14,7 @@ const DOWNLOAD_URL_TTL_SECONDS = 15 * 60;
 
 /**
  * Story 66 — thin wrapper around the AWS SDK v3 S3 client, pointed at the
- * MinIO endpoint locally (`S3_ENDPOINT`) — the same S3 API works unchanged
+ * RustFS endpoint locally (`S3_ENDPOINT`) — the same S3 API works unchanged
  * against a real AWS S3/Azure Blob-S3-compatible endpoint in production,
  * per docs/architecture/01-technology-stack.md's own stated rationale for
  * choosing S3 ("keeps the hosting provider undecided until deployment
@@ -34,8 +34,8 @@ export class S3StorageService implements OnModuleInit {
     this.bucket = this.configService.get("S3_BUCKET", { infer: true });
     this.client = new S3Client({
       endpoint: this.configService.get("S3_ENDPOINT", { infer: true }),
-      region: "us-east-1", // MinIO ignores region; a fixed value keeps the SDK client happy.
-      forcePathStyle: true, // required for MinIO/path-style S3-compatible endpoints.
+      region: "us-east-1",
+      forcePathStyle: true, // required for path-style S3-compatible endpoints.
       credentials: {
         accessKeyId: this.configService.get("S3_ACCESS_KEY", { infer: true }),
         secretAccessKey: this.configService.get("S3_SECRET_KEY", { infer: true }),

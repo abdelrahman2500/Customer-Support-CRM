@@ -13,9 +13,9 @@ import { MAX_ATTACHMENT_SIZE_BYTES } from "../src/modules/attachments/attachment
  * `customer-attachments.e2e-spec.ts` (Story 67) exactly, scoped to a
  * Knowledge Base article instead of a `Customer`.
  *
- * Bootstraps the REAL `AppModule` against REAL Postgres/Redis/MinIO. MinIO
- * must be running (`docker compose up -d minio`) with its bucket already
- * created (`S3StorageService.onModuleInit` creates it if missing).
+ * Bootstraps the REAL `AppModule` against REAL Postgres/Redis/RustFS.
+ * RustFS must be running (`docker compose up -d object-storage`);
+ * `S3StorageService.onModuleInit` creates its bucket if missing.
  *
  * Known scope limit, same as every sibling e2e suite: `prisma/seed.ts`
  * creates exactly one Branch, so this suite cannot exercise true

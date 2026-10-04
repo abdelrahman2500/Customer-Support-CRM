@@ -19,5 +19,5 @@
 
 - Environments are local (`docker-compose`), staging, and production. Environment variables are validated at boot with `@nestjs/config` and `zod`.
 - GitHub Actions runs install, lint, type-check, unit/integration tests, and builds on every PR; merges to main additionally build and push Docker images. Deployment is outside this story.
-- Each app ships a Dockerfile. Root `docker-compose.yml` runs Postgres, Redis, MinIO, MailHog, and the four apps locally.
+- Each app ships a Dockerfile. Root `docker-compose.yml` runs Postgres, Redis, RustFS, MailHog, and the four apps locally.
 - `prisma migrate deploy` runs explicitly before API/worker startup in non-local environments; migrations never run implicitly at app boot.

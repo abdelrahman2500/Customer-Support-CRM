@@ -47,7 +47,7 @@ export class AttachmentsController {
    * as data lets the frontend make one authenticated JSON call, then
    * perform a plain top-level browser navigation to the presigned URL —
    * which is not subject to CORS at all (unlike a script-initiated fetch
-   * read), so no MinIO/S3 CORS configuration is needed either. The API
+   * read), so no object-storage CORS configuration is needed either. The API
    * still never proxies the binary itself (plan Design item 4).
    */
   @Get(":attachmentId/download")

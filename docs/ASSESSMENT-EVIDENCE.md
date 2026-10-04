@@ -63,7 +63,7 @@ commit `9cd542e`'s message states the exact e2e run it performed — see
 The project's own objective definition of "verified" is
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml): install → Prisma
 generate → lint → typecheck → build → unit tests → API e2e tests (against
-real Postgres/Redis/MinIO service containers), with a separate
+real Postgres/Redis/RustFS service containers), with a separate
 `browser-e2e` job (builds `apps/api`/`apps/web`/`apps/portal`, then runs the
 Playwright suite against them) and a separate Docker-image-build job (build
 only, no push — no container registry has been chosen; see

@@ -96,7 +96,7 @@ const baseEnvSchema = z.object({
   API_KEY_HASH_SECRET: optionalString,
 
   /** Story 66 — Ticket Attachments is the first real consumer. Keep the
-   * local MinIO defaults here so test/CI bootstraps do not fail when the
+   * local RustFS defaults here so test/CI bootstraps do not fail when the
    * per-app `.env` file is not present yet; production and local overrides
    * still win because `ConfigModule.forRoot()` reads the actual environment
    * values before validation.
@@ -257,7 +257,7 @@ export type EnvConfig = z.infer<typeof baseEnvSchema>;
  * inspects the *raw* environment in `validateEnv` below.
  *
  * Without it, a production deployment that forgets these boots with
- * `http://localhost:9000` and MinIO's well-known `minioadmin`/`minioadmin`
+ * `http://localhost:9000` and the local object's `minioadmin`/`minioadmin`
  * dev credentials. `S3StorageService.onModuleInit` calls the endpoint
  * unconditionally at bootstrap, so the container crash-loops on an
  * `ECONNREFUSED` stack trace that names localhost — a confusing symptom for
@@ -266,9 +266,9 @@ export type EnvConfig = z.infer<typeof baseEnvSchema>;
  * declared these required in production.
  */
 const PRODUCTION_REQUIRED_LOCAL_DEFAULTS: Record<string, string> = {
-  S3_ENDPOINT: "the object-storage endpoint — the default points at the local MinIO container",
-  S3_ACCESS_KEY: "the object-storage access key — the default is MinIO's dev credential",
-  S3_SECRET_KEY: "the object-storage secret key — the default is MinIO's dev credential",
+  S3_ENDPOINT: "the object-storage endpoint — the default points at the local RustFS container",
+  S3_ACCESS_KEY: "the object-storage access key — the default is the local RustFS dev credential",
+  S3_SECRET_KEY: "the object-storage secret key — the default is the local RustFS dev credential",
 };
 
 function findMissingProductionValues(
