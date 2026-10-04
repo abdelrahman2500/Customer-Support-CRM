@@ -151,7 +151,10 @@ describe("TicketDetailView", () => {
     // the list and its status filter. This file stubs `useTranslations`
     // to echo the key, so the key is what renders here.
     expect(screen.getByText("status.OPEN")).toBeInTheDocument();
-    expect(screen.getByText("MEDIUM")).toBeInTheDocument();
+    // Story 193 (RD-1.16) — the priority is a localized badge now, not the
+    // raw enum (this file's translator echoes the key).
+    expect(screen.getByText("priority.MEDIUM")).toBeInTheDocument();
+    expect(screen.queryByText("MEDIUM")).not.toBeInTheDocument();
     expect(screen.getByText("account")).toBeInTheDocument();
   });
 
@@ -198,7 +201,9 @@ describe("TicketDetailView", () => {
 
     render(<TicketDetailView ticketId="ticket-1" />);
 
-    expect(screen.getByText("ticket.created")).toBeInTheDocument();
+    // Story 193 (RD-1.16) — the event type's label key, never the raw type.
+    expect(screen.getByText("detail.historyEvent.created")).toBeInTheDocument();
+    expect(screen.queryByText("ticket.created")).not.toBeInTheDocument();
   });
 
   it("renders an inline error when history fails to load", () => {

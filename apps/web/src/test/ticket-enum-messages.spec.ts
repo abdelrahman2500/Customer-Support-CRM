@@ -97,4 +97,22 @@ describe("ticket enum messages", () => {
       }
     }
   });
+
+  // Story 193 (RD-1.16) — ticket history event labels (`lib/history-event.ts`).
+  // Every type the API's ticket-history listener writes, plus the fallback.
+  it("labels every ticket history event, distinctly and in Arabic script", () => {
+    const EVENTS = ["created", "updated", "recategorized", "escalated", "other"] as const;
+    for (const messages of Object.values(CATALOGS)) {
+      const labels = EVENTS.map((e) => messages.tickets.detail.historyEvent[e]);
+      for (const label of labels) {
+        expect(label).toBeTypeOf("string");
+        expect(label.trim()).not.toBe("");
+        expect(label).not.toMatch(/^ticket./);
+      }
+      expect(new Set(labels).size).toBe(EVENTS.length);
+    }
+    for (const e of EVENTS) {
+      expect(ar.tickets.detail.historyEvent[e]).toMatch(/[؀-ۿ]/);
+    }
+  });
 });

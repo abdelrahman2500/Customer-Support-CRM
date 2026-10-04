@@ -59,6 +59,7 @@ function ticketIdFor(notification: PortalNotification): string {
  */
 export function NotificationToaster() {
   const t = useTranslations("notifications");
+  const tTickets = useTranslations("tickets");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const notifications = usePortalNotificationsStore((state) => state.notifications);
@@ -92,7 +93,7 @@ export function NotificationToaster() {
                   <CloseIcon className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
-              <p className="text-sm text-ink-strong">{messageFor(notification, t)}</p>
+              <p className="text-sm text-ink-strong">{messageFor(notification, t, tTickets)}</p>
               <Button
                 type="button"
                 onClick={() => {
@@ -116,11 +117,15 @@ export function NotificationToaster() {
 function messageFor(
   notification: PortalNotification,
   t: ReturnType<typeof useTranslations<"notifications">>,
+  tTickets: ReturnType<typeof useTranslations<"tickets">>,
 ): string {
   if (isTicketUpdatedPayload(notification)) {
     return t("ticketUpdated", {
       subject: notification.payload.ticket.subject,
-      status: notification.payload.ticket.status,
+      // Story 193 (RD-1.16) — the localized label, never the raw enum.
+      status: tTickets(
+        `status.${notification.payload.ticket.status}` as Parameters<typeof tTickets>[0],
+      ),
     });
   }
   if (isChannelMessagePayload(notification)) {

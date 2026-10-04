@@ -10,6 +10,7 @@ import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { ListTicketsFilters } from "@/lib/tickets-api";
 import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/ticket-badges";
 import { SlaIndicator } from "@/components/tickets/sla-indicator";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useUrlFilters } from "@/lib/url-filters";
 import {
   Button,
@@ -117,6 +118,7 @@ export function TicketListView() {
 
 function TicketListViewContent() {
   const t = useTranslations("tickets");
+  const ticketLabels = useTicketLabels();
   const tCommon = useTranslations("common");
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
@@ -209,6 +211,7 @@ function TicketListViewContent() {
           value={filters.status ?? ALL_VALUE}
           onChange={(value) => updateFilter("status", value)}
           options={STATUS_OPTIONS}
+          renderLabel={ticketLabels.status}
         />
         <FilterSelect
           allValue={ALL_VALUE}
@@ -217,6 +220,7 @@ function TicketListViewContent() {
           value={filters.priority ?? ALL_VALUE}
           onChange={(value) => updateFilter("priority", value)}
           options={PRIORITY_OPTIONS}
+          renderLabel={ticketLabels.priority}
         />
         <FilterSelect
           allValue={ALL_VALUE}

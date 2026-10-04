@@ -143,6 +143,13 @@
       "historyHeading": "السجل",
       "historyError": "تعذّر تحميل سجل هذه التذكرة.",
       "historyEmpty": "لا توجد إدخالات في السجل حتى الآن.",
+      "historyEvent": {
+        "created": "تم إنشاء التذكرة",
+        "updated": "تم تحديث التذكرة",
+        "recategorized": "تم تغيير الفئة",
+        "escalated": "تم تصعيد التذكرة",
+        "other": "تم تغيير التذكرة"
+      },
       "csatHeading": "الملاحظات",
       "csatError": "تعذّر تحميل ملاحظاتك.",
       "csatPrompt": "كيف تقيّم الدعم الذي تلقيته؟",
@@ -165,6 +172,12 @@
       "IN_PROGRESS": "قيد المعالجة",
       "RESOLVED": "تم الحل",
       "CLOSED": "مغلقة"
+    },
+    "priority": {
+      "LOW": "منخفضة",
+      "MEDIUM": "متوسطة",
+      "HIGH": "عالية",
+      "URGENT": "عاجلة"
     }
   },
   "knowledgeBase": {

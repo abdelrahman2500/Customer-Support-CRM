@@ -231,6 +231,13 @@
       "historyHeading": "السجل",
       "historyError": "تعذّر تحميل سجل هذه التذكرة.",
       "historyEmpty": "لا توجد إدخالات في السجل حتى الآن.",
+      "historyEvent": {
+        "created": "تم إنشاء التذكرة",
+        "updated": "تم تحديث التذكرة",
+        "recategorized": "تم تغيير الفئة",
+        "escalated": "تم تصعيد التذكرة",
+        "other": "تم تغيير التذكرة"
+      },
       "notesHeading": "الملاحظات",
       "notesError": "تعذّر تحميل ملاحظات هذه التذكرة.",
       "notesEmpty": "لا توجد ملاحظات حتى الآن.",

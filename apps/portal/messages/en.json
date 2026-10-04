@@ -143,6 +143,13 @@
       "historyHeading": "History",
       "historyError": "Couldn't load this ticket's history.",
       "historyEmpty": "No history entries yet.",
+      "historyEvent": {
+        "created": "Ticket created",
+        "updated": "Ticket updated",
+        "recategorized": "Category changed",
+        "escalated": "Ticket escalated",
+        "other": "Ticket changed"
+      },
       "csatHeading": "Feedback",
       "csatError": "Couldn't load your feedback.",
       "csatPrompt": "How would you rate the support you received?",
@@ -165,6 +172,12 @@
       "IN_PROGRESS": "In progress",
       "RESOLVED": "Resolved",
       "CLOSED": "Closed"
+    },
+    "priority": {
+      "LOW": "Low",
+      "MEDIUM": "Medium",
+      "HIGH": "High",
+      "URGENT": "Urgent"
     }
   },
   "knowledgeBase": {

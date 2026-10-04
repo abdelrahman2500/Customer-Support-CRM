@@ -30,6 +30,7 @@ import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus } from "@/lib/sla";
 import { SlaIndicator } from "@/components/tickets/sla-indicator";
+import { historyEventKey } from "@/lib/history-event";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
@@ -800,7 +801,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                     key={entry.id}
                     className="flex items-center justify-between border-b border-rule-subtle pb-2"
                   >
-                    <span className="font-medium text-ink-strong">{entry.eventType}</span>
+                    <span className="font-medium text-ink-strong">
+                      {t(`detail.historyEvent.${historyEventKey(entry.eventType)}`)}
+                    </span>
                     <span className="text-ink-subtle">
                       {new Date(entry.createdAt).toLocaleString(locale)}
                     </span>

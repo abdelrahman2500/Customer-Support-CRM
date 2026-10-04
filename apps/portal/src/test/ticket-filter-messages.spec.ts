@@ -87,4 +87,36 @@ describe("ticket filter messages", () => {
       expect(ar.tickets.list.resultCount).toContain(category);
     }
   });
+
+  // Story 193 (RD-1.16) — the portal's own priority labels (its detail page
+  // printed the raw enum) and ticket history event labels.
+  it("labels every priority, distinctly, in Arabic script, with the agent workspace's wording", () => {
+    const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
+    for (const messages of Object.values(CATALOGS)) {
+      const labels = PRIORITIES.map((p) => messages.tickets.priority[p]);
+      for (const [i, label] of labels.entries()) {
+        expect(label.trim()).not.toBe("");
+        expect(label).not.toBe(PRIORITIES[i]);
+      }
+      expect(new Set(labels).size).toBe(PRIORITIES.length);
+    }
+    for (const p of PRIORITIES) {
+      expect(ar.tickets.priority[p]).toMatch(/[؀-ۿ]/);
+    }
+  });
+
+  it("labels every ticket history event, distinctly and in Arabic script", () => {
+    const EVENTS = ["created", "updated", "recategorized", "escalated", "other"] as const;
+    for (const messages of Object.values(CATALOGS)) {
+      const labels = EVENTS.map((e) => messages.tickets.detail.historyEvent[e]);
+      for (const label of labels) {
+        expect(label.trim()).not.toBe("");
+        expect(label).not.toMatch(/^ticket./);
+      }
+      expect(new Set(labels).size).toBe(EVENTS.length);
+    }
+    for (const e of EVENTS) {
+      expect(ar.tickets.detail.historyEvent[e]).toMatch(/[؀-ۿ]/);
+    }
+  });
 });

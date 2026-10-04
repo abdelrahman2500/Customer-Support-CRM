@@ -16,6 +16,8 @@ import { TicketAttachmentsCard } from "@/components/tickets/ticket-attachments-c
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { TicketStatusBadge } from "@/components/tickets/ticket-status-badge";
+import { TicketPriorityBadge } from "@/components/tickets/ticket-priority-badge";
+import { historyEventKey } from "@/lib/history-event";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
 import {
   Alert,
@@ -132,7 +134,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           </div>
           <div>
             <dt className="text-xs text-ink-subtle">{t("detail.priority")}</dt>
-            <dd className="font-medium text-ink-strong">{ticket.priority}</dd>
+            <dd>
+              <TicketPriorityBadge priority={ticket.priority} />
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-ink-subtle">{t("detail.category")}</dt>
@@ -168,7 +172,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                 key={entry.id}
                 className="flex items-center justify-between border-b border-rule-subtle pb-2"
               >
-                <span className="font-medium text-ink-strong">{entry.eventType}</span>
+                <span className="font-medium text-ink-strong">
+                  {t(`detail.historyEvent.${historyEventKey(entry.eventType)}`)}
+                </span>
                 <span className="text-ink-subtle">
                   {new Date(entry.createdAt).toLocaleString(locale)}
                 </span>

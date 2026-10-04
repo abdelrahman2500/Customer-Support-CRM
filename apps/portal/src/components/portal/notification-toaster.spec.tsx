@@ -57,8 +57,9 @@ describe("NotificationToaster", () => {
     );
 
     expect(screen.getByText("Ticket updated")).toBeInTheDocument();
+    // Story 193 (RD-1.16) — the status is the localized label, not the raw enum.
     expect(
-      screen.getByText('Your ticket "Cannot log in" was updated — status: RESOLVED.'),
+      screen.getByText('Your ticket "Cannot log in" was updated — status: Resolved.'),
     ).toBeInTheDocument();
   });
 
@@ -75,6 +76,10 @@ describe("NotificationToaster", () => {
     );
 
     expect(screen.getByText("تم تحديث التذكرة")).toBeInTheDocument();
+    // Story 193 (RD-1.16) — the status inside the message is Arabic too.
+    const region = screen.getByRole("region");
+    expect(region).toHaveTextContent(arMessages.tickets.status.RESOLVED);
+    expect(region).not.toHaveTextContent("RESOLVED");
   });
 
   it("renders a body preview for channel.message.created", () => {
