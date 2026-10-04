@@ -40,6 +40,10 @@ export {
 } from "./lib/theme";
 export type { ThemePreference } from "./lib/theme";
 export { ThemeScript } from "./components/theme-script";
+export { ThemeSwitcher } from "./components/theme-switcher";
+export type { ThemeSwitcherProps } from "./components/theme-switcher";
+export { NativeSelect } from "./components/native-select";
+export type { NativeSelectOption, NativeSelectProps } from "./components/native-select";
 
 // --- Icon vocabulary (Story S-5) -------------------------------------------
 // Semantic role names over glyph names, so "delete" is one decision made

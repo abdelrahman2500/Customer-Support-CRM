@@ -20,6 +20,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   MenuIcon,
+  NativeSelect,
+  ThemeSwitcher,
 } from "@crm/ui";
 import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
@@ -228,46 +230,47 @@ export function WorkspaceHeader({
               it is the one that yields. */}
           <span className="min-w-0 truncate">{t("signedInAs", { name: user.fullName })}</span>
           {memberships.length > 1 && (
-            <select
+            // Story 182 (RD-1.5) — the shared NativeSelect: same native
+            // control, now with the token focus ring and control border.
+            <NativeSelect
               aria-label={t("branchSwitcher.label")}
-              className="h-8 rounded-md border border-rule-strong bg-surface px-2 text-sm"
               value={`${memberships.find((m) => m.isActive)?.branchId ?? ""}::${
                 memberships.find((m) => m.isActive)?.departmentId ?? ""
               }`}
-              onChange={(event) => void handleSwitchBranch(event.target.value)}
-            >
-              {memberships.map((membership) => (
-                <option
-                  key={`${membership.branchId}::${membership.departmentId ?? ""}`}
-                  value={`${membership.branchId}::${membership.departmentId ?? ""}`}
-                >
-                  {membership.departmentId
-                    ? t("branchSwitcher.branchAndDepartment", {
-                        branch: membership.branchName,
-                        department: membership.departmentName ?? "",
-                      })
-                    : membership.branchName}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => void handleSwitchBranch(value)}
+              options={memberships.map((membership) => ({
+                value: `${membership.branchId}::${membership.departmentId ?? ""}`,
+                label: membership.departmentId
+                  ? t("branchSwitcher.branchAndDepartment", {
+                      branch: membership.branchName,
+                      department: membership.departmentName ?? "",
+                    })
+                  : membership.branchName,
+              }))}
+            />
           )}
           {branchSwitchError && (
             <span role="alert" className="text-danger-foreground">
               {branchSwitchError}
             </span>
           )}
-          <select
+          <NativeSelect
             aria-label={t("languageSwitcher.label")}
-            className="h-8 rounded-md border border-rule-strong bg-surface px-2 text-sm"
             value={locale}
-            onChange={(event) => void handleSwitchLocale(event.target.value)}
-          >
-            {LOCALES.map((localeOption) => (
-              <option key={localeOption} value={localeOption}>
-                {t(`languageSwitcher.options.${localeOption}`)}
-              </option>
-            ))}
-          </select>
+            onValueChange={(value) => void handleSwitchLocale(value)}
+            options={LOCALES.map((localeOption) => ({
+              value: localeOption,
+              label: t(`languageSwitcher.options.${localeOption}`),
+            }))}
+          />
+          <ThemeSwitcher
+            label={t("themeSwitcher.label")}
+            optionLabels={{
+              system: t("themeSwitcher.options.system"),
+              light: t("themeSwitcher.options.light"),
+              dark: t("themeSwitcher.options.dark"),
+            }}
+          />
           <Button variant="outline" size="sm" onClick={handleSignOut}>
             {t("signOut")}
           </Button>

@@ -259,7 +259,8 @@ describe("LoginPage (portal)", () => {
 
         const select = screen.getByRole("combobox", { name: "languageSwitcher.label" });
         expect(select).toHaveValue("en");
-        expect(screen.getAllByRole("option")).toHaveLength(2);
+        // Scoped to the locale switcher: the theme switcher (Story 182) sits beside it.
+        expect(within(select).getAllByRole("option")).toHaveLength(2);
       });
 
       it("navigates to the target locale's login route", () => {

@@ -82,6 +82,14 @@
         "ar": "العربية"
       }
     },
+    "themeSwitcher": {
+      "label": "Theme",
+      "options": {
+        "system": "System",
+        "light": "Light",
+        "dark": "Dark"
+      }
+    },
     "nav": {
       "label": "Portal navigation",
       "menuLabel": "Open navigation menu"

@@ -45,7 +45,8 @@ const PHYSICAL_DIRECTION = new RegExp(
     `)${BOUNDARY_AFTER}`,
 );
 
-const DARK_VARIANT = new RegExp(`${BOUNDARY_BEFORE}dark:`);
+/** `dark:` immediately followed by a utility (`dark:bg-…`), not an object key (`dark: t(…)`). */
+const DARK_VARIANT = new RegExp(`${BOUNDARY_BEFORE}dark:(?=[\\w[!-])`);
 
 /**
  * `-solid` is the fill/icon step (≥ 3:1), not a text step — sky `info-solid`
@@ -167,6 +168,7 @@ describe("style guard patterns", () => {
   it("flags a dark: variant", () => {
     expect(DARK_VARIANT.test('className="dark:bg-surface"')).toBe(true);
     expect(DARK_VARIANT.test("const darkMode = true")).toBe(false);
+    expect(DARK_VARIANT.test('  dark: t("themeSwitcher.options.dark"),')).toBe(false);
   });
 });
 

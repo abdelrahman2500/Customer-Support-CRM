@@ -20,6 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   MenuIcon,
+  NativeSelect,
+  ThemeSwitcher,
 } from "@crm/ui";
 
 /** Story 119 — mirrors `apps/web`'s own `WorkspaceNav` constants/helper
@@ -230,19 +232,26 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-2">
-          <select
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Story 182 (RD-1.5) — the shared NativeSelect (with the token
+              focus ring it lacked, recon A11Y-08) and the theme switcher. */}
+          <NativeSelect
             aria-label={t("languageSwitcher.label")}
-            className="h-9 rounded-md border border-rule-strong bg-surface px-2 text-sm"
             value={locale}
-            onChange={(event) => void handleSwitchLocale(event.target.value)}
-          >
-            {LOCALES.map((localeOption) => (
-              <option key={localeOption} value={localeOption}>
-                {t(`languageSwitcher.options.${localeOption}`)}
-              </option>
-            ))}
-          </select>
+            onValueChange={(value) => void handleSwitchLocale(value)}
+            options={LOCALES.map((localeOption) => ({
+              value: localeOption,
+              label: t(`languageSwitcher.options.${localeOption}`),
+            }))}
+          />
+          <ThemeSwitcher
+            label={t("themeSwitcher.label")}
+            optionLabels={{
+              system: t("themeSwitcher.options.system"),
+              light: t("themeSwitcher.options.light"),
+              dark: t("themeSwitcher.options.dark"),
+            }}
+          />
           <Button type="button" onClick={handleSignOut} variant="outline" className="px-3">
             {t("signOut")}
           </Button>

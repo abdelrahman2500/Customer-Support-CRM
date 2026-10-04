@@ -12,6 +12,8 @@ import {
   KnowledgeBaseIcon,
   ReportsIcon,
   TicketsIcon,
+  NativeSelect,
+  ThemeSwitcher,
 } from "@crm/ui";
 import { getApiBaseUrl, setAccessToken } from "@/lib/api";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
@@ -157,19 +159,28 @@ export default function LoginPage() {
               property of how you read this screen, not a field you fill in.
               `justify-end` is logical, so it lands on the correct edge in both
               directions without a single `ml-*`/`mr-*`. */}
-          <div className="flex justify-end">
-            <select
+          <div className="flex flex-wrap justify-end gap-inline">
+            {/* Story 182 (RD-1.5) — the shared NativeSelect and ThemeSwitcher:
+                appearance is chosen here too, before signing in. */}
+            <NativeSelect
               aria-label={tWorkspace("languageSwitcher.label")}
-              className="focus-ring h-9 rounded-surface border border-rule-strong bg-surface px-2 text-sm text-ink"
+              size="md"
               value={locale}
-              onChange={(event) => handleSwitchLocale(event.target.value)}
-            >
-              {LOCALES.map((localeOption) => (
-                <option key={localeOption} value={localeOption}>
-                  {tWorkspace(`languageSwitcher.options.${localeOption}`)}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => handleSwitchLocale(value)}
+              options={LOCALES.map((localeOption) => ({
+                value: localeOption,
+                label: tWorkspace(`languageSwitcher.options.${localeOption}`),
+              }))}
+            />
+            <ThemeSwitcher
+              label={tWorkspace("themeSwitcher.label")}
+              size="md"
+              optionLabels={{
+                system: tWorkspace("themeSwitcher.options.system"),
+                light: tWorkspace("themeSwitcher.options.light"),
+                dark: tWorkspace("themeSwitcher.options.dark"),
+              }}
+            />
           </div>
 
           <div className="flex flex-1 items-center justify-center">
