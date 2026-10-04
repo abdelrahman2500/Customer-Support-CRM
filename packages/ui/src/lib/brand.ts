@@ -53,6 +53,43 @@ export const BRAND_CONTRAST_SURFACES = {
   dark: { surface: [15, 23, 42], sunk: [2, 6, 23], raised: [30, 41, 59] },
 } as const satisfies Record<"light" | "dark", Record<string, Rgb>>;
 
+/**
+ * Story 184 (RD-1.7) — the core palette a branding preview renders with when
+ * it cannot use the live CSS tokens (it shows light AND dark side by side).
+ * Mirrors packages/config/tailwind-tokens.css; apps/web's token-contrast
+ * spec fails if the two drift.
+ */
+export const CORE_PREVIEW_PALETTE = {
+  light: {
+    accent: { accent: [79, 70, 229], hover: [67, 56, 202], active: [55, 48, 163], foreground: [255, 255, 255], surface: [238, 242, 255] },
+    brand: [79, 70, 229],
+    surface: [255, 255, 255],
+    sunk: [248, 250, 252],
+    ink: [15, 23, 42],
+    inkMuted: [71, 85, 105],
+    rule: [226, 232, 240],
+    infoSurface: [224, 242, 254],
+    infoForeground: [7, 89, 133],
+  },
+  dark: {
+    accent: { accent: [129, 140, 248], hover: [165, 180, 252], active: [199, 210, 254], foreground: [15, 23, 42], surface: [30, 27, 75] },
+    brand: [129, 140, 248],
+    surface: [15, 23, 42],
+    sunk: [2, 6, 23],
+    ink: [241, 245, 249],
+    inkMuted: [180, 191, 207],
+    rule: [30, 41, 59],
+    infoSurface: [8, 47, 73],
+    infoForeground: [125, 211, 252],
+  },
+} as const satisfies Record<
+  "light" | "dark",
+  { accent: AccentSet; brand: Rgb } & Record<
+    "surface" | "sunk" | "ink" | "inkMuted" | "rule" | "infoSurface" | "infoForeground",
+    Rgb
+  >
+>;
+
 const WHITE: Rgb = [255, 255, 255];
 const INK: Rgb = [15, 23, 42];
 const AA = 4.5;

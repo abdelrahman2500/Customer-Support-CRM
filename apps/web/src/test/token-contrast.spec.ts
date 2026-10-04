@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { contrastRatio, parseChannels } from "@crm/ui";
+import { CORE_PREVIEW_PALETTE, contrastRatio, parseChannels } from "@crm/ui";
 import type { Rgb } from "@crm/ui";
 
 /**
@@ -139,5 +139,44 @@ describe("design token contrast (dark)", () => {
     expect(contrastRatio(get("danger-solid-foreground"), get("danger-solid-hover"))).toBeGreaterThanOrEqual(
       AA_TEXT,
     );
+  });
+});
+
+/**
+ * Story 184 (RD-1.7) — the branding preview renders light and dark side by
+ * side from CORE_PREVIEW_PALETTE, so it must mirror the real tokens.
+ */
+describe("CORE_PREVIEW_PALETTE mirrors the token file", () => {
+  const source = readFileSync(TOKENS, "utf8");
+  const blocks = {
+    light: readThemeBlock(source, ":root"),
+    dark: readThemeBlock(source, ':root[data-theme="dark"]'),
+  };
+  const TOKEN_FOR = {
+    brand: "brand",
+    surface: "surface",
+    sunk: "surface-sunk",
+    ink: "ink",
+    inkMuted: "ink-muted",
+    rule: "rule",
+    infoSurface: "info-surface",
+    infoForeground: "info-foreground",
+  } as const;
+
+  it.each(["light", "dark"] as const)("matches the %s tokens", (theme) => {
+    const palette = CORE_PREVIEW_PALETTE[theme];
+    const tokens = blocks[theme];
+    for (const [key, token] of Object.entries(TOKEN_FOR)) {
+      expect([...palette[key as keyof typeof TOKEN_FOR]], key).toEqual(tokens.get(token));
+    }
+    for (const [key, token] of Object.entries({
+      accent: "accent",
+      hover: "accent-hover",
+      active: "accent-active",
+      foreground: "accent-foreground",
+      surface: "accent-surface",
+    })) {
+      expect([...palette.accent[key as keyof typeof palette.accent]], key).toEqual(tokens.get(token));
+    }
   });
 });

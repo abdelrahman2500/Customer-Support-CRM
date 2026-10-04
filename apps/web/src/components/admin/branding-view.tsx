@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useBrandingQuery, useUpdateBrandingMutation } from "@/hooks/use-branding";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { resolveNavigationLayout } from "@/components/workspace/nav-items";
+import { BrandPreview } from "./brand-preview";
 import type { BrandingSummary, NavigationLayout } from "@/lib/branding-api";
 import {
   Alert,
@@ -180,22 +181,42 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("primaryColorLabel")}
-            <Input
-              value={primaryColor}
-              placeholder="#0f172a"
-              aria-invalid={invalidPrimary || undefined}
-              onChange={(event) => setPrimaryColor(event.target.value)}
-            />
+            {/* Story 184 (RD-1.7) — a native colour picker beside the hex
+                field (no dependency); the text field stays authoritative. */}
+            <span className="flex items-center gap-inline">
+              <Input
+                value={primaryColor}
+                placeholder="#4f46e5"
+                aria-invalid={invalidPrimary || undefined}
+                onChange={(event) => setPrimaryColor(event.target.value)}
+              />
+              <input
+                type="color"
+                aria-label={t("pickColor", { field: t("primaryColorLabel") })}
+                className="focus-ring h-10 w-12 shrink-0 cursor-pointer rounded-control border border-rule-control bg-surface p-1"
+                value={validPrimary ? primaryColor.toLowerCase() : "#4f46e5"}
+                onChange={(event) => setPrimaryColor(event.target.value)}
+              />
+            </span>
             {invalidPrimary && <span className="text-danger-foreground">{t("invalidColor")}</span>}
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("secondaryColorLabel")}
-            <Input
-              value={secondaryColor}
-              placeholder="#64748b"
-              aria-invalid={invalidSecondary || undefined}
-              onChange={(event) => setSecondaryColor(event.target.value)}
-            />
+            <span className="flex items-center gap-inline">
+              <Input
+                value={secondaryColor}
+                placeholder="#0d9488"
+                aria-invalid={invalidSecondary || undefined}
+                onChange={(event) => setSecondaryColor(event.target.value)}
+              />
+              <input
+                type="color"
+                aria-label={t("pickColor", { field: t("secondaryColorLabel") })}
+                className="focus-ring h-10 w-12 shrink-0 cursor-pointer rounded-control border border-rule-control bg-surface p-1"
+                value={validSecondary ? secondaryColor.toLowerCase() : "#0d9488"}
+                onChange={(event) => setSecondaryColor(event.target.value)}
+              />
+            </span>
             {invalidSecondary && (
               <span className="text-danger-foreground">{t("invalidColor")}</span>
             )}
@@ -225,7 +246,7 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
                       name="navigationLayout"
                       value={option}
                       checked={checked}
-                      className="mt-0.5"
+                      className="focus-ring mt-0.5"
                       onChange={() => setNavigationLayout(option)}
                     />
                     <span className="flex flex-col gap-1.5">
@@ -272,22 +293,11 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
           ) : (
             <p className="text-sm text-ink-subtle">{t("noLogo")}</p>
           )}
-          <div className="flex items-center gap-2 text-sm">
-            <span
-              className="h-6 w-6 rounded-full border border-rule-strong"
-              style={{ backgroundColor: validPrimary ? primaryColor : undefined }}
-              aria-hidden="true"
-            />
-            <span className="text-ink-muted">{t("primaryColorLabel")}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span
-              className="h-6 w-6 rounded-full border border-rule-strong"
-              style={{ backgroundColor: validSecondary ? secondaryColor : undefined }}
-              aria-hidden="true"
-            />
-            <span className="text-ink-muted">{t("secondaryColorLabel")}</span>
-          </div>
+          <BrandPreview
+            primaryColor={primaryColor.trim()}
+            secondaryColor={secondaryColor.trim()}
+            brandName={previewBrandName}
+          />
         </div>
       </SectionCard>
     </div>

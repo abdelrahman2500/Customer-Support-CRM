@@ -56,7 +56,9 @@ function collectSourceFiles(dir: string): string[] {
   return out;
 }
 
-describe("S-1 design tokens (portal)", () => {
+// Story 184 — explicit budget: this scans every production file and can exceed
+// the 5s default under the parallel full-suite run (assertions unchanged).
+describe("S-1 design tokens (portal)", { timeout: 30_000 }, () => {
   const files = collectSourceFiles(SRC);
 
   it("finds the production source tree to scan", () => {

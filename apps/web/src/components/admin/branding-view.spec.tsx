@@ -90,7 +90,8 @@ describe("BrandingView", () => {
     render(<BrandingView />);
 
     expect(screen.getByDisplayValue("https://example.com/logo.png")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("#112233")).toBeInTheDocument();
+    // Story 184 — the colour picker shares the value, so assert the field itself.
+    expect(screen.getByLabelText("primaryColorLabel")).toHaveValue("#112233");
   });
 
   it("shows the no-logo placeholder in the preview when no logo is set", () => {
@@ -262,14 +263,16 @@ describe("BrandingView", () => {
 
       render(<BrandingView />);
 
-      expect(screen.getByText("previewBrandName")).toBeInTheDocument();
+      // Story 184 — the name also heads both theme previews; assert it there.
+      const lightPreview = screen.getByTestId("brand-preview-light");
+      expect(within(lightPreview).getByText("previewBrandName")).toBeInTheDocument();
 
       fireEvent.change(screen.getByLabelText("appNameLabel"), {
         target: { value: "Acme Support" },
       });
 
-      expect(screen.getByText("Acme Support")).toBeInTheDocument();
-      expect(screen.queryByText("previewBrandName")).not.toBeInTheDocument();
+      expect(within(lightPreview).getByText("Acme Support")).toBeInTheDocument();
+      expect(screen.queryAllByText("previewBrandName")).toHaveLength(0);
     });
   });
 

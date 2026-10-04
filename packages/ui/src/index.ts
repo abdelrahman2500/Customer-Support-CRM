@@ -45,6 +45,7 @@ export { BrandScope } from "./components/brand-scope";
 export {
   accentSetPasses,
   brandCssVariables,
+  CORE_PREVIEW_PALETTE,
   deriveBrandTokens,
   NEUTRAL_CHROMA,
   RECOGNISABLE_SHIFT,
