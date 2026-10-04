@@ -170,9 +170,25 @@ describe("WorkspaceSidebar", () => {
 
       const active = screen.getByRole("link", { name: "nav.tickets" });
       const inactive = screen.getByRole("link", { name: "nav.dashboard" });
-      expect(active).toHaveClass("border-accent");
+      // Story 196 (RD-2.2) — the Tier 1 brand indicator on a neutral fill,
+      // not the accent tint.
+      expect(active).toHaveClass("border-brand", "bg-surface-muted", "font-medium");
+      expect(active).not.toHaveClass("bg-accent-surface");
       expect(inactive).toHaveClass("border-transparent");
-      expect(inactive).not.toHaveClass("border-accent");
+      expect(inactive).not.toHaveClass("border-brand");
+    });
+  });
+
+  // Story 196 (RD-2.2) — the design language's navigation sizes and labels.
+  describe("rail presentation (Story 196)", () => {
+    it("draws rail icons at 20px and styles group headings as labels", () => {
+      renderSidebar();
+
+      const link = screen.getByRole("link", { name: "nav.tickets" });
+      expect(link.querySelector("svg")).toHaveClass("h-5", "w-5");
+      const heading = screen.getByText("nav.groups.workspace");
+      expect(heading).toHaveClass("text-label");
+      expect(heading).not.toHaveClass("uppercase");
     });
   });
 

@@ -148,6 +148,7 @@
       },
       "unreadNotificationsLabel": "{count} إشعارات غير مقروءة",
       "groupMenuLabel": "قائمة {group}",
+      "groupMenuLabelUnread": "قائمة {group}، {count} غير مقروءة",
       "collapseSidebar": "طي شريط التنقل الجانبي",
       "expandSidebar": "توسيع شريط التنقل الجانبي"
     }

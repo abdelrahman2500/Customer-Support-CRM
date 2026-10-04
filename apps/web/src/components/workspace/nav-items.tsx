@@ -319,7 +319,9 @@ export function NavItemLabel({
   return (
     <>
       <Icon
-        className={inMenu ? "h-4 w-4 shrink-0 -ms-4 me-4" : "h-4 w-4 shrink-0"}
+        // Story 196 (RD-2.2) — the design language's icon sizes: 20px on a
+        // navigation surface (the rail), 16px in an inline menu row.
+        className={inMenu ? "h-4 w-4 shrink-0 -ms-4 me-4" : "h-5 w-5 shrink-0"}
         aria-hidden
       />
       <span className={labelClassName}>{t(item.labelKey)}</span>

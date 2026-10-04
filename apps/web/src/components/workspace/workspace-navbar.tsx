@@ -73,22 +73,29 @@ export function WorkspaceNavbar({
               // to this trigger programmatically (on close, on Escape),
               // where `:focus-visible` does not always match — see
               // `packages/config/tailwind-tokens.css`.
-              className={`flex items-center gap-1.5 rounded-md border-s-2 px-2 py-1.5 text-sm transition-colors focus-ring-always ${
+              // Story 196 (RD-2.2) — the active section reads as a neutral fill
+              // plus the Tier 1 brand indicator, not the accent tint, so
+              // selection and the (indigo) focus ring are separate cues.
+              className={`flex items-center gap-1.5 rounded-control border-s-2 px-2 py-1.5 text-sm transition-colors focus-ring-always ${
                 isGroupActive
-                  ? "border-accent bg-accent-surface font-medium text-ink-strong"
+                  ? "border-brand bg-surface-muted font-medium text-ink-strong"
                   : "border-transparent text-ink-muted hover:bg-surface-muted hover:text-ink-strong"
               }`}
-              aria-label={t("nav.groupMenuLabel", { group: groupName })}
+              // Story 196 — the trigger's aria-label is its whole accessible
+              // name, so the unread count has to be in it (recon A11Y-11);
+              // the visual badge below is aria-hidden.
+              aria-label={
+                groupUnreadCount > 0
+                  ? t("nav.groupMenuLabelUnread", { group: groupName, count: groupUnreadCount })
+                  : t("nav.groupMenuLabel", { group: groupName })
+              }
             >
               {/* No `uppercase`/`tracking-wide`: Arabic has no case
                   distinction and letter-spacing breaks its connected
                   letterforms — see `nav-items.tsx`'s doc comment. */}
               {groupName}
               {groupUnreadCount > 0 && (
-                <Badge
-                  variant="destructive"
-                  aria-label={t("nav.unreadNotificationsLabel", { count: groupUnreadCount })}
-                >
+                <Badge variant="destructive" aria-hidden="true">
                   {groupUnreadCount}
                 </Badge>
               )}

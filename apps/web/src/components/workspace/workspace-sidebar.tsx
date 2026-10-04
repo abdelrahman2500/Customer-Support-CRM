@@ -90,8 +90,8 @@ export function WorkspaceSidebar({
     >
       <div className={`flex px-2 ${collapsed ? "justify-center" : "justify-end"}`}>
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon-sm"
           onClick={toggleCollapsed}
           aria-expanded={!collapsed}
           aria-label={collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
@@ -115,7 +115,7 @@ export function WorkspaceSidebar({
                 fixed `w-60`, and a long Arabic group name must wrap inside
                 it rather than widen it. */}
             <p
-              className={`px-3 py-1.5 text-xs font-semibold text-ink-subtle ${
+              className={`px-3 py-1.5 text-label text-ink-subtle ${
                 collapsed ? "sr-only" : "break-words"
               }`}
             >
@@ -128,11 +128,12 @@ export function WorkspaceSidebar({
                 <Link
                   href={href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`flex items-center gap-2 rounded-md border-s-2 px-3 py-2 text-sm transition-colors focus-ring ${
+                  className={`flex items-center gap-2 rounded-control border-s-2 px-3 py-2 text-sm transition-colors focus-ring ${
                     collapsed ? "justify-center" : ""
                   } ${
                     isActive
-                      ? "border-accent bg-accent-surface font-medium text-ink-strong"
+                      ? // Story 196 (RD-2.2) — neutral fill + Tier 1 brand indicator.
+                        "border-brand bg-surface-muted font-medium text-ink-strong"
                       : "border-transparent text-ink-muted hover:bg-surface-muted hover:text-ink-strong"
                   }`}
                 >

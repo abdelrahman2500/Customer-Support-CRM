@@ -148,6 +148,7 @@
       },
       "unreadNotificationsLabel": "{count} unread notifications",
       "groupMenuLabel": "{group} menu",
+      "groupMenuLabelUnread": "{group} menu, {count} unread",
       "collapseSidebar": "Collapse the navigation sidebar",
       "expandSidebar": "Expand the navigation sidebar"
     }

@@ -42,6 +42,12 @@ function triggerName(groupKey: string): string {
   return `nav.groupMenuLabel:${JSON.stringify({ group: `nav.groups.${groupKey}` })}`;
 }
 
+/** Story 196 (RD-2.2, recon A11Y-11) — the trigger of the group holding an
+ * unread item names the count itself. */
+function unreadTriggerName(groupKey: string, count: number): string {
+  return `nav.groupMenuLabelUnread:${JSON.stringify({ group: `nav.groups.${groupKey}`, count })}`;
+}
+
 // Mirrors the deleted spec's own `EXPECTED_LINKS` — the full 20-item list,
 // which is this story's permission-visibility regression guard: both
 // presentations render every destination, exactly as before.
@@ -80,9 +86,9 @@ function renderNavbar(props: { unreadCount?: number; unreadCountKnown?: boolean 
 /** Opens one group's menu and returns it. Radix only mounts
  * `DropdownMenuContent` once opened, so exactly one menu exists at a time
  * and no two link sets ever coexist in the DOM. */
-async function openGroup(groupKey: string) {
+async function openGroup(groupKey: string, name: string = triggerName(groupKey)) {
   const clickUser = userEvent.setup();
-  await clickUser.click(screen.getByRole("button", { name: triggerName(groupKey) }));
+  await clickUser.click(screen.getByRole("button", { name }));
   return screen.findByRole("menu");
 }
 
@@ -206,9 +212,12 @@ describe("WorkspaceNavbar", () => {
 
       const active = screen.getByRole("button", { name: triggerName("workspace") });
       const inactive = screen.getByRole("button", { name: triggerName("reporting") });
-      expect(active).toHaveClass("border-accent");
+      // Story 196 (RD-2.2) — the Tier 1 brand indicator on a neutral fill,
+      // not the accent tint.
+      expect(active).toHaveClass("border-brand", "bg-surface-muted", "font-medium");
+      expect(active).not.toHaveClass("bg-accent-surface");
       expect(inactive).toHaveClass("border-transparent");
-      expect(inactive).not.toHaveClass("border-accent");
+      expect(inactive).not.toHaveClass("border-brand");
     });
 
     it("marks the group trigger from a nested detail route too", () => {
@@ -216,7 +225,7 @@ describe("WorkspaceNavbar", () => {
       renderNavbar();
 
       expect(screen.getByRole("button", { name: triggerName("workspace") })).toHaveClass(
-        "border-accent",
+        "border-brand",
       );
     });
   });
@@ -241,7 +250,7 @@ describe("WorkspaceNavbar", () => {
 
     it("renders the unread count next to the notifications item once it is positive", async () => {
       renderNavbar({ unreadCount: 3, unreadCountKnown: true });
-      const menu = await openGroup("workspace");
+      const menu = await openGroup("workspace", unreadTriggerName("workspace", 3));
 
       const item = within(menu).getByRole("menuitem", { name: /nav\.notifications/ });
       expect(within(item).getByLabelText(/unreadNotificationsLabel/)).toHaveTextContent("3");
@@ -252,8 +261,16 @@ describe("WorkspaceNavbar", () => {
     it("mirrors the count onto the holding group's trigger, so it is visible with the menu closed", () => {
       renderNavbar({ unreadCount: 3, unreadCountKnown: true });
 
-      const trigger = screen.getByRole("button", { name: triggerName("workspace") });
-      expect(within(trigger).getByLabelText(/unreadNotificationsLabel/)).toHaveTextContent("3");
+      // Story 196 (A11Y-11) — the count is in the trigger's own name (its
+      // aria-label would otherwise mask it), and the visual badge is
+      // aria-hidden so it is not announced twice.
+      const trigger = screen.getByRole("button", { name: unreadTriggerName("workspace", 3) });
+      expect(within(trigger).getByText("3")).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("keeps the plain trigger name while the count is unknown", () => {
+      renderNavbar({ unreadCount: 3, unreadCountKnown: false });
+      expect(screen.getByRole("button", { name: triggerName("workspace") })).toBeInTheDocument();
     });
 
     it("does not put the count on a group that holds no unread item", () => {
