@@ -150,6 +150,8 @@ export type { AlertProps } from "./components/alert";
 // --- Query / loading / empty state (Story S-4) -----------------------------
 export { EmptyState } from "./components/empty-state";
 export type { EmptyStateProps } from "./components/empty-state";
+export { ErrorState } from "./components/error-state";
+export type { ErrorStateProps } from "./components/error-state";
 
 export { FetchingIndicator } from "./components/fetching-indicator";
 export type { FetchingIndicatorProps } from "./components/fetching-indicator";

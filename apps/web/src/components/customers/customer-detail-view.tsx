@@ -37,6 +37,7 @@ import {
   Textarea,
 } from "@crm/ui";
 import { BackLink } from "@crm/ui";
+import { ErrorState } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/ticket-badges";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
@@ -525,8 +526,27 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
 
   if (customerQuery.isError) {
     const notFound = customerQuery.error instanceof ApiError && customerQuery.error.status === 404;
+    // Story 199 (RD-2.5, recon A11Y-03/VL-08) — a record that failed to load
+    // is the page: an h1, a way back, and a retry when retrying can help (a
+    // 404 will not come back on its own).
     return (
-      <Alert variant="destructive">{notFound ? t("detail.notFound") : t("detail.loadError")}</Alert>
+      <ErrorState
+        headingLevel={1}
+        tone={notFound ? "neutral" : "danger"}
+        title={notFound ? t("detail.notFound") : t("detail.loadError")}
+        actions={
+          notFound ? undefined : (
+            <Button onClick={() => void customerQuery.refetch()}>
+              {tCommon("errorBoundary.retry")}
+            </Button>
+          )
+        }
+        back={
+          <BackLink asChild>
+            <Link href={`/${locale}/customers`}>{t("detail.backToList")}</Link>
+          </BackLink>
+        }
+      />
     );
   }
 

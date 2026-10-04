@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import * as Sentry from "@sentry/nextjs";
+import { Button, ErrorState } from "@crm/ui";
 
 /**
  * Story 96 — Navigation & Route Robustness. Mirrors
@@ -31,17 +32,14 @@ export default function LocaleError({
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface-sunk p-8">
-      <div className="w-full max-w-sm rounded-lg border border-rule bg-surface p-8 text-center shadow-sm">
-        <h1 className="text-title text-ink">{t("errorBoundary.title")}</h1>
-        <p className="mt-2 text-sm text-ink-muted">{t("errorBoundary.description")}</p>
-        <button
-          type="button"
-          onClick={reset}
-          className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground hover:bg-accent-hover focus-ring"
-        >
-          {t("errorBoundary.retry")}
-        </button>
-      </div>
+      {/* Story 199 (RD-2.5) — the shared ErrorState instead of a hand-rolled card. */}
+      <ErrorState
+        className="w-full max-w-sm"
+        headingLevel={1}
+        title={t("errorBoundary.title")}
+        description={t("errorBoundary.description")}
+        actions={<Button onClick={reset}>{t("errorBoundary.retry")}</Button>}
+      />
     </main>
   );
 }

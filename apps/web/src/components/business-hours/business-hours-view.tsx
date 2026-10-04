@@ -457,13 +457,18 @@ export function BusinessHoursView({ hosted = false }: { hosted?: boolean } = {})
   const t = useTranslations("businessHours");
   const tCommon = useTranslations("common");
   const calendarQuery = useBusinessHoursCalendarQuery();
+  // Story 199 (RD-2.5) — the page heading in every state; the loading and
+  // error states used to return before it, leaving the page without an h1.
+  const header = <PageHeader title={t("title")} headingLevel={hosted ? 2 : 1} />;
 
   if (calendarQuery.isLoading) {
     return (
-      <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-3">
-        <Skeleton className="h-8 w-1/2" />
-        <Skeleton className="h-64 w-full" />
-      </LoadingStatus>
+      <section className="flex flex-col gap-6">
+        {header}
+        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-3">
+          <Skeleton className="h-64 w-full" />
+        </LoadingStatus>
+      </section>
     );
   }
 
@@ -473,14 +478,25 @@ export function BusinessHoursView({ hosted = false }: { hosted?: boolean } = {})
     calendarQuery.error.status === 404;
 
   if (calendarQuery.isError && !notFound) {
-    return <Alert variant="destructive">{t("loadError")}</Alert>;
+    return (
+      <section className="flex flex-col gap-6">
+        {header}
+        {/* Story 199 — the same retry pattern as the branch section. */}
+        <Alert variant="destructive" className="flex items-center justify-between gap-inline">
+          <span>{t("loadError")}</span>
+          <Button variant="outline" size="sm" onClick={() => void calendarQuery.refetch()}>
+            {tCommon("errorBoundary.retry")}
+          </Button>
+        </Alert>
+      </section>
+    );
   }
 
   const calendar = calendarQuery.data;
 
   return (
     <section className="flex flex-col gap-6">
-      <PageHeader title={t("title")} headingLevel={hosted ? 2 : 1} />
+      {header}
       {!calendar ? (
         <CreateCalendarForm />
       ) : (

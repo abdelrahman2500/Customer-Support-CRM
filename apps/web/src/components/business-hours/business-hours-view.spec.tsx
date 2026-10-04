@@ -109,6 +109,38 @@ describe("BusinessHoursView", () => {
     expect(screen.getByText("loadError")).toBeInTheDocument();
   });
 
+  // Story 199 (RD-2.5) — the page keeps its heading while loading and on
+  // error, and the error can be retried.
+  it("keeps the page h1 while loading", () => {
+    mockedUseBusinessHoursCalendarQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    render(<BusinessHoursView />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "title" })).toBeInTheDocument();
+  });
+
+  it("keeps the page h1 on error and retries through the existing refetch", () => {
+    const refetch = vi.fn();
+    mockedUseBusinessHoursCalendarQuery.mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("Server error", 500), refetch }) as never,
+    );
+
+    render(<BusinessHoursView />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "title" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "errorBoundary.retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("renders its heading as an h2 in every state when hosted in Settings", () => {
+    mockedUseBusinessHoursCalendarQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
+
+    render(<BusinessHoursView hosted />);
+
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "title" })).toBeInTheDocument();
+  });
+
   it("shows the create-calendar form when the calendar genuinely 404s", () => {
     mockedUseBusinessHoursCalendarQuery.mockReturnValue(
       queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,
@@ -308,6 +340,8 @@ describe("BusinessHoursView", () => {
 
     const placeholder = status.querySelector("[aria-hidden='true']");
     expect(placeholder).toHaveClass("flex", "flex-col", "gap-3");
-    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(2);
+    // Story 199 (RD-2.5) — the title placeholder bar is gone: the real page
+    // heading now renders while loading, so only the content bar remains.
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(1);
   });
 });

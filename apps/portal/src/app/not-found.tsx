@@ -4,7 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { resolveCookieLocale } from "@/i18n/cookie-locale";
 import { localeDirection } from "@/i18n/direction";
 import { fontVariables } from "@/lib/fonts";
-import { ThemeScript } from "@crm/ui";
+import { Button, ErrorState, ThemeScript } from "@crm/ui";
 
 /**
  * Story 96 — the ROOT not-found boundary.
@@ -55,16 +55,19 @@ export default async function RootNotFound() {
       </head>
       <body className="font-sans antialiased">
         <main className="flex min-h-screen items-center justify-center bg-surface-sunk p-8">
-          <div className="w-full max-w-sm rounded-lg border border-rule bg-surface p-8 text-center shadow-sm">
-            <h1 className="text-title text-ink">{t("notFound.title")}</h1>
-            <p className="mt-2 text-sm text-ink-muted">{t("notFound.description")}</p>
-            <Link
-              href={`/${locale}/home`}
-              className="mt-4 inline-block text-sm font-medium text-ink hover:underline"
-            >
-              {t("backLinkLabel")}
-            </Link>
-          </div>
+          {/* Story 199 (RD-2.5) — the shared ErrorState instead of a hand-rolled card. */}
+          <ErrorState
+            className="w-full max-w-sm"
+            tone="neutral"
+            headingLevel={1}
+            title={t("notFound.title")}
+            description={t("notFound.description")}
+            back={
+              <Button asChild variant="outline">
+                <Link href={`/${locale}/home`}>{t("backLinkLabel")}</Link>
+              </Button>
+            }
+          />
         </main>
       </body>
     </html>

@@ -26,6 +26,7 @@ import {
   Skeleton,
 } from "@crm/ui";
 import { BackLink } from "@crm/ui";
+import { ErrorState } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import {
@@ -131,8 +132,27 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
 
   if (articleQuery.isError) {
     const notFound = articleQuery.error instanceof ApiError && articleQuery.error.status === 404;
+    // Story 199 (RD-2.5, recon A11Y-03/VL-08) — a record that failed to load
+    // is the page: an h1, a way back, and a retry when retrying can help (a
+    // 404 will not come back on its own).
     return (
-      <Alert variant="destructive">{notFound ? t("detail.notFound") : t("detail.loadError")}</Alert>
+      <ErrorState
+        headingLevel={1}
+        tone={notFound ? "neutral" : "danger"}
+        title={notFound ? t("detail.notFound") : t("detail.loadError")}
+        actions={
+          notFound ? undefined : (
+            <Button onClick={() => void articleQuery.refetch()}>
+              {tCommon("errorBoundary.retry")}
+            </Button>
+          )
+        }
+        back={
+          <BackLink asChild>
+            <Link href={`/${locale}/knowledge-base`}>{t("detail.backToList")}</Link>
+          </BackLink>
+        }
+      />
     );
   }
 

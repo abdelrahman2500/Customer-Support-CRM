@@ -163,6 +163,34 @@ describe("CustomerDetailView", () => {
     expect(screen.getByText("detail.loadError")).toBeInTheDocument();
   });
 
+  // Story 199 (RD-2.5, recon A11Y-03/VL-08) — a record that failed to load is
+  // the page: an h1, a way back, and a retry that calls the existing refetch.
+  it("makes a load failure the page: an h1, a retry that refetches, and a way back", () => {
+    const refetch = vi.fn();
+    mockedUseCustomerQuery.mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("Server error", 500), refetch }) as never,
+    );
+
+    render(<CustomerDetailView customerId="customer-1" />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "detail.loadError" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "errorBoundary.retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(screen.getByRole("link", { name: "detail.backToList" })).toHaveAttribute("href", "/en/customers");
+  });
+
+  it("offers no retry for a 404 — only the way back", () => {
+    mockedUseCustomerQuery.mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,
+    );
+
+    render(<CustomerDetailView customerId="customer-1" />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "detail.notFound" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "errorBoundary.retry" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "detail.backToList" })).toHaveAttribute("href", "/en/customers");
+  });
+
   it("renders the customer's name, status, and contacts", () => {
     mockedUseCustomerQuery.mockReturnValue(
       queryResult({

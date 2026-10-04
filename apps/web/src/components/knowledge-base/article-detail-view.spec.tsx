@@ -149,6 +149,34 @@ describe("ArticleDetailView", () => {
     expect(screen.getByText("detail.loadError")).toBeInTheDocument();
   });
 
+  // Story 199 (RD-2.5, recon A11Y-03/VL-08) — a record that failed to load is
+  // the page: an h1, a way back, and a retry that calls the existing refetch.
+  it("makes a load failure the page: an h1, a retry that refetches, and a way back", () => {
+    const refetch = vi.fn();
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("Server error", 500), refetch }) as never,
+    );
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "detail.loadError" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "errorBoundary.retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+    expect(screen.getByRole("link", { name: "detail.backToList" })).toHaveAttribute("href", "/en/knowledge-base");
+  });
+
+  it("offers no retry for a 404 — only the way back", () => {
+    vi.mocked(useArticleQuery).mockReturnValue(
+      queryResult({ isError: true, error: new ApiError("Not found", 404) }) as never,
+    );
+
+    render(<ArticleDetailView articleId="article-1" />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "detail.notFound" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "errorBoundary.retry" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "detail.backToList" })).toHaveAttribute("href", "/en/knowledge-base");
+  });
+
   it("renders the article's title, category, body, and draft status", () => {
     vi.mocked(useArticleQuery).mockReturnValue(
       queryResult({ data: baseArticle, isSuccess: true }) as never,
