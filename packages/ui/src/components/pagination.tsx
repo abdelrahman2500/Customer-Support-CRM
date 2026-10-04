@@ -82,7 +82,7 @@ export function Pagination({
       {/* `aria-live="polite"`: a keyboard user who activates "next" gets
           told which page they landed on, rather than having to hunt for
           the change. */}
-      <span aria-live="polite" className="text-xs text-ink-muted">
+      <span aria-live="polite" className="text-caption tabular-nums text-ink-muted">
         {indicator}
       </span>
 
@@ -90,7 +90,7 @@ export function Pagination({
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="icon-sm"
           aria-label={previousLabel}
           disabled={disabled || atFirst}
           onClick={() => onPageChange(page - 1)}
@@ -100,7 +100,7 @@ export function Pagination({
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="icon-sm"
           aria-label={nextLabel}
           disabled={disabled || atLast}
           onClick={() => onPageChange(page + 1)}

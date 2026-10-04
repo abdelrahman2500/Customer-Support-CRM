@@ -23,7 +23,7 @@ import {
   Pagination,
   QueryStateCard,
   Skeleton,
-  SortIndicator,
+  TableSortHead,
 } from "@crm/ui";
 import {
   Table,
@@ -37,22 +37,6 @@ import {
 const STATUS_OPTIONS = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"] as const;
 const PRIORITY_OPTIONS = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
 const ALL_VALUE = "__all__";
-
-/**
- * A11Y-2 — the semantic counterpart to `SortIndicator`'s visual arrow.
- * `SortIndicator`'s own doc comment notes `aria-sort` is "the caller's to
- * set" since only the caller owns the `<th>`; this is that setter, mirrored
- * in `CustomerListView` for its own two sortable columns.
- */
-function sortAriaValue(
-  filters: ListTicketsFilters,
-  column: NonNullable<ListTicketsFilters["sortBy"]>,
-): "ascending" | "descending" | "none" {
-  if (filters.sortBy !== column) {
-    return "none";
-  }
-  return filters.sortDir === "asc" ? "ascending" : "descending";
-}
 
 /** Batch 4 (UX audit) — the URL <-> `ListTicketsFilters` mapping for this
  * view's own `useUrlFilters`. Only the fields this screen's UI actually
@@ -330,30 +314,18 @@ function TicketListViewContent() {
               <TableHead>{t("list.columns.priority")}</TableHead>
               <TableHead>{t("list.columns.assignedAgent")}</TableHead>
               <TableHead>{t("list.columns.sla")}</TableHead>
-              <TableHead aria-sort={sortAriaValue(filters, "createdAt")}>
-                <button
-                  type="button"
-                  className="rounded-sm hover:underline focus-ring"
-                  onClick={() => toggleSort("createdAt")}
-                >
-                  {t("list.columns.createdAt")}
-                  <SortIndicator
-                    direction={filters.sortBy === "createdAt" ? filters.sortDir : null}
-                  />
-                </button>
-              </TableHead>
-              <TableHead aria-sort={sortAriaValue(filters, "updatedAt")}>
-                <button
-                  type="button"
-                  className="rounded-sm hover:underline focus-ring"
-                  onClick={() => toggleSort("updatedAt")}
-                >
-                  {t("list.columns.updatedAt")}
-                  <SortIndicator
-                    direction={filters.sortBy === "updatedAt" ? filters.sortDir : null}
-                  />
-                </button>
-              </TableHead>
+              <TableSortHead
+                direction={filters.sortBy === "createdAt" ? filters.sortDir : null}
+                onSort={() => toggleSort("createdAt")}
+              >
+                {t("list.columns.createdAt")}
+              </TableSortHead>
+              <TableSortHead
+                direction={filters.sortBy === "updatedAt" ? filters.sortDir : null}
+                onSort={() => toggleSort("updatedAt")}
+              >
+                {t("list.columns.updatedAt")}
+              </TableSortHead>
             </TableRow>
           </TableHeader>
           <TableBody>

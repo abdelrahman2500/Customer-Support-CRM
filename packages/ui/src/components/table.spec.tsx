@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./table";
+import userEvent from "@testing-library/user-event";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableSortHead,
+} from "./table";
 
 /**
  * RM-10 — Mobile-Responsive Data Tables. jsdom applies no real stylesheet
@@ -115,10 +124,13 @@ describe("Table", () => {
     expect(screen.getByRole("cell").closest("tr")).toHaveClass(
       "flex",
       "flex-col",
-      "rounded-md",
+      // Story 188 — the mobile card takes the token radius and surface.
+      "rounded-surface",
+      "bg-surface",
       "border",
       "sm:table-row",
       "sm:border-0",
+      "sm:bg-transparent",
     );
   });
 
@@ -196,5 +208,103 @@ describe("Table", () => {
     );
 
     expect(screen.getByRole("cell")).toHaveClass("text-end", "sm:table-cell");
+  });
+});
+
+describe("Table v2 (Story 188)", () => {
+  function renderTable(props: { density?: "compact" | "comfortable"; selected?: boolean } = {}) {
+    return render(
+      <Table density={props.density}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Subject</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow selected={props.selected} aria-selected={props.selected ? true : undefined}>
+            <TableCell label="Subject">Printer down</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+  }
+
+  it("defaults to compact density, exactly the pre-188 padding", () => {
+    renderTable();
+    expect(screen.getByRole("columnheader")).toHaveClass("h-10", "px-3");
+    expect(screen.getByRole("cell")).toHaveClass("px-3", "py-2");
+    expect(screen.getByRole("table")).toHaveAttribute("data-density", "compact");
+  });
+
+  it("offers a comfortable density for the whole table", () => {
+    renderTable({ density: "comfortable" });
+    expect(screen.getByRole("columnheader")).toHaveClass("h-11", "px-4");
+    expect(screen.getByRole("cell")).toHaveClass("px-4", "py-3");
+    expect(screen.getByRole("table")).toHaveAttribute("data-density", "comfortable");
+  });
+
+  it("sets header and mobile labels on the label type step, never uppercase or tracked", () => {
+    renderTable();
+    const head = screen.getByRole("columnheader");
+    const mobileLabel = screen.getAllByText("Subject").find((el) => el.tagName === "SPAN")!;
+    for (const el of [head, mobileLabel]) {
+      expect(el).toHaveClass("text-label");
+      expect(el).not.toHaveClass("uppercase");
+      expect(el).not.toHaveClass("tracking-wide");
+    }
+  });
+
+  it("tints a hovered row with surface-muted and a selected row with accent-surface", () => {
+    renderTable({ selected: true });
+    const row = screen.getByRole("cell").closest("tr")!;
+    expect(row).toHaveClass("sm:hover:bg-surface-muted", "data-[selected=true]:bg-accent-surface");
+    expect(row).toHaveAttribute("data-selected", "true");
+    // aria-selected is the caller's to set (only meaningful in a grid) and is forwarded.
+    expect(row).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("leaves an unselected row without the selected marker", () => {
+    renderTable();
+    expect(screen.getByRole("cell").closest("tr")).not.toHaveAttribute("data-selected");
+  });
+});
+
+describe("TableSortHead (Story 188)", () => {
+  function renderSortHead(direction: "asc" | "desc" | null, onSort = vi.fn()) {
+    render(
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableSortHead direction={direction} onSort={onSort}>
+              Created
+            </TableSortHead>
+          </TableRow>
+        </TableHeader>
+      </Table>,
+    );
+    return onSort;
+  }
+
+  it.each([
+    ["asc", "ascending"],
+    ["desc", "descending"],
+  ] as const)("maps %s to aria-sort=%s and shows the indicator", (direction, aria) => {
+    renderSortHead(direction);
+    const header = screen.getByRole("columnheader", { name: "Created" });
+    expect(header).toHaveAttribute("aria-sort", aria);
+    expect(header.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("reports aria-sort=none and hides the indicator when another column is sorted", () => {
+    renderSortHead(null);
+    const header = screen.getByRole("columnheader", { name: "Created" });
+    expect(header).toHaveAttribute("aria-sort", "none");
+    expect(header.querySelector("svg")).toBeNull();
+  });
+
+  it("hands activation back to the caller through a real button", async () => {
+    const onSort = renderSortHead("asc");
+    await userEvent.click(screen.getByRole("button", { name: "Created" }));
+    expect(onSort).toHaveBeenCalledTimes(1);
   });
 });

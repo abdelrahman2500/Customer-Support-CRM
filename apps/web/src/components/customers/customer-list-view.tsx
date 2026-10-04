@@ -18,7 +18,7 @@ import {
   Pagination,
   QueryStateCard,
   Skeleton,
-  SortIndicator,
+  TableSortHead,
 } from "@crm/ui";
 import {
   Select,
@@ -35,22 +35,6 @@ import {
 } from "@crm/ui";
 
 const ALL_VALUE = "__all__";
-
-/**
- * A11Y-2 — the semantic counterpart to `SortIndicator`'s visual arrow.
- * `SortIndicator`'s own doc comment notes `aria-sort` is "the caller's to
- * set" since only the caller owns the `<th>`; this is that setter, mirrored
- * in `TicketListView` for its own two sortable columns.
- */
-function sortAriaValue(
-  filters: ListCustomersFilters,
-  column: NonNullable<ListCustomersFilters["sortBy"]>,
-): "ascending" | "descending" | "none" {
-  if (filters.sortBy !== column) {
-    return "none";
-  }
-  return filters.sortDir === "asc" ? "ascending" : "descending";
-}
 
 /** Batch 4 (UX audit) — the URL <-> `ListCustomersFilters` mapping for this
  * view's own `useUrlFilters`, mirroring `ticket-list-view.tsx`'s identical
@@ -230,31 +214,19 @@ function CustomerListViewContent() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead aria-sort={sortAriaValue(filters, "displayName")}>
-                <button
-                  type="button"
-                  className="rounded-sm hover:underline focus-ring"
-                  onClick={() => toggleSort("displayName")}
-                >
-                  {t("list.columns.name")}
-                  <SortIndicator
-                    direction={filters.sortBy === "displayName" ? filters.sortDir : null}
-                  />
-                </button>
-              </TableHead>
+              <TableSortHead
+                direction={filters.sortBy === "displayName" ? filters.sortDir : null}
+                onSort={() => toggleSort("displayName")}
+              >
+                {t("list.columns.name")}
+              </TableSortHead>
               <TableHead>{t("list.columns.status")}</TableHead>
-              <TableHead aria-sort={sortAriaValue(filters, "createdAt")}>
-                <button
-                  type="button"
-                  className="rounded-sm hover:underline focus-ring"
-                  onClick={() => toggleSort("createdAt")}
-                >
-                  {t("list.columns.createdAt")}
-                  <SortIndicator
-                    direction={filters.sortBy === "createdAt" ? filters.sortDir : null}
-                  />
-                </button>
-              </TableHead>
+              <TableSortHead
+                direction={filters.sortBy === "createdAt" ? filters.sortDir : null}
+                onSort={() => toggleSort("createdAt")}
+              >
+                {t("list.columns.createdAt")}
+              </TableSortHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -179,3 +179,15 @@ describe("Pagination", () => {
     expect(nav).toHaveClass("flex");
   });
 });
+
+describe("Pagination refresh (Story 188)", () => {
+  it("uses square icon buttons and a tabular, live page indicator", () => {
+    setup();
+    for (const name of ["Previous page", "Next page"]) {
+      expect(screen.getByRole("button", { name })).toHaveClass("h-8", "w-8");
+    }
+    const indicator = screen.getByText("Page 2 of 5");
+    expect(indicator).toHaveClass("tabular-nums", "text-caption");
+    expect(indicator).toHaveAttribute("aria-live", "polite");
+  });
+});

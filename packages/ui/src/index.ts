@@ -242,8 +242,22 @@ export type { SpinnerProps } from "./components/spinner";
 
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/tabs";
 
-export { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "./components/table";
-export type { TableCellProps } from "./components/table";
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableSortHead,
+  TableCell,
+} from "./components/table";
+export type {
+  TableCellProps,
+  TableDensity,
+  TableProps,
+  TableRowProps,
+  TableSortHeadProps,
+} from "./components/table";
 
 export { Textarea } from "./components/textarea";
 export type { TextareaProps } from "./components/textarea";
