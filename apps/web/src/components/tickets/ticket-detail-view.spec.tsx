@@ -455,6 +455,89 @@ describe("TicketDetailView", () => {
     });
   });
 
+  /**
+   * Phase 3 guard (Story 201, RD-3.1 — extended by every Phase 3 Story). The
+   * ticket workspace is being restructured over fourteen Stories; this pins
+   * every section and every control that exists today, so a restructure can
+   * move them but never silently drop one.
+   */
+  describe("section survival (Phase 3 guard)", () => {
+    function renderWithSla() {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      // A live SLA target, so the hold control (rendered only then) is present.
+      vi.mocked(useTicketSlaTargetQuery).mockReturnValue(
+        queryResult({
+          data: {
+            responseTargetAt: "2999-01-01T00:00:00.000Z",
+            resolutionTargetAt: "2999-01-02T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      return render(<TicketDetailView ticketId="ticket-1" />);
+    }
+
+    it("keeps every section", () => {
+      renderWithSla();
+
+      for (const heading of [
+        "detail.chatHeading",
+        "detail.aiHeading",
+        "detail.notesHeading",
+        "detail.attachmentsHeading",
+        "detail.kbReferencesHeading",
+        "detail.contextPanelHeading",
+        "detail.slaHeading",
+        "detail.escalationsHeading",
+        "detail.historyHeading",
+        "detail.csatHeading",
+      ]) {
+        expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+      }
+    });
+
+    it("keeps every control", () => {
+      renderWithSla();
+
+      expect(screen.getByRole("link", { name: "detail.backToList" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "detail.subjectEdit" })).toBeInTheDocument();
+      for (const field of [
+        "detail.status",
+        "detail.priority",
+        "detail.category",
+        "detail.assignedAgent",
+        "detail.department",
+      ]) {
+        expect(screen.getByRole("combobox", { name: field })).toBeInTheDocument();
+      }
+      expect(screen.getByRole("button", { name: "sla.placeOnHold" })).toBeInTheDocument();
+      expect(screen.getByLabelText("detail.notesPlaceholder")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Acme Inc." })).toHaveAttribute(
+        "href",
+        "/en/customers/customer-1",
+      );
+    });
+
+    // Story 201 — the state facts head the page, ahead of the conversation.
+    it("shows status, priority, SLA and assignee in the header, before the conversation", () => {
+      const { container } = renderWithSla();
+
+      const header = container.querySelector("header")!;
+      for (const term of [
+        "list.columns.status",
+        "list.columns.priority",
+        "list.columns.sla",
+        "list.columns.assignedAgent",
+      ]) {
+        expect(within(header).getByText(term).tagName).toBe("DT");
+      }
+      const chat = screen.getByRole("heading", { name: "detail.chatHeading" });
+      expect(header.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
   describe("subject editing (Story 42)", () => {
     it("commits a subject edit on blur when the value changed", () => {
       vi.mocked(useTicketQuery).mockReturnValue(
@@ -788,7 +871,11 @@ describe("TicketDetailView", () => {
       } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
-      fireEvent.click(screen.getByText("ticketStatus.OPEN"));
+      // Story 201 (RD-3.1) — the header now shows the same badge text, so the
+      // click is scoped to the inspector's own trigger (the same element as before).
+      fireEvent.click(
+        within(screen.getByRole("combobox", { name: "detail.status" })).getByText("ticketStatus.OPEN"),
+      );
       fireEvent.click(await screen.findByRole("option", { name: "ticketStatus.IN_PROGRESS" }));
 
       // Story 153 — the toast reports the localized label, not the raw enum.
@@ -811,7 +898,13 @@ describe("TicketDetailView", () => {
       } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
-      fireEvent.click(screen.getByText("ticketPriority.HIGH"));
+      // Story 201 (RD-3.1) — the header now shows the same badge text, so the
+      // click is scoped to the inspector's own trigger (the same element as before).
+      fireEvent.click(
+        within(screen.getByRole("combobox", { name: "detail.priority" })).getByText(
+          "ticketPriority.HIGH",
+        ),
+      );
       fireEvent.click(await screen.findByRole("option", { name: "ticketPriority.URGENT" }));
 
       expect(mockedShowSuccessToast).toHaveBeenCalledWith(
@@ -850,7 +943,11 @@ describe("TicketDetailView", () => {
       } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
-      fireEvent.click(screen.getByText("ticketStatus.OPEN"));
+      // Story 201 (RD-3.1) — the header now shows the same badge text, so the
+      // click is scoped to the inspector's own trigger (the same element as before).
+      fireEvent.click(
+        within(screen.getByRole("combobox", { name: "detail.status" })).getByText("ticketStatus.OPEN"),
+      );
       fireEvent.click(await screen.findByRole("option", { name: "ticketStatus.IN_PROGRESS" }));
 
       expect(mockedShowSuccessToast).not.toHaveBeenCalled();
@@ -1025,7 +1122,12 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
 
-      expect(screen.getByText("sla.none")).toBeInTheDocument();
+      // Story 201 (RD-3.1) — the header shows the SLA too, so this is scoped
+      // to the SLA card it has always been about.
+      const slaCard = screen
+        .getByRole("heading", { name: "detail.slaHeading" })
+        .closest(".p-surface") as HTMLElement;
+      expect(within(slaCard).getByText("sla.none")).toBeInTheDocument();
       expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
     });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -30,6 +30,7 @@ import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus } from "@/lib/sla";
 import { SlaIndicator } from "@/components/tickets/sla-indicator";
+import { TicketHeader } from "@/components/tickets/ticket-header";
 import { historyEventKey } from "@/lib/history-event";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
@@ -38,14 +39,12 @@ import {
   Badge,
   Button,
   Card,
-  Input,
   LoadingStatus,
   SectionCard,
   showSuccessToast,
   Skeleton,
   Textarea,
 } from "@crm/ui";
-import { BackLink } from "@crm/ui";
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -229,20 +228,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const holdMutation = useHoldTicketMutation(ticketId);
   const resumeMutation = useResumeTicketMutation(ticketId);
 
-  const [subjectDraft, setSubjectDraft] = useState<string | null>(null);
-  /** Story 156 — the subject is a heading until an agent chooses to edit it. */
-  const [editingSubject, setEditingSubject] = useState(false);
-  /** Story 166 — the `Input` unmounts on both keyboard exits (Escape, and
-   * Enter via `blur()`), so without this focus lands on `document.body`.
-   * Guarded on `document.body`: a blur caused by clicking another control has
-   * already moved focus somewhere valid and must not be overridden. Mirrors
-   * `ConfirmDialog`'s own hand-rolled capture-and-restore (Story 94) rather
-   * than introducing a shared focus-management hook for four call sites. */
-  const subjectEditTriggerRef = useRef<HTMLButtonElement>(null);
-  /** Latches on the first entry into edit mode, so the effect's own initial
-   * run — which also sees `editingSubject === false`, on a page where nothing
-   * is focused yet — cannot steal focus on load. */
-  const subjectWasEditingRef = useRef(false);
+  // Story 201 (RD-3.1) — the subject edit state (Stories 42/156/166) moved,
+  // verbatim, into TicketHeader along with the heading it edits.
   const [aiCategoryNoMatch, setAiCategoryNoMatch] = useState<string | null>(null);
   const [confirmHoldOpen, setConfirmHoldOpen] = useState(false);
 
@@ -258,19 +245,6 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   // `userIds`/`useAgentPresence` pattern exactly.
   const userIds = useMemo(() => (usersQuery.data ?? []).map((user) => user.id), [usersQuery.data]);
   const presence = useAgentPresence(userIds);
-
-  useEffect(() => {
-    if (editingSubject) {
-      subjectWasEditingRef.current = true;
-      return;
-    }
-    if (!subjectWasEditingRef.current) return;
-    subjectWasEditingRef.current = false;
-    const active = document.activeElement;
-    if (active === null || active === document.body) {
-      subjectEditTriggerRef.current?.focus();
-    }
-  }, [editingSubject]);
 
   if (ticketQuery.isLoading) {
     return (
@@ -295,88 +269,33 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
 
   return (
     <section className="flex flex-col gap-6">
-      {/* Story 189 — the shared BackLink: chevron flips in RTL, token focus ring. */}
-      <BackLink asChild>
-        <Link href={`/${locale}/tickets`}>{t("detail.backToList")}</Link>
-      </BackLink>
-
-      <div>
-        {/* Story 156 — a real, visible page title.
-
-            NAV-2 added an `sr-only` h1 because the subject was an
-            always-editable `Input`, so the page had no visible heading at
-            all — the right accessibility patch for a layout problem it
-            could not fix. The page read as a form rather than a record, and
-            its most important text was the one thing not rendered as text.
-
-            The subject is still editable through the same `PATCH`, with the
-            same blur-commit and the same revert-on-error; editing is now an
-            explicit mode instead of the permanent state. The `h1` carries
-            the title in both modes, so the document outline never depends
-            on which mode is active. */}
-        {editingSubject ? (
-          <>
-            <h1 className="sr-only">{ticket.subject}</h1>
-            <Input
-              autoFocus
-              className="w-full max-w-xl text-title"
-              // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
-              // rejected edit can be explicitly reverted, mirroring
-              // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern:
-              // `subjectDraft` starts `null` (this hook runs before `ticket`
-              // exists, above the loading/error early-returns) and falls back
-              // to the server's own value until the field is actually touched.
-              value={subjectDraft ?? ticket.subject}
-              aria-label={t("detail.subjectLabel")}
-              onChange={(event) => setSubjectDraft(event.target.value)}
-              onKeyDown={(event) => {
-                // Escape abandons the edit; the draft resets so reopening
-                // starts from the server's value, never a stale keystroke.
-                if (event.key === "Escape") {
-                  setSubjectDraft(ticket.subject);
-                  setEditingSubject(false);
-                }
-                if (event.key === "Enter") {
-                  event.currentTarget.blur();
-                }
-              }}
-              onBlur={() => {
-                const value = subjectDraft?.trim();
-                if (value && subjectDraft !== ticket.subject) {
-                  mutation.mutate(
-                    { subject: value },
-                    { onError: () => setSubjectDraft(ticket.subject) },
-                  );
-                }
-                setEditingSubject(false);
-              }}
-            />
-          </>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-title text-ink">{ticket.subject}</h1>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              ref={subjectEditTriggerRef}
-              onClick={() => setEditingSubject(true)}
-            >
-              {t("detail.subjectEdit")}
-            </Button>
-          </div>
-        )}
-        <p className="text-sm text-ink-subtle">
-          {t("detail.customer")}:{" "}
-          <Link
-            href={`/${locale}/customers/${ticket.customerId}`}
-            className="focus-ring rounded-sm hover:underline"
-          >
-            {/* Story S-8d — resolved by the API. */}
-            {ticket.customerName ?? ticket.customerId}
-          </Link>
-        </p>
-      </div>
+      {/* Story 201 (RD-3.1, recon TW-01) — identity and state at a glance:
+          back link, short id, the subject h1 (its inline edit unchanged),
+          status, priority, SLA, assignee, customer and times; sticky at lg. */}
+      <TicketHeader
+        ticket={ticket}
+        locale={locale}
+        sla={
+          slaTargetQuery.isSuccess
+            ? { status: "ready", target: slaTargetQuery.data ?? null }
+            : slaTargetQuery.isError
+              ? { status: "error" }
+              : { status: "loading" }
+        }
+        assigneeName={
+          ticket.assignedToUserId
+            ? (userNameById.get(ticket.assignedToUserId) ?? ticket.assignedToUserId)
+            : null
+        }
+        assigneePresence={
+          ticket.assignedToUserId
+            ? presence[ticket.assignedToUserId] === "online"
+              ? "online"
+              : "offline"
+            : undefined
+        }
+        onSubjectCommit={(subject, { onError }) => mutation.mutate({ subject }, { onError })}
+      />
 
       {mutation.isError && (
         <Alert variant="destructive">
