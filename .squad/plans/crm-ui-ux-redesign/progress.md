@@ -2,6 +2,8 @@
 
 Live status of the redesign track. Plan: [`00-overview.md`](./00-overview.md) · audit: [`recon.md`](./recon.md).
 
+> **2026-10-05 — active roadmap moved.** Stories 177–209 (RD-0.1 … RD-3.9) are complete and unchanged. New work follows [`../crm-product-redesign/`](../crm-product-redesign/00-overview.md) (Stories 210–235); the unstarted RD items are merged into its Stories, not cancelled, and are tracked there. New Story records go in that track's `progress.md`. Note: its PD-8 keeps Latin digits in the Arabic UI, superseding D4 below.
+
 ## Approved decisions (2026-10-04)
 
 All §12 recommendations in `00-overview.md` are approved as written: D1 indigo accent · D2 Tier-2 brand accent on when gates pass · D3 at-risk ≤ 25% or ≤ 60 min · **D4 keep Arabic-Indic digits** (explicitly confirmed) · D5 cookie-only theme · D6 no permission-gated nav · D7 landing route unchanged · D8 shortcuts optional/Low · D9 no send-and-set-status · D10 light logo plate · D11 40px default controls · D12 presentation map in `@crm/shared`.

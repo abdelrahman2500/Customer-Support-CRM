@@ -6,6 +6,8 @@ Story IDs here are **track IDs** (`RD-<phase>.<n>`). Repository Story numbers (`
 
 Status: **planning only**. Nothing in this document has been implemented.
 
+> **Active roadmap moved (2026-10-05).** RD-0.1 … RD-3.9 are **complete** (Stories 177–209; see [`progress.md`](./progress.md)) and remain the foundation of the product. The **active roadmap** is now the product redesign track [`../crm-product-redesign/00-overview.md`](../crm-product-redesign/00-overview.md) (Stories 210–235). The unstarted items here (RD-3.10 … RD-7.8) are **not cancelled**: each is merged into a Story of that track (its §3 maps every item and the findings it cites), and none is implemented individually from this document. This document stays as the historical plan and reference for the completed work.
+
 ---
 
 ## 1. Executive Summary
