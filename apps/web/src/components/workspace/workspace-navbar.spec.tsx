@@ -27,14 +27,8 @@ vi.mock("next-intl", () => ({
     vars ? `${key}:${JSON.stringify(vars)}` : key,
 }));
 
-const GROUP_KEYS = [
-  "workspace",
-  "ticketingConfig",
-  "reporting",
-  "administration",
-  "system",
-  "account",
-] as const;
+// Story 213 (PR-2.1, PD-10) — the regrouped navigation: same items, five groups.
+const GROUP_KEYS = ["work", "insights", "configure", "admin", "account"] as const;
 
 /** The navbar's own accessible name for a group trigger, per Story 129's
  * `nav.groupMenuLabel` key, resolved through this file's key-echo mock. */
@@ -52,24 +46,24 @@ function unreadTriggerName(groupKey: string, count: number): string {
 // which is this story's permission-visibility regression guard: both
 // presentations render every destination, exactly as before.
 const EXPECTED_LINKS: Array<[group: string, name: string, href: string]> = [
-  ["workspace", "nav.dashboard", "/en/dashboard"],
-  ["workspace", "nav.tickets", "/en/tickets"],
-  ["workspace", "nav.customers", "/en/customers"],
-  ["workspace", "nav.knowledgeBase", "/en/knowledge-base"],
-  ["workspace", "nav.kbCategories", "/en/kb-categories"],
-  ["workspace", "nav.notifications", "/en/notifications"],
-  ["ticketingConfig", "nav.slaPolicies", "/en/sla-policies"],
-  ["ticketingConfig", "nav.ticketCategories", "/en/ticket-categories"],
-  ["ticketingConfig", "nav.automationRules", "/en/automation-rules"],
-  ["ticketingConfig", "nav.quickReplies", "/en/quick-replies"],
-  ["reporting", "nav.reports", "/en/reports"],
-  ["reporting", "nav.auditLogs", "/en/audit-logs"],
-  ["administration", "nav.branches", "/en/branches"],
-  ["administration", "nav.users", "/en/users"],
-  ["administration", "nav.roles", "/en/roles"],
-  ["system", "nav.notificationTemplates", "/en/notification-templates"],
-  ["system", "nav.webhookSubscriptions", "/en/webhook-subscriptions"],
-  ["system", "nav.apiKeys", "/en/api-keys"],
+  ["work", "nav.dashboard", "/en/dashboard"],
+  ["work", "nav.tickets", "/en/tickets"],
+  ["work", "nav.customers", "/en/customers"],
+  ["work", "nav.knowledgeBase", "/en/knowledge-base"],
+  ["work", "nav.notifications", "/en/notifications"],
+  ["insights", "nav.reports", "/en/reports"],
+  ["insights", "nav.auditLogs", "/en/audit-logs"],
+  ["configure", "nav.slaPolicies", "/en/sla-policies"],
+  ["configure", "nav.ticketCategories", "/en/ticket-categories"],
+  ["configure", "nav.kbCategories", "/en/kb-categories"],
+  ["configure", "nav.automationRules", "/en/automation-rules"],
+  ["configure", "nav.quickReplies", "/en/quick-replies"],
+  ["configure", "nav.notificationTemplates", "/en/notification-templates"],
+  ["admin", "nav.branches", "/en/branches"],
+  ["admin", "nav.users", "/en/users"],
+  ["admin", "nav.roles", "/en/roles"],
+  ["admin", "nav.webhookSubscriptions", "/en/webhook-subscriptions"],
+  ["admin", "nav.apiKeys", "/en/api-keys"],
   ["account", "nav.settings", "/en/settings"],
   ["account", "nav.mySessions", "/en/my-sessions"],
 ];
@@ -105,11 +99,12 @@ describe("WorkspaceNavbar", () => {
     expect(screen.getByRole("navigation", { name: "nav.label" })).toBeInTheDocument();
   });
 
-  it("renders exactly one trigger per group — six, never a wrapping row of 20 links", () => {
+  it("renders exactly one trigger per group — five, never a wrapping row of 20 links", () => {
     renderNavbar();
 
     const nav = screen.getByRole("navigation", { name: "nav.label" });
-    expect(within(nav).getAllByRole("button")).toHaveLength(6);
+    // Story 213 (PD-10) — five groups after the regrouping.
+    expect(within(nav).getAllByRole("button")).toHaveLength(5);
     for (const groupKey of GROUP_KEYS) {
       expect(within(nav).getByRole("button", { name: triggerName(groupKey) })).toBeInTheDocument();
     }
@@ -127,7 +122,7 @@ describe("WorkspaceNavbar", () => {
   // The permission-visibility regression guard: this story must not have
   // introduced client-side gating, so all 20 destinations are still
   // reachable — now spread across the six menus.
-  it("reveals every one of the 20 destinations across the six menus, with the right hrefs", async () => {
+  it("reveals every one of the 20 destinations across the five menus, with the right hrefs", async () => {
     for (const groupKey of GROUP_KEYS) {
       const { unmount } = renderNavbar();
       const menu = await openGroup(groupKey);
@@ -158,7 +153,7 @@ describe("WorkspaceNavbar", () => {
 
   it("renders a decorative icon inside every item", async () => {
     renderNavbar();
-    const menu = await openGroup("workspace");
+    const menu = await openGroup("work");
 
     const ticketsItem = within(menu).getByRole("menuitem", { name: "nav.tickets" });
     const icon = ticketsItem.querySelector("svg");
@@ -171,7 +166,7 @@ describe("WorkspaceNavbar", () => {
     it("marks the current top-level route's item as the current page", async () => {
       pathname = "/en/tickets";
       renderNavbar();
-      const menu = await openGroup("workspace");
+      const menu = await openGroup("work");
 
       expect(within(menu).getByRole("menuitem", { name: "nav.tickets" })).toHaveAttribute(
         "aria-current",
@@ -185,7 +180,7 @@ describe("WorkspaceNavbar", () => {
     it("still marks the top-level item current from a nested detail route", async () => {
       pathname = "/en/tickets/ticket-1";
       renderNavbar();
-      const menu = await openGroup("workspace");
+      const menu = await openGroup("work");
 
       expect(within(menu).getByRole("menuitem", { name: "nav.tickets" })).toHaveAttribute(
         "aria-current",
@@ -196,7 +191,7 @@ describe("WorkspaceNavbar", () => {
     it("marks no item current on a route no nav item matches", async () => {
       pathname = "/en/nowhere";
       renderNavbar();
-      const menu = await openGroup("workspace");
+      const menu = await openGroup("work");
 
       for (const item of within(menu).getAllByRole("menuitem")) {
         expect(item).not.toHaveAttribute("aria-current");
@@ -210,11 +205,12 @@ describe("WorkspaceNavbar", () => {
       pathname = "/en/tickets";
       renderNavbar();
 
-      const active = screen.getByRole("button", { name: triggerName("workspace") });
-      const inactive = screen.getByRole("button", { name: triggerName("reporting") });
+      const active = screen.getByRole("button", { name: triggerName("work") });
+      const inactive = screen.getByRole("button", { name: triggerName("insights") });
       // Story 196 (RD-2.2) — the Tier 1 brand indicator on a neutral fill,
       // not the accent tint.
-      expect(active).toHaveClass("border-brand", "bg-surface-muted", "font-medium");
+      // Story 213 (PR-2.1) — on the ink chrome: the active chrome step.
+      expect(active).toHaveClass("border-brand", "bg-chrome-active", "font-medium");
       expect(active).not.toHaveClass("bg-accent-surface");
       expect(inactive).toHaveClass("border-transparent");
       expect(inactive).not.toHaveClass("border-brand");
@@ -224,7 +220,7 @@ describe("WorkspaceNavbar", () => {
       pathname = "/en/tickets/ticket-1";
       renderNavbar();
 
-      expect(screen.getByRole("button", { name: triggerName("workspace") })).toHaveClass(
+      expect(screen.getByRole("button", { name: triggerName("work") })).toHaveClass(
         "border-brand",
       );
     });
@@ -236,7 +232,7 @@ describe("WorkspaceNavbar", () => {
       renderNavbar({ unreadCount: 0, unreadCountKnown: false });
 
       expect(screen.queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
-      const menu = await openGroup("workspace");
+      const menu = await openGroup("work");
       expect(within(menu).queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
     });
 
@@ -244,13 +240,13 @@ describe("WorkspaceNavbar", () => {
       renderNavbar({ unreadCount: 0, unreadCountKnown: true });
 
       expect(screen.queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
-      const menu = await openGroup("workspace");
+      const menu = await openGroup("work");
       expect(within(menu).queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
     });
 
     it("renders the unread count next to the notifications item once it is positive", async () => {
       renderNavbar({ unreadCount: 3, unreadCountKnown: true });
-      const menu = await openGroup("workspace", unreadTriggerName("workspace", 3));
+      const menu = await openGroup("work", unreadTriggerName("work", 3));
 
       const item = within(menu).getByRole("menuitem", { name: /nav\.notifications/ });
       expect(within(item).getByLabelText(/unreadNotificationsLabel/)).toHaveTextContent("3");
@@ -264,19 +260,19 @@ describe("WorkspaceNavbar", () => {
       // Story 196 (A11Y-11) — the count is in the trigger's own name (its
       // aria-label would otherwise mask it), and the visual badge is
       // aria-hidden so it is not announced twice.
-      const trigger = screen.getByRole("button", { name: unreadTriggerName("workspace", 3) });
+      const trigger = screen.getByRole("button", { name: unreadTriggerName("work", 3) });
       expect(within(trigger).getByText("3")).toHaveAttribute("aria-hidden", "true");
     });
 
     it("keeps the plain trigger name while the count is unknown", () => {
       renderNavbar({ unreadCount: 3, unreadCountKnown: false });
-      expect(screen.getByRole("button", { name: triggerName("workspace") })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: triggerName("work") })).toBeInTheDocument();
     });
 
     it("does not put the count on a group that holds no unread item", () => {
       renderNavbar({ unreadCount: 3, unreadCountKnown: true });
 
-      const trigger = screen.getByRole("button", { name: triggerName("reporting") });
+      const trigger = screen.getByRole("button", { name: triggerName("insights") });
       expect(within(trigger).queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
     });
   });

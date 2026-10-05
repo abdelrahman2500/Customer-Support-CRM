@@ -211,50 +211,52 @@ export interface NavGroup {
   readonly items: readonly NavLinkItem[];
 }
 
+/**
+ * Story 213 (PR-2.1, decision PD-10) — regrouped by what people come to do:
+ * *Work* (the daily surfaces), *Insights* (reports, audit), *Configure* (how
+ * tickets behave), *Admin* (people, branches and integrations), *Account*.
+ * Same items, routes, labels and icons as before; only the grouping and the
+ * group names changed.
+ */
 export const NAV_GROUPS: readonly NavGroup[] = [
   {
-    groupKey: "workspace",
+    groupKey: "work",
     items: [
       { href: "dashboard", labelKey: "nav.dashboard", icon: DashboardIcon },
       { href: "tickets", labelKey: "nav.tickets", icon: TicketsIcon },
       { href: "customers", labelKey: "nav.customers", icon: CustomersIcon },
       { href: "knowledge-base", labelKey: "nav.knowledgeBase", icon: KnowledgeBaseIcon },
-      { href: "kb-categories", labelKey: "nav.kbCategories", icon: KbCategoriesIcon },
       { href: "notifications", labelKey: "nav.notifications", icon: NotificationsIcon },
     ],
   },
   {
-    groupKey: "ticketingConfig",
-    items: [
-      { href: "sla-policies", labelKey: "nav.slaPolicies", icon: SlaPoliciesIcon },
-      { href: "ticket-categories", labelKey: "nav.ticketCategories", icon: TicketCategoriesIcon },
-      { href: "automation-rules", labelKey: "nav.automationRules", icon: AutomationRulesIcon },
-      { href: "quick-replies", labelKey: "nav.quickReplies", icon: QuickRepliesIcon },
-    ],
-  },
-  {
-    groupKey: "reporting",
+    groupKey: "insights",
     items: [
       { href: "reports", labelKey: "nav.reports", icon: ReportsIcon },
       { href: "audit-logs", labelKey: "nav.auditLogs", icon: AuditLogsIcon },
     ],
   },
   {
-    groupKey: "administration",
+    groupKey: "configure",
     items: [
-      { href: "branches", labelKey: "nav.branches", icon: BranchesIcon },
-      { href: "users", labelKey: "nav.users", icon: UsersIcon },
-      { href: "roles", labelKey: "nav.roles", icon: RolesIcon },
-    ],
-  },
-  {
-    groupKey: "system",
-    items: [
+      { href: "sla-policies", labelKey: "nav.slaPolicies", icon: SlaPoliciesIcon },
+      { href: "ticket-categories", labelKey: "nav.ticketCategories", icon: TicketCategoriesIcon },
+      { href: "kb-categories", labelKey: "nav.kbCategories", icon: KbCategoriesIcon },
+      { href: "automation-rules", labelKey: "nav.automationRules", icon: AutomationRulesIcon },
+      { href: "quick-replies", labelKey: "nav.quickReplies", icon: QuickRepliesIcon },
       {
         href: "notification-templates",
         labelKey: "nav.notificationTemplates",
         icon: NotificationTemplatesIcon,
       },
+    ],
+  },
+  {
+    groupKey: "admin",
+    items: [
+      { href: "branches", labelKey: "nav.branches", icon: BranchesIcon },
+      { href: "users", labelKey: "nav.users", icon: UsersIcon },
+      { href: "roles", labelKey: "nav.roles", icon: RolesIcon },
       {
         href: "webhook-subscriptions",
         labelKey: "nav.webhookSubscriptions",

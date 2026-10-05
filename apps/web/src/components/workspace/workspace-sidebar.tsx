@@ -11,6 +11,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  recipes,
 } from "@crm/ui";
 import { localeDirection } from "@/i18n/direction";
 import { NAV_GROUPS, NavItemLabel, isNavItemActive } from "./nav-items";
@@ -23,28 +24,100 @@ import { NAV_GROUPS, NavItemLabel, isNavItemActive } from "./nav-items";
  * let one agent's preference re-render every colleague's workspace. */
 const COLLAPSED_STORAGE_KEY = "crm.workspace.sidebarCollapsed";
 
+/** Story 213 (PR-2.1) — a nav item on the ink chrome: the reserved
+ * `border-s-2` only ever swaps colour (never layout), the current item gets
+ * the active chrome step plus the Tier 1 brand edge, the rest stay muted. */
+export function chromeNavItemClassName(isActive: boolean): string {
+  return isActive
+    ? "border-brand bg-chrome-active font-medium text-chrome-ink"
+    : "border-transparent text-chrome-muted hover:bg-chrome-raised hover:text-chrome-ink";
+}
+
+/**
+ * Story 213 (PR-2.1) — the grouped navigation drawn on the ink chrome,
+ * shared by the desktop rail (`WorkspaceSidebar`) and the mobile drawer
+ * (the header's Sheet), so both list the same routes, labels, icons and
+ * active rule from `nav-items.tsx`.
+ *
+ * Group headings are real text, never `uppercase`/tracked (Arabic). When the
+ * rail is collapsed the labels become `sr-only` — still each link's
+ * accessible name — and a tooltip on the content side is layered on top.
+ */
+export function RailNav({
+  collapsed = false,
+  unreadCount,
+  unreadCountKnown,
+  onNavigate,
+}: {
+  collapsed?: boolean;
+  unreadCount: number;
+  unreadCountKnown: boolean;
+  onNavigate?: () => void;
+}) {
+  const t = useTranslations("workspace");
+  const pathname = usePathname();
+  const { locale } = useParams<{ locale: string }>();
+
+  return (
+    <nav aria-label={t("nav.label")} className="flex flex-col gap-section px-2">
+      {NAV_GROUPS.map((group) => (
+        <div key={group.groupKey} className="flex flex-col gap-0.5">
+          <p
+            className={`px-3 py-1.5 text-label text-chrome-muted ${
+              collapsed ? "sr-only" : "break-words"
+            }`}
+          >
+            {t(`nav.groups.${group.groupKey}`)}
+          </p>
+          {group.items.map((item) => {
+            const href = `/${locale}/${item.href}`;
+            const isActive = isNavItemActive(pathname, href);
+            const link = (
+              <Link
+                href={href}
+                aria-current={isActive ? "page" : undefined}
+                onClick={onNavigate}
+                className={`flex items-center gap-2 rounded-control border-s-2 px-3 py-2 text-sm transition-colors duration-fast focus-ring ${
+                  collapsed ? "justify-center" : ""
+                } ${chromeNavItemClassName(isActive)}`}
+              >
+                <NavItemLabel
+                  item={item}
+                  t={t}
+                  unreadCount={unreadCount}
+                  unreadCountKnown={unreadCountKnown}
+                  labelClassName={collapsed ? "sr-only" : "truncate"}
+                />
+              </Link>
+            );
+            return (
+              <CollapsedItemTooltip
+                key={item.href}
+                enabled={collapsed}
+                label={t(item.labelKey)}
+                // Radix's `side` is physical: the tooltip belongs on the
+                // content side of the rail, which is the left under RTL.
+                side={localeDirection(locale) === "rtl" ? "left" : "right"}
+                trigger={link}
+              />
+            );
+          })}
+        </div>
+      ))}
+    </nav>
+  );
+}
+
 /**
  * Story 129 — the `SIDEBAR` presentation, rendered only when a branch
- * admin opts into it. A genuinely vertical surface rather than a rotated
- * navbar:
+ * admin opts into it. It owns its own scroll (`sticky top-0 max-h-screen
+ * overflow-y-auto`), uses logical classes throughout (RTL), and is
+ * `hidden sm:flex` — below `sm` the header's drawer is the only navigation.
  *
- * - It owns its own scroll (`sticky top-0 max-h-screen overflow-y-auto`).
- *   Twenty items stacked vertically do not fit a 720px-tall viewport, and
- *   the page's own scroll is the wrong one to use — scrolling the article
- *   you are reading must not scroll the navigation away. The navbar never
- *   had this problem, which is why `nav-items.tsx`'s pre-Story-129 comment
- *   could correctly say no scroll container was needed there.
- * - It is `border-e`, `ps-`/`pe-`, `border-s-2` throughout — never
- *   `border-r`/`pl-`/`left-`. `docs/architecture/12-risks-tradeoffs-and-scope.md`'s
- *   risk #1 names physical-direction classes as this codebase's standing
- *   RTL hazard, and a sidebar is exactly where that leak happens.
- * - `hidden sm:flex` — below `sm` the header's hamburger is the only
- *   navigation, so this rail can never occupy a phone's width.
- *
- * Everything it renders still comes from `nav-items.tsx`: same routes,
- * same labels, same icons, same `isNavItemActive` rule, same
- * `NavItemLabel`. The active treatment is the identical reserved-border
- * swap the navbar uses, applied in a vertical rhythm.
+ * Story 213 (PR-2.1, visual language v2) — the rail is the ink chrome,
+ * continuous with the header band above it, so the two frame the light
+ * canvas: the product's signature silhouette. The chrome scopes the focus
+ * ring (`.on-chrome`).
  */
 export function WorkspaceSidebar({
   unreadCount,
@@ -54,12 +127,8 @@ export function WorkspaceSidebar({
   unreadCountKnown: boolean;
 }) {
   const t = useTranslations("workspace");
-  const pathname = usePathname();
-  const { locale } = useParams<{ locale: string }>();
-  // Never read `localStorage` during render: the server renders this
-  // component too, and a value only the browser has would make the first
-  // client render disagree with the server's HTML — a hydration mismatch.
-  // Default to expanded, then adopt the stored preference in an effect.
+  // Never read `localStorage` during render (hydration): default to
+  // expanded, then adopt the stored preference in an effect.
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -84,99 +153,35 @@ export function WorkspaceSidebar({
 
   return (
     <aside
-      className={`hidden shrink-0 flex-col gap-2 border-e border-rule bg-surface py-3 sm:sticky sm:top-0 sm:flex sm:max-h-screen sm:overflow-y-auto ${
+      className={`${recipes.chrome} hidden shrink-0 flex-col gap-3 border-e border-chrome-rule py-3 sm:sticky sm:top-0 sm:flex sm:max-h-screen sm:overflow-y-auto ${
         collapsed ? "w-16" : "w-60"
       }`}
     >
       <div className={`flex px-2 ${collapsed ? "justify-center" : "justify-end"}`}>
         <Button
-          variant="ghost"
+          variant="chrome"
           size="icon-sm"
           onClick={toggleCollapsed}
           aria-expanded={!collapsed}
           aria-label={collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
         >
-          {/* `SidebarToggleIcon` is directional (its chevron points at the
-              start edge), so it takes the `rtl:rotate-180` flip
-              `packages/ui/src/lib/icons.ts` prescribes for exactly this
-              case. The glyph itself never changes — `aria-expanded` above
-              is what carries the state. */}
+          {/* Directional glyph: takes the prescribed `rtl:rotate-180`. The
+              glyph never changes — `aria-expanded` carries the state. */}
           <SidebarToggleIcon className="h-4 w-4 rtl:rotate-180" aria-hidden />
         </Button>
       </div>
-      <nav aria-label={t("nav.label")} className="flex flex-col gap-3 px-2">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.groupKey} className="flex flex-col gap-0.5">
-            {/* A real heading, not decoration — and no `uppercase`/
-                `tracking-wide`, for the Arabic reasons `nav-items.tsx`
-                records. Collapsed it becomes `sr-only` rather than being
-                removed, so the grouping survives for a screen reader while
-                the rail is only 4rem wide. `break-words`: the rail is a
-                fixed `w-60`, and a long Arabic group name must wrap inside
-                it rather than widen it. */}
-            <p
-              className={`px-3 py-1.5 text-label text-ink-subtle ${
-                collapsed ? "sr-only" : "break-words"
-              }`}
-            >
-              {t(`nav.groups.${group.groupKey}`)}
-            </p>
-            {group.items.map((item) => {
-              const href = `/${locale}/${item.href}`;
-              const isActive = isNavItemActive(pathname, href);
-              const link = (
-                <Link
-                  href={href}
-                  aria-current={isActive ? "page" : undefined}
-                  className={`flex items-center gap-2 rounded-control border-s-2 px-3 py-2 text-sm transition-colors focus-ring ${
-                    collapsed ? "justify-center" : ""
-                  } ${
-                    isActive
-                      ? // Story 196 (RD-2.2) — neutral fill + Tier 1 brand indicator.
-                        "border-brand bg-surface-muted font-medium text-ink-strong"
-                      : "border-transparent text-ink-muted hover:bg-surface-muted hover:text-ink-strong"
-                  }`}
-                >
-                  <NavItemLabel
-                    item={item}
-                    t={t}
-                    unreadCount={unreadCount}
-                    unreadCountKnown={unreadCountKnown}
-                    // Collapsed, the label is hidden visually but kept in
-                    // the accessibility tree, so it remains the link's
-                    // accessible name. The tooltip below is a sighted-user
-                    // affordance layered on top of that — never the only
-                    // place the name lives.
-                    labelClassName={collapsed ? "sr-only" : "truncate"}
-                  />
-                </Link>
-              );
-              return (
-                <CollapsedItemTooltip
-                  key={item.href}
-                  enabled={collapsed}
-                  label={t(item.labelKey)}
-                  // Radix's `side` is physical, with no logical equivalent,
-                  // so it is the one place in this file that has to be
-                  // derived from the reading direction rather than left to
-                  // CSS: the tooltip belongs on the content side of the
-                  // rail, which is the left under RTL.
-                  side={localeDirection(locale) === "rtl" ? "left" : "right"}
-                  trigger={link}
-                />
-              );
-            })}
-          </div>
-        ))}
-      </nav>
+      <RailNav
+        collapsed={collapsed}
+        unreadCount={unreadCount}
+        unreadCountKnown={unreadCountKnown}
+      />
     </aside>
   );
 }
 
 /** Only the collapsed rail needs a tooltip — expanded, the label is right
  * there. Rendering the provider/root only when it is actually used keeps
- * the expanded rail's DOM identical to what it would be without tooltips
- * at all. */
+ * the expanded rail's DOM identical to what it would be without tooltips. */
 function CollapsedItemTooltip({
   enabled,
   label,

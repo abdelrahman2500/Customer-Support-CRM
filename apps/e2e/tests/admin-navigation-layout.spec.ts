@@ -41,10 +41,13 @@ test("an admin switches the workspace navigation to a sidebar, and it persists",
 
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
 
-  // 1. The default layout: six group menus, not a rail.
-  const workspaceMenu = nav.getByRole("button", { name: "Workspace menu" });
+  // 1. The default layout: five group menus, not a rail.
+  // Story 213 (PR-2.1, PD-10) — the navigation was regrouped (Work /
+  // Insights / Configure / Admin / Account; same items and routes), so the
+  // group menus are named "Work menu" and "Insights menu".
+  const workspaceMenu = nav.getByRole("button", { name: "Work menu" });
   await expect(workspaceMenu).toBeVisible();
-  await expect(nav.getByRole("button", { name: "Reporting menu" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Insights menu" })).toBeVisible();
 
   // 2. Navigate through the navbar and land where it says.
   await workspaceMenu.click();
@@ -60,7 +63,7 @@ test("an admin switches the workspace navigation to a sidebar, and it persists",
   // 4. The rail is now the workspace's navigation, and the group menus are
   //    gone — the shell swapped without a route change.
   await expect(page.getByRole("link", { name: "Tickets" })).toBeVisible();
-  await expect(nav.getByRole("button", { name: "Workspace menu" })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Work menu" })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Collapse the navigation sidebar" }),
   ).toBeVisible();
@@ -72,7 +75,7 @@ test("an admin switches the workspace navigation to a sidebar, and it persists",
   await expect(
     page.getByRole("button", { name: "Collapse the navigation sidebar" }),
   ).toBeVisible();
-  await expect(nav.getByRole("button", { name: "Workspace menu" })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Work menu" })).toHaveCount(0);
 
   // 6. Navigate via the sidebar; the destination's own item is current.
   await page.getByRole("link", { name: "Reports" }).click();

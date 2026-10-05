@@ -62,13 +62,14 @@ describe("resolveNavigationLayout (Story 129)", () => {
 });
 
 describe("NAV_GROUPS", () => {
-  it("still holds the six named groups, in order", () => {
+  // Story 213 (PR-2.1, PD-10) — regrouped by what people come to do; the
+  // same 20 items (the route guard below is unchanged).
+  it("holds the five named groups, in order", () => {
     expect(NAV_GROUPS.map((group) => group.groupKey)).toEqual([
-      "workspace",
-      "ticketingConfig",
-      "reporting",
-      "administration",
-      "system",
+      "work",
+      "insights",
+      "configure",
+      "admin",
       "account",
     ]);
   });

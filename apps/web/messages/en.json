@@ -115,6 +115,7 @@
     "nav": {
       "label": "Workspace navigation",
       "menuLabel": "Open navigation menu",
+      "closeMenu": "Close menu",
       "dashboard": "Dashboard",
       "tickets": "Tickets",
       "customers": "Customers",
@@ -139,11 +140,10 @@
       "settings": "Settings",
       "mySessions": "My Sessions",
       "groups": {
-        "workspace": "Workspace",
-        "ticketingConfig": "Ticketing Configuration",
-        "reporting": "Reporting",
-        "administration": "Administration",
-        "system": "System & Integrations",
+        "work": "Work",
+        "insights": "Insights",
+        "configure": "Configure",
+        "admin": "Admin",
         "account": "Account"
       },
       "unreadNotificationsLabel": "{count} unread notifications",

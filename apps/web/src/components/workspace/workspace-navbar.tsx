@@ -10,8 +10,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  recipes,
 } from "@crm/ui";
 import { NAV_GROUPS, NavItemLabel, isNavItemActive } from "./nav-items";
+import { chromeNavItemClassName } from "./workspace-sidebar";
 
 /**
  * Story 129 — the `NAVBAR` presentation, and the default one: every branch
@@ -47,7 +49,9 @@ export function WorkspaceNavbar({
   return (
     <nav
       aria-label={t("nav.label")}
-      className="hidden items-center gap-1 border-b border-rule bg-surface px-6 py-2 sm:flex"
+      // Story 213 (PR-2.1) — the navbar row continues the header's ink chrome
+      // band; its menus still open on the light raised surface.
+      className={`${recipes.chrome} hidden items-center gap-1 border-b border-chrome-rule px-6 py-2 sm:flex`}
     >
       {NAV_GROUPS.map((group) => {
         const groupName = t(`nav.groups.${group.groupKey}`);
@@ -76,11 +80,10 @@ export function WorkspaceNavbar({
               // Story 196 (RD-2.2) — the active section reads as a neutral fill
               // plus the Tier 1 brand indicator, not the accent tint, so
               // selection and the (indigo) focus ring are separate cues.
-              className={`flex items-center gap-1.5 rounded-control border-s-2 px-2 py-1.5 text-sm transition-colors focus-ring-always ${
-                isGroupActive
-                  ? "border-brand bg-surface-muted font-medium text-ink-strong"
-                  : "border-transparent text-ink-muted hover:bg-surface-muted hover:text-ink-strong"
-              }`}
+              // Story 213 (PR-2.1) — the same chrome item treatment as the rail.
+              className={`flex items-center gap-1.5 rounded-control border-s-2 px-2 py-1.5 text-sm transition-colors focus-ring-always ${chromeNavItemClassName(
+                isGroupActive,
+              )}`}
               // Story 196 — the trigger's aria-label is its whole accessible
               // name, so the unread count has to be in it (recon A11Y-11);
               // the visual badge below is aria-hidden.

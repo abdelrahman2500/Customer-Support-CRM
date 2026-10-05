@@ -115,6 +115,7 @@
     "nav": {
       "label": "التنقل في مساحة العمل",
       "menuLabel": "فتح قائمة التنقل",
+      "closeMenu": "إغلاق القائمة",
       "dashboard": "لوحة التحكم",
       "tickets": "التذاكر",
       "customers": "العملاء",
@@ -139,11 +140,10 @@
       "settings": "الإعدادات",
       "mySessions": "جلساتي",
       "groups": {
-        "workspace": "مساحة العمل",
-        "ticketingConfig": "إعدادات التذاكر",
-        "reporting": "التقارير",
-        "administration": "الإدارة",
-        "system": "النظام والتكاملات",
+        "work": "العمل",
+        "insights": "التحليلات",
+        "configure": "الإعدادات",
+        "admin": "الإدارة",
         "account": "الحساب"
       },
       "unreadNotificationsLabel": "{count} إشعارات غير مقروءة",

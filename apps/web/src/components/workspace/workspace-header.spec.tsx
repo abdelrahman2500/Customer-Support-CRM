@@ -333,6 +333,9 @@ describe("WorkspaceHeader", () => {
 
   // RM-11 — Mobile-Responsive Navigation. Story 129 — one hamburger now
   // serves both desktop presentations, so it lives here in the header.
+  // Story 213 (PR-2.1) — below sm the hamburger opens a drawer (a Sheet
+  // dialog named by the menu label) holding the same grouped links as the
+  // rail, instead of a dropdown menu; so these find a dialog of links.
   describe("collapsed mobile menu (RM-11)", () => {
     const EXPECTED_LINKS: Array<[name: string, href: string]> = [
       ["nav.dashboard", "/en/dashboard"],
@@ -369,9 +372,9 @@ describe("WorkspaceHeader", () => {
 
       await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
 
-      const menu = await screen.findByRole("menu");
+      const menu = await screen.findByRole("dialog", { name: "nav.menuLabel" });
       for (const [name, href] of EXPECTED_LINKS) {
-        expect(within(menu).getByRole("menuitem", { name })).toHaveAttribute("href", href);
+        expect(within(menu).getByRole("link", { name })).toHaveAttribute("href", href);
       }
     });
 
@@ -381,16 +384,10 @@ describe("WorkspaceHeader", () => {
       renderHeader();
 
       await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
-      const menu = await screen.findByRole("menu");
+      const menu = await screen.findByRole("dialog", { name: "nav.menuLabel" });
 
-      for (const groupKey of [
-        "workspace",
-        "ticketingConfig",
-        "reporting",
-        "administration",
-        "system",
-        "account",
-      ]) {
+      // Story 213 (PD-10) — the regrouped navigation.
+      for (const groupKey of ["work", "insights", "configure", "admin", "account"]) {
         expect(within(menu).getByText(`nav.groups.${groupKey}`)).toBeInTheDocument();
       }
     });
@@ -405,16 +402,16 @@ describe("WorkspaceHeader", () => {
       renderHeader();
 
       await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
-      const menu = await screen.findByRole("menu");
+      const menu = await screen.findByRole("dialog", { name: "nav.menuLabel" });
 
-      expect(within(menu).queryByRole("menuitem", { name: "nav.branding" })).not.toBeInTheDocument();
+      expect(within(menu).queryByRole("link", { name: "nav.branding" })).not.toBeInTheDocument();
       expect(
-        within(menu).queryByRole("menuitem", { name: "nav.aiSettings" }),
+        within(menu).queryByRole("link", { name: "nav.aiSettings" }),
       ).not.toBeInTheDocument();
       expect(
-        within(menu).queryByRole("menuitem", { name: "nav.businessHours" }),
+        within(menu).queryByRole("link", { name: "nav.businessHours" }),
       ).not.toBeInTheDocument();
-      expect(within(menu).getByRole("menuitem", { name: "nav.settings" })).toHaveAttribute(
+      expect(within(menu).getByRole("link", { name: "nav.settings" })).toHaveAttribute(
         "href",
         "/en/settings",
       );
@@ -426,13 +423,13 @@ describe("WorkspaceHeader", () => {
       renderHeader();
 
       await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
-      const menu = await screen.findByRole("menu");
+      const menu = await screen.findByRole("dialog", { name: "nav.menuLabel" });
 
-      expect(within(menu).getByRole("menuitem", { name: "nav.tickets" })).toHaveAttribute(
+      expect(within(menu).getByRole("link", { name: "nav.tickets" })).toHaveAttribute(
         "aria-current",
         "page",
       );
-      expect(within(menu).getByRole("menuitem", { name: "nav.dashboard" })).not.toHaveAttribute(
+      expect(within(menu).getByRole("link", { name: "nav.dashboard" })).not.toHaveAttribute(
         "aria-current",
       );
     });
@@ -443,9 +440,9 @@ describe("WorkspaceHeader", () => {
       renderHeader();
 
       await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
-      const menu = await screen.findByRole("menu");
+      const menu = await screen.findByRole("dialog", { name: "nav.menuLabel" });
 
-      expect(within(menu).getByRole("menuitem", { name: "nav.tickets" })).toHaveAttribute(
+      expect(within(menu).getByRole("link", { name: "nav.tickets" })).toHaveAttribute(
         "aria-current",
         "page",
       );
@@ -459,11 +456,11 @@ describe("WorkspaceHeader", () => {
         renderHeader();
 
         await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
-        const menu = await screen.findByRole("menu");
+        const menu = await screen.findByRole("dialog", { name: "nav.menuLabel" });
 
         for (const [name, href] of EXPECTED_LINKS) {
           const arabicHref = href.replace("/en/", "/ar/");
-          expect(within(menu).getByRole("menuitem", { name }), name).toHaveAttribute(
+          expect(within(menu).getByRole("link", { name }), name).toHaveAttribute(
             "href",
             arabicHref,
           );
@@ -480,7 +477,7 @@ describe("WorkspaceHeader", () => {
       renderHeader({ unreadCount: 3, unreadCountKnown: true });
 
       await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
-      const menu = await screen.findByRole("menu");
+      const menu = await screen.findByRole("dialog", { name: "nav.menuLabel" });
 
       expect(within(menu).getByLabelText(/unreadNotificationsLabel/)).toHaveTextContent("3");
     });
@@ -490,7 +487,7 @@ describe("WorkspaceHeader", () => {
       renderHeader({ unreadCount: 0, unreadCountKnown: true });
 
       await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
-      const menu = await screen.findByRole("menu");
+      const menu = await screen.findByRole("dialog", { name: "nav.menuLabel" });
 
       expect(within(menu).queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
     });
@@ -939,6 +936,39 @@ describe("WorkspaceHeader", () => {
       renderHeader();
 
       expect(screen.getByText("realtimeReconnecting")).toBeInTheDocument();
+    });
+  });
+
+  // Story 213 (PR-2.1) — the ink chrome band and the mobile drawer.
+  describe("shell v2 (Story 213)", () => {
+    it("is the ink chrome band with the brand edge, and its quiet actions use the chrome variant", () => {
+      renderHeader();
+      const banner = screen.getByRole("banner");
+      expect(banner).toHaveClass("bg-chrome", "on-chrome", "border-brand");
+      expect(screen.getByRole("button", { name: "nav.menuLabel" })).toHaveClass("text-chrome-muted");
+    });
+
+    it("opens the drawer from the reading side and closes it when a route is chosen", async () => {
+      const clickUser = userEvent.setup();
+      renderHeader();
+
+      await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+      const drawer = await screen.findByRole("dialog", { name: "nav.menuLabel" });
+      expect(drawer).toHaveAttribute("data-side", "start");
+      expect(within(drawer).getByRole("navigation", { name: "nav.label" })).toBeInTheDocument();
+
+      await clickUser.click(within(drawer).getByRole("link", { name: "nav.tickets" }));
+      await vi.waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "nav.menuLabel" })).not.toBeInTheDocument(),
+      );
+    });
+
+    it("closes the drawer with its named close button", async () => {
+      const clickUser = userEvent.setup();
+      renderHeader();
+      await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
+      await clickUser.click(await screen.findByRole("button", { name: "nav.closeMenu" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
   });
 });

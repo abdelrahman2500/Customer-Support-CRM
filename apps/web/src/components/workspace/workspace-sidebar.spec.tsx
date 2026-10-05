@@ -30,14 +30,8 @@ vi.mock("next-intl", () => ({
 
 const COLLAPSED_STORAGE_KEY = "crm.workspace.sidebarCollapsed";
 
-const GROUP_KEYS = [
-  "workspace",
-  "ticketingConfig",
-  "reporting",
-  "administration",
-  "system",
-  "account",
-] as const;
+// Story 213 (PR-2.1, PD-10) — the regrouped navigation: same items, five groups.
+const GROUP_KEYS = ["work", "insights", "configure", "admin", "account"] as const;
 
 // Mirrors the deleted `workspace-nav.spec.tsx`'s own `EXPECTED_LINKS` —
 // the full 20-item list, this story's permission-visibility regression
@@ -88,7 +82,7 @@ describe("WorkspaceSidebar", () => {
     expect(screen.getByRole("navigation", { name: "nav.label" })).toBeInTheDocument();
   });
 
-  it("renders all six group headings as real text, not just as decoration", () => {
+  it("renders all five group headings as real text, not just as decoration", () => {
     renderSidebar();
 
     const nav = screen.getByRole("navigation", { name: "nav.label" });
@@ -172,7 +166,8 @@ describe("WorkspaceSidebar", () => {
       const inactive = screen.getByRole("link", { name: "nav.dashboard" });
       // Story 196 (RD-2.2) — the Tier 1 brand indicator on a neutral fill,
       // not the accent tint.
-      expect(active).toHaveClass("border-brand", "bg-surface-muted", "font-medium");
+      // Story 213 (PR-2.1) — the rail is the ink chrome: the active chrome step.
+      expect(active).toHaveClass("border-brand", "bg-chrome-active", "font-medium");
       expect(active).not.toHaveClass("bg-accent-surface");
       expect(inactive).toHaveClass("border-transparent");
       expect(inactive).not.toHaveClass("border-brand");
@@ -186,7 +181,7 @@ describe("WorkspaceSidebar", () => {
 
       const link = screen.getByRole("link", { name: "nav.tickets" });
       expect(link.querySelector("svg")).toHaveClass("h-5", "w-5");
-      const heading = screen.getByText("nav.groups.workspace");
+      const heading = screen.getByText("nav.groups.work");
       expect(heading).toHaveClass("text-label");
       expect(heading).not.toHaveClass("uppercase");
     });
@@ -364,5 +359,12 @@ describe("WorkspaceSidebar", () => {
       expect(classes).toContain("border-e");
       expect(classes.some((c) => /^border-[lr]\b|^border-[lr]-/.test(c))).toBe(false);
     });
+  });
+
+  // Story 213 (PR-2.1) — the rail is the ink chrome, which scopes the focus ring.
+  it("draws the rail on the ink chrome with chrome-scoped focus", () => {
+    const { container } = renderSidebar();
+    const rail = container.querySelector("aside")!;
+    expect(rail).toHaveClass("bg-chrome", "on-chrome", "text-chrome-ink", "border-chrome-rule");
   });
 });

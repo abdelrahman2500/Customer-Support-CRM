@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { Fragment, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { AuthenticatedUser } from "@crm/shared";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
@@ -16,12 +16,6 @@ import {
   Avatar,
   Badge,
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   MenuIcon,
   NativeSelect,
   NotificationsIcon,
@@ -29,12 +23,18 @@ import {
   PopoverContent,
   PopoverTrigger,
   Separator,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
   ThemeSwitcher,
+  recipes,
 } from "@crm/ui";
 import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
 import type { BrandingSummary } from "@/lib/branding-api";
-import { NAV_GROUPS, NavItemLabel, isNavItemActive } from "./nav-items";
+import { RailNav } from "./workspace-sidebar";
 
 /** Story 119 — `apps/web/src/i18n/routing.ts`'s own configured locales. */
 const LOCALES = ["en", "ar"] as const;
@@ -79,6 +79,12 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * menu's roving focus and typeahead would capture their keys. The hamburger
  * joined the header row instead of a third stacked bar (recon NAV-04), and
  * the bell's accessible name carries the unread count (A11Y-11).
+ *
+ * Story 213 (PR-2.1, visual language v2) — the header is the ink chrome band
+ * (with the sidebar rail, it frames the light canvas); the Tier 1 brand edge
+ * stays along its bottom. Below `sm` the hamburger opens a drawer (`Sheet`
+ * from the reading side) holding the same grouped navigation as the rail,
+ * instead of a long dropdown menu; it closes when a route is chosen.
  */
 export function WorkspaceHeader({
   user,
@@ -195,52 +201,50 @@ export function WorkspaceHeader({
     router.push(buildLocalePath(pathname ?? `/${locale}`, locale, targetLocale));
   }
 
+  // Story 213 — the mobile drawer closes once a new route renders.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => setDrawerOpen(false), [pathname]);
+
   const activeMembership = memberships.find((m) => m.isActive);
   const hasUnread = unreadCountKnown && unreadCount > 0;
 
   return (
     <>
-      <header className="flex items-center gap-2 border-b-2 border-brand bg-surface px-4 py-3 sm:gap-3 sm:px-6">
+      <header
+        className={`${recipes.chrome} flex items-center gap-2 border-b-2 border-brand px-4 py-3 sm:gap-3 sm:px-6`}
+      >
         {/* RM-11 — the hamburger, below `sm` only. Story 129 — at `sm` and up
             the branch's chosen presentation (navbar or sidebar) takes over,
             and both are `hidden sm:flex`, so exactly one navigation surface
             is ever visible. Story 195 — moved into the header row (NAV-04). */}
         <div className="sm:hidden">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon-sm" aria-label={t("nav.menuLabel")}>
+          <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <SheetTrigger asChild>
+              <Button variant="chrome" size="icon-sm" aria-label={t("nav.menuLabel")}>
                 <MenuIcon className="h-4 w-4" aria-hidden />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {NAV_GROUPS.map((group, groupIndex) => (
-                <Fragment key={group.groupKey}>
-                  {groupIndex > 0 && <DropdownMenuSeparator />}
-                  <DropdownMenuLabel>{t(`nav.groups.${group.groupKey}`)}</DropdownMenuLabel>
-                  {group.items.map((item) => {
-                    const href = `/${locale}/${item.href}`;
-                    const isActive = isNavItemActive(pathname, href);
-                    return (
-                      <DropdownMenuItem key={item.href} asChild>
-                        <Link href={href} aria-current={isActive ? "page" : undefined}>
-                          <NavItemLabel
-                            item={item}
-                            t={t}
-                            unreadCount={unreadCount}
-                            unreadCountKnown={unreadCountKnown}
-                            // A `DropdownMenuItem` in BOTH layouts — this
-                            // hamburger is the only navigation below `sm`
-                            // whether the branch chose navbar or sidebar.
-                            inMenu
-                          />
-                        </Link>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </Fragment>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </SheetTrigger>
+            <SheetContent
+              side="start"
+              size="sm"
+              closeLabel={t("nav.closeMenu")}
+              aria-describedby={undefined}
+              className={`${recipes.chrome} border-chrome-rule`}
+            >
+              <SheetHeader className="border-chrome-rule">
+                <SheetTitle className="text-subhead text-chrome-ink">
+                  {t("nav.menuLabel")}
+                </SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-y-auto py-3">
+                <RailNav
+                  unreadCount={unreadCount}
+                  unreadCountKnown={unreadCountKnown}
+                  onNavigate={() => setDrawerOpen(false)}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
 
         {/* `min-w-0` — the brand is the one elastic item in the row. */}
@@ -262,7 +266,7 @@ export function WorkspaceHeader({
               // `truncate` — Story 129's `appName` is free text capped at 60
               // characters, long enough to push the header's controls
               // off-screen on a narrow viewport if left unbounded.
-              className="focus-ring min-w-0 truncate rounded-inner text-sm font-semibold text-ink-strong"
+              className="focus-ring min-w-0 truncate rounded-inner text-sm font-semibold text-chrome-ink"
             >
               {brandName}
             </Link>
@@ -280,7 +284,7 @@ export function WorkspaceHeader({
 
         {/* The count is part of the link's accessible name; the visual badge
             is aria-hidden so it is not announced twice (A11Y-11). */}
-        <Button asChild variant="ghost" size="icon-sm" className="relative shrink-0">
+        <Button asChild variant="chrome" size="icon-sm" className="relative shrink-0">
           <Link
             href={`/${locale}/notifications`}
             aria-label={
@@ -306,7 +310,7 @@ export function WorkspaceHeader({
         <Popover>
           <PopoverTrigger asChild>
             <Button
-              variant="ghost"
+              variant="chrome"
               size="sm"
               aria-label={t("userMenu.trigger", { name: user.fullName })}
               className="min-w-0 shrink-0 gap-2 px-1 sm:px-2"
