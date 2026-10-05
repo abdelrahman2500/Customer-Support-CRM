@@ -151,6 +151,8 @@ export type { AlertProps } from "./components/alert";
 export { EmptyState } from "./components/empty-state";
 export type { EmptyStateProps } from "./components/empty-state";
 export { ErrorState } from "./components/error-state";
+export { Combobox } from "./components/combobox";
+export type { ComboboxOption, ComboboxProps } from "./components/combobox";
 export type { ErrorStateProps } from "./components/error-state";
 
 export { FetchingIndicator } from "./components/fetching-indicator";

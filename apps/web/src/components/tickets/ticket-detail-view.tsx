@@ -37,8 +37,10 @@ import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
   Alert,
-  Badge,
+  Avatar,
   Button,
+  Combobox,
+  type ComboboxOption,
   Card,
   DescriptionItem,
   DescriptionList,
@@ -316,6 +318,31 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   }
   const currentUserId = currentUserQuery.data?.id;
 
+  /** Story 204 (RD-3.4) — the assignee options: avatar (with presence dot),
+   * name, presence as text; the current agent first, marked "(you)". */
+  const assigneeOptions: ComboboxOption[] = [...(usersQuery.data ?? [])]
+    .sort((a, b) => Number(b.id === currentUserId) - Number(a.id === currentUserId))
+    .map((user) => {
+      const online = presence[user.id] === "online";
+      return {
+        value: user.id,
+        label:
+          user.id === currentUserId
+            ? `${user.fullName} (${t("detail.assigneeYou")})`
+            : user.fullName,
+        // RM-06 — the same presence words as before, now as text in the name.
+        description: online ? t("detail.presenceOnline") : t("detail.presenceOffline"),
+        leading: (
+          <Avatar
+            name={user.fullName}
+            size="sm"
+            presence={online ? "online" : "offline"}
+            decorative
+          />
+        ),
+      };
+    });
+
   return (
     <section
       ref={workspaceRef}
@@ -577,35 +604,23 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               </Field>
 
               <Field label={t("detail.assignedAgent")}>
-                <Select
+                {/* Story 204 (RD-3.4, recon TW-08) — a searchable picker: type to
+                    filter, arrow keys, presence as text in each option's name,
+                    the current agent first and marked. Same updateAssignee
+                    (PATCH + toast) as before. No "Unassigned"/clear option:
+                    the PATCH does not accept null (recon, Story 204). */}
+                <Combobox
+                  aria-label={t("detail.assignedAgent")}
                   value={ticket.assignedToUserId ?? undefined}
                   disabled={mutation.isPending || usersQuery.isLoading}
-                  onValueChange={(value) => updateAssignee(value)}
-                >
-                  <SelectTrigger aria-label={t("detail.assignedAgent")}>
-                    <SelectValue
-                      placeholder={
-                        usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(usersQuery.data ?? []).map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        <span className="flex w-full items-center justify-between gap-2">
-                          <span>{user.fullName}</span>
-                          {/* RM-06 — mirrors `UserListView`'s own presence Badge shape,
-                            just under this namespace's own key names. */}
-                          <Badge variant={presence[user.id] === "online" ? "success" : "secondary"}>
-                            {presence[user.id] === "online"
-                              ? t("detail.presenceOnline")
-                              : t("detail.presenceOffline")}
-                          </Badge>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onValueChange={updateAssignee}
+                  placeholder={
+                    usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")
+                  }
+                  searchLabel={t("detail.assigneeSearch")}
+                  emptyText={t("detail.assigneeNoMatch")}
+                  options={assigneeOptions}
+                />
               </Field>
 
               <Field label={t("detail.department")}>

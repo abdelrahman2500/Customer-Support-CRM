@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { act, render, screen, fireEvent, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { TicketDetailView } from "./ticket-detail-view";
 import {
   useCreateTicketNoteMutation,
@@ -2036,6 +2037,78 @@ describe("TicketDetailView", () => {
         .getByRole("heading", { name: "detail.propertiesHeading" })
         .closest(".p-surface")!.parentElement!;
       expect(inspector).toHaveClass("lg:sticky", "lg:overflow-y-auto");
+    });
+  });
+
+  /**
+   * Story 204 (RD-3.4, recon TW-08) — the assignee field is a searchable
+   * Combobox: keyboard-only assignment through the same updateAssignee
+   * request and toast; presence as text; the current agent first.
+   */
+  describe("assignee picker (Story 204)", () => {
+    function renderPicker() {
+      const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
+        options?.onSuccess?.();
+      });
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useUsersQuery).mockReturnValue(
+        queryResult({
+          data: [
+            { id: "user-1", fullName: "Jane Online" },
+            { id: "agent-1", fullName: "Ada Agent" },
+            { id: "user-2", fullName: "John Offline" },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+      vi.mocked(useAgentPresence).mockReturnValue({ "user-1": "online" });
+      render(<TicketDetailView ticketId="ticket-1" />);
+      return mutate;
+    }
+
+    it("lists the current agent first, marked as you, with presence as text", async () => {
+      const ue = userEvent.setup();
+      renderPicker();
+
+      await ue.click(screen.getByRole("combobox", { name: "detail.assignedAgent" }));
+
+      const options = screen.getAllByRole("option");
+      expect(options[0]).toHaveTextContent("Ada Agent (detail.assigneeYou)");
+      expect(screen.getByRole("option", { name: /Jane Online\s*detail\.presenceOnline/ })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: /John Offline\s*detail\.presenceOffline/ })).toBeInTheDocument();
+    });
+
+    it("assigns with the keyboard alone, through the assignee field's own request and toast", async () => {
+      const ue = userEvent.setup();
+      const mutate = renderPicker();
+
+      screen.getByRole("combobox", { name: "detail.assignedAgent" }).focus();
+      await ue.keyboard("{ArrowDown}");
+      await ue.keyboard("john");
+      await ue.keyboard("{Enter}");
+
+      expect(mutate).toHaveBeenCalledWith({ assignedToUserId: "user-2" }, expect.any(Object));
+      expect(mockedShowSuccessToast).toHaveBeenCalledWith(
+        'detail.assignedAgentUpdateSuccess:{"agent":"John Offline"}',
+      );
+    });
+
+    it("offers no unassign option — the PATCH does not accept null (recon)", async () => {
+      const ue = userEvent.setup();
+      renderPicker();
+
+      await ue.click(screen.getByRole("combobox", { name: "detail.assignedAgent" }));
+
+      expect(screen.getAllByRole("option")).toHaveLength(3);
+      expect(screen.queryByRole("option", { name: /list\.unassigned/ })).not.toBeInTheDocument();
     });
   });
 });

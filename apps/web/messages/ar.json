@@ -289,6 +289,9 @@
       "subjectEdit": "تعديل",
       "propertiesHeading": "الخصائص",
       "ticketIdFull": "معرّف التذكرة",
+      "assigneeSearch": "ابحث عن وكيل",
+      "assigneeYou": "أنت",
+      "assigneeNoMatch": "لا يوجد وكلاء مطابقون.",
       "actions": {
         "label": "إجراءات التذكرة",
         "assignToMe": "إسناد إليّ",
