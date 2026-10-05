@@ -4,12 +4,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ticketStatusPresentation } from "@crm/shared";
 import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
-import { TicketStatusBadge } from "@/components/tickets/ticket-status-badge";
+import { TicketCard } from "@/components/tickets/ticket-card";
 import type { KbLocale } from "@/lib/knowledge-base-api";
-import type { PortalTicketSummary } from "@/lib/tickets-api";
 import {
   AddIcon,
   AiSummaryIcon,
@@ -23,10 +21,8 @@ import {
   Skeleton,
   cn,
   recipes,
-  toneSpine,
   type LucideIcon,
 } from "@crm/ui";
-import { formatDate } from "@crm/ui";
 
 /**
  * Story 136 — the Customer Portal's real landing page.
@@ -94,29 +90,6 @@ function ActionCard({
       <span className="flex min-w-0 flex-col gap-tight">
         <span className="font-semibold text-ink group-hover:underline">{title}</span>
         <span className="text-sm text-ink-muted">{body}</span>
-      </span>
-    </Link>
-  );
-}
-
-/** Story 229 — a recent ticket with the status spine on its leading edge. */
-function TicketMiniCard({ ticket, locale }: { ticket: PortalTicketSummary; locale: string }) {
-  const spine = toneSpine(ticketStatusPresentation(ticket.status).tone);
-  return (
-    <Link
-      href={`/${locale}/tickets/${ticket.id}`}
-      className={cn(
-        "focus-ring flex flex-col gap-1.5 rounded-control border border-s-[3px] border-rule-subtle bg-surface px-3 py-2.5 hover:bg-surface-muted",
-        spine.start,
-      )}
-    >
-      {/* `break-words`: a subject is free text the customer typed, and one
-          long unbreakable word must wrap rather than widen the card. */}
-      <span className="min-w-0 break-words font-medium text-ink-strong">{ticket.subject}</span>
-      <span className="flex flex-wrap items-center gap-2 text-caption text-ink-subtle">
-        <TicketStatusBadge status={ticket.status} />
-        <span>{formatDate(ticket.createdAt, locale)}</span>
-        {ticket.categoryName && <span>· {ticket.categoryName}</span>}
       </span>
     </Link>
   );
@@ -218,7 +191,7 @@ export function PortalHomeView() {
                 <ol className="mt-3 flex flex-col gap-2 text-sm">
                   {recentTickets?.map((ticket) => (
                     <li key={ticket.id}>
-                      <TicketMiniCard ticket={ticket} locale={locale} />
+                      <TicketCard ticket={ticket} locale={locale} />
                     </li>
                   ))}
                 </ol>

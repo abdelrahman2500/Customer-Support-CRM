@@ -19,6 +19,7 @@ import { TicketStatusBadge } from "@/components/tickets/ticket-status-badge";
 import { TicketPriorityBadge } from "@/components/tickets/ticket-priority-badge";
 import { historyEventKey } from "@/lib/history-event";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
+import { ticketStatusPresentation } from "@crm/shared";
 import {
   Alert,
   Button,
@@ -28,10 +29,12 @@ import {
   SectionCard,
   Skeleton,
   Textarea,
+  cn,
+  toneSpine,
 } from "@crm/ui";
 import { BackLink } from "@crm/ui";
 import { ErrorState } from "@crm/ui";
-import { formatDateTime } from "@crm/ui";
+import { formatDate, formatDateTime } from "@crm/ui";
 
 const CSAT_ELIGIBLE_STATUSES: PortalTicketStatus[] = ["RESOLVED", "CLOSED"];
 
@@ -67,8 +70,8 @@ export function TicketDetailSkeleton() {
 
       <Card className="p-surface">
         <Skeleton className="h-6 w-1/2" />
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, index) => (
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
             <div key={index} className="flex flex-col gap-1">
               <Skeleton className="h-3 w-16" />
               <Skeleton className="h-4 w-20" />
@@ -77,12 +80,13 @@ export function TicketDetailSkeleton() {
         </div>
       </Card>
 
-      <Skeleton className="h-40 w-full" />
-
-      <Card className="p-surface">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="mt-2 h-24 w-full" />
-      </Card>
+      <div className="grid gap-section lg:grid-cols-3 lg:items-start">
+        <Skeleton className="h-64 w-full lg:col-span-2" />
+        <Card className="p-surface">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="mt-2 h-24 w-full" />
+        </Card>
+      </div>
     </section>
   );
 }
@@ -134,16 +138,22 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
     return null;
   }
 
+  const spine = toneSpine(ticketStatusPresentation(ticket.status).tone);
+  const feedbackDue = CSAT_ELIGIBLE_STATUSES.includes(ticket.status);
+
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-col gap-section">
       {/* Story 189 — the shared BackLink: chevron flips in RTL, token focus ring. */}
       <BackLink asChild>
         <Link href={`/${locale}/tickets`}>{t("detail.backToList")}</Link>
       </BackLink>
 
-      <Card className="p-surface">
+      {/* Story 230 (PR-5.2) — the header carries the status spine along
+          its top edge, the same hue the customer's ticket cards and the
+          agent's board use for this status. */}
+      <Card className={cn("border-t-[3px] p-surface", spine.top)}>
         <PageHeader title={ticket.subject} />
-        <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+        <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <div>
             <dt className="text-xs text-ink-subtle">{t("detail.status")}</dt>
             <dd>
@@ -165,45 +175,73 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               {ticket.categoryName ?? t("list.noCategory")}
             </dd>
           </div>
+          <div>
+            <dt className="text-xs text-ink-subtle">{t("detail.opened")}</dt>
+            <dd className="font-medium text-ink-strong">{formatDate(ticket.createdAt, locale)}</dd>
+          </div>
         </dl>
       </Card>
 
-      <TicketChatCard ticketId={ticketId} />
+      {/* Story 230 — a closed ticket says what to do next instead of
+          leaving the customer at a conversation nobody is watching. */}
+      {ticket.status === "CLOSED" && (
+        <Alert variant="info" icon title={t("detail.closedTitle")}>
+          {t("detail.closedBody")}{" "}
+          <Link
+            href={`/${locale}/tickets#new-ticket`}
+            className="focus-ring rounded-sm font-medium underline"
+          >
+            {t("detail.closedAction")}
+          </Link>
+        </Alert>
+      )}
 
-      <TicketAttachmentsCard ticketId={ticketId} />
+      {/* Story 230 — feedback is asked for first, right under the header,
+          once the ticket is resolved: it is the one thing left to do. */}
+      {feedbackDue && <CsatSection ticketId={ticketId} />}
 
-      <SectionCard title={t("detail.historyHeading")}>
-        {historyQuery.isLoading && (
-          <LoadingStatus label={tCommon("loading")} asChild>
-            <Skeleton className="mt-2 h-24 w-full" />
-          </LoadingStatus>
-        )}
-        {historyQuery.isError && (
-          <Alert variant="destructive" className="mt-2">
-            {t("detail.historyError")}
-          </Alert>
-        )}
-        {historyQuery.isSuccess && historyQuery.data.length === 0 && (
-          <p className="mt-2 text-sm text-ink-subtle">{t("detail.historyEmpty")}</p>
-        )}
-        {historyQuery.isSuccess && historyQuery.data.length > 0 && (
-          <ol className="mt-2 flex flex-col gap-2 text-sm">
-            {historyQuery.data.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex items-center justify-between border-b border-rule-subtle pb-2"
-              >
-                <span className="font-medium text-ink-strong">
-                  {t(`detail.historyEvent.${historyEventKey(entry.eventType)}`)}
-                </span>
-                <span className="text-ink-subtle">{formatDateTime(entry.createdAt, locale)}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </SectionCard>
+      <div className="grid gap-section lg:grid-cols-3 lg:items-start">
+        <div className="lg:col-span-2">
+          <TicketChatCard ticketId={ticketId} />
+        </div>
 
-      {CSAT_ELIGIBLE_STATUSES.includes(ticket.status) && <CsatSection ticketId={ticketId} />}
+        <div className="flex flex-col gap-section">
+          <TicketAttachmentsCard ticketId={ticketId} />
+
+          <SectionCard title={t("detail.historyHeading")}>
+            {historyQuery.isLoading && (
+              <LoadingStatus label={tCommon("loading")} asChild>
+                <Skeleton className="mt-2 h-24 w-full" />
+              </LoadingStatus>
+            )}
+            {historyQuery.isError && (
+              <Alert variant="destructive" className="mt-2">
+                {t("detail.historyError")}
+              </Alert>
+            )}
+            {historyQuery.isSuccess && historyQuery.data.length === 0 && (
+              <p className="mt-2 text-sm text-ink-subtle">{t("detail.historyEmpty")}</p>
+            )}
+            {historyQuery.isSuccess && historyQuery.data.length > 0 && (
+              <ol className="mt-2 flex flex-col gap-2 text-sm">
+                {historyQuery.data.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex items-center justify-between border-b border-rule-subtle pb-2"
+                  >
+                    <span className="font-medium text-ink-strong">
+                      {t(`detail.historyEvent.${historyEventKey(entry.eventType)}`)}
+                    </span>
+                    <span className="text-ink-subtle">
+                      {formatDateTime(entry.createdAt, locale)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </SectionCard>
+        </div>
+      </div>
     </section>
   );
 }
@@ -218,8 +256,10 @@ function CsatSection({ ticketId }: { ticketId: string }) {
   const tCommon = useTranslations("common");
   const csatQuery = useMyTicketCsatQuery(ticketId);
 
+  // Story 230 — set apart with the accent edge: a resolved ticket's one
+  // remaining action.
   return (
-    <SectionCard title={t("detail.csatHeading")}>
+    <SectionCard title={t("detail.csatHeading")} className="border-s-[3px] border-s-accent">
       {csatQuery.isLoading && (
         <LoadingStatus label={tCommon("loading")} asChild>
           <Skeleton className="mt-2 h-16 w-full" />

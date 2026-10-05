@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -9,8 +8,19 @@ import {
   useSendMyTicketMessageMutation,
 } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, LoadingStatus, SectionCard, Skeleton, Textarea } from "@crm/ui";
-import { formatTime } from "@crm/ui";
+import {
+  Alert,
+  Avatar,
+  Composer,
+  LoadingStatus,
+  MessageBubble,
+  MessageThread,
+  SectionCard,
+  Skeleton,
+  formatDate,
+  formatDateTime,
+  formatTime,
+} from "@crm/ui";
 
 /**
  * Story 78 — Live Chat UI (Customer Portal side). Reads
@@ -27,25 +37,54 @@ import { formatTime } from "@crm/ui";
  * the agent user list (`identity` module is agent-only), so agents are
  * labeled generically rather than by name.
  *
- * RM-13 — mirrors `apps/web`'s own identical delivery-status indicator:
- * an `OUTBOUND` (agent's) message whose `deliveryStatus` isn't `DELIVERED`
- * renders a small status label after its timestamp. Invisible today (no
- * adapter exists yet), and stays live via the same `mergeChannelMessage`
- * upsert-by-id change — see that file's own doc comment.
+ * RM-13 — an `OUTBOUND` (agent's) message whose `deliveryStatus` isn't
+ * `DELIVERED` renders a small status label after its timestamp.
+ *
+ * Story 230 (PR-5.2) — the agent workspace's own conversation parts: the
+ * shared `MessageThread` (a polite `role="log"` grouped by day, which only
+ * follows new messages while the reader is at the bottom), `MessageBubble`
+ * and `Composer` (Enter sends, Shift+Enter adds a line, IME-safe, the field
+ * stays focusable while sending). The card is called "Conversation", the
+ * same word the agent uses for the same messages.
  */
 export function TicketChatCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
   const messagesQuery = useMyTicketMessagesQuery(ticketId);
-  const listRef = useRef<HTMLOListElement>(null);
 
-  useEffect(() => {
-    const list = listRef.current;
-    if (list) {
-      list.scrollTop = list.scrollHeight;
-    }
-  }, [messagesQuery.data]);
+  const items = (messagesQuery.data ?? []).map((message) => {
+    const isMine = message.direction === "INBOUND";
+    const sender = isMine ? t("detail.chatYouLabel") : t("detail.chatAgentLabel");
+    return {
+      key: message.id,
+      at: message.createdAt,
+      node: (
+        <MessageBubble
+          align={isMine ? "end" : "start"}
+          tone={isMine ? "mine" : "other"}
+          sender={sender}
+          avatar={<Avatar name={sender} size="sm" decorative />}
+          at={message.createdAt}
+          timeLabel={formatTime(message.createdAt, locale)}
+          dateTimeLabel={formatDateTime(message.createdAt, locale)}
+          status={
+            message.direction === "OUTBOUND" && message.deliveryStatus !== "DELIVERED" ? (
+              <span
+                className={
+                  message.deliveryStatus === "FAILED" ? "text-danger-foreground" : undefined
+                }
+              >
+                {t(`detail.chatDeliveryStatus.${message.deliveryStatus}`)}
+              </span>
+            ) : undefined
+          }
+        >
+          {message.body}
+        </MessageBubble>
+      ),
+    };
+  });
 
   return (
     <SectionCard title={t("detail.chatHeading")}>
@@ -59,47 +98,17 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
           {t("detail.chatLoadError")}
         </Alert>
       )}
-      {messagesQuery.isSuccess && messagesQuery.data.length === 0 && (
+      {messagesQuery.isSuccess && items.length === 0 && (
         <p className="mt-2 text-sm text-ink-subtle">{t("detail.chatEmpty")}</p>
       )}
-      {messagesQuery.isSuccess && messagesQuery.data.length > 0 && (
-        <ol
-          ref={listRef}
-          aria-label={t("detail.chatHeading")}
-          className="mt-2 flex max-h-80 flex-col gap-3 overflow-y-auto py-1"
-        >
-          {messagesQuery.data.map((message) => {
-            const isMine = message.direction === "INBOUND";
-            return (
-              <li
-                key={message.id}
-                className={`flex flex-col gap-1 ${isMine ? "items-end" : "items-start"}`}
-              >
-                <div
-                  className={`max-w-[80%] whitespace-pre-wrap rounded-md px-3 py-2 text-sm ${
-                    isMine ? "bg-accent text-accent-foreground" : "bg-surface-muted text-ink-strong"
-                  }`}
-                >
-                  {message.body}
-                </div>
-                <span className="text-xs text-ink-subtle">
-                  {isMine ? t("detail.chatYouLabel") : t("detail.chatAgentLabel")} ·{" "}
-                  {formatTime(message.createdAt, locale)}
-                  {message.direction === "OUTBOUND" && message.deliveryStatus !== "DELIVERED" && (
-                    <>
-                      {" · "}
-                      <span
-                        className={message.deliveryStatus === "FAILED" ? "text-danger-foreground" : undefined}
-                      >
-                        {t(`detail.chatDeliveryStatus.${message.deliveryStatus}`)}
-                      </span>
-                    </>
-                  )}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
+      {items.length > 0 && (
+        <MessageThread
+          className="mt-2"
+          label={t("detail.chatHeading")}
+          items={items}
+          formatDay={(at) => formatDate(at, locale)}
+          newMessagesLabel={t("detail.chatNewMessages")}
+        />
       )}
 
       <ChatComposer ticketId={ticketId} />
@@ -107,9 +116,8 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
   );
 }
 
-/** Enter sends, Shift+Enter inserts a newline — mirrors `apps/web`'s own
- * `ChatComposer` exactly. Never assumes a send succeeds: a rejected mutation
- * renders inline and leaves the draft in the textarea. */
+/** Never assumes a send succeeds: a rejected mutation renders inline and
+ * leaves the draft in the field. */
 function ChatComposer({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
   const errorMessage = useErrorMessage();
@@ -136,35 +144,20 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    void send();
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      void send();
-    }
-  }
-
   return (
-    <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
-      <Textarea
-        rows={2}
-        value={body}
-        placeholder={t("detail.chatPlaceholder")}
-        disabled={mutation.isPending}
-        aria-label={t("detail.chatPlaceholder")}
-        onChange={(event) => setBody(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <div>
-        <Button type="submit" disabled={mutation.isPending || !body.trim()} className="w-fit">
-          {mutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
-        </Button>
-      </div>
-      {error && <Alert variant="destructive">{error}</Alert>}
-    </form>
+    <Composer
+      className="mt-3"
+      label={t("detail.chatComposerLabel")}
+      placeholder={t("detail.chatPlaceholder")}
+      rows={2}
+      value={body}
+      onValueChange={setBody}
+      onSubmit={send}
+      canSubmit={!mutation.isPending && body.trim().length > 0}
+      pending={mutation.isPending}
+      submitLabel={mutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
+      hint={t("detail.chatHint")}
+      error={error && <Alert variant="destructive">{error}</Alert>}
+    />
   );
 }

@@ -137,7 +137,10 @@
       "filterAll": "Any status",
       "clearFilters": "Clear filters",
       "noResults": "No tickets match your search.",
-      "resultCount": "{count, plural, =0 {No matching tickets} one {# matching ticket} other {# matching tickets}}"
+      "resultCount": "{count, plural, =0 {No matching tickets} one {# matching ticket} other {# matching tickets}}",
+      "description": "Raise a new request or follow up on the ones you've sent.",
+      "allHeading": "Your tickets",
+      "createCategoryHint": "For example Billing or Technical issue."
     },
     "detail": {
       "notFound": "This ticket could not be found.",
@@ -146,7 +149,7 @@
       "category": "Category",
       "status": "Status",
       "priority": "Priority",
-      "chatHeading": "Live Chat",
+      "chatHeading": "Conversation",
       "chatLoadError": "Couldn't load this conversation.",
       "chatEmpty": "No messages yet.",
       "chatYouLabel": "You",
@@ -185,7 +188,16 @@
       "attachmentsError": "Couldn't load attachments.",
       "attachmentsEmpty": "No attachments yet.",
       "attachmentsUploading": "Uploading...",
-      "attachmentsUploadFailed": "Couldn't upload the file. Please try again."
+      "attachmentsUploadFailed": "Couldn't upload the file. Please try again.",
+      "chatNewMessages": "New messages",
+      "chatComposerLabel": "Message to the support team",
+      "chatHint": "Enter to send · Shift+Enter for a new line",
+      "attachmentsAdd": "Add a file",
+      "attachmentsHint": "Drop a file here or choose one",
+      "opened": "Opened",
+      "closedTitle": "This ticket is closed",
+      "closedBody": "Still need help with this?",
+      "closedAction": "Raise a new ticket"
     },
     "status": {
       "OPEN": "Open",

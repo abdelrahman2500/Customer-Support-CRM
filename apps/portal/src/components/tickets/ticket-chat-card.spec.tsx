@@ -125,7 +125,7 @@ describe("TicketChatCard (portal)", () => {
     } as never);
 
     render(<TicketChatCard ticketId="ticket-1" />);
-    fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+    fireEvent.change(screen.getByLabelText("detail.chatComposerLabel"), {
       target: { value: "I still can't log in." },
     });
     fireEvent.click(screen.getByText("detail.chatSend"));
@@ -146,7 +146,7 @@ describe("TicketChatCard (portal)", () => {
     } as never);
 
     render(<TicketChatCard ticketId="ticket-1" />);
-    const textarea = screen.getByLabelText("detail.chatPlaceholder");
+    const textarea = screen.getByLabelText("detail.chatComposerLabel");
     fireEvent.change(textarea, { target: { value: "hello" } });
     fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
     expect(mutateAsync).not.toHaveBeenCalled();
@@ -157,7 +157,10 @@ describe("TicketChatCard (portal)", () => {
     });
   });
 
-  it("disables the composer while sending", () => {
+  // Story 230 — the shared Composer keeps the field enabled while a send
+  // is pending (disabling it would drop focus); the send button carries the
+  // pending state instead.
+  it("blocks sending, not typing, while a message is on its way", () => {
     vi.mocked(useMyTicketMessagesQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -168,8 +171,8 @@ describe("TicketChatCard (portal)", () => {
 
     render(<TicketChatCard ticketId="ticket-1" />);
 
-    expect(screen.getByLabelText("detail.chatPlaceholder")).toBeDisabled();
-    expect(screen.getByText("detail.chatSending")).toBeInTheDocument();
+    expect(screen.getByLabelText("detail.chatComposerLabel")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "detail.chatSending" })).toBeDisabled();
   });
 
   it("shows an inline error when sending fails", async () => {
@@ -182,7 +185,7 @@ describe("TicketChatCard (portal)", () => {
     } as never);
 
     render(<TicketChatCard ticketId="ticket-1" />);
-    fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+    fireEvent.change(screen.getByLabelText("detail.chatComposerLabel"), {
       target: { value: "hello" },
     });
     fireEvent.click(screen.getByText("detail.chatSend"));
@@ -268,7 +271,7 @@ describe("TicketChatCard (portal)", () => {
     } as never);
 
     render(<TicketChatCard ticketId="ticket-1" />);
-    fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+    fireEvent.change(screen.getByLabelText("detail.chatComposerLabel"), {
       target: { value: "hello" },
     });
     fireEvent.click(screen.getByText("detail.chatSend"));

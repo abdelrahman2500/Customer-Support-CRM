@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -9,7 +9,7 @@ import {
 } from "@/hooks/use-portal-attachments";
 import { getMyTicketAttachmentDownloadUrl } from "@/lib/attachments-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
+import { Alert, FileDropzone, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
 import { formatDateTime } from "@crm/ui";
 
 function formatFileSize(bytes: number): string {
@@ -25,6 +25,10 @@ function formatFileSize(bytes: number): string {
  * History/CSAT cards) rather than a shared `Alert` component — this app
  * has none. Scoped by `ticketId` alone (the caller's own ticket — Contacts
  * have no cross-ticket attachment view).
+ *
+ * Story 230 (PR-5.2) — the upload control is the shared `FileDropzone`: a
+ * named, keyboard-reachable drop area instead of the browser's bare
+ * "Choose File" input, which was neither translated nor meaningful.
  */
 export function TicketAttachmentsCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
@@ -84,11 +88,7 @@ function AddAttachmentForm({ ticketId }: { ticketId: string }) {
   const [error, setError] = useState<string | null>(null);
   const mutation = useUploadMyTicketAttachmentMutation(ticketId);
 
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.target.files?.[0];
-    event.target.value = ""; // allow re-selecting the same file next time.
-    if (!file) return;
-
+  async function upload(file: File): Promise<void> {
     setError(null);
     try {
       await mutation.mutateAsync(file);
@@ -104,17 +104,15 @@ function AddAttachmentForm({ ticketId }: { ticketId: string }) {
 
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <label className="flex flex-col gap-1 text-xs text-ink-muted">
-        <input
-          type="file"
-          disabled={mutation.isPending}
-          onChange={(event) => void handleFileChange(event)}
-          className="text-sm text-ink-strong"
-        />
-      </label>
-      {mutation.isPending && (
-        <p className="text-xs text-ink-subtle">{t("detail.attachmentsUploading")}</p>
-      )}
+      <FileDropzone
+        label={t("detail.attachmentsAdd")}
+        hint={t("detail.attachmentsHint")}
+        disabled={mutation.isPending}
+        onFile={(file) => void upload(file)}
+      />
+      <p role="status" className="text-xs text-ink-subtle empty:hidden">
+        {mutation.isPending ? t("detail.attachmentsUploading") : ""}
+      </p>
       {error && <Alert variant="destructive">{error}</Alert>}
     </div>
   );

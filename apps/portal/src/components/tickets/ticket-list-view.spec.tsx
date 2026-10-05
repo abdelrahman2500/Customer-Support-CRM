@@ -6,6 +6,10 @@ import { ApiError } from "@/lib/api";
 
 const push = vi.fn();
 
+/** Story 230 — the subject is a required FormField, whose label carries an
+ * aria-hidden "*" marker. */
+const SUBJECT_LABEL = /^list\.createSubjectLabel\*?$/;
+
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
   useRouter: () => ({ push }),
@@ -103,7 +107,9 @@ describe("TicketListView", () => {
 
     render(<TicketListView />);
 
-    const link = screen.getByRole("link", { name: "Cannot log in" });
+    // Story 230 — the whole card is the link, so its name also carries the
+    // status and date after the subject.
+    const link = screen.getByRole("link", { name: /^Cannot log in/ });
     expect(link).toHaveAttribute("href", "/en/tickets/ticket-1");
   });
 
@@ -117,7 +123,7 @@ describe("TicketListView", () => {
     const submit = screen.getByText("list.createSubmit");
     expect(submit).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("list.createSubjectLabel"), {
+    fireEvent.change(screen.getByLabelText(SUBJECT_LABEL), {
       target: { value: "Billing question" },
     });
     expect(submit).not.toBeDisabled();
@@ -131,7 +137,7 @@ describe("TicketListView", () => {
     mockedUseCreateMyTicketMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
 
     render(<TicketListView />);
-    fireEvent.change(screen.getByLabelText("list.createSubjectLabel"), {
+    fireEvent.change(screen.getByLabelText(SUBJECT_LABEL), {
       target: { value: "Billing question" },
     });
     fireEvent.change(screen.getByLabelText("list.createCategoryLabel"), {
@@ -145,7 +151,36 @@ describe("TicketListView", () => {
         category: "billing",
       }),
     );
-    await waitFor(() => expect(screen.getByLabelText("list.createSubjectLabel")).toHaveValue(""));
+    await waitFor(() => expect(screen.getByLabelText(SUBJECT_LABEL)).toHaveValue(""));
+  });
+
+  it("goes straight to the new ticket once it is created (Story 230)", async () => {
+    mockedUseMyTicketsQuery.mockReturnValue(
+      queryResult({ data: ticketPage([]), isSuccess: true }) as never,
+    );
+    const mutateAsync = vi.fn().mockResolvedValue({ id: "ticket-2" });
+    mockedUseCreateMyTicketMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
+
+    render(<TicketListView />);
+    fireEvent.change(screen.getByLabelText(SUBJECT_LABEL), {
+      target: { value: "Billing question" },
+    });
+    fireEvent.click(screen.getByText("list.createSubmit"));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/en/tickets/ticket-2"));
+  });
+
+  it("gives each ticket the status spine on its leading edge (Story 230)", () => {
+    mockedUseMyTicketsQuery.mockReturnValue(
+      queryResult({ data: ticketPage([baseTicket]), isSuccess: true }) as never,
+    );
+
+    render(<TicketListView />);
+
+    expect(screen.getByRole("link", { name: /^Cannot log in/ })).toHaveClass(
+      "border-s-[3px]",
+      "border-s-info-solid",
+    );
   });
 
   it("submits without a category when left blank", async () => {
@@ -156,7 +191,7 @@ describe("TicketListView", () => {
     mockedUseCreateMyTicketMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
 
     render(<TicketListView />);
-    fireEvent.change(screen.getByLabelText("list.createSubjectLabel"), {
+    fireEvent.change(screen.getByLabelText(SUBJECT_LABEL), {
       target: { value: "Billing question" },
     });
     fireEvent.click(screen.getByText("list.createSubmit"));
@@ -172,7 +207,7 @@ describe("TicketListView", () => {
     mockedUseCreateMyTicketMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
 
     render(<TicketListView />);
-    fireEvent.change(screen.getByLabelText("list.createSubjectLabel"), {
+    fireEvent.change(screen.getByLabelText(SUBJECT_LABEL), {
       target: { value: "Billing question" },
     });
     fireEvent.click(screen.getByText("list.createSubmit"));
@@ -458,8 +493,10 @@ describe("TicketListView", () => {
 
       render(<TicketListView />);
 
+      // Story 230 — the page title (list.title) now heads the whole page;
+      // the list itself is headed by list.allHeading.
       const createHeading = screen.getByText("list.createHeading");
-      const listHeading = screen.getByText("list.title");
+      const listHeading = screen.getByText("list.allHeading");
       expect(
         createHeading.compareDocumentPosition(listHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();

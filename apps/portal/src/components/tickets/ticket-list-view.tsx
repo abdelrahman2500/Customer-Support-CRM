@@ -1,18 +1,18 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTranslations } from "next-intl";
 import { useCreateMyTicketMutation, useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { TicketStatusBadge } from "@/components/tickets/ticket-status-badge";
+import { TicketCard } from "@/components/tickets/ticket-card";
 import type { PortalTicketStatus } from "@/lib/tickets-api";
 import {
   Alert,
   Button,
   Card,
+  cn,
   FetchingIndicator,
   FilterBar,
   FilterSelect,
@@ -25,7 +25,6 @@ import {
   showSuccessToast,
   Skeleton,
 } from "@crm/ui";
-import { formatDate } from "@crm/ui";
 
 /** Story 148 — the four statuses a customer can filter by, in the order
  * a ticket actually moves through them. `TicketStatus` has exactly these
@@ -80,7 +79,6 @@ const ALL_STATUSES = "ALL";
 export function TicketListView() {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
-  const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PortalTicketStatus | typeof ALL_STATUSES>(ALL_STATUSES);
@@ -118,156 +116,143 @@ export function TicketListView() {
   const tickets = ticketPage?.items;
 
   return (
-    <section className="flex flex-col gap-6">
-      {/* Story 157 — creation comes FIRST. It used to sit after the list and
-          its pager, so a customer arriving to report a problem scrolled past
-          every ticket they already had — and on a phone, past the pagination
-          too — before finding the form. Submitting a ticket is the primary
-          reason a customer opens this screen; the list is what they check
-          afterwards. */}
-      <CreateTicketForm />
-
-      {/* Story 98 — p-4, not p-6: matches apps/web's own dominant card
-          padding convention (see that app's data cards throughout). */}
-      <Card className="p-surface">
-        <div className="flex items-center justify-between gap-3">
-          <PageHeader title={t("list.title")} />
-          {/* In the heading's own row, so it adds no height and cannot
-              shift the list below it — mirrors ArticleListView exactly. */}
+    <section className="flex flex-col gap-section">
+      {/* Story 230 — the page's own header; the fetch indicator sits in its
+          actions slot, so it adds no height and cannot shift the list. */}
+      <PageHeader
+        title={t("list.title")}
+        description={t("list.description")}
+        actions={
           <FetchingIndicator active={ticketsQuery.isPlaceholderData} label={tCommon("updating")} />
-        </div>
+        }
+      />
 
-        <FilterBar className="mt-3">
-          {/* `FormField` compact renders the same `text-xs text-ink-muted`
+      <div className="grid gap-section lg:grid-cols-3 lg:items-start">
+        {/* Story 157 — creation comes FIRST on a phone: submitting a ticket
+            is the primary reason a customer opens this screen. Story 230 —
+            on a wide screen it moves beside the list instead of above it. */}
+        <CreateTicketForm className="lg:order-last" />
+
+        <Card asChild className="p-surface lg:col-span-2">
+          <section>
+            <h2 className="text-sm font-semibold text-ink">{t("list.allHeading")}</h2>
+
+            <FilterBar className="mt-3">
+              {/* `FormField` compact renders the same `text-xs text-ink-muted`
               label `FilterSelect` does, so the two controls share a
               baseline instead of one carrying a visible label and the
               other only an `aria-label`. */}
-          <FormField label={t("list.searchLabel")} className="sm:w-64">
-            <Input
-              type="search"
-              placeholder={t("list.searchPlaceholder")}
-              value={search}
-              onChange={(event) => updateSearch(event.target.value)}
-            />
-          </FormField>
-          <FilterSelect
-            label={t("list.filterStatus")}
-            value={status}
-            onChange={updateStatus}
-            options={STATUSES}
-            allValue={ALL_STATUSES}
-            allLabel={t("list.filterAll")}
-            renderLabel={(value) => t(`status.${value}` as Parameters<typeof t>[0])}
-          />
-        </FilterBar>
+              <FormField label={t("list.searchLabel")} className="sm:w-64">
+                <Input
+                  type="search"
+                  placeholder={t("list.searchPlaceholder")}
+                  value={search}
+                  onChange={(event) => updateSearch(event.target.value)}
+                />
+              </FormField>
+              <FilterSelect
+                label={t("list.filterStatus")}
+                value={status}
+                onChange={updateStatus}
+                options={STATUSES}
+                allValue={ALL_STATUSES}
+                allLabel={t("list.filterAll")}
+                renderLabel={(value) => t(`status.${value}` as Parameters<typeof t>[0])}
+              />
+            </FilterBar>
 
-        {/* The active-filter state: how many tickets the current filters
+            {/* The active-filter state: how many tickets the current filters
             match, and the one control that undoes them. Rendered only when
             something is actually filtered, so an untouched list is exactly
             as quiet as it was before this story. */}
-        {hasActiveFilters && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
-            <span role="status">
-              {ticketPage === undefined
-                ? tCommon("updating")
-                : t("list.resultCount", { count: ticketPage.total })}
-            </span>
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
-              {t("list.clearFilters")}
-            </Button>
-          </div>
-        )}
+            {hasActiveFilters && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
+                <span role="status">
+                  {ticketPage === undefined
+                    ? tCommon("updating")
+                    : t("list.resultCount", { count: ticketPage.total })}
+                </span>
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  {t("list.clearFilters")}
+                </Button>
+              </div>
+            )}
 
-        {ticketsQuery.isPending && (
-          <LoadingStatus label={tCommon("loading")} className="mt-3 flex flex-col gap-2">
-            {[0, 1, 2].map((row) => (
-              <Skeleton key={row} className="h-10 w-full" />
-            ))}
-          </LoadingStatus>
-        )}
+            {ticketsQuery.isPending && (
+              <LoadingStatus label={tCommon("loading")} className="mt-3 flex flex-col gap-2">
+                {[0, 1, 2].map((row) => (
+                  <Skeleton key={row} className="h-10 w-full" />
+                ))}
+              </LoadingStatus>
+            )}
 
-        {ticketsQuery.isError && (
-          <Alert variant="destructive" className="mt-3 flex items-center justify-between">
-            <span>{t("list.error")}</span>
-            <Button variant="outline" size="sm" onClick={() => ticketsQuery.refetch()}>
-              {t("list.retry")}
-            </Button>
-          </Alert>
-        )}
+            {ticketsQuery.isError && (
+              <Alert variant="destructive" className="mt-3 flex items-center justify-between">
+                <span>{t("list.error")}</span>
+                <Button variant="outline" size="sm" onClick={() => ticketsQuery.refetch()}>
+                  {t("list.retry")}
+                </Button>
+              </Alert>
+            )}
 
-        {/* Story 148 — "you have no tickets" and "nothing matched what you
+            {/* Story 148 — "you have no tickets" and "nothing matched what you
             asked for" are different facts, and telling a customer who has
             twenty tickets that they have none is the version of this the
             list used to show. Mirrors `ArticleListView`'s own split. */}
-        {tickets !== undefined && tickets.length === 0 && !hasActiveFilters && (
-          <p className="mt-3 text-sm text-ink-subtle">{t("list.empty")}</p>
-        )}
+            {tickets !== undefined && tickets.length === 0 && !hasActiveFilters && (
+              <p className="mt-3 text-sm text-ink-subtle">{t("list.empty")}</p>
+            )}
 
-        {/* No second "clear" control here: the active-filter row above is
+            {/* No second "clear" control here: the active-filter row above is
             always on screen whenever this message is, and two buttons with
             the same label a few pixels apart is worse than one. */}
-        {tickets !== undefined && tickets.length === 0 && hasActiveFilters && (
-          <p className="mt-3 text-sm text-ink-subtle">{t("list.noResults")}</p>
-        )}
+            {tickets !== undefined && tickets.length === 0 && hasActiveFilters && (
+              <p className="mt-3 text-sm text-ink-subtle">{t("list.noResults")}</p>
+            )}
 
-        {tickets !== undefined && tickets.length > 0 && (
-          <ol className="mt-3 flex flex-col gap-2 text-sm">
-            {tickets.map((ticket) => (
-              <li
-                key={ticket.id}
-                className="flex cursor-pointer items-center justify-between gap-2 border-b border-rule-subtle pb-2"
-                onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
-              >
-                {/* `min-w-0 break-words` for the same reason
-                    `ArticleListView`'s title carries it: a subject is
-                    customer-written free text, and a flex item's default
-                    `min-width: auto` refuses to shrink below it, pushing
-                    the status and date past the viewport edge on a narrow
-                    screen. The status/date group keeps `shrink-0` so it is
-                    never squeezed instead. */}
-                <Link
-                  href={`/${locale}/tickets/${ticket.id}`}
-                  className="focus-ring min-w-0 break-words rounded-sm font-medium text-ink-strong hover:underline"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {ticket.subject}
-                </Link>
-                <span className="flex shrink-0 items-center gap-2 text-ink-subtle">
-                  <TicketStatusBadge status={ticket.status} />
-                  <span>{formatDate(ticket.createdAt, locale)}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
+            {/* Story 230 — each ticket is a card carrying the status spine (the
+            whole card is the link, replacing the row's click handler). */}
+            {tickets !== undefined && tickets.length > 0 && (
+              <ol className="mt-3 flex flex-col gap-2 text-sm">
+                {tickets.map((ticket) => (
+                  <li key={ticket.id}>
+                    <TicketCard ticket={ticket} locale={locale} />
+                  </li>
+                ))}
+              </ol>
+            )}
 
-        {ticketPage !== undefined && (
-          <div className="mt-3">
-            {/* Story S-8c — the shared pager, same primitive the agent
+            {ticketPage !== undefined && (
+              <div className="mt-3">
+                {/* Story S-8c — the shared pager, same primitive the agent
                 workspace and this portal's own KB list use. Renders nothing
                 for a single page. */}
-            <Pagination
-              page={ticketPage.page}
-              totalPages={ticketPage.totalPages}
-              onPageChange={setPage}
-              disabled={ticketsQuery.isPlaceholderData}
-              label={tCommon("pagination.label")}
-              previousLabel={tCommon("pagination.previous")}
-              nextLabel={tCommon("pagination.next")}
-              indicator={tCommon("pagination.indicator", {
-                page: ticketPage.page,
-                totalPages: ticketPage.totalPages,
-              })}
-            />
-          </div>
-        )}
-      </Card>
+                <Pagination
+                  page={ticketPage.page}
+                  totalPages={ticketPage.totalPages}
+                  onPageChange={setPage}
+                  disabled={ticketsQuery.isPlaceholderData}
+                  label={tCommon("pagination.label")}
+                  previousLabel={tCommon("pagination.previous")}
+                  nextLabel={tCommon("pagination.next")}
+                  indicator={tCommon("pagination.indicator", {
+                    page: ticketPage.page,
+                    totalPages: ticketPage.totalPages,
+                  })}
+                />
+              </div>
+            )}
+          </section>
+        </Card>
+      </div>
     </section>
   );
 }
 
-function CreateTicketForm() {
+function CreateTicketForm({ className }: { className?: string }) {
   const t = useTranslations("tickets");
+  const router = useRouter();
+  const { locale } = useParams<{ locale: string }>();
   const errorMessage = useErrorMessage();
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState("");
@@ -278,13 +263,18 @@ function CreateTicketForm() {
     event.preventDefault();
     setError(null);
     try {
-      await mutation.mutateAsync({
+      const created = await mutation.mutateAsync({
         subject: subject.trim(),
         ...(category.trim() ? { category: category.trim() } : {}),
       });
       setSubject("");
       setCategory("");
       showSuccessToast(t("list.createSuccess"));
+      // Story 230 — straight on to the new ticket, where the conversation
+      // and attachments are; stay on the list if the response had no id.
+      if (created?.id) {
+        router.push(`/${locale}/tickets/${created.id}`);
+      }
     } catch (submitError) {
       setError(
         errorMessage(submitError, {
@@ -298,25 +288,24 @@ function CreateTicketForm() {
   // Story 229 — `#new-ticket` is where the home page's "Raise a ticket"
   // card lands.
   return (
-    <SectionCard id="new-ticket" className="scroll-mt-4" title={t("list.createHeading")}>
+    <SectionCard
+      id="new-ticket"
+      className={cn("scroll-mt-4", className)}
+      title={t("list.createHeading")}
+    >
+      {/* Story 230 — the shared FormField (comfortable density, a required
+          marker on the subject, a hint on the optional category). */}
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("list.createSubjectLabel")}
-          <Input
-            className="max-w-md"
-            value={subject}
-            onChange={(event) => setSubject(event.target.value)}
-            required
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("list.createCategoryLabel")}
-          <Input
-            className="max-w-md"
-            value={category}
-            onChange={(event) => setCategory(event.target.value)}
-          />
-        </label>
+        <FormField label={t("list.createSubjectLabel")} density="comfortable" required>
+          <Input value={subject} onChange={(event) => setSubject(event.target.value)} required />
+        </FormField>
+        <FormField
+          label={t("list.createCategoryLabel")}
+          density="comfortable"
+          hint={t("list.createCategoryHint")}
+        >
+          <Input value={category} onChange={(event) => setCategory(event.target.value)} />
+        </FormField>
         {error && <Alert variant="destructive">{error}</Alert>}
         {/* Story 157 — `lg` is this page's single primary action, which is
             what Story S-3 introduced the size for and left unapplied. */}
@@ -324,7 +313,7 @@ function CreateTicketForm() {
           type="submit"
           size="lg"
           disabled={mutation.isPending || !subject.trim()}
-          className="w-fit"
+          className="w-full sm:w-fit lg:w-full"
         >
           {mutation.isPending ? t("list.createSubmitting") : t("list.createSubmit")}
         </Button>

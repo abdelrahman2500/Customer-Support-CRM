@@ -556,4 +556,54 @@ describe("TicketDetailView", () => {
     // The skeleton's own visuals are unchanged.
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
   });
+  describe("Story 230 (PR-5.2) layout", () => {
+    it("carries the status spine along the header's top edge", () => {
+      vi.mocked(useMyTicketQuery).mockReturnValue(
+        queryResult({ data: { ...baseTicket, status: "RESOLVED" }, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const header = screen.getByRole("heading", { level: 1 }).closest(".border-t-\\[3px\\]");
+      expect(header).toHaveClass("border-t-success-solid");
+    });
+
+    it("tells a customer with a closed ticket how to get more help", () => {
+      vi.mocked(useMyTicketQuery).mockReturnValue(
+        queryResult({ data: { ...baseTicket, status: "CLOSED" }, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.closedTitle")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "detail.closedAction" })).toHaveAttribute(
+        "href",
+        "/en/tickets#new-ticket",
+      );
+    });
+
+    it("shows no closed hint while the ticket is still open", () => {
+      vi.mocked(useMyTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      expect(screen.queryByText("detail.closedTitle")).not.toBeInTheDocument();
+    });
+
+    it("asks for feedback before the conversation once the ticket is resolved", () => {
+      vi.mocked(useMyTicketQuery).mockReturnValue(
+        queryResult({ data: { ...baseTicket, status: "RESOLVED" }, isSuccess: true }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const feedback = screen.getByText("detail.csatHeading");
+      const conversation = screen.getByText("detail.chatHeading");
+      expect(
+        feedback.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+  });
 });

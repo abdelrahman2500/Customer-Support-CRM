@@ -137,7 +137,10 @@
       "filterAll": "كل الحالات",
       "clearFilters": "مسح عوامل التصفية",
       "noResults": "لا توجد تذاكر مطابقة لبحثك.",
-      "resultCount": "{count, plural, =0 {لا توجد تذاكر مطابقة} zero {# تذكرة مطابقة} one {تذكرة واحدة مطابقة} two {تذكرتان مطابقتان} few {# تذاكر مطابقة} many {# تذكرة مطابقة} other {# تذكرة مطابقة}}"
+      "resultCount": "{count, plural, =0 {لا توجد تذاكر مطابقة} zero {# تذكرة مطابقة} one {تذكرة واحدة مطابقة} two {تذكرتان مطابقتان} few {# تذاكر مطابقة} many {# تذكرة مطابقة} other {# تذكرة مطابقة}}",
+      "description": "افتح طلبًا جديدًا أو تابع الطلبات التي أرسلتها.",
+      "allHeading": "تذاكرك",
+      "createCategoryHint": "مثل الفوترة أو مشكلة تقنية."
     },
     "detail": {
       "notFound": "تعذّر العثور على هذه التذكرة.",
@@ -146,7 +149,7 @@
       "category": "الفئة",
       "status": "الحالة",
       "priority": "الأولوية",
-      "chatHeading": "الدردشة المباشرة",
+      "chatHeading": "المحادثة",
       "chatLoadError": "تعذّر تحميل هذه المحادثة.",
       "chatEmpty": "لا توجد رسائل حتى الآن.",
       "chatYouLabel": "أنت",
@@ -185,7 +188,16 @@
       "attachmentsError": "تعذّر تحميل المرفقات.",
       "attachmentsEmpty": "لا توجد مرفقات حتى الآن.",
       "attachmentsUploading": "جارٍ الرفع...",
-      "attachmentsUploadFailed": "تعذّر رفع الملف. حاول مرة أخرى."
+      "attachmentsUploadFailed": "تعذّر رفع الملف. حاول مرة أخرى.",
+      "chatNewMessages": "رسائل جديدة",
+      "chatComposerLabel": "رسالة إلى فريق الدعم",
+      "chatHint": "Enter للإرسال · Shift+Enter لسطر جديد",
+      "attachmentsAdd": "أضف ملفًا",
+      "attachmentsHint": "أفلت ملفًا هنا أو اختر واحدًا",
+      "opened": "تاريخ الفتح",
+      "closedTitle": "هذه التذكرة مغلقة",
+      "closedBody": "هل ما زلت بحاجة إلى مساعدة في هذا الأمر؟",
+      "closedAction": "افتح تذكرة جديدة"
     },
     "status": {
       "OPEN": "مفتوحة",
