@@ -461,7 +461,8 @@
         "moved": "Moved {subject} to {status}.",
         "cancelled": "Move cancelled.",
         "failed": "Couldn't move {subject}: {reason}"
-      }
+      },
+      "moveCollision": "This ticket was also changed by someone else; your move was applied."
     }
   },
   "customers": {

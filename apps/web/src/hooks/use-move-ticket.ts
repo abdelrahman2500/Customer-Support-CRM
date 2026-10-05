@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api";
-import { updateTicket, type TicketListItem, type TicketStatus } from "@/lib/tickets-api";
+import { getTicket, updateTicket, type TicketListItem, type TicketStatus } from "@/lib/tickets-api";
 import { ticketHistoryQueryKey, ticketQueryKey } from "@/hooks/use-tickets";
 import {
+  changedElsewhere,
   insertIntoPages,
   removeFromPages,
   type ColumnPages,
@@ -15,6 +16,8 @@ export interface MoveTicketInput {
 }
 
 const BOARD_KEY = ["tickets", "board"] as const;
+/** Story 218 — lets the board hold its refetches while a move is saving. */
+export const MOVE_TICKET_MUTATION_KEY = ["tickets", "move"] as const;
 
 /**
  * Story 217 (PR-3.2, tickets-kanban-ux.md §5 "Data flow") — moves a ticket
@@ -27,6 +30,12 @@ const BOARD_KEY = ["tickets", "board"] as const;
  *   is gone). The caller turns the error into copy and an announcement.
  * - `onSettled`: invalidates every ticket list (board, list view,
  *   dashboard) and the ticket itself, so the server's order wins.
+ *
+ * Story 218 (PR-3.3, §6 "Conflicts") — the API has no versioning, so the
+ * last write wins. Before the PATCH the ticket is read once: if its status,
+ * assignee or priority no longer match the card, someone else changed it
+ * since the board last refreshed, and the result says so (`collided`) for
+ * the caller's "your move was applied" notice.
  */
 export function useMoveTicketMutation() {
   const queryClient = useQueryClient();
@@ -38,7 +47,12 @@ export function useMoveTicketMutation() {
   };
 
   return useMutation({
-    mutationFn: ({ ticket, to }: MoveTicketInput) => updateTicket(ticket.id, { status: to }),
+    mutationKey: MOVE_TICKET_MUTATION_KEY,
+    mutationFn: async ({ ticket, to }: MoveTicketInput) => {
+      const current = await getTicket(ticket.id);
+      await updateTicket(ticket.id, { status: to });
+      return { collided: changedElsewhere(ticket, current) };
+    },
     onMutate: async ({ ticket, to }) => {
       await queryClient.cancelQueries({ queryKey: BOARD_KEY });
       const snapshots = queryClient.getQueriesData<ColumnPages>({ queryKey: BOARD_KEY });

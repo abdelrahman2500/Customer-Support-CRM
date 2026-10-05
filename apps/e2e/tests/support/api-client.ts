@@ -160,3 +160,27 @@ export async function createPortalContactWithTicketAsAdmin(
   });
   return { customerId, contactId, ticketId: ticket.id };
 }
+
+/** Story 218 (PR-3.3) — reads a ticket's status as the admin, so a board
+ * move is verified against the API rather than only the screen. */
+export async function getTicketStatusAsAdmin(
+  adminToken: string,
+  ticketId: string,
+): Promise<string> {
+  const ticket = await apiFetch<{ status: string }>(`/tickets/${ticketId}`, { token: adminToken });
+  return ticket.status;
+}
+
+/** Story 218 (PR-3.3) — "another agent" changes a ticket's status behind
+ * the board's back (the collision and freshness cases). */
+export async function setTicketStatusAsAdmin(
+  adminToken: string,
+  ticketId: string,
+  status: string,
+): Promise<void> {
+  await apiFetch(`/tickets/${ticketId}`, {
+    method: "PATCH",
+    token: adminToken,
+    body: JSON.stringify({ status }),
+  });
+}

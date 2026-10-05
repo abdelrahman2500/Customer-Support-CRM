@@ -461,7 +461,8 @@
         "moved": "تم نقل {subject} إلى {status}.",
         "cancelled": "تم إلغاء النقل.",
         "failed": "تعذر نقل {subject}: {reason}"
-      }
+      },
+      "moveCollision": "غيّر شخص آخر هذه التذكرة أيضًا؛ تم تطبيق النقل الذي أجريته."
     }
   },
   "customers": {

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  changedElsewhere,
+  changedSince,
   columnCoordinates,
+  snapshotOf,
   compareForSort,
   insertIntoPages,
   needsConfirmation,
@@ -137,6 +140,42 @@ describe("board moves", () => {
 
     it("ignores other keys (no pixel nudging inside a column)", () => {
       expect(columnCoordinates(key("ArrowDown"), args(140))).toBeUndefined();
+    });
+  });
+
+  describe("change cues (Story 218)", () => {
+    const at = (iso: string) => new Date(iso).getTime();
+    const before = [
+      ticket("a", { updatedAt: "2026-10-05T10:00:00Z", assignedToUserId: "u1" }),
+      ticket("b", { updatedAt: "2026-10-05T10:05:00Z" }),
+    ];
+    const previous = snapshotOf(before, at("2026-10-05T10:06:00Z"));
+
+    it("cues cards that arrived or were re-assigned / re-prioritised after the last fetch", () => {
+      const after = [
+        ticket("a", { updatedAt: "2026-10-05T10:07:00Z", assignedToUserId: "u2" }),
+        ticket("b", { updatedAt: "2026-10-05T10:05:00Z" }),
+        ticket("new", { updatedAt: "2026-10-05T10:07:30Z" }),
+        ticket("prio", { updatedAt: "2026-10-05T10:01:00Z" }),
+      ];
+      expect(changedSince(previous, after, new Set())).toEqual(["a", "new"]);
+    });
+
+    it("ignores a new message (same fields), the agent's own moves and older cards sliding in", () => {
+      const after = [
+        ticket("a", { updatedAt: "2026-10-05T10:08:00Z", assignedToUserId: "u1" }),
+        ticket("mine", { updatedAt: "2026-10-05T10:08:00Z" }),
+        ticket("old", { updatedAt: "2026-10-05T08:00:00Z" }),
+      ];
+      expect(changedSince(previous, after, new Set(["mine"]))).toEqual([]);
+    });
+
+    it("detects a collision from status, assignee or priority", () => {
+      const shown = ticket("a", { assignedToUserId: "u1" });
+      expect(changedElsewhere(shown, shown)).toBe(false);
+      expect(changedElsewhere(shown, { ...shown, status: "RESOLVED" })).toBe(true);
+      expect(changedElsewhere(shown, { ...shown, assignedToUserId: "u2" })).toBe(true);
+      expect(changedElsewhere(shown, { ...shown, priority: "URGENT" })).toBe(true);
     });
   });
 });

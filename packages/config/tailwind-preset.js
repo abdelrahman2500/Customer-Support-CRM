@@ -268,6 +268,12 @@ const sharedThemeExtend = {
     // -100% in RTL, set by the Sheet), so one keyframe serves both directions.
     "sheet-in": { from: { translate: "var(--sheet-from) 0" }, to: { translate: "0 0" } },
     "sheet-out": { from: { translate: "0 0" }, to: { translate: "var(--sheet-from) 0" } },
+    // Story 218 (PR-3.3) — the change cue: a board card someone else just
+    // changed pulses an accent ring once (reduced motion: a static ring).
+    "change-cue": {
+      "0%, 30%": { boxShadow: "0 0 0 3px rgb(var(--accent) / 0.55)" },
+      "100%": { boxShadow: "0 0 0 0 rgb(var(--accent) / 0)" },
+    },
   },
   animation: {
     "fade-in": "fade-in var(--duration-base) var(--ease-standard)",
@@ -276,6 +282,7 @@ const sharedThemeExtend = {
     "zoom-out": "zoom-out var(--duration-fast) var(--ease-standard)",
     "sheet-in": "sheet-in var(--duration-slow) var(--ease-standard)",
     "sheet-out": "sheet-out var(--duration-base) var(--ease-standard)",
+    "change-cue": "change-cue 2.4s var(--ease-standard)",
   },
 };
 

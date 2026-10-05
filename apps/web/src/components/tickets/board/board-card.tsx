@@ -30,6 +30,8 @@ export interface BoardCardProps {
   draggable: boolean;
   /** The status this card waits to be confirmed into (Resolved/Closed), if any. */
   confirming: TicketStatus | null;
+  /** Story 218 — someone else just changed this card (a brief accent pulse). */
+  changed?: boolean;
   /** True once, after a keyboard or menu move landed this card here. */
   focusRequested: boolean;
   onMoveRequest: (ticket: TicketListItem, to: TicketStatus) => void;
@@ -60,6 +62,7 @@ export const BoardCard = memo(function BoardCard({
   draggable,
   confirming,
   focusRequested,
+  changed = false,
   onMoveRequest,
   onConfirm,
   onCancel,
@@ -157,6 +160,7 @@ export const BoardCard = memo(function BoardCard({
         <div
           ref={setNodeRef}
           {...(draggable ? pointerListeners : {})}
+          data-changed={changed || undefined}
           className="touch-manipulation"
         >
           <TicketCard
@@ -167,6 +171,9 @@ export const BoardCard = memo(function BoardCard({
             className={cn(
               isDragging &&
                 "border-dashed border-rule-strong bg-surface-muted opacity-50 shadow-none",
+              // With reduced motion only the colour remains (§6).
+              changed &&
+                "motion-safe:animate-change-cue motion-reduce:ring-2 motion-reduce:ring-accent/50",
             )}
           />
         </div>

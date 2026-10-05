@@ -110,3 +110,67 @@ export const columnCoordinates: KeyboardCoordinateGetter = (
   }
   return best ? { x: best.center - halfWidth, y: currentCoordinates.y } : currentCoordinates;
 };
+
+/** What a column remembers about the cards it last showed. */
+export interface ColumnSnapshot {
+  /** id → the fields whose change is worth a cue. */
+  cards: Map<string, { assignee: string | null; priority: string }>;
+  /** The newest `updatedAt` among them (server clock). */
+  newestUpdate: number;
+  /** When the snapshot was taken (client clock). */
+  takenAt: number;
+}
+
+export function snapshotOf(items: TicketListItem[], takenAt: number): ColumnSnapshot {
+  const cards = new Map<string, { assignee: string | null; priority: string }>();
+  let newestUpdate = 0;
+  for (const item of items) {
+    cards.set(item.id, { assignee: item.assignedToUserId ?? null, priority: item.priority });
+    newestUpdate = Math.max(newestUpdate, new Date(item.updatedAt).getTime());
+  }
+  return { cards, newestUpdate, takenAt };
+}
+
+/** Tolerated difference between the server's and the browser's clocks. */
+const CLOCK_SKEW_MS = 60_000;
+
+/**
+ * Story 218 (PR-3.3, tickets-kanban-ux.md §6) — which cards a refetch shows
+ * as changed by someone else: a card that arrived in this column (a new
+ * ticket, or another agent's status change) or whose assignee or priority
+ * changed. Only cards updated after the previous snapshot count — so a new
+ * message (same fields), "Show more" or an older card sliding up into the
+ * loaded window never pulses — and the agent's own moves are excluded.
+ */
+export function changedSince(
+  previous: ColumnSnapshot,
+  items: TicketListItem[],
+  ownMoves: ReadonlySet<string>,
+): string[] {
+  const changed: string[] = [];
+  for (const item of items) {
+    if (ownMoves.has(item.id)) continue;
+    const updated = new Date(item.updatedAt).getTime();
+    if (updated <= previous.newestUpdate || updated < previous.takenAt - CLOCK_SKEW_MS) continue;
+    const before = previous.cards.get(item.id);
+    if (
+      !before ||
+      before.assignee !== (item.assignedToUserId ?? null) ||
+      before.priority !== item.priority
+    ) {
+      changed.push(item.id);
+    }
+  }
+  return changed;
+}
+
+/** True when the server's copy differs from what the card showed (a collision). */
+export function changedElsewhere(shown: TicketListItem, current: TicketSummaryLike): boolean {
+  return (
+    current.status !== shown.status ||
+    (current.assignedToUserId ?? null) !== (shown.assignedToUserId ?? null) ||
+    current.priority !== shown.priority
+  );
+}
+
+type TicketSummaryLike = Pick<TicketListItem, "status" | "assignedToUserId" | "priority">;

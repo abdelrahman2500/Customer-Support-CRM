@@ -90,6 +90,9 @@ const collisionDetection: CollisionDetection = (args) => {
 
 type MoveVia = "pointer" | "keyboard" | "menu";
 
+/** How long a card the agent moved counts as their own change. */
+const OWN_MOVE_MS = 45_000;
+
 const SILENT_ANNOUNCEMENTS = {
   onDragStart: () => undefined,
   onDragMove: () => undefined,
@@ -215,12 +218,21 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
           generic: t("moveErrors.generic"),
         });
 
+  // Story 218 — the agent's own recent moves never get the change cue.
+  const ownMoves = useRef(new Set<string>()).current;
+
   const performMove = (ticket: TicketListItem, to: TicketStatus, via: MoveVia) => {
     const status = labels.status(to);
+    ownMoves.add(ticket.id);
+    window.setTimeout(() => ownMoves.delete(ticket.id), OWN_MOVE_MS);
     moveMutation.mutate(
       { ticket, to },
       {
-        onSuccess: () => announce(t("announce.moved", { subject: ticket.subject, status })),
+        onSuccess: (result) => {
+          announce(t("announce.moved", { subject: ticket.subject, status }));
+          // Last write wins (§6 "Conflicts"): say so when it overrode a change.
+          if (result?.collided) showToast(t("moveCollision"), { tone: "info" });
+        },
         onError: (error) => {
           const reason = moveFailureReason(error);
           setFocusRequest(null);
@@ -276,8 +288,13 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
   }
   function onDragOver(event: DragOverEvent) {
     const over = (event.over?.id as TicketStatus | undefined) ?? null;
+    const previous = overStatus;
     setOverStatus(over);
-    const subject = (event.active.data.current?.ticket as TicketListItem | undefined)?.subject;
+    const ticket = event.active.data.current?.ticket as TicketListItem | undefined;
+    const subject = ticket?.subject;
+    // The first "over" is the card's own column, right after pick-up: saying
+    // it would cut off the "Picked up…" instructions.
+    if (previous === null && over === ticket?.status) return;
     if (subject) {
       announce(
         over
@@ -304,8 +321,9 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
     announce(t("announce.cancelled"));
   }
 
-  const renderCard = (ticket: TicketListItem) => (
+  const renderCard = (ticket: TicketListItem, changed: boolean) => (
     <BoardCard
+      changed={changed}
       ticket={ticket}
       locale={locale}
       assigneeName={assigneeNameOf(ticket)}
@@ -385,6 +403,7 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
   );
 
   const everythingEmpty = known && grandTotal === 0;
+  const filteredEmpty = everythingEmpty && filterCount > 0;
 
   return (
     <section className="flex flex-col gap-section">
@@ -435,7 +454,10 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
         />
       </ListToolbar>
 
-      {everythingEmpty && filterCount > 0 ? (
+      {/* Story 218 — the columns stay mounted (hidden) under the empty state:
+          their queries keep refreshing, so a refetch that briefly reads 0
+          everywhere can never strand the board on "no tickets". */}
+      {filteredEmpty && (
         <EmptyState
           icon={<TicketsIcon className="h-5 w-5" />}
           title={t("filteredEmpty")}
@@ -450,72 +472,76 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
             </Button>
           }
         />
-      ) : (
-        <>
-          {!desktop && (
-            <SegmentedControl
-              aria-label={t("columnSwitcher")}
-              dir={dir}
-              size="sm"
-              fill
-              className="sticky top-0 z-10"
-              options={BOARD_STATUSES.map((status) => ({
-                value: status,
-                label: labels.status(status),
-                count: reports[status]?.total,
-                dot: statusSpine(status).dot,
-              }))}
-              value={mobileStatus}
-              onValueChange={(value) => setMobileStatus(value as TicketStatus)}
-            />
-          )}
-          <DndContext
-            sensors={sensors}
-            collisionDetection={collisionDetection}
-            onDragStart={onDragStart}
-            onDragOver={onDragOver}
-            onDragEnd={onDragEnd}
-            onDragCancel={onDragCancel}
-            accessibility={{
-              screenReaderInstructions: { draggable: t("announce.instructions") },
-              // dnd-kit's own region is assertive; the spec asks for polite,
-              // so every drag message goes through the board's region below.
-              announcements: SILENT_ANNOUNCEMENTS,
-            }}
-          >
-            <Board
-              aria-label={t("boardLabel")}
-              className="md:h-[calc(100dvh-17rem)] md:min-h-[28rem]"
-            >
-              {BOARD_STATUSES.map((status) => (
-                <TicketBoardColumn
-                  key={status}
-                  status={status}
-                  filters={filters}
-                  collapsed={desktop && status === "CLOSED" && closedCollapsed}
-                  onToggleCollapsed={status === "CLOSED" && desktop ? toggleClosed : undefined}
-                  renderCard={renderCard}
-                  onReport={onReport}
-                  hiddenBelowMd={!desktop && status !== mobileStatus}
-                  fullWidth={!desktop}
-                  countDelta={countDeltaOf(status)}
-                  dragSource={dragging?.status ?? null}
-                />
-              ))}
-            </Board>
-            <DragOverlay dropAnimation={reducedMotion ? null : undefined}>
-              {dragging && (
-                <TicketCard
-                  ticket={dragging}
-                  locale={locale}
-                  assigneeName={assigneeNameOf(dragging)}
-                  className="cursor-grabbing shadow-overlay motion-safe:scale-[1.02]"
-                />
-              )}
-            </DragOverlay>
-          </DndContext>
-        </>
       )}
+      <div
+        hidden={filteredEmpty}
+        className={filteredEmpty ? "hidden" : "flex flex-col gap-section"}
+      >
+        {!desktop && (
+          <SegmentedControl
+            aria-label={t("columnSwitcher")}
+            dir={dir}
+            size="sm"
+            fill
+            className="sticky top-0 z-10"
+            options={BOARD_STATUSES.map((status) => ({
+              value: status,
+              label: labels.status(status),
+              count: reports[status]?.total,
+              dot: statusSpine(status).dot,
+            }))}
+            value={mobileStatus}
+            onValueChange={(value) => setMobileStatus(value as TicketStatus)}
+          />
+        )}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={collisionDetection}
+          onDragStart={onDragStart}
+          onDragOver={onDragOver}
+          onDragEnd={onDragEnd}
+          onDragCancel={onDragCancel}
+          accessibility={{
+            screenReaderInstructions: { draggable: t("announce.instructions") },
+            // dnd-kit's own region is assertive; the spec asks for polite,
+            // so every drag message goes through the board's region below.
+            announcements: SILENT_ANNOUNCEMENTS,
+          }}
+        >
+          <Board
+            aria-label={t("boardLabel")}
+            className="md:h-[calc(100dvh-17rem)] md:min-h-[28rem]"
+          >
+            {BOARD_STATUSES.map((status) => (
+              <TicketBoardColumn
+                key={status}
+                status={status}
+                filters={filters}
+                collapsed={desktop && status === "CLOSED" && closedCollapsed}
+                onToggleCollapsed={status === "CLOSED" && desktop ? toggleClosed : undefined}
+                renderCard={renderCard}
+                onReport={onReport}
+                hiddenBelowMd={!desktop && status !== mobileStatus}
+                fullWidth={!desktop}
+                countDelta={countDeltaOf(status)}
+                dragSource={dragging?.status ?? null}
+                paused={dragging !== null}
+                ownMoves={ownMoves}
+              />
+            ))}
+          </Board>
+          <DragOverlay dropAnimation={reducedMotion ? null : undefined}>
+            {dragging && (
+              <TicketCard
+                ticket={dragging}
+                locale={locale}
+                assigneeName={assigneeNameOf(dragging)}
+                className="cursor-grabbing shadow-overlay motion-safe:scale-[1.02]"
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
+      </div>
       {/* Always mounted, so the first message lands in an existing region. */}
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         <span key={announcement.key}>{announcement.text}</span>

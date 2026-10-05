@@ -3,13 +3,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useMoveTicketMutation } from "./use-move-ticket";
-import { updateTicket, type TicketListItem } from "@/lib/tickets-api";
+import { getTicket, updateTicket, type TicketListItem } from "@/lib/tickets-api";
 import { ApiError } from "@/lib/api";
 import type { ColumnPages } from "@/components/tickets/board/board-moves";
 
 vi.mock("@/lib/tickets-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tickets-api")>()),
   updateTicket: vi.fn(),
+  getTicket: vi.fn(),
 }));
 
 /** Story 217 (PR-3.2, tickets-kanban-ux.md §5 "Data flow") — optimistic moves. */
@@ -43,12 +44,30 @@ const totalOf = (key: unknown[]) => client.getQueryData<ColumnPages>(key)!.pages
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // By default the server still has what the card showed: no collision.
+  vi.mocked(getTicket).mockImplementation(async (id) =>
+    card(id, id === "c" ? "IN_PROGRESS" : "OPEN"),
+  );
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   client.setQueryData(openKey, column([card("a", "OPEN"), card("b", "OPEN")], 2));
   client.setQueryData(progressKey, column([card("c", "IN_PROGRESS")], 1));
 });
 
 describe("useMoveTicketMutation", () => {
+  it("reports a collision when someone else changed the ticket since the board loaded (Story 218)", async () => {
+    vi.mocked(updateTicket).mockResolvedValue({ id: "a" });
+    const { result } = renderHook(() => useMoveTicketMutation(), { wrapper });
+    act(() => result.current.mutate({ ticket: card("a", "OPEN"), to: "IN_PROGRESS" }));
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual({ collided: false });
+
+    vi.mocked(getTicket).mockResolvedValue({ ...card("a", "RESOLVED") });
+    act(() => result.current.mutate({ ticket: card("a", "OPEN"), to: "IN_PROGRESS" }));
+    await waitFor(() => expect(result.current.data).toEqual({ collided: true }));
+    // Last write wins: the move is still sent.
+    expect(updateTicket).toHaveBeenLastCalledWith("a", { status: "IN_PROGRESS" });
+  });
+
   it("moves the card between the cached columns at once and sends the status PATCH", async () => {
     let resolve!: (value: { id: string }) => void;
     vi.mocked(updateTicket).mockReturnValue(new Promise((r) => (resolve = r)));

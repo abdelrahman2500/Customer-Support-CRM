@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { useDroppable } from "@dnd-kit/core";
 import { ticketStatusPresentation } from "@crm/shared";
@@ -10,6 +10,11 @@ import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useTicketBoardColumnQuery } from "@/hooks/use-ticket-board";
 import { TICKET_ICON } from "@/components/tickets/ticket-badges";
 import { isAtRiskTicket, statusSpine, type BoardFilters } from "./board-state";
+import { changedSince, snapshotOf, type ColumnSnapshot } from "./board-moves";
+
+/** How long a changed card keeps its cue. */
+const CUE_MS = 2400;
+const NO_CUES: ReadonlySet<string> = new Set();
 
 /** What a column reports up to the board (for the summary and switcher). */
 export interface ColumnReport {
@@ -30,6 +35,12 @@ export interface ColumnReport {
  * Story 217 (PR-3.2) — every column, folded or not, is a drop target: while
  * a card from another column is over it, it takes an accent ring and a
  * soft tint, and both counts preview the move (`countDelta`).
+ *
+ * Story 218 (PR-3.3, §6) — after each fetch the column compares the cards
+ * with the previous fetch: a card someone else moved here, created, assigned
+ * or re-prioritised gets the change cue for a moment (not the agent's own
+ * moves, not "Show more", not a filter change). Refetching is held while a
+ * card is being dragged (`paused`).
  */
 export function TicketBoardColumn({
   status,
@@ -42,12 +53,14 @@ export function TicketBoardColumn({
   fullWidth = false,
   countDelta = 0,
   dragSource = null,
+  paused = false,
+  ownMoves,
 }: {
   status: TicketStatus;
   filters: BoardFilters;
   collapsed: boolean;
   onToggleCollapsed?: () => void;
-  renderCard: (ticket: TicketListItem) => ReactNode;
+  renderCard: (ticket: TicketListItem, changed: boolean) => ReactNode;
   onReport: (report: ColumnReport) => void;
   /** Below md only one column shows (the switcher's choice). */
   hiddenBelowMd: boolean;
@@ -57,11 +70,15 @@ export function TicketBoardColumn({
   countDelta?: number;
   /** The status the card being dragged comes from, while a drag is active. */
   dragSource?: TicketStatus | null;
+  /** True while a drag is in progress: no refetch underneath it. */
+  paused?: boolean;
+  /** Tickets this agent just moved (no cue for their own changes). */
+  ownMoves: ReadonlySet<string>;
 }) {
   const t = useTranslations("tickets.board");
   const tCommon = useTranslations("common");
   const labels = useTicketLabels();
-  const query = useTicketBoardColumnQuery(status, filters);
+  const query = useTicketBoardColumnQuery(status, filters, { paused });
   const spine = statusSpine(status);
   const Icon = TICKET_ICON[ticketStatusPresentation(status).icon];
   const statusLabel = labels.status(status);
@@ -73,6 +90,27 @@ export function TicketBoardColumn({
     () => (filters.risk ? loaded.filter((ticket) => isAtRiskTicket(ticket)) : loaded),
     [filters.risk, loaded],
   );
+  // --- Change cues (Story 218) ---------------------------------------------
+  // The server-side filters (not the client "at risk" scope) define the data.
+  const queryKey = JSON.stringify({ ...filters, risk: undefined });
+  const pageCount = query.data?.pages.length ?? 0;
+  const snapshot = useRef<{ key: string; pages: number; value: ColumnSnapshot } | null>(null);
+  const [cued, setCued] = useState<ReadonlySet<string>>(NO_CUES);
+  useEffect(() => {
+    if (!query.data) return;
+    const previous = snapshot.current;
+    if (previous && previous.key === queryKey && previous.pages === pageCount) {
+      const changed = changedSince(previous.value, loaded, ownMoves);
+      if (changed.length > 0) setCued(new Set(changed));
+    }
+    snapshot.current = { key: queryKey, pages: pageCount, value: snapshotOf(loaded, Date.now()) };
+  }, [loaded, query.data, queryKey, pageCount, ownMoves]);
+  useEffect(() => {
+    if (cued.size === 0) return;
+    const timer = window.setTimeout(() => setCued(NO_CUES), CUE_MS);
+    return () => window.clearTimeout(timer);
+  }, [cued]);
+
   const total = query.data?.pages[0]?.total;
   const count = filters.risk ? tickets.length : total;
   const shownCount = count === undefined ? undefined : Math.max(0, count + countDelta);
@@ -174,7 +212,7 @@ export function TicketBoardColumn({
       ) : (
         <ol className="flex flex-col gap-2">
           {tickets.map((ticket) => (
-            <li key={ticket.id}>{renderCard(ticket)}</li>
+            <li key={ticket.id}>{renderCard(ticket, cued.has(ticket.id))}</li>
           ))}
         </ol>
       )}

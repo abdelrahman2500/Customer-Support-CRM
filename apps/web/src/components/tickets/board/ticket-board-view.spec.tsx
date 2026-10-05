@@ -6,6 +6,7 @@ import { useTicketBoardColumnQuery } from "@/hooks/use-ticket-board";
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
+import { useToastStore } from "@crm/ui";
 
 const replace = vi.fn();
 let searchParamsString = "";
@@ -348,5 +349,45 @@ describe("TicketBoardView moves", () => {
     expect(
       within(switcher).getByRole("radio", { name: /ticketStatus\.IN_PROGRESS/ }),
     ).toBeChecked();
+  });
+});
+
+/** Story 218 (PR-3.3, tickets-kanban-ux.md §6) — freshness cues and collisions. */
+describe("TicketBoardView freshness", () => {
+  it("cues a card someone else moved in once a refresh shows it, never on first load", () => {
+    const { rerender } = render(<TicketBoardView />);
+    expect(document.querySelector("[data-changed]")).toBeNull();
+
+    const elsewhere = {
+      ...card("t8", "IN_PROGRESS", "Moved by a colleague"),
+      updatedAt: new Date().toISOString(),
+    } as TicketListItem;
+    columns.IN_PROGRESS = {
+      items: [...columns.IN_PROGRESS!.items!, elsewhere],
+      total: 32,
+    };
+    mockColumns();
+    rerender(<TicketBoardView />);
+
+    const changed = document.querySelectorAll("[data-changed]");
+    expect(changed).toHaveLength(1);
+    expect(changed[0]).toHaveTextContent("Moved by a colleague");
+  });
+
+  it("says so when the agent's move overrode someone else's change", async () => {
+    useToastStore.setState({ toasts: [] });
+    const user = userEvent.setup();
+    render(<TicketBoardView />);
+    await user.click(
+      screen.getByRole("button", {
+        name: `cardActions:${JSON.stringify({ subject: "Invoice shows the old price" })}`,
+      }),
+    );
+    await user.click(screen.getByRole("menuitem", { name: "ticketStatus.IN_PROGRESS" }));
+    const [, options] = mutate.mock.calls[0]!;
+    options.onSuccess({ collided: true });
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toContain(
+      "moveCollision",
+    );
   });
 });
