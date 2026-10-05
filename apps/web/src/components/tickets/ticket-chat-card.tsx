@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -19,6 +19,7 @@ import {
   useUsersQuery,
 } from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
+import { useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { historyEventKey } from "@/lib/history-event";
 import { localeDirection } from "@/i18n/direction";
@@ -34,10 +35,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@crm/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import {
   Avatar,
+  Combobox,
   Composer,
+  FileDropzone,
   HistoryEventIcon,
   InternalNoteIcon,
   Kbd,
@@ -114,7 +116,14 @@ type TimelineEntry = MessageThreadItem & { kind: TimelineKind };
  * Story 207 (RD-3.7) — one composer below it, in Reply or Internal note
  * mode (`TicketComposer`).
  */
-export function TicketChatCard({ ticketId }: { ticketId: string }) {
+export function TicketChatCard({
+  ticketId,
+  replyInsertion,
+}: {
+  ticketId: string;
+  /** Story 208 — text to put into the reply draft (e.g. an AI suggestion). */
+  replyInsertion?: ReplyInsertion | null;
+}) {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
@@ -352,7 +361,7 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
         })}
       </Tabs>
 
-      <TicketComposer ticketId={ticketId} />
+      <TicketComposer ticketId={ticketId} replyInsertion={replyInsertion} />
     </SectionCard>
   );
 }
@@ -395,6 +404,20 @@ function TimelineEvent({
 }
 
 type ComposerMode = "reply" | "note";
+
+/** Story 208 — a request to insert text into the reply draft; a new `id`
+ * is a new request, so the same text can be inserted twice. */
+export interface ReplyInsertion {
+  text: string;
+  id: number;
+}
+
+/** Story 91's rule, shared by quick replies and inserted text: fill an empty
+ * draft, else append after a blank line — never discard what was typed. */
+function appendToDraft(current: string, text: string): string {
+  return current.trim() ? `${current}\n\n${text}` : text;
+}
+
 const COMPOSER_MODES: ComposerMode[] = ["reply", "note"];
 
 /** Story 207 — where a mode's unsent draft lives for the session. */
@@ -474,16 +497,35 @@ function useDraft(ticketId: string, mode: ComposerMode) {
  * the backend's `parseMentions` matches against. The suggestions are now a
  * listbox driven from the keyboard (A11Y-05).
  */
-function TicketComposer({ ticketId }: { ticketId: string }) {
+function TicketComposer({
+  ticketId,
+  replyInsertion,
+}: {
+  ticketId: string;
+  replyInsertion?: ReplyInsertion | null;
+}) {
   const t = useTranslations("tickets");
   const { locale } = useParams<{ locale: string }>();
   const errorMessage = useErrorMessage();
   const [mode, setMode] = useState<ComposerMode>("reply");
+  const replyFieldRef = useRef<HTMLTextAreaElement | null>(null);
+  // Story 208 — focus owed to the reply field after an insertion. Switching
+  // from Internal note mounts the Reply panel a render later, so the field
+  // takes the focus when it attaches (the ref callback) or, if it is
+  // already there, right away (the effect).
+  const pendingReplyFocus = useRef(false);
+  const [insertions, setInsertions] = useState(0);
+  const attachReplyField = useCallback((field: HTMLTextAreaElement | null) => {
+    replyFieldRef.current = field;
+    if (field && pendingReplyFocus.current) {
+      pendingReplyFocus.current = false;
+      field.focus();
+    }
+  }, []);
 
   // Reply mode.
   const [replyBody, setReplyBody] = useDraft(ticketId, "reply");
   const [replyError, setReplyError] = useState<string | null>(null);
-  const [selectedQuickReplyId, setSelectedQuickReplyId] = useState("");
   const [sendAsEmail, setSendAsEmail] = useState(false);
   const mutation = useCreateTicketMessageMutation(ticketId);
   const emailMutation = useCreateTicketEmailMessageMutation(ticketId);
@@ -491,6 +533,12 @@ function TicketComposer({ ticketId }: { ticketId: string }) {
   const quickRepliesQuery = useQuickRepliesQuery();
   const activeQuickReplies = (quickRepliesQuery.data ?? []).filter((reply) => reply.isActive);
   const activeMutation = sendAsEmail ? emailMutation : mutation;
+  // Story 208 — attach from the composer: the ticket's own attachments
+  // (same hook and cache as the Attachments card, which refreshes).
+  const uploadMutation = useUploadAttachmentMutation({ type: "ticket", id: ticketId });
+  const [attachStatus, setAttachStatus] = useState<
+    { kind: "done"; filename: string } | { kind: "error"; message: string } | null
+  >(null);
 
   // Note mode.
   const [noteBody, setNoteBody] = useDraft(ticketId, "note");
@@ -520,13 +568,45 @@ function TicketComposer({ ticketId }: { ticketId: string }) {
 
   function insertQuickReply(quickReplyId: string): void {
     const quickReply = activeQuickReplies.find((reply) => reply.id === quickReplyId);
-    setSelectedQuickReplyId("");
     if (!quickReply) {
       return;
     }
-    setReplyBody((current) =>
-      current.trim() ? `${current}\n\n${quickReply.body}` : quickReply.body,
-    );
+    setReplyBody((current) => appendToDraft(current, quickReply.body));
+  }
+
+  // Story 208 (RD-3.8, recon TW-06) — inserted text (an AI-suggested reply)
+  // lands in the reply draft by the same rule, in Reply mode, with the
+  // field focused so the agent can review it. It is never sent from here.
+  useEffect(() => {
+    if (!replyInsertion) return;
+    setMode("reply");
+    setReplyBody((current) => appendToDraft(current, replyInsertion.text));
+    pendingReplyFocus.current = true;
+    setInsertions((count) => count + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one run per request id.
+  }, [replyInsertion?.id]);
+
+  useEffect(() => {
+    if (insertions > 0 && pendingReplyFocus.current && replyFieldRef.current) {
+      pendingReplyFocus.current = false;
+      replyFieldRef.current.focus();
+    }
+  }, [insertions]);
+
+  async function attach(file: File): Promise<void> {
+    setAttachStatus(null);
+    try {
+      await uploadMutation.mutateAsync(file);
+      setAttachStatus({ kind: "done", filename: file.name });
+    } catch (uploadError) {
+      setAttachStatus({
+        kind: "error",
+        message: errorMessage(uploadError, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.attachmentsUploadFailed"),
+        }),
+      });
+    }
   }
 
   const mentionQuery = useMemo(() => {
@@ -604,6 +684,7 @@ function TicketComposer({ ticketId }: { ticketId: string }) {
           <Composer
             label={t("detail.composerReplyLabel")}
             placeholder={t("detail.chatPlaceholder")}
+            textareaRef={attachReplyField}
             rows={2}
             value={replyBody}
             onValueChange={setReplyBody}
@@ -613,23 +694,44 @@ function TicketComposer({ ticketId }: { ticketId: string }) {
             submitLabel={activeMutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
             hint={hint}
             toolbar={
-              activeQuickReplies.length > 0 && (
-                <Select value={selectedQuickReplyId} onValueChange={insertQuickReply}>
-                  <SelectTrigger
-                    className="w-full sm:w-64"
-                    aria-label={t("detail.quickReplyPlaceholder")}
-                  >
-                    <SelectValue placeholder={t("detail.quickReplyPlaceholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeQuickReplies.map((reply) => (
-                      <SelectItem key={reply.id} value={reply.id}>
-                        {reply.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )
+              // Story 208 (RD-3.8) — the reply tools. Attach is offered in
+              // Reply mode only: ticket attachments reach the customer, so
+              // they never sit under "Internal note".
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeQuickReplies.length > 0 && (
+                    <Combobox
+                      className="w-full sm:w-64"
+                      aria-label={t("detail.quickReplyPlaceholder")}
+                      placeholder={t("detail.quickReplyPlaceholder")}
+                      searchLabel={t("detail.quickReplySearch")}
+                      emptyText={t("detail.quickReplyNoMatch")}
+                      value=""
+                      options={activeQuickReplies.map((reply) => ({
+                        value: reply.id,
+                        label: reply.title,
+                      }))}
+                      onValueChange={insertQuickReply}
+                    />
+                  )}
+                  <FileDropzone
+                    variant="button"
+                    label={t("detail.composerAttach")}
+                    disabled={uploadMutation.isPending}
+                    onFile={(file) => void attach(file)}
+                  />
+                </div>
+                <p role="status" className="text-caption text-ink-subtle empty:hidden">
+                  {uploadMutation.isPending
+                    ? t("detail.attachmentsUploading")
+                    : attachStatus?.kind === "done"
+                      ? t("detail.composerAttached", { filename: attachStatus.filename })
+                      : null}
+                </p>
+                {attachStatus?.kind === "error" && (
+                  <Alert variant="destructive">{attachStatus.message}</Alert>
+                )}
+              </div>
             }
             footer={
               emailStatusQuery.data?.configured && (

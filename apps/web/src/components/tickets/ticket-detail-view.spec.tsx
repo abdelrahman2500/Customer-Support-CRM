@@ -1844,7 +1844,10 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
       const file = new File(["hello"], "notes.txt", { type: "text/plain" });
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      // Story 208 (RD-3.8) — the composer has a file input too (earlier in the
+      // DOM); this case is about the Attachments card, so it takes the card's
+      // input by its name.
+      const input = screen.getByLabelText("detail.attachmentsUploadLabel");
       fireEvent.change(input, { target: { files: [file] } });
 
       await vi.waitFor(() => {
@@ -1863,7 +1866,10 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
       const file = new File(["hello"], "script.sh", { type: "application/x-sh" });
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      // Story 208 (RD-3.8) — the composer has a file input too (earlier in the
+      // DOM); this case is about the Attachments card, so it takes the card's
+      // input by its name.
+      const input = screen.getByLabelText("detail.attachmentsUploadLabel");
       fireEvent.change(input, { target: { files: [file] } });
 
       await screen.findByText("File type not allowed");
@@ -2191,6 +2197,49 @@ describe("TicketDetailView", () => {
 
       expect(screen.getAllByRole("option")).toHaveLength(3);
       expect(screen.queryByRole("option", { name: /list\.unassigned/ })).not.toBeInTheDocument();
+    });
+  });
+
+  // Story 208 (RD-3.8, recon TW-06) — the AI card and the composer, wired.
+  describe("AI reply insert (Story 208)", () => {
+    it("puts a suggested reply into the reply draft without sending it", async () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+        mutateAsync: vi.fn().mockResolvedValue({ id: "log-1", outcome: "PENDING" }),
+        isPending: false,
+      } as never);
+      vi.mocked(useTicketAiResultQuery).mockReturnValue(
+        queryResult({
+          data: {
+            id: "log-1",
+            feature: "SUGGEST_REPLY",
+            outcome: "SUCCESS",
+            outputText: "Please try resetting your password.",
+            errorMessage: null,
+            createdAt: "2024-01-01T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      const sendMessage = vi.fn();
+      vi.mocked(useCreateTicketMessageMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: sendMessage,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByText("detail.aiSuggestReply"));
+      fireEvent.click(await screen.findByRole("button", { name: "detail.aiInsertIntoReply" }));
+
+      const reply = screen.getByRole("textbox", { name: "detail.composerReplyLabel" });
+      expect(reply).toHaveValue("Please try resetting your password.");
+      await vi.waitFor(() => expect(reply).toHaveFocus());
+      expect(sendMessage).not.toHaveBeenCalled();
     });
   });
 });

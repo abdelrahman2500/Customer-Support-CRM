@@ -353,6 +353,8 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
               uploading: t("detail.attachmentsUploading"),
               uploadFailedFallback: t("detail.attachmentsUploadFailed"),
               uploadForbidden: t("detail.actionForbidden"),
+              uploadLabel: t("detail.attachmentsUploadLabel"),
+              dropHint: t("detail.attachmentsDropHint"),
             }}
           />
 

@@ -112,6 +112,7 @@ export {
   PriorityUrgentIcon,
   InternalNoteIcon,
   HistoryEventIcon,
+  AttachIcon,
 } from "./lib/icons";
 export type { LucideIcon } from "./lib/icons";
 
@@ -157,6 +158,8 @@ export { Combobox } from "./components/combobox";
 export type { ComboboxOption, ComboboxProps } from "./components/combobox";
 export { MessageThread } from "./components/message-thread";
 export type { MessageThreadItem, MessageThreadProps } from "./components/message-thread";
+export { FileDropzone } from "./components/file-dropzone";
+export type { FileDropzoneProps } from "./components/file-dropzone";
 export { Composer } from "./components/composer";
 export type { ComposerProps, ComposerSuggestion } from "./components/composer";
 export { MessageBubble } from "./components/message-bubble";

@@ -21,6 +21,7 @@ import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
 import { CustomerContextPanel } from "@/components/tickets/customer-context-panel";
 import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
+import type { ReplyInsertion } from "@/components/tickets/ticket-chat-card";
 import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
 import { TicketKbReferencesCard } from "@/components/tickets/ticket-kb-references-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
@@ -219,6 +220,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   // Story 201 (RD-3.1) — the subject edit state (Stories 42/156/166) moved,
   // verbatim, into TicketHeader along with the heading it edits.
   const [aiCategoryNoMatch, setAiCategoryNoMatch] = useState<string | null>(null);
+  // Story 208 — an AI-suggested reply on its way into the composer's draft.
+  const [replyInsertion, setReplyInsertion] = useState<ReplyInsertion | null>(null);
 
   /** Story 203 (RD-3.3) — the inspector sticks just under the sticky ticket
    * header, whose height varies (subject length, wrapped facts, actions).
@@ -398,10 +401,12 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               timeline: notes, history and SLA escalations now sit in it, in
               time order, instead of three cards of their own. Story 207
               (RD-3.7) — its one composer writes replies and internal notes. */}
-          <TicketChatCard ticketId={ticketId} />
+          <TicketChatCard ticketId={ticketId} replyInsertion={replyInsertion} />
 
           <TicketAiCard
             ticketId={ticketId}
+            // Story 208 (RD-3.8, recon TW-06) — into the reply draft, unsent.
+            onInsertReply={(text) => setReplyInsertion({ text, id: Date.now() })}
             onApplyCategory={(suggested) => {
               const match = (categoriesQuery.data ?? []).find(
                 (category) => category.name.toLowerCase() === suggested.trim().toLowerCase(),
@@ -434,6 +439,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               uploading: t("detail.attachmentsUploading"),
               uploadFailedFallback: t("detail.attachmentsUploadFailed"),
               uploadForbidden: t("detail.actionForbidden"),
+              uploadLabel: t("detail.attachmentsUploadLabel"),
+              dropHint: t("detail.attachmentsDropHint"),
             }}
           />
 

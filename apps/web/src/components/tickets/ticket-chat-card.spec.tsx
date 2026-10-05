@@ -17,6 +17,7 @@ import {
   useUsersQuery,
 } from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
+import { useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { ApiError } from "@/lib/api";
 
 // Story 206 — switchable, so one case can read the page as Arabic (RTL).
@@ -49,6 +50,11 @@ vi.mock("@/hooks/use-tickets", () => ({
 
 vi.mock("@/hooks/use-quick-replies", () => ({
   useQuickRepliesQuery: vi.fn(),
+}));
+
+// Story 208 — the composer's "Attach file" uploads to the ticket.
+vi.mock("@/hooks/use-attachments", () => ({
+  useUploadAttachmentMutation: vi.fn(),
 }));
 
 /** Story 207 (RD-3.7, recon A11Y-09) — the reply field is named by its own
@@ -156,6 +162,13 @@ describe("TicketChatCard", () => {
     route.locale = "en";
     // Story 207 — drafts persist per ticket for the session; start clean.
     window.sessionStorage.clear();
+    vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({ id: "attachment-new" }),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
     vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
       mutate: vi.fn(),
       mutateAsync: vi.fn().mockResolvedValue({ id: "note-new" }),
@@ -633,7 +646,10 @@ describe("TicketChatCard", () => {
 
       render(<TicketChatCard ticketId="ticket-1" />);
 
-      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+      // Story 208 — the picker is a Combobox, named like the Select was.
+      expect(
+        screen.queryByRole("combobox", { name: "detail.quickReplyPlaceholder" }),
+      ).not.toBeInTheDocument();
     });
 
     it("inserts the selected quick reply's body into an empty draft", async () => {
@@ -646,7 +662,8 @@ describe("TicketChatCard", () => {
 
       render(<TicketChatCard ticketId="ticket-1" />);
 
-      fireEvent.click(screen.getByRole("combobox"));
+      // Story 208 (RD-3.8) — a searchable Combobox replaced the Select.
+      fireEvent.click(screen.getByRole("combobox", { name: "detail.quickReplyPlaceholder" }));
       fireEvent.click(await screen.findByRole("option", { name: "Password reset" }));
 
       expect(replyBox()).toHaveValue(quickReply.body);
@@ -665,7 +682,8 @@ describe("TicketChatCard", () => {
       const textarea = replyBox();
       fireEvent.change(textarea, { target: { value: "Thanks for reaching out." } });
 
-      fireEvent.click(screen.getByRole("combobox"));
+      // Story 208 (RD-3.8) — a searchable Combobox replaced the Select.
+      fireEvent.click(screen.getByRole("combobox", { name: "detail.quickReplyPlaceholder" }));
       fireEvent.click(await screen.findByRole("option", { name: "Password reset" }));
 
       expect(textarea).toHaveValue(`Thanks for reaching out.\n\n${quickReply.body}`);
@@ -1120,6 +1138,115 @@ describe("TicketChatCard", () => {
         "aria-selected",
         "true",
       );
+    });
+  });
+
+  // Story 208 (RD-3.8, recon A11Y-02/TW-06/TW-12) — composer tools.
+  describe("composer tools (Story 208)", () => {
+    beforeEach(() => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+    });
+
+    it("finds a quick reply by searching, then inserts it by the same rule", async () => {
+      const user = userEvent.setup();
+      vi.mocked(useQuickRepliesQuery).mockReturnValue(
+        queryResult({
+          data: [
+            { id: "q1", title: "Password reset", body: "Reset it from the login page.", isActive: true },
+            { id: "q2", title: "Refund policy", body: "Refunds take 5 days.", isActive: true },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      await user.click(screen.getByRole("combobox", { name: "detail.quickReplyPlaceholder" }));
+      await user.keyboard("refund");
+      const options = screen.getAllByRole("option");
+      expect(options).toHaveLength(1);
+      await user.keyboard("{Enter}");
+
+      expect(replyBox()).toHaveValue("Refunds take 5 days.");
+    });
+
+    it("attaches a file to the ticket from Reply mode and says where it went", async () => {
+      const mutateAsync = vi.fn().mockResolvedValue({ id: "attachment-new" });
+      vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(useUploadAttachmentMutation).toHaveBeenCalledWith({ type: "ticket", id: "ticket-1" });
+      const file = new File(["log"], "error.log", { type: "text/plain" });
+      fireEvent.change(screen.getByLabelText("detail.composerAttach"), { target: { files: [file] } });
+
+      await vi.waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(file));
+      expect(await screen.findByText("detail.composerAttached")).toHaveAttribute("role", "status");
+      // Attaching never sends a message.
+      expect(vi.mocked(useCreateTicketMessageMutation).mock.results[0]!.value.mutateAsync).not.toHaveBeenCalled();
+    });
+
+    it("shows the upload's own error copy when attaching fails", async () => {
+      vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(new ApiError("internals", 500)),
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      fireEvent.change(screen.getByLabelText("detail.composerAttach"), {
+        target: { files: [new File(["x"], "x.txt")] },
+      });
+
+      expect(await screen.findByText("detail.attachmentsUploadFailed")).toBeInTheDocument();
+    });
+
+    it("never offers attach in Internal note mode, where the customer would see the file", async () => {
+      const user = userEvent.setup();
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      await user.click(screen.getByRole("tab", { name: "detail.internalNoteLabel" }));
+
+      expect(screen.queryByLabelText("detail.composerAttach")).not.toBeInTheDocument();
+    });
+
+    it("puts inserted text into the reply draft, in Reply mode and focused, without sending", async () => {
+      const user = userEvent.setup();
+      const mutateAsync = vi.fn();
+      vi.mocked(useCreateTicketMessageMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      const { rerender } = render(<TicketChatCard ticketId="ticket-1" />);
+      fireEvent.change(replyBox(), { target: { value: "Hi Sam," } });
+      await user.click(screen.getByRole("tab", { name: "detail.internalNoteLabel" }));
+
+      rerender(<TicketChatCard ticketId="ticket-1" replyInsertion={{ text: "Try a reset.", id: 1 }} />);
+
+      expect(screen.getByRole("tab", { name: "detail.composerModeReply" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await vi.waitFor(() => expect(replyBox()).toHaveFocus());
+      expect(replyBox()).toHaveValue("Hi Sam,\n\nTry a reset.");
+      expect(mutateAsync).not.toHaveBeenCalled();
+
+      // A new request inserts again; re-rendering the same one does not.
+      rerender(<TicketChatCard ticketId="ticket-1" replyInsertion={{ text: "Try a reset.", id: 1 }} />);
+      expect(replyBox()).toHaveValue("Hi Sam,\n\nTry a reset.");
+      rerender(<TicketChatCard ticketId="ticket-1" replyInsertion={{ text: "Thanks!", id: 2 }} />);
+      expect(replyBox()).toHaveValue("Hi Sam,\n\nTry a reset.\n\nThanks!");
     });
   });
 });

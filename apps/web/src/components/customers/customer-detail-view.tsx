@@ -793,6 +793,8 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               uploading: t("detail.attachmentsUploading"),
               uploadFailedFallback: t("detail.attachmentsUploadFailed"),
               uploadForbidden: t("detail.actionForbidden"),
+              uploadLabel: t("detail.attachmentsUploadLabel"),
+              dropHint: t("detail.attachmentsDropHint"),
             }}
           />
 

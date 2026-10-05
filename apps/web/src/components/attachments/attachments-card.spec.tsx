@@ -29,6 +29,9 @@ const strings = {
   uploading: "Uploading...",
   uploadFailedFallback: "Upload failed.",
   uploadForbidden: "Not allowed.",
+  // Story 208 (RD-3.8) — the file control is named and described now.
+  uploadLabel: "Attach a file",
+  dropHint: "or drop it here",
 };
 
 function queryResult(overrides: Record<string, unknown>) {
@@ -164,7 +167,9 @@ describe("AttachmentsCard", () => {
 
     render(<AttachmentsCard owner={ticketOwner} locale="en" strings={strings} />);
     const file = new File(["hello"], "notes.txt", { type: "text/plain" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    // Story 208 (RD-3.8, recon A11Y-02) — the same file input, found by the
+    // name it has now.
+    const input = screen.getByLabelText(strings.uploadLabel);
     fireEvent.change(input, { target: { files: [file] } });
 
     await vi.waitFor(() => {
@@ -186,7 +191,9 @@ describe("AttachmentsCard", () => {
 
     render(<AttachmentsCard owner={ticketOwner} locale="en" strings={strings} />);
     const file = new File(["hello"], "notes.txt", { type: "text/plain" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    // Story 208 (RD-3.8, recon A11Y-02) — the same file input, found by the
+    // name it has now.
+    const input = screen.getByLabelText(strings.uploadLabel);
     fireEvent.change(input, { target: { files: [file] } });
 
     // Batch 1 (UX audit) — a non-`ApiError` rejection is a network failure,
@@ -209,7 +216,9 @@ describe("AttachmentsCard", () => {
 
     render(<AttachmentsCard owner={ticketOwner} locale="en" strings={strings} />);
     const file = new File(["hello"], "notes.txt", { type: "text/plain" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    // Story 208 (RD-3.8, recon A11Y-02) — the same file input, found by the
+    // name it has now.
+    const input = screen.getByLabelText(strings.uploadLabel);
     fireEvent.change(input, { target: { files: [file] } });
 
     await screen.findByText(strings.uploadForbidden);
@@ -229,11 +238,65 @@ describe("AttachmentsCard", () => {
 
     render(<AttachmentsCard owner={ticketOwner} locale="en" strings={strings} />);
     const file = new File(["hello"], "notes.txt", { type: "text/plain" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    // Story 208 (RD-3.8, recon A11Y-02) — the same file input, found by the
+    // name it has now.
+    const input = screen.getByLabelText(strings.uploadLabel);
     fireEvent.change(input, { target: { files: [file] } });
 
     // Never the raw 500 body — that's the exact leak this batch closes.
     await screen.findByText(strings.uploadFailedFallback);
     expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
+  });
+
+  // Story 208 (RD-3.8, recon A11Y-02) — a named file control and drop target.
+  it("names the file control and describes it as a drop target", () => {
+    vi.mocked(useAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+
+    render(<AttachmentsCard owner={ticketOwner} locale="en" strings={strings} />);
+
+    const input = screen.getByLabelText(strings.uploadLabel);
+    expect(input).toHaveAttribute("type", "file");
+    expect(input).toHaveAccessibleDescription(strings.dropHint);
+  });
+
+  it("uploads a dropped file through the same mutation", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ id: "attachment-new" });
+    vi.mocked(useAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync,
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<AttachmentsCard owner={ticketOwner} locale="en" strings={strings} />);
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const zone = screen.getByLabelText(strings.uploadLabel).closest("label")!;
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+
+    await vi.waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(file));
+  });
+
+  it("disables the control while an upload is in flight", () => {
+    vi.mocked(useAttachmentsQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useUploadAttachmentMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: true,
+      isError: false,
+      error: null,
+    } as never);
+
+    render(<AttachmentsCard owner={ticketOwner} locale="en" strings={strings} />);
+
+    expect(screen.getByLabelText(strings.uploadLabel)).toBeDisabled();
+    expect(screen.getByText(strings.uploading)).toBeInTheDocument();
   });
 });

@@ -21,7 +21,7 @@ import { Spinner } from "./spinner";
  * Story S-3 — adds a loading state and an `lg` size. The four variants and
  * the `default`/`sm` sizes are byte-identical to before.
  */
-const buttonVariants = cva(
+export const buttonVariants = cva(
   "focus-ring inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control text-sm font-medium transition-colors duration-fast ease-standard disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {

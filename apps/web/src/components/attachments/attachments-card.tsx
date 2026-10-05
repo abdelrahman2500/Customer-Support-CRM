@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import type { ChangeEvent } from "react";
 import { useAttachmentsQuery, useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { getAttachmentDownloadUrl } from "@/lib/attachments-api";
 import type { AttachmentOwner } from "@/lib/attachments-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
+import { Alert, FileDropzone, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
 import { formatDateTime } from "@crm/ui";
 
 /** Every string this shared component needs, supplied by the caller's own
@@ -24,6 +23,10 @@ export interface AttachmentsCardStrings {
    * string in their own namespace; threaded through so an upload rejected
    * for permissions shows that instead of the generic upload-failed text. */
   uploadForbidden: string;
+  /** Story 208 (RD-3.8, recon A11Y-02) — the file control's name… */
+  uploadLabel: string;
+  /** …and its description ("or drop it here"). */
+  dropHint: string;
 }
 
 function formatFileSize(bytes: number): string {
@@ -111,11 +114,7 @@ function AddAttachmentForm({
   const mutation = useUploadAttachmentMutation(owner);
   const errorMessage = useErrorMessage();
 
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.target.files?.[0];
-    event.target.value = ""; // allow re-selecting the same file next time.
-    if (!file) return;
-
+  async function handleFile(file: File): Promise<void> {
     setError(null);
     try {
       await mutation.mutateAsync(file);
@@ -131,14 +130,14 @@ function AddAttachmentForm({
 
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <label className="flex flex-col gap-1 text-xs text-ink-muted">
-        <input
-          type="file"
-          disabled={mutation.isPending}
-          onChange={(event) => void handleFileChange(event)}
-          className="text-sm text-ink-strong"
-        />
-      </label>
+      {/* Story 208 (RD-3.8, recon A11Y-02) — a named control, and a drop
+          target; it still resets after each pick (same file again). */}
+      <FileDropzone
+        label={strings.uploadLabel}
+        hint={strings.dropHint}
+        disabled={mutation.isPending}
+        onFile={(file) => void handleFile(file)}
+      />
       {mutation.isPending && <p className="text-xs text-ink-subtle">{strings.uploading}</p>}
       {error && <Alert variant="destructive">{error}</Alert>}
     </div>

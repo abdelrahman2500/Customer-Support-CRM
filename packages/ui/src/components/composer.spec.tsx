@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { createRef, useState } from "react";
 import { Composer, type ComposerProps } from "./composer";
 
 /** Story 207 (RD-3.7, recon A11Y-05/A11Y-09) — the composer shell. */
@@ -91,6 +91,12 @@ describe("Composer", () => {
 
     await act(async () => resolve());
     expect(field()).toHaveFocus();
+  });
+
+  it("hands the caller a ref to the field", () => {
+    const ref = createRef<HTMLTextAreaElement>();
+    render(<Harness textareaRef={ref} />);
+    expect(ref.current).toBe(field());
   });
 
   it("tints the field as an internal note", () => {

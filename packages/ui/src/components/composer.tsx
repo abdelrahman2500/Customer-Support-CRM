@@ -58,6 +58,8 @@ export interface ComposerProps {
     onDismiss: () => void;
   };
   className?: string;
+  /** Story 208 — lets the caller focus the field (e.g. after inserting text). */
+  textareaRef?: React.Ref<HTMLTextAreaElement>;
 }
 
 export function Composer({
@@ -77,8 +79,10 @@ export function Composer({
   error,
   suggestions,
   className,
+  textareaRef,
 }: ComposerProps) {
   const fieldRef = React.useRef<HTMLTextAreaElement>(null);
+  React.useImperativeHandle(textareaRef, () => fieldRef.current as HTMLTextAreaElement);
   const composingRef = React.useRef(false);
   const listId = React.useId();
   const [activeIndex, setActiveIndex] = React.useState(0);

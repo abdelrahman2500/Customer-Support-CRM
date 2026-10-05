@@ -127,6 +127,9 @@ export {
   // paired with its "Internal note" text) and a history event row.
   Lock as InternalNoteIcon,
   GitCommitHorizontal as HistoryEventIcon,
+
+  // Story 208 (RD-3.8) — attach a file (composer, attachments dropzone).
+  Paperclip as AttachIcon,
 } from "lucide-react";
 
 /** The shape every icon above satisfies, for a component that accepts one. */

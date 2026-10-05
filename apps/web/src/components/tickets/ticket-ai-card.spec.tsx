@@ -331,4 +331,60 @@ describe("TicketAiCard", () => {
     expect(await screen.findByText("detail.aiSubmitFailed")).toBeInTheDocument();
     expect(screen.queryByText("stack trace-ish internals")).not.toBeInTheDocument();
   });
+
+  // Story 208 (RD-3.8, recon TW-06) — a suggested reply can go into the draft.
+  it("offers 'insert into reply' for a suggested reply and hands over its text", async () => {
+    vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: "log-1", outcome: "PENDING" }),
+      isPending: false,
+    } as never);
+    vi.mocked(useTicketAiResultQuery).mockReturnValue(
+      queryResult({
+        data: {
+          id: "log-1",
+          feature: "SUGGEST_REPLY",
+          outcome: "SUCCESS",
+          outputText: "Please try resetting your password.",
+          errorMessage: null,
+          createdAt: "2024-01-01T00:00:00.000Z",
+        },
+        isSuccess: true,
+      }) as never,
+    );
+    const onInsertReply = vi.fn();
+
+    render(
+      <TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} onInsertReply={onInsertReply} />,
+    );
+    fireEvent.click(screen.getByText("detail.aiSuggestReply"));
+    fireEvent.click(await screen.findByRole("button", { name: "detail.aiInsertIntoReply" }));
+
+    expect(onInsertReply).toHaveBeenCalledWith("Please try resetting your password.");
+  });
+
+  it("offers no reply insert for any other feature", async () => {
+    vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: "log-1", outcome: "PENDING" }),
+      isPending: false,
+    } as never);
+    vi.mocked(useTicketAiResultQuery).mockReturnValue(
+      queryResult({
+        data: {
+          id: "log-1",
+          feature: "SUMMARIZE",
+          outcome: "SUCCESS",
+          outputText: "A short summary.",
+          errorMessage: null,
+          createdAt: "2024-01-01T00:00:00.000Z",
+        },
+        isSuccess: true,
+      }) as never,
+    );
+
+    render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} onInsertReply={vi.fn()} />);
+    fireEvent.click(screen.getByText("detail.aiSummarize"));
+
+    expect(await screen.findByText("A short summary.")).toBeInTheDocument();
+    expect(screen.queryByText("detail.aiInsertIntoReply")).not.toBeInTheDocument();
+  });
 });

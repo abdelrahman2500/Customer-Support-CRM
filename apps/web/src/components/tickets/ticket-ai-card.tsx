@@ -41,13 +41,19 @@ const FEATURE_LABEL_KEYS: Record<TicketAiFeature, string> = {
  * distinct, non-error state — never the same path as `ERROR` — per this
  * story's own product rule: a caller must be able to tell "AI is off"
  * from "AI is broken" at a glance.
+ *
+ * Story 208 (RD-3.8, recon TW-06) — a suggested reply can be put into the
+ * reply draft ("Insert into reply", via `onInsertReply`). It is only ever
+ * inserted, never sent: the agent reviews and sends it from the composer.
  */
 export function TicketAiCard({
   ticketId,
   onApplyCategory,
+  onInsertReply,
 }: {
   ticketId: string;
   onApplyCategory: (category: string) => void;
+  onInsertReply?: (text: string) => void;
 }) {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
@@ -137,6 +143,19 @@ export function TicketAiCard({
                   </Button>
                 </div>
               )}
+              {operation.feature === "SUGGEST_REPLY" &&
+                resultQuery.data.outputText &&
+                onInsertReply && (
+                  <div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => onInsertReply(resultQuery.data.outputText as string)}
+                    >
+                      {t("detail.aiInsertIntoReply")}
+                    </Button>
+                  </div>
+                )}
             </div>
           )}
 
