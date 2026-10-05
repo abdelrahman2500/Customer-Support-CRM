@@ -70,6 +70,11 @@ const baseRule = {
   actionSetDepartmentId: null,
 };
 
+/** Story 227 (PR-4.6) — the create form lives in a dialog opened from the page header. */
+function openCreateDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "createHeading" }));
+}
+
 describe("AutomationRulesView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -217,6 +222,7 @@ describe("AutomationRulesView", () => {
     );
 
     render(<AutomationRulesView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     expect(screen.getByText("createSubmit").closest("button")).toBeDisabled();
 
@@ -289,6 +295,7 @@ describe("AutomationRulesView", () => {
       );
 
       render(<AutomationRulesView />);
+      openCreateDialog(); // Story 227 — the create form opens in a dialog
 
       fireEvent.change(screen.getByLabelText("nameLabel"), {
         target: { value: "Auto-categorize" },
@@ -319,6 +326,7 @@ describe("AutomationRulesView", () => {
       );
 
       render(<AutomationRulesView />);
+      openCreateDialog(); // Story 227 — the create form opens in a dialog
 
       expect(screen.getByRole("combobox", { name: "conditionCategoryLabel" })).toBeInTheDocument();
       expect(screen.getByRole("combobox", { name: "actionAssignToLabel" })).toBeInTheDocument();
@@ -357,6 +365,7 @@ describe("AutomationRulesView", () => {
       );
 
       render(<AutomationRulesView />);
+      openCreateDialog(); // Story 227 — the create form opens in a dialog
 
       expect(
         screen.getByRole("combobox", { name: "actionSetPriorityLabel" }),
@@ -373,6 +382,7 @@ describe("AutomationRulesView", () => {
       );
 
       render(<AutomationRulesView />);
+      openCreateDialog(); // Story 227 — the create form opens in a dialog
 
       fireEvent.change(screen.getByLabelText("nameLabel"), {
         target: { value: "Auto-escalate" },
@@ -404,6 +414,7 @@ describe("AutomationRulesView", () => {
       );
 
       render(<AutomationRulesView />);
+      openCreateDialog(); // Story 227 — the create form opens in a dialog
 
       fireEvent.change(screen.getByLabelText("nameLabel"), { target: { value: "No priority" } });
       fireEvent.click(
@@ -466,6 +477,7 @@ describe("AutomationRulesView", () => {
       );
 
       render(<AutomationRulesView />);
+      openCreateDialog(); // Story 227 — the create form opens in a dialog
 
       expect(screen.queryByText("eligibleAgentPoolLabel")).not.toBeInTheDocument();
 
@@ -486,6 +498,7 @@ describe("AutomationRulesView", () => {
       );
 
       render(<AutomationRulesView />);
+      openCreateDialog(); // Story 227 — the create form opens in a dialog
 
       fireEvent.change(screen.getByLabelText("nameLabel"), {
         target: { value: "Load-balanced rule" },
@@ -523,6 +536,7 @@ describe("AutomationRulesView", () => {
       );
 
       render(<AutomationRulesView />);
+      openCreateDialog(); // Story 227 — the create form opens in a dialog
 
       fireEvent.change(screen.getByLabelText("nameLabel"), { target: { value: "Fixed rule" } });
       fireEvent.click(

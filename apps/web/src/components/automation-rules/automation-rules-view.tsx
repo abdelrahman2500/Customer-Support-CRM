@@ -16,15 +16,13 @@ import type {
 } from "@/lib/automation-rules-api";
 import type { TicketPriority } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
+import { CreateDialog, useCreateDialogClose } from "@/components/admin/create-dialog";
 import {
-  Alert,
-  Badge,
   Button,
   Checkbox,
   EmptyState,
   Input,
   Label,
-  LoadingStatus,
   Skeleton,
   Table,
   TableBody,
@@ -33,16 +31,11 @@ import {
   TableHeader,
   TableRow,
 } from "@crm/ui";
+import { Alert } from "@crm/ui";
+import { QueryStateCard } from "@crm/ui";
+import { ActiveBadge } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import {
-  PageHeader,
-  SectionCard,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crm/ui";
+import { PageHeader, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /**
  * Story 57 — Automation Rules, over the already-existing
@@ -117,28 +110,28 @@ export function AutomationRulesView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} actions={<AddAutomationRuleForm />} />
 
-      {rulesQuery.isLoading && (
-        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
-          {[0, 1, 2].map((row) => (
-            <Skeleton key={row} className="h-10 w-full" />
-          ))}
-        </LoadingStatus>
-      )}
-
-      {rulesQuery.isError && (
-        <Alert variant="destructive" className="flex items-center justify-between">
-          <span>{t("error")}</span>
-          <Button variant="outline" size="sm" onClick={() => rulesQuery.refetch()}>
-            {t("retry")}
-          </Button>
-        </Alert>
-      )}
-
-      {rulesQuery.isSuccess && rulesQuery.data.length === 0 && <EmptyState title={t("empty")} />}
-
-      {rulesQuery.isSuccess && rulesQuery.data.length > 0 && (
+      {/* Story 227 (PR-4.6) — the shared loading / error / empty states. */}
+      <QueryStateCard
+        isLoading={rulesQuery.isLoading}
+        isError={rulesQuery.isError}
+        isEmpty={rulesQuery.isSuccess && rulesQuery.data.length === 0}
+        loadingLabel={tCommon("loading")}
+        loadingPlaceholder={
+          <div className="flex flex-col gap-2">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} className="h-10 w-full" />
+            ))}
+          </div>
+        }
+        error={{
+          title: t("error"),
+          retryLabel: t("retry"),
+          onRetry: () => void rulesQuery.refetch(),
+        }}
+        empty={<EmptyState title={t("empty")} />}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -152,7 +145,7 @@ export function AutomationRulesView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rulesQuery.data.map((rule) => (
+            {(rulesQuery.data ?? []).map((rule) => (
               <AutomationRuleRow
                 key={rule.id}
                 rule={rule}
@@ -163,9 +156,7 @@ export function AutomationRulesView() {
             ))}
           </TableBody>
         </Table>
-      )}
-
-      <AddAutomationRuleForm />
+      </QueryStateCard>
     </section>
   );
 }
@@ -238,9 +229,11 @@ function AutomationRuleRow({
       </TableCell>
       <TableCell label={t("columns.status")}>
         <div className="flex items-center gap-2">
-          <Badge variant={rule.isActive ? "success" : "secondary"}>
-            {rule.isActive ? t("active") : t("inactive")}
-          </Badge>
+          <ActiveBadge
+            active={rule.isActive}
+            activeLabel={t("active")}
+            inactiveLabel={t("inactive")}
+          />
           <Button
             variant={rule.isActive ? "destructive" : "outline"}
             size="sm"
@@ -280,6 +273,7 @@ function AutomationRuleRow({
  * `LEAST_LOADED` is chosen, the eligible-agent-pool `Checkbox` list. */
 function AddAutomationRuleForm() {
   const t = useTranslations("automationRules");
+  const closeDialog = useCreateDialogClose();
   const errorMessage = useErrorMessage();
   const usersQuery = useUsersQuery();
   const departmentsQuery = useDepartmentsQuery();
@@ -318,6 +312,7 @@ function AddAutomationRuleForm() {
           : {}),
         ...(actionAssignmentMode === "LEAST_LOADED" ? { eligibleAgentPool } : {}),
       });
+      closeDialog();
       setName("");
       setConditionCategoryId("");
       setActionAssignToUserId("");
@@ -334,8 +329,8 @@ function AddAutomationRuleForm() {
   }
 
   return (
-    <SectionCard title={t("createHeading")}>
-      <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
+    <CreateDialog label={t("createHeading")}>
+      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("nameLabel")}
@@ -487,6 +482,6 @@ function AddAutomationRuleForm() {
           </Alert>
         )}
       </form>
-    </SectionCard>
+    </CreateDialog>
   );
 }

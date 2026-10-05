@@ -10,17 +10,15 @@ import {
 import { API_KEY_SCOPES } from "@/lib/api-keys-api";
 import type { ApiKeySummary } from "@/lib/api-keys-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
+import { CreateDialog } from "@/components/admin/create-dialog";
 import {
-  Alert,
   Badge,
   Button,
   Checkbox,
   EmptyState,
   Input,
   Label,
-  LoadingStatus,
   PageHeader,
-  SectionCard,
   Skeleton,
   Table,
   TableBody,
@@ -29,6 +27,8 @@ import {
   TableHeader,
   TableRow,
 } from "@crm/ui";
+import { Alert } from "@crm/ui";
+import { QueryStateCard } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { formatDateTime } from "@crm/ui";
 import { useParams } from "next/navigation";
@@ -60,30 +60,28 @@ export function ApiKeysView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} actions={<AddApiKeyForm />} />
 
-      {apiKeysQuery.isLoading && (
-        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
-          {[0, 1, 2].map((row) => (
-            <Skeleton key={row} className="h-10 w-full" />
-          ))}
-        </LoadingStatus>
-      )}
-
-      {apiKeysQuery.isError && (
-        <Alert variant="destructive" className="flex items-center justify-between">
-          <span>{t("error")}</span>
-          <Button variant="outline" size="sm" onClick={() => apiKeysQuery.refetch()}>
-            {t("retry")}
-          </Button>
-        </Alert>
-      )}
-
-      {apiKeysQuery.isSuccess && apiKeysQuery.data.length === 0 && (
-        <EmptyState title={t("empty")} />
-      )}
-
-      {apiKeysQuery.isSuccess && apiKeysQuery.data.length > 0 && (
+      {/* Story 227 (PR-4.6) — the shared loading / error / empty states. */}
+      <QueryStateCard
+        isLoading={apiKeysQuery.isLoading}
+        isError={apiKeysQuery.isError}
+        isEmpty={apiKeysQuery.isSuccess && apiKeysQuery.data.length === 0}
+        loadingLabel={tCommon("loading")}
+        loadingPlaceholder={
+          <div className="flex flex-col gap-2">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} className="h-10 w-full" />
+            ))}
+          </div>
+        }
+        error={{
+          title: t("error"),
+          retryLabel: t("retry"),
+          onRetry: () => void apiKeysQuery.refetch(),
+        }}
+        empty={<EmptyState title={t("empty")} />}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -96,14 +94,12 @@ export function ApiKeysView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {apiKeysQuery.data.map((apiKey) => (
+            {(apiKeysQuery.data ?? []).map((apiKey) => (
               <ApiKeyRow key={apiKey.id} apiKey={apiKey} />
             ))}
           </TableBody>
         </Table>
-      )}
-
-      <AddApiKeyForm />
+      </QueryStateCard>
     </section>
   );
 }
@@ -222,8 +218,8 @@ function AddApiKeyForm() {
   }
 
   return (
-    <SectionCard title={t("createHeading")}>
-      <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
+    <CreateDialog label={t("createHeading")}>
+      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("labelLabel")}
           <Input
@@ -272,6 +268,6 @@ function AddApiKeyForm() {
           </Alert>
         )}
       </form>
-    </SectionCard>
+    </CreateDialog>
   );
 }

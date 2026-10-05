@@ -9,12 +9,11 @@ import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { SlaPolicySummary } from "@/lib/sla-policies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
-  Alert,
-  Badge,
+  QueryStateCard,
+  ActiveBadge,
   Button,
   EmptyState,
   Input,
-  LoadingStatus,
   PageHeader,
   Skeleton,
 } from "@crm/ui";
@@ -62,35 +61,35 @@ export function SlaPolicyListView() {
         }
       />
 
-      {policiesQuery.isLoading && (
-        <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
-          {[0, 1, 2, 3, 4].map((row) => (
-            <Skeleton key={row} className="h-10 w-full" />
-          ))}
-        </LoadingStatus>
-      )}
-
-      {policiesQuery.isError && (
-        <Alert variant="destructive" className="flex items-center justify-between">
-          <span>{t("list.error")}</span>
-          <Button variant="outline" size="sm" onClick={() => policiesQuery.refetch()}>
-            {t("list.retry")}
-          </Button>
-        </Alert>
-      )}
-
-      {policiesQuery.isSuccess && policiesQuery.data.length === 0 && (
-        <EmptyState
-          title={t("list.empty")}
-          action={
-            <Button size="sm" asChild>
-              <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
-            </Button>
-          }
-        />
-      )}
-
-      {policiesQuery.isSuccess && policiesQuery.data.length > 0 && (
+      {/* Story 227 (PR-4.6) — the shared loading / error / empty states. */}
+      <QueryStateCard
+        isLoading={policiesQuery.isLoading}
+        isError={policiesQuery.isError}
+        isEmpty={policiesQuery.isSuccess && policiesQuery.data.length === 0}
+        loadingLabel={tCommon("loading")}
+        loadingPlaceholder={
+          <div className="flex flex-col gap-2">
+            {[0, 1, 2, 3, 4].map((row) => (
+              <Skeleton key={row} className="h-10 w-full" />
+            ))}
+          </div>
+        }
+        error={{
+          title: t("list.error"),
+          retryLabel: t("list.retry"),
+          onRetry: () => void policiesQuery.refetch(),
+        }}
+        empty={
+          <EmptyState
+            title={t("list.empty")}
+            action={
+              <Button size="sm" asChild>
+                <Link href={`/${locale}/sla-policies/new`}>{t("list.createButton")}</Link>
+              </Button>
+            }
+          />
+        }
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -103,12 +102,12 @@ export function SlaPolicyListView() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {policiesQuery.data.map((policy) => (
+            {(policiesQuery.data ?? []).map((policy) => (
               <SlaPolicyRow key={policy.id} policy={policy} categoryNameById={categoryNameById} />
             ))}
           </TableBody>
         </Table>
-      )}
+      </QueryStateCard>
     </section>
   );
 }
@@ -219,9 +218,11 @@ function SlaPolicyRow({
       </TableCell>
       <TableCell label={t("list.columns.status")}>
         <div className="flex items-center gap-2">
-          <Badge variant={policy.isActive ? "success" : "secondary"}>
-            {policy.isActive ? t("list.active") : t("list.inactive")}
-          </Badge>
+          <ActiveBadge
+            active={policy.isActive}
+            activeLabel={t("list.active")}
+            inactiveLabel={t("list.inactive")}
+          />
           <Button
             variant={policy.isActive ? "destructive" : "outline"}
             size="sm"

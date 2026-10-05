@@ -13,7 +13,6 @@ import type { ManagedBranch, ManagedDepartment } from "@/lib/branches-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -30,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@crm/ui";
+import { ActiveBadge } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
@@ -139,9 +139,7 @@ function MyBranchFields({ branch }: { branch: ManagedBranch }) {
         />
       </label>
       <div className="flex items-center gap-2">
-        <Badge variant={branch.isActive ? "success" : "secondary"}>
-          {branch.isActive ? t("myBranch.active") : t("myBranch.inactive")}
-        </Badge>
+        <ActiveBadge active={branch.isActive} activeLabel={t("myBranch.active")} inactiveLabel={t("myBranch.inactive")} />
         <Button
           variant={branch.isActive ? "destructive" : "outline"}
           size="sm"
@@ -278,9 +276,7 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
       </TableCell>
       <TableCell label={t("departments.columns.status")}>
         <div className="flex items-center gap-2">
-          <Badge variant={department.isActive ? "success" : "secondary"}>
-            {department.isActive ? t("departments.active") : t("departments.inactive")}
-          </Badge>
+          <ActiveBadge active={department.isActive} activeLabel={t("departments.active")} inactiveLabel={t("departments.inactive")} />
           <Button
             variant={department.isActive ? "destructive" : "outline"}
             size="sm"

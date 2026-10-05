@@ -54,6 +54,11 @@ const ACTIVE_KEY = {
   createdAt: "2024-01-01T00:00:00.000Z",
 };
 
+/** Story 227 (PR-4.6) — the create form lives in a dialog opened from the page header. */
+function openCreateDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "createHeading" }));
+}
+
 describe("ApiKeysView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -159,6 +164,7 @@ describe("ApiKeysView", () => {
     mockedUseApiKeysQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
 
     render(<ApiKeysView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     expect(screen.getByText("createSubmit").closest("button")).toBeDisabled();
 
@@ -175,6 +181,7 @@ describe("ApiKeysView", () => {
     mockedUseCreateApiKeyMutation.mockReturnValue(mutationResult({ mutateAsync }) as never);
 
     render(<ApiKeysView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     fireEvent.change(screen.getByLabelText("labelLabel"), { target: { value: "CI bot" } });
     fireEvent.click(screen.getByLabelText("integration:read"));
@@ -192,6 +199,7 @@ describe("ApiKeysView", () => {
     mockedUseCreateApiKeyMutation.mockReturnValue(mutationResult({ mutateAsync }) as never);
 
     render(<ApiKeysView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     fireEvent.change(screen.getByLabelText("labelLabel"), { target: { value: "CI bot" } });
     fireEvent.click(screen.getByLabelText("integration:read"));

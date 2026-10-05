@@ -9,17 +9,17 @@ import {
 } from "@/hooks/use-quick-replies";
 import type { QuickReplySummary } from "@/lib/quick-replies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
+import { CreateDialog, useCreateDialogClose } from "@/components/admin/create-dialog";
 import {
   Alert,
-  Badge,
   Button,
   Input,
   PageHeader,
   QueryStateCard,
-  SectionCard,
   Skeleton,
   Textarea,
 } from "@crm/ui";
+import { ActiveBadge } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
@@ -36,7 +36,7 @@ export function QuickRepliesView() {
 
   return (
     <section className="flex flex-col gap-4">
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} actions={<AddQuickReplyForm />} />
 
       {/* Story 155 — the hand-rolled four-branch ladder, replaced by the
           shared primitive. Same skeleton, same retry, same empty copy.
@@ -87,7 +87,6 @@ export function QuickRepliesView() {
         </Table>
       </QueryStateCard>
 
-      <AddQuickReplyForm />
     </section>
   );
 }
@@ -124,9 +123,7 @@ function QuickReplyRow({ quickReply }: { quickReply: QuickReplySummary }) {
       </TableCell>
       <TableCell label={t("columns.status")}>
         <div className="flex items-center gap-2">
-          <Badge variant={quickReply.isActive ? "success" : "secondary"}>
-            {quickReply.isActive ? t("active") : t("inactive")}
-          </Badge>
+          <ActiveBadge active={quickReply.isActive} activeLabel={t("active")} inactiveLabel={t("inactive")} />
           <Button
             variant={quickReply.isActive ? "destructive" : "outline"}
             size="sm"
@@ -162,6 +159,7 @@ function QuickReplyRow({ quickReply }: { quickReply: QuickReplySummary }) {
  * table, mirroring `AddAutomationRuleForm`'s exact submit/error pattern. */
 function AddQuickReplyForm() {
   const t = useTranslations("quickReplies");
+  const closeDialog = useCreateDialogClose();
   const errorMessage = useErrorMessage();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -173,6 +171,7 @@ function AddQuickReplyForm() {
     setError(null);
     try {
       await mutation.mutateAsync({ title: title.trim(), body: body.trim() });
+      closeDialog();
       setTitle("");
       setBody("");
     } catch (submitError) {
@@ -183,8 +182,8 @@ function AddQuickReplyForm() {
   }
 
   return (
-    <SectionCard title={t("createHeading")}>
-      <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
+    <CreateDialog label={t("createHeading")}>
+      <form className="flex flex-col gap-2" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-xs text-ink-muted">
           {t("titleLabel")}
           <Input
@@ -210,6 +209,6 @@ function AddQuickReplyForm() {
         </div>
         {error && <Alert variant="destructive">{error}</Alert>}
       </form>
-    </SectionCard>
+    </CreateDialog>
   );
 }

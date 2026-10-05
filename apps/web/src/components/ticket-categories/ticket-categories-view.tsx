@@ -11,7 +11,6 @@ import type { TicketCategory } from "@/lib/ticket-categories-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   Input,
@@ -26,6 +25,7 @@ import {
   TableRow,
   showSuccessToast,
 } from "@crm/ui";
+import { ActiveBadge } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
@@ -157,9 +157,7 @@ function TicketCategoryRow({ category }: { category: TicketCategory }) {
       </TableCell>
       <TableCell label={t("columns.status")}>
         <div className="flex items-center gap-2">
-          <Badge variant={category.isActive ? "success" : "secondary"}>
-            {category.isActive ? t("active") : t("inactive")}
-          </Badge>
+          <ActiveBadge active={category.isActive} activeLabel={t("active")} inactiveLabel={t("inactive")} />
           <Button
             variant={category.isActive ? "destructive" : "outline"}
             size="sm"

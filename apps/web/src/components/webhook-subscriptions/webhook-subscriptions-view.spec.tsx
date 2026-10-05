@@ -68,6 +68,11 @@ const SUBSCRIPTION = {
   updatedAt: "2024-01-01T00:00:00.000Z",
 };
 
+/** Story 227 (PR-4.6) — the create form lives in a dialog opened from the page header. */
+function openCreateDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "createHeading" }));
+}
+
 describe("WebhookSubscriptionsView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -252,6 +257,7 @@ describe("WebhookSubscriptionsView", () => {
     );
 
     render(<WebhookSubscriptionsView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     expect(screen.getByText("createSubmit").closest("button")).toBeDisabled();
 
@@ -274,6 +280,7 @@ describe("WebhookSubscriptionsView", () => {
     );
 
     render(<WebhookSubscriptionsView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     fireEvent.change(screen.getByLabelText("targetUrlLabel"), {
       target: { value: "https://example.test/hook" },
@@ -302,6 +309,7 @@ describe("WebhookSubscriptionsView", () => {
     );
 
     render(<WebhookSubscriptionsView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     fireEvent.change(screen.getByLabelText("targetUrlLabel"), {
       target: { value: "https://example.test/hook" },

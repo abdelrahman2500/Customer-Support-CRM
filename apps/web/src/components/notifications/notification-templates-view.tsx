@@ -12,7 +12,6 @@ import type { NotificationTemplateSummary } from "@/lib/notification-templates-a
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   Alert,
-  Badge,
   Button,
   Card,
   LoadingStatus,
@@ -25,6 +24,7 @@ import {
   Skeleton,
   Textarea,
 } from "@crm/ui";
+import { ActiveBadge } from "@crm/ui";
 
 /** RM-30 — the same sentinel-for-"no locale" convention
  * `AutomationRulesView`'s `UNSET_PRIORITY`/`CreateTicketView`'s
@@ -231,9 +231,7 @@ function TemplateLifecycleToggle({ template }: { template: NotificationTemplateS
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-2">
-        <Badge variant={template.isActive ? "success" : "secondary"}>
-          {template.isActive ? t("active") : t("inactive")}
-        </Badge>
+        <ActiveBadge active={template.isActive} activeLabel={t("active")} inactiveLabel={t("inactive")} />
         <Button
           variant={template.isActive ? "destructive" : "outline"}
           size="sm"

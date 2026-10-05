@@ -52,6 +52,11 @@ const baseQuickReply = {
   isActive: true,
 };
 
+/** Story 227 (PR-4.6) — the create form lives in a dialog opened from the page header. */
+function openCreateDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "createHeading" }));
+}
+
 describe("QuickRepliesView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -151,6 +156,7 @@ describe("QuickRepliesView", () => {
     mockedUseQuickRepliesQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
 
     render(<QuickRepliesView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     expect(screen.getByText("createSubmit").closest("button")).toBeDisabled();
 
@@ -171,6 +177,7 @@ describe("QuickRepliesView", () => {
     mockedUseCreateQuickReplyMutation.mockReturnValue(mutationResult({ mutateAsync }) as never);
 
     render(<QuickRepliesView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     fireEvent.change(screen.getByLabelText("titleLabel"), {
       target: { value: "Password reset" },
@@ -198,6 +205,7 @@ describe("QuickRepliesView", () => {
     );
 
     render(<QuickRepliesView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     fireEvent.change(screen.getByLabelText("titleLabel"), {
       target: { value: "Password reset" },
@@ -226,6 +234,7 @@ describe("QuickRepliesView", () => {
     mockedUseQuickRepliesQuery.mockReturnValue(queryResult({ isSuccess: true, data: [] }) as never);
 
     render(<QuickRepliesView />);
+    openCreateDialog(); // Story 227 — the create form opens in a dialog
 
     const titleInput = screen.getByLabelText("titleLabel");
     expect(titleInput).toHaveClass("w-full");

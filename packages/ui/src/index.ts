@@ -356,3 +356,6 @@ export { DragHandleIcon, MoreActionsIcon } from "./lib/icons";
 
 // --- Story 225 (PR-4.4) — the form-section recipe -------------------------
 export { FormActions, FormSection } from "./components/form-layout";
+
+// --- Story 227 (PR-4.6) — admin lists ---------------------------------------
+export { ActiveBadge } from "./components/active-badge";
