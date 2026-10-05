@@ -1875,4 +1875,86 @@ describe("TicketDetailView", () => {
     // The skeleton's own visuals are unchanged.
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
   });
+
+  /**
+   * Story 202 (RD-3.2) — the header actions go through the very handlers the
+   * inspector fields use, so each sends exactly the field's request and
+   * shows exactly its toast.
+   */
+  describe("header actions (Story 202)", () => {
+    function renderWith(ticket: Record<string, unknown>, mutation: Record<string, unknown> = {}) {
+      const mutate = vi.fn((_input: unknown, options?: { onSuccess?: () => void }) => {
+        options?.onSuccess?.();
+      });
+      vi.mocked(useUpdateTicketMutation).mockReturnValue({
+        mutate,
+        isPending: false,
+        isError: false,
+        error: null,
+        ...mutation,
+      } as never);
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: { ...baseTicket, ...ticket }, isSuccess: true }) as never,
+      );
+      vi.mocked(useUsersQuery).mockReturnValue(
+        queryResult({ data: [{ id: "agent-1", fullName: "Ada Agent" }], isSuccess: true }) as never,
+      );
+      render(<TicketDetailView ticketId="ticket-1" />);
+      return mutate;
+    }
+    const actions = () => screen.getByRole("group", { name: "detail.actions.label" });
+
+    it("resolves through the status field's own request and toast", () => {
+      const mutate = renderWith({ status: "OPEN" });
+
+      fireEvent.click(within(actions()).getByRole("button", { name: "detail.actions.resolve" }));
+
+      expect(mutate).toHaveBeenCalledWith({ status: "RESOLVED" }, expect.any(Object));
+      expect(mockedShowSuccessToast).toHaveBeenCalledWith(
+        'detail.statusUpdateSuccess:{"status":"ticketStatus.RESOLVED"}',
+      );
+    });
+
+    it("reopens a resolved ticket through the same request", () => {
+      const mutate = renderWith({ status: "RESOLVED" });
+
+      fireEvent.click(within(actions()).getByRole("button", { name: "detail.actions.reopen" }));
+
+      expect(mutate).toHaveBeenCalledWith({ status: "OPEN" }, expect.any(Object));
+    });
+
+    it("assigns to the current agent through the assignee field's own request and toast", () => {
+      const mutate = renderWith({ assignedToUserId: null });
+
+      fireEvent.click(within(actions()).getByRole("button", { name: "detail.actions.assignToMe" }));
+
+      expect(mutate).toHaveBeenCalledWith({ assignedToUserId: "agent-1" }, expect.any(Object));
+      expect(mockedShowSuccessToast).toHaveBeenCalledWith(
+        'detail.assignedAgentUpdateSuccess:{"agent":"Ada Agent"}',
+      );
+    });
+
+    it("hides Assign to me when the ticket is already the current agent's", () => {
+      renderWith({ assignedToUserId: "agent-1" });
+
+      expect(
+        within(actions()).queryByRole("button", { name: "detail.actions.assignToMe" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("disables the actions while the shared mutation is pending", () => {
+      renderWith({ status: "OPEN" }, { isPending: true });
+
+      for (const button of within(actions()).getAllByRole("button")) {
+        expect(button).toBeDisabled();
+      }
+    });
+
+    // Phase 3 guard, extended by Story 202.
+    it("keeps the header actions in the section-survival set", () => {
+      renderWith({ status: "OPEN", assignedToUserId: null });
+
+      expect(within(actions()).getAllByRole("button")).toHaveLength(2);
+    });
+  });
 });

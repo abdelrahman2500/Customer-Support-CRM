@@ -286,7 +286,14 @@
       "assignedAgentUpdateSuccess": "Assigned agent updated to {agent}.",
       "departmentUpdateSuccess": "Department updated to {department}.",
       "optionsLoading": "Loading…",
-      "subjectEdit": "Edit"
+      "subjectEdit": "Edit",
+      "actions": {
+        "label": "Ticket actions",
+        "assignToMe": "Assign to me",
+        "resolve": "Resolve",
+        "close": "Close",
+        "reopen": "Reopen"
+      }
     },
     "sla": {
       "none": "No SLA target",

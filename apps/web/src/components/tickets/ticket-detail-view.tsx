@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import {
   useCreateTicketNoteMutation,
+  useCurrentUserQuery,
   useDepartmentsQuery,
   useHoldTicketMutation,
   useResumeTicketMutation,
@@ -30,7 +31,7 @@ import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus } from "@/lib/sla";
 import { SlaIndicator } from "@/components/tickets/sla-indicator";
-import { TicketHeader } from "@/components/tickets/ticket-header";
+import { TicketHeader, TicketHeaderActions } from "@/components/tickets/ticket-header";
 import { historyEventKey } from "@/lib/history-event";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
@@ -220,6 +221,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const escalationsQuery = useTicketEscalationsQuery(ticketId);
   const notesQuery = useTicketNotesQuery(ticketId);
   const usersQuery = useUsersQuery();
+  // Story 202 (RD-3.2) — "Assign to me" needs the agent's own id.
+  const currentUserQuery = useCurrentUserQuery();
   const departmentsQuery = useDepartmentsQuery();
   const categoriesQuery = useTicketCategoriesQuery();
   const errorMessage = useErrorMessage();
@@ -267,6 +270,32 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   }
   const slaStatus = deriveSlaStatus(slaTargetQuery.data ?? null);
 
+  /** Story 202 (RD-3.2) — the one status and assignee code path. The
+   * inspector Selects and the header actions both call these, so an action
+   * sends exactly the field's request and shows exactly its toast; a
+   * rejection lands in the shared error Alert below the header. */
+  function updateStatus(value: TicketStatus) {
+    mutation.mutate(
+      { status: value },
+      {
+        onSuccess: () =>
+          showSuccessToast(t("detail.statusUpdateSuccess", { status: ticketLabels.status(value) })),
+      },
+    );
+  }
+  function updateAssignee(value: string) {
+    mutation.mutate(
+      { assignedToUserId: value },
+      {
+        onSuccess: () =>
+          showSuccessToast(
+            t("detail.assignedAgentUpdateSuccess", { agent: userNameById.get(value) ?? value }),
+          ),
+      },
+    );
+  }
+  const currentUserId = currentUserQuery.data?.id;
+
   return (
     <section className="flex flex-col gap-6">
       {/* Story 201 (RD-3.1, recon TW-01) — identity and state at a glance:
@@ -295,6 +324,15 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             : undefined
         }
         onSubjectCommit={(subject, { onError }) => mutation.mutate({ subject }, { onError })}
+        actions={
+          <TicketHeaderActions
+            status={ticket.status}
+            canAssignToMe={!!currentUserId && ticket.assignedToUserId !== currentUserId}
+            pending={mutation.isPending}
+            onAssignToMe={() => currentUserId && updateAssignee(currentUserId)}
+            onSetStatus={updateStatus}
+          />
+        }
       />
 
       {mutation.isError && (
@@ -406,17 +444,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               <Select
                 value={ticket.status}
                 disabled={mutation.isPending}
-                onValueChange={(value) =>
-                  mutation.mutate(
-                    { status: value as TicketStatus },
-                    {
-                      onSuccess: () =>
-                        showSuccessToast(
-                          t("detail.statusUpdateSuccess", { status: ticketLabels.status(value) }),
-                        ),
-                    },
-                  )
-                }
+                onValueChange={(value) => updateStatus(value as TicketStatus)}
               >
                 <SelectTrigger aria-label={t("detail.status")}>
                   <SelectValue />
@@ -515,19 +543,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               <Select
                 value={ticket.assignedToUserId ?? undefined}
                 disabled={mutation.isPending || usersQuery.isLoading}
-                onValueChange={(value) =>
-                  mutation.mutate(
-                    { assignedToUserId: value },
-                    {
-                      onSuccess: () =>
-                        showSuccessToast(
-                          t("detail.assignedAgentUpdateSuccess", {
-                            agent: userNameById.get(value) ?? value,
-                          }),
-                        ),
-                    },
-                  )
-                }
+                onValueChange={(value) => updateAssignee(value)}
               >
                 <SelectTrigger aria-label={t("detail.assignedAgent")}>
                   <SelectValue

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import { TicketHeader, type TicketHeaderSla } from "./ticket-header";
+import { TicketHeader, TicketHeaderActions, type TicketHeaderSla } from "./ticket-header";
 import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
 
@@ -160,5 +160,64 @@ describe("TicketHeader", () => {
         false,
       );
     }
+  });
+
+  // Story 202 (RD-3.2) — the header actions.
+  describe("TicketHeaderActions (Story 202)", () => {
+    function renderActions(props: Partial<Parameters<typeof TicketHeaderActions>[0]> = {}) {
+      locale = "en";
+      const handlers = { onAssignToMe: vi.fn(), onSetStatus: vi.fn() };
+      render(
+        <NextIntlClientProvider locale="en" messages={enMessages} timeZone="UTC">
+          <TicketHeaderActions
+            status="OPEN"
+            canAssignToMe
+            pending={false}
+            {...handlers}
+            {...props}
+          />
+        </NextIntlClientProvider>,
+      );
+      return handlers;
+    }
+    const names = () =>
+      within(screen.getByRole("group", { name: "Ticket actions" }))
+        .getAllByRole("button")
+        .map((b) => b.textContent);
+
+    it("offers Assign to me and Resolve on an open or in-progress ticket", () => {
+      const { onAssignToMe, onSetStatus } = renderActions({ status: "IN_PROGRESS" });
+      expect(names()).toEqual(["Assign to me", "Resolve"]);
+      fireEvent.click(screen.getByRole("button", { name: "Assign to me" }));
+      fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
+      expect(onAssignToMe).toHaveBeenCalledOnce();
+      expect(onSetStatus).toHaveBeenCalledWith("RESOLVED");
+    });
+
+    it("offers Close and Reopen on a resolved ticket, Reopen on a closed one", () => {
+      const { onSetStatus } = renderActions({ status: "RESOLVED", canAssignToMe: false });
+      expect(names()).toEqual(["Close", "Reopen"]);
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      fireEvent.click(screen.getByRole("button", { name: "Reopen" }));
+      expect(onSetStatus.mock.calls).toEqual([["CLOSED"], ["OPEN"]]);
+    });
+
+    it("offers only Reopen on a closed ticket already assigned to me", () => {
+      renderActions({ status: "CLOSED", canAssignToMe: false });
+      expect(names()).toEqual(["Reopen"]);
+    });
+
+    it("disables every action while the shared mutation is pending", () => {
+      renderActions({ pending: true });
+      for (const button of screen.getAllByRole("button")) {
+        expect(button).toBeDisabled();
+      }
+    });
+
+    it("names its group without Status/Priority, so the inspector's labels stay unique", () => {
+      renderActions();
+      const group = screen.getByRole("group", { name: "Ticket actions" });
+      expect(group.getAttribute("aria-label")).not.toMatch(/status|priority/i);
+    });
   });
 });

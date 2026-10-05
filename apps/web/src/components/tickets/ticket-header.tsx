@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
@@ -14,7 +14,7 @@ import {
   type AvatarPresence,
 } from "@crm/ui";
 import type { TicketSlaTarget } from "@/lib/sla";
-import type { TicketSummary } from "@/lib/tickets-api";
+import type { TicketStatus, TicketSummary } from "@/lib/tickets-api";
 import { SlaIndicator } from "./sla-indicator";
 import { TicketPriorityBadge, TicketStatusBadge } from "./ticket-badges";
 
@@ -45,6 +45,7 @@ export function TicketHeader({
   assigneeName,
   assigneePresence,
   onSubjectCommit,
+  actions,
 }: {
   ticket: TicketSummary;
   locale: string;
@@ -54,6 +55,8 @@ export function TicketHeader({
   assigneePresence?: AvatarPresence;
   /** The same `PATCH` the page has always used for the subject. */
   onSubjectCommit: (subject: string, options: { onError: () => void }) => void;
+  /** Story 202 (RD-3.2) — the header's actions, at the end of the title row. */
+  actions?: ReactNode;
 }) {
   const t = useTranslations("tickets");
 
@@ -96,13 +99,16 @@ export function TicketHeader({
         <Link href={`/${locale}/tickets`}>{t("detail.backToList")}</Link>
       </BackLink>
 
-      <div className="flex min-w-0 flex-col gap-tight">
-        {/* `dir="ltr"` keeps the id's characters in order inside Arabic text;
+      {/* Story 202 — the title block and the actions share a row that wraps:
+          on narrow screens the actions move under the title. */}
+      <div className="flex flex-wrap items-start justify-between gap-inline">
+        <div className="flex min-w-0 flex-col gap-tight">
+          {/* `dir="ltr"` keeps the id's characters in order inside Arabic text;
             `self-start` keeps it at the reading start, not the far edge. */}
-        <span className="self-start font-mono text-caption text-ink-subtle" dir="ltr">
-          #{shortId}
-        </span>
-        {/* Story 156 — a real, visible page title.
+          <span className="self-start font-mono text-caption text-ink-subtle" dir="ltr">
+            #{shortId}
+          </span>
+          {/* Story 156 — a real, visible page title.
 
             NAV-2 added an `sr-only` h1 because the subject was an
             always-editable `Input`, so the page had no visible heading at
@@ -115,54 +121,56 @@ export function TicketHeader({
             explicit mode instead of the permanent state. The `h1` carries
             the title in both modes, so the document outline never depends
             on which mode is active. */}
-        {editingSubject ? (
-          <>
-            <h1 className="sr-only">{ticket.subject}</h1>
-            <Input
-              autoFocus
-              className="w-full max-w-xl text-title"
-              // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
-              // rejected edit can be explicitly reverted, mirroring
-              // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern:
-              // `subjectDraft` starts `null` and falls back to the server's
-              // own value until the field is actually touched.
-              value={subjectDraft ?? ticket.subject}
-              aria-label={t("detail.subjectLabel")}
-              onChange={(event) => setSubjectDraft(event.target.value)}
-              onKeyDown={(event) => {
-                // Escape abandons the edit; the draft resets so reopening
-                // starts from the server's value, never a stale keystroke.
-                if (event.key === "Escape") {
-                  setSubjectDraft(ticket.subject);
+          {editingSubject ? (
+            <>
+              <h1 className="sr-only">{ticket.subject}</h1>
+              <Input
+                autoFocus
+                className="w-full max-w-xl text-title"
+                // Batch 5 (UX audit) — controlled (not `defaultValue`) so a
+                // rejected edit can be explicitly reverted, mirroring
+                // `SlaPolicyRow`'s own blur-commit-with-revert-on-error pattern:
+                // `subjectDraft` starts `null` and falls back to the server's
+                // own value until the field is actually touched.
+                value={subjectDraft ?? ticket.subject}
+                aria-label={t("detail.subjectLabel")}
+                onChange={(event) => setSubjectDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  // Escape abandons the edit; the draft resets so reopening
+                  // starts from the server's value, never a stale keystroke.
+                  if (event.key === "Escape") {
+                    setSubjectDraft(ticket.subject);
+                    setEditingSubject(false);
+                  }
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+                onBlur={() => {
+                  const value = subjectDraft?.trim();
+                  if (value && subjectDraft !== ticket.subject) {
+                    onSubjectCommit(value, { onError: () => setSubjectDraft(ticket.subject) });
+                  }
                   setEditingSubject(false);
-                }
-                if (event.key === "Enter") {
-                  event.currentTarget.blur();
-                }
-              }}
-              onBlur={() => {
-                const value = subjectDraft?.trim();
-                if (value && subjectDraft !== ticket.subject) {
-                  onSubjectCommit(value, { onError: () => setSubjectDraft(ticket.subject) });
-                }
-                setEditingSubject(false);
-              }}
-            />
-          </>
-        ) : (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="min-w-0 break-words text-title text-ink">{ticket.subject}</h1>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              ref={subjectEditTriggerRef}
-              onClick={() => setEditingSubject(true)}
-            >
-              {t("detail.subjectEdit")}
-            </Button>
-          </div>
-        )}
+                }}
+              />
+            </>
+          ) : (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h1 className="min-w-0 break-words text-title text-ink">{ticket.subject}</h1>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                ref={subjectEditTriggerRef}
+                onClick={() => setEditingSubject(true)}
+              >
+                {t("detail.subjectEdit")}
+              </Button>
+            </div>
+          )}
+        </div>
+        {actions}
       </div>
 
       <dl className="flex flex-wrap gap-x-section gap-y-stack">
@@ -206,5 +214,73 @@ export function TicketHeader({
         </DescriptionItem>
       </dl>
     </header>
+  );
+}
+
+/**
+ * Story 202 (RD-3.2, recon TW-01) — the two things an agent most often does
+ * to a ticket: take it, and resolve it (or close/reopen it). Callbacks only:
+ * the view wires them to the very same handlers its inspector fields use,
+ * so a header action sends exactly the request, toast and error handling of
+ * the equivalent field. Disabled while that shared mutation is pending.
+ *
+ * The group's accessible name is "Ticket actions" — never "Status"/
+ * "Priority", which the inspector's own fields are found by.
+ */
+export function TicketHeaderActions({
+  status,
+  canAssignToMe,
+  pending,
+  onAssignToMe,
+  onSetStatus,
+}: {
+  status: TicketStatus;
+  /** The current agent is known and is not already the assignee. */
+  canAssignToMe: boolean;
+  pending: boolean;
+  onAssignToMe: () => void;
+  onSetStatus: (status: TicketStatus) => void;
+}) {
+  const t = useTranslations("tickets");
+  const open = status === "OPEN" || status === "IN_PROGRESS";
+  return (
+    <div
+      role="group"
+      aria-label={t("detail.actions.label")}
+      className="flex shrink-0 flex-wrap items-center gap-inline"
+    >
+      {canAssignToMe && (
+        <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onAssignToMe}>
+          {t("detail.actions.assignToMe")}
+        </Button>
+      )}
+      {open && (
+        <Button type="button" size="sm" disabled={pending} onClick={() => onSetStatus("RESOLVED")}>
+          {t("detail.actions.resolve")}
+        </Button>
+      )}
+      {status === "RESOLVED" && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={pending}
+          onClick={() => onSetStatus("CLOSED")}
+        >
+          {t("detail.actions.close")}
+        </Button>
+      )}
+      {!open && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={pending}
+          onClick={() => onSetStatus("OPEN")}
+        >
+          {t("detail.actions.reopen")}
+        </Button>
+      )}
+    </div>
   );
 }

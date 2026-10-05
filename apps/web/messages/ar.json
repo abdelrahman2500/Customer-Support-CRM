@@ -286,7 +286,14 @@
       "assignedAgentUpdateSuccess": "تم تعيين الوكيل إلى {agent}.",
       "departmentUpdateSuccess": "تم تحديث القسم إلى {department}.",
       "optionsLoading": "جارٍ التحميل…",
-      "subjectEdit": "تعديل"
+      "subjectEdit": "تعديل",
+      "actions": {
+        "label": "إجراءات التذكرة",
+        "assignToMe": "إسناد إليّ",
+        "resolve": "حل",
+        "close": "إغلاق",
+        "reopen": "إعادة فتح"
+      }
     },
     "sla": {
       "none": "لا يوجد هدف اتفاقية مستوى خدمة",
