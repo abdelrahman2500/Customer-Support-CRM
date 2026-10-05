@@ -21,7 +21,9 @@ describe("Avatar", () => {
   });
 
   it("announces presence through the accessible name, not colour alone", () => {
-    const { container } = render(<Avatar name="Ada Lovelace" presence="online" presenceLabel="Online" />);
+    const { container } = render(
+      <Avatar name="Ada Lovelace" presence="online" presenceLabel="Online" />,
+    );
     expect(screen.getByRole("img", { name: "Ada Lovelace, Online" })).toBeInTheDocument();
     const dot = container.querySelector('[data-presence="online"]');
     expect(dot).toHaveAttribute("aria-hidden", "true");
@@ -52,5 +54,14 @@ describe("Avatar", () => {
   ] as const)("size %s uses %s", (size, height) => {
     render(<Avatar name="Ada" size={size} />);
     expect(screen.getByRole("img", { name: "Ada" })).toHaveClass(height, "rounded-pill");
+  });
+
+  // Story 212 (PR-1.3) — "nobody assigned yet".
+  it("renders the unassigned variant as a dashed, named placeholder without initials", () => {
+    render(<Avatar name="Unassigned" variant="unassigned" />);
+    const avatar = screen.getByRole("img", { name: "Unassigned" });
+    expect(avatar).toHaveClass("border-dashed");
+    expect(avatar).not.toHaveTextContent("U");
+    expect(avatar.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 });

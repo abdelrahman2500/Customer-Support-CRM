@@ -71,7 +71,16 @@ describe("EmptyState design-language surface (Story 187)", () => {
     );
     expect(container.firstElementChild).toHaveClass("rounded-surface", "px-6", "py-10");
     const disc = screen.getByTestId("glyph").parentElement;
-    expect(disc).toHaveClass("rounded-pill", "bg-surface-muted");
+    // Story 212 (PR-1.3) — the panel itself is now tinted, so the disc sits
+    // on the surface with a hairline to stay distinct from it.
+    expect(disc).toHaveClass("rounded-pill", "bg-surface", "ring-rule");
     expect(disc).toHaveAttribute("aria-hidden", "true");
+  });
+
+  // Story 212 (PR-1.3) — v2: a quiet tinted panel, not a dashed drop-zone box.
+  it("renders as a quiet tinted panel without a dashed border", () => {
+    const { container } = render(<EmptyState title="Nothing here" />);
+    expect(container.firstElementChild).toHaveClass("bg-surface-muted/60");
+    expect(container.firstElementChild).not.toHaveClass("border-dashed");
   });
 });

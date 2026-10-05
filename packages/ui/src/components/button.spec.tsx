@@ -142,4 +142,13 @@ describe("Button design-language API (Story 185)", () => {
     render(<Button>Send</Button>);
     expect(screen.getByRole("button", { name: "Send" })).toHaveClass("active:bg-accent-active");
   });
+
+  // Story 212 (PR-1.3) — a quiet action on the ink chrome.
+  it("offers a chrome variant on the chrome tokens", () => {
+    render(<Button variant="chrome">Collapse</Button>);
+    expect(screen.getByRole("button", { name: "Collapse" })).toHaveClass(
+      "text-chrome-muted",
+      "hover:bg-chrome-raised",
+    );
+  });
 });

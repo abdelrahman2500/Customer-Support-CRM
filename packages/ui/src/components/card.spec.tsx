@@ -62,12 +62,17 @@ describe("Card", () => {
     expect(card.firstElementChild).toHaveClass("p-surface");
   });
 
-  it("is flat by default and can be raised for emphasis", () => {
+  // Story 212 (PR-1.3) — v2 elevation: resting cards never cast a shadow;
+  // "raised" emphasises with the stronger hairline instead.
+  it("is flat by default and can be raised for emphasis, never with a shadow", () => {
     const { container: flat } = render(<Card />);
-    expect(flat.firstElementChild).not.toHaveClass("shadow-resting");
+    expect(flat.firstElementChild).not.toHaveClass("border-rule-strong");
 
     const { container: raised } = render(<Card elevation="raised" />);
-    expect(raised.firstElementChild).toHaveClass("shadow-resting");
+    expect(raised.firstElementChild).toHaveClass("border-rule-strong");
+    for (const card of [flat.firstElementChild!, raised.firstElementChild!]) {
+      expect(card.className).not.toMatch(/(^|\s)shadow-/);
+    }
   });
 
   it("merges a caller className over the base classes", () => {
@@ -193,7 +198,8 @@ describe("SectionCard (Story 154)", () => {
       </SectionCard>,
     );
 
-    expect(container.firstElementChild).toHaveClass("shadow-resting", "mt-4");
+    // Story 212 (PR-1.3) — raised is the stronger hairline in v2.
+    expect(container.firstElementChild).toHaveClass("border-rule-strong", "mt-4");
   });
 
   it("uses no physical-direction utility, so it is correct under RTL", () => {

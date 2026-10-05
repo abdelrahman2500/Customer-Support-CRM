@@ -24,12 +24,16 @@ import { CollapsibleSectionCard } from "./collapsible-section-card";
  * equally important. `flat` is the default and reproduces today's look
  * exactly; `raised` is available for the one thing on a page that should draw
  * the eye. Nothing is migrated to `raised` in this story.
+ *
+ * Story 212 (PR-1.3, visual language v2) — borders before shadows: a resting
+ * card never casts a shadow (shadow is for things that float), so `raised`
+ * now emphasises with the stronger hairline instead of `shadow-resting`.
  */
 const cardVariants = cva("rounded-surface border border-rule bg-surface", {
   variants: {
     elevation: {
       flat: "",
-      raised: "shadow-resting",
+      raised: "border-rule-strong",
     },
   },
   defaultVariants: { elevation: "flat" },

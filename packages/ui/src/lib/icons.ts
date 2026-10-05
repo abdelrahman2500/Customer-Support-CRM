@@ -137,3 +137,7 @@ export {
 
 /** The shape every icon above satisfies, for a component that accepts one. */
 export type { LucideIcon } from "lucide-react";
+
+// Story 212 (PR-1.3) — the "nobody assigned yet" person glyph (Avatar's
+// unassigned variant).
+export { UserRound as UnassignedIcon } from "lucide-react";

@@ -37,6 +37,10 @@ export const buttonVariants = cva(
         outline:
           "border border-rule-strong bg-surface text-ink hover:bg-surface-muted active:bg-surface-sunk",
         ghost: "text-ink-strong hover:bg-surface-muted active:bg-surface-sunk",
+        // Story 212 (PR-1.3) — a quiet action on the ink chrome (rail, header
+        // band); the chrome's `.on-chrome` scope supplies a visible focus ring.
+        chrome:
+          "text-chrome-muted hover:bg-chrome-raised hover:text-chrome-ink active:bg-chrome-active",
         link: "text-accent underline-offset-4 hover:underline",
         destructive:
           "bg-danger-solid text-danger-solid-foreground hover:bg-danger-solid-hover active:bg-danger-solid-hover",

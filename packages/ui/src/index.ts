@@ -340,3 +340,6 @@ export { BarChart, DonutGauge, RatingBar, DistributionBar } from "./components/c
 export type { BarChartRow, BarSegment, DistributionSegment } from "./components/charts";
 export { Board, BoardColumn } from "./components/board";
 export type { BoardColumnProps } from "./components/board";
+
+// --- Story 212 (PR-1.3) — primitive restyle v2 ------------------------------
+export { UnassignedIcon } from "./lib/icons";

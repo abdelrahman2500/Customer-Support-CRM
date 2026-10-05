@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "../lib/cn";
+import { UnassignedIcon } from "../lib/icons";
 
 /**
  * Story 189 (RD-1.12) — a person's avatar: their image, or initials when there
@@ -24,6 +25,12 @@ export interface AvatarProps extends Omit<React.HTMLAttributes<HTMLSpanElement>,
   presenceLabel?: string;
   /** The name is already visible beside the avatar: hide it from assistive tech. */
   decorative?: boolean;
+  /**
+   * Story 212 (PR-1.3) — `unassigned`: a dashed placeholder with a person
+   * glyph instead of initials, for "nobody yet" (a ticket card's assignee).
+   * `name` is then the accessible name ("Unassigned").
+   */
+  variant?: "person" | "unassigned";
 }
 
 const SIZE: Record<AvatarSize, string> = {
@@ -67,6 +74,7 @@ export function Avatar({
   presence,
   presenceLabel,
   decorative = false,
+  variant = "person",
   className,
   ...props
 }: AvatarProps) {
@@ -81,13 +89,18 @@ export function Avatar({
       aria-label={decorative ? undefined : label}
       aria-hidden={decorative ? true : undefined}
       className={cn(
-        "relative inline-flex shrink-0 select-none items-center justify-center rounded-pill bg-accent-surface font-medium text-accent-hover",
+        "relative inline-flex shrink-0 select-none items-center justify-center rounded-pill font-medium",
+        variant === "unassigned"
+          ? "border border-dashed border-rule-control text-ink-subtle"
+          : "bg-accent-surface text-accent-hover",
         SIZE[size],
         className,
       )}
       {...props}
     >
-      {showImage ? (
+      {variant === "unassigned" ? (
+        <UnassignedIcon aria-hidden="true" className="h-3/5 w-3/5" />
+      ) : showImage ? (
         <img
           src={src!}
           alt=""

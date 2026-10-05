@@ -59,7 +59,10 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center gap-2 rounded-surface border border-dashed border-rule-strong px-6 py-10 text-center",
+        // Story 212 (PR-1.3) — v2: a quiet tinted panel rather than a dashed
+        // box (a dashed edge reads as a drop target), at home both inside a
+        // card and on the canvas.
+        "flex flex-col items-center gap-2 rounded-surface bg-surface-muted/60 px-6 py-10 text-center",
         className,
       )}
       {...props}
@@ -68,7 +71,7 @@ export function EmptyState({
           design language's empty-state mark. */}
       {icon ? (
         <span
-          className="mb-1 flex h-10 w-10 items-center justify-center rounded-pill bg-surface-muted text-ink-muted"
+          className="mb-1 flex h-12 w-12 items-center justify-center rounded-pill bg-surface text-ink-muted ring-1 ring-rule"
           aria-hidden="true"
         >
           {icon}
