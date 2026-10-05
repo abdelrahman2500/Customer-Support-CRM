@@ -20,6 +20,7 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
+    "prisma:seed:demo": "tsx prisma/seed-demo.ts",
     "migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
