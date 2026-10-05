@@ -24,7 +24,9 @@ test("a customer signs in to the portal and submits a new ticket", async ({ page
 
   await page.goto("/en/login");
   await page.getByLabel("Email").fill(contactEmail);
-  await page.getByLabel("Password").fill(contactPassword);
+  // Story 214 (PR-2.2) — exact: the sign-in field now has a "Show password"
+  // toggle beside it, and getByLabel also substring-matches aria-label.
+  await page.getByLabel("Password", { exact: true }).fill(contactPassword);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/home$/);
 

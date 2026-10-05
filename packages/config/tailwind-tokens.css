@@ -561,6 +561,20 @@
   :lang(ar) .text-body-lg {
     line-height: 1.75rem;
   }
+  /**
+   * Story 214 (PR-2.2) — the Arabic face actually renders. `next/font`
+   * expands --font-plex-sans to `"IBM Plex Sans", "IBM Plex Sans Fallback"`,
+   * and that metric-matched fallback (a system face with Arabic glyphs) sat
+   * before Plex Sans Arabic in the stack, so Arabic text never reached it
+   * (the deferred RD-1.4 "fallback face" finding). Under `:lang(ar)` the
+   * Arabic family leads — it carries Latin glyphs too — and Latin pages keep
+   * their adjusted fallback. Outranks the `font-sans` utility on <body>.
+   */
+  :lang(ar) .font-sans,
+  html:lang(ar) {
+    font-family:
+      var(--font-plex-arabic), var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  }
   /** Story 179 (RD-1.2) — motion never runs for users who asked it not to. */
   @media (prefers-reduced-motion: reduce) {
     *,

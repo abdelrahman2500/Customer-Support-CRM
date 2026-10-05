@@ -6,10 +6,12 @@ import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router"
 import { useTranslations } from "next-intl";
 import {
   Alert,
+  AuthLayout,
   Button,
-  Card,
   FormField,
   Input,
+  PasswordInput,
+  PasswordToggle,
   KnowledgeBaseIcon,
   NotificationsIcon,
   TicketsIcon,
@@ -84,6 +86,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   /**
    * Story 168 — the pre-auth locale switch. Deliberately NOT
@@ -141,155 +144,88 @@ export default function LoginPage() {
     }
   }
 
+  // Story 214 (PR-2.2) — the shared AuthLayout (form first in the DOM, the
+  // ink brand panel from lg), a password visibility toggle, and — since no
+  // reset flow exists (decision PD-7) — a help hint instead of a
+  // "Forgot password?" link to nowhere. Sign-in behaviour is unchanged.
   return (
-    <main className="min-h-screen bg-surface-sunk">
-      <div className="mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col lg:flex-row">
-        {/*
-         * The sign-in column comes FIRST in the DOM and is moved to the
-         * logical end at `lg` with `order-last`. That keeps the document
-         * outline correct — this column owns the page's single `h1`, and the
-         * brand panel's `h2` follows it — and keeps the keyboard on the form
-         * rather than tabbing through a panel that holds no controls.
-         * `order-*` is flex order, not a physical direction, so the split
-         * mirrors correctly under `dir="rtl"` with nothing to configure.
-         */}
-        <section className="flex flex-1 flex-col px-surface py-shell sm:px-shell lg:order-last">
-          {/* The locale switcher sits on the page, not inside the panel: it is a
-              property of how you read this screen, not a field you fill in.
-              `justify-end` is logical, so it lands on the correct edge in both
-              directions without a single `ml-*`/`mr-*`. */}
-          <div className="flex flex-wrap justify-end gap-inline">
-            {/* Story 182 (RD-1.5) — the shared NativeSelect and ThemeSwitcher:
-                appearance is chosen here too, before signing in. */}
-            <NativeSelect
-              aria-label={tHome("languageSwitcher.label")}
-              size="md"
-              value={locale}
-              onValueChange={(value) => handleSwitchLocale(value)}
-              options={LOCALES.map((localeOption) => ({
-                value: localeOption,
-                label: tHome(`languageSwitcher.options.${localeOption}`),
-              }))}
-            />
-            <ThemeSwitcher
-              label={tHome("themeSwitcher.label")}
-              size="md"
-              optionLabels={{
-                system: tHome("themeSwitcher.options.system"),
-                light: tHome("themeSwitcher.options.light"),
-                dark: tHome("themeSwitcher.options.dark"),
-              }}
-            />
-          </div>
-
-          <div className="flex flex-1 items-center justify-center">
-            <div className="w-full max-w-sm">
-              {/* Identity block, outside the panel. Two steps of one hierarchy:
-                  which product this is, then what you are doing in it. */}
-              <div className="mb-stack flex flex-col gap-tight text-center">
-                {/* Story 175 — `lg:hidden`: from `lg` up the brand panel owns
-                    the product name, so printing it here too would say the
-                    same thing twice on one screen. Below `lg` the panel is
-                    not rendered and this is the only identity on the page. */}
-                <span className="text-sm font-medium text-ink-muted lg:hidden">
-                  {tCommon("appName")}
-                </span>
-                <h1 className="text-title text-ink">{t("title")}</h1>
-              </div>
-
-              <Card elevation="raised" className="overflow-hidden">
-                {/* The one piece of deliberate product chrome on this screen.
-                    Decorative and `aria-hidden`; it carries no information and is
-                    not reachable. `bg-accent` is the existing primary token, so a
-                    future branding colour repoints it with no edit here. */}
-                <div aria-hidden className="h-1 w-full bg-accent" />
-                <div className="flex flex-col gap-stack p-surface sm:p-shell">
-                  {sessionExpired && !error && <Alert>{tCommon("errors.unauthorized")}</Alert>}
-                  <form className="flex flex-col gap-stack" onSubmit={handleSubmit}>
-                    <FormField density="comfortable" label={t("email")}>
-                      <Input
-                        type="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        required
-                        autoComplete="email"
-                        autoFocus
-                      />
-                    </FormField>
-                    <FormField density="comfortable" label={t("password")}>
-                      <Input
-                        type="password"
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        required
-                        autoComplete="current-password"
-                      />
-                    </FormField>
-                    {error && <Alert variant="destructive">{error}</Alert>}
-                    <Button type="submit" size="lg" isLoading={submitting}>
-                      {submitting ? t("signingIn") : t("signIn")}
-                    </Button>
-                  </form>
-                </div>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        {/*
-         * Story 175 — the brand panel. Real content, not decoration, so it is
-         * NOT `aria-hidden`; below `lg` it is simply not rendered, because a
-         * shrunken marketing panel stacked above a login form is noise on a
-         * phone rather than a fallback.
-         *
-         * The gradient runs `to-b` rather than diagonally on purpose: a
-         * vertical gradient is identical under both reading directions, so
-         * there is no RTL asymmetry to correct. Both stops are existing
-         * tokens, so a branch's configured accent repoints this panel with no
-         * edit here.
-         */}
-        <aside className="relative hidden overflow-hidden bg-gradient-to-b from-accent to-accent-hover text-accent-foreground lg:flex lg:flex-1 lg:flex-col lg:justify-center lg:p-shell">
-          {/* Abstract depth only — `aria-hidden`, positioned with logical
-              insets so the composition mirrors under RTL. */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -top-24 -start-24 h-80 w-80 rounded-pill bg-accent-foreground/10 blur-3xl"
+    <AuthLayout
+      productName={tCommon("appName")}
+      title={t("title")}
+      controls={
+        <>
+          {/* Story 182 (RD-1.5) — appearance and language are chosen here too,
+              before signing in. */}
+          <NativeSelect
+            aria-label={tHome("languageSwitcher.label")}
+            size="md"
+            value={locale}
+            onValueChange={(value) => handleSwitchLocale(value)}
+            options={LOCALES.map((localeOption) => ({
+              value: localeOption,
+              label: tHome(`languageSwitcher.options.${localeOption}`),
+            }))}
           />
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -bottom-32 -end-16 h-96 w-96 rounded-pill bg-accent-surface/20 blur-3xl"
+          <ThemeSwitcher
+            label={tHome("themeSwitcher.label")}
+            size="md"
+            optionLabels={{
+              system: tHome("themeSwitcher.options.system"),
+              light: tHome("themeSwitcher.options.light"),
+              dark: tHome("themeSwitcher.options.dark"),
+            }}
           />
-
-          <div className="relative flex max-w-lg flex-col gap-stack">
-            <span className="text-sm font-medium text-accent-foreground">
-              {tCommon("appName")}
-            </span>
-            <h2 className="text-title">{t("marketing.headline")}</h2>
-            <p className="text-sm text-accent-foreground">{t("marketing.subheadline")}</p>
-
-            <ul className="mt-stack flex flex-col gap-stack">
-              {FEATURES.map(({ key, Icon }) => (
-                <li key={key} className="flex items-start gap-inline">
-                  <span
-                    aria-hidden
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-surface bg-accent-foreground/10"
-                  >
-                    <Icon className="h-4 w-4" aria-hidden />
-                  </span>
-                  <span className="flex flex-col gap-tight">
-                    <span className="text-sm font-semibold">
-                      {t(`marketing.features.${key}.title`)}
-                    </span>
-                    <span className="text-sm text-accent-foreground">
-                      {t(`marketing.features.${key}.description`)}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-      </div>
-    </main>
+        </>
+      }
+      panel={{
+        headline: t("marketing.headline"),
+        subheadline: t("marketing.subheadline"),
+        features: FEATURES.map(({ key, Icon }) => ({
+          key,
+          icon: Icon,
+          title: t(`marketing.features.${key}.title`),
+          description: t(`marketing.features.${key}.description`),
+        })),
+      }}
+    >
+      {sessionExpired && !error && <Alert>{tCommon("errors.unauthorized")}</Alert>}
+      <form className="flex flex-col gap-stack" onSubmit={handleSubmit}>
+        <FormField density="comfortable" label={t("email")}>
+          <Input
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            autoComplete="email"
+            autoFocus
+          />
+        </FormField>
+        <FormField
+          density="comfortable"
+          label={t("password")}
+          action={
+            <PasswordToggle
+              visible={passwordVisible}
+              onVisibleChange={setPasswordVisible}
+              showLabel={t("showPassword")}
+              hideLabel={t("hidePassword")}
+            />
+          }
+        >
+          <PasswordInput
+            visible={passwordVisible}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        </FormField>
+        {error && <Alert variant="destructive">{error}</Alert>}
+        <Button type="submit" size="lg" isLoading={submitting}>
+          {submitting ? t("signingIn") : t("signIn")}
+        </Button>
+      </form>
+      <p className="text-center text-caption text-ink-subtle">{t("forgotPasswordHint")}</p>
+    </AuthLayout>
   );
 }

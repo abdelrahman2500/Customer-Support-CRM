@@ -65,6 +65,8 @@ const ROLES = [
   "AttachIcon",
   "AiSummaryIcon",
   "UnassignedIcon",
+  "ShowPasswordIcon",
+  "HidePasswordIcon",
 ] as const;
 
 describe("icon vocabulary", () => {

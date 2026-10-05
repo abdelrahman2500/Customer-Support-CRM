@@ -35,7 +35,9 @@ test("an admin switches the workspace navigation to a sidebar, and it persists",
 
   await page.goto("/en/login");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
+  // Story 214 (PR-2.2) — exact: the sign-in field now has a "Show password"
+  // toggle beside it, and getByLabel also substring-matches aria-label.
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/tickets$/);
 

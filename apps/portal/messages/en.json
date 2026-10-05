@@ -33,9 +33,12 @@
     "title": "Sign in",
     "email": "Email",
     "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "signIn": "Sign in",
     "signingIn": "Signing in...",
     "loginFailed": "Sign-in failed. Check your email and password and try again.",
+    "forgotPasswordHint": "Forgot your password? Contact our support team to reset it.",
     "marketing": {
       "headline": "Get help and follow it through.",
       "subheadline": "Send a request, watch its progress, and find answers on your own.",

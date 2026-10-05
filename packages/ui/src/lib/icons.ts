@@ -141,3 +141,6 @@ export type { LucideIcon } from "lucide-react";
 // Story 212 (PR-1.3) — the "nobody assigned yet" person glyph (Avatar's
 // unassigned variant).
 export { UserRound as UnassignedIcon } from "lucide-react";
+
+// Story 214 (PR-2.2) — the password visibility toggle (sign-in screens).
+export { Eye as ShowPasswordIcon, EyeOff as HidePasswordIcon } from "lucide-react";

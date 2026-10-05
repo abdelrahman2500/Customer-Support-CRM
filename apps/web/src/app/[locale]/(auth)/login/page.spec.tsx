@@ -364,4 +364,31 @@ describe("LoginPage", () => {
       expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("marketing.headline");
     });
   });
+
+  // Story 214 (PR-2.2) — authentication v2.
+  describe("authentication v2 (Story 214)", () => {
+    it("toggles the password visibility from a named button, without submitting", () => {
+      render(<LoginPage />);
+      const password = screen.getByLabelText("password");
+      expect(password).toHaveAttribute("type", "password");
+      fireEvent.click(screen.getByRole("button", { name: "showPassword" }));
+      expect(password).toHaveAttribute("type", "text");
+      expect(screen.getByRole("button", { name: "hidePassword" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("explains how to recover a forgotten password instead of linking to a missing flow", () => {
+      render(<LoginPage />);
+      expect(screen.getByText("forgotPasswordHint")).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /forgot/i })).not.toBeInTheDocument();
+    });
+
+    it("draws the brand panel on the ink chrome", () => {
+      const { container } = render(<LoginPage />);
+      expect(container.querySelector("aside")).toHaveClass("bg-chrome", "on-chrome");
+    });
+  });
 });

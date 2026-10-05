@@ -94,7 +94,11 @@ function waitForTicketRoomJoin(page: Page, ticketId: string): Promise<void> {
 async function signInAsAgent(page: Page): Promise<void> {
   await page.goto("/en/login");
   await page.getByLabel("Email").fill(process.env.SEED_ADMIN_EMAIL as string);
-  await page.getByLabel("Password").fill(process.env.SEED_ADMIN_PASSWORD as string);
+  // Story 214 (PR-2.2) — exact: the sign-in field now has a "Show password"
+  // toggle beside it, and getByLabel also substring-matches aria-label.
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill(process.env.SEED_ADMIN_PASSWORD as string);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/en\/tickets$/);
 }
@@ -103,7 +107,7 @@ async function signInAsAgent(page: Page): Promise<void> {
 async function signInAsCustomer(page: Page, email: string, password: string): Promise<void> {
   await page.goto("/en/login");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/en\/home$/);
 }

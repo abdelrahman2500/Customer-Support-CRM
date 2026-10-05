@@ -101,6 +101,15 @@ describe("design token contrast (light)", () => {
     }
   });
 
+  // Story 214 (PR-2.2) — Arabic text must reach Plex Sans Arabic, not the
+  // metric fallback next/font puts inside --font-plex-sans.
+  it("leads with the Arabic face under :lang(ar) (Story 214)", () => {
+    const source = readFileSync(TOKENS, "utf8");
+    expect(source).toMatch(
+      /:lang\(ar\) \.font-sans,\s*html:lang\(ar\) \{\s*font-family:\s*var\(--font-plex-arabic\), var\(--font-plex-sans\)/,
+    );
+  });
+
   it("neutralises animation and transition under prefers-reduced-motion (Story 179)", () => {
     const source = readFileSync(TOKENS, "utf8");
     const rule = source.slice(source.indexOf("@media (prefers-reduced-motion: reduce)"));

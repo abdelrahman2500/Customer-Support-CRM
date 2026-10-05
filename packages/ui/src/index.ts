@@ -343,3 +343,10 @@ export type { BoardColumnProps } from "./components/board";
 
 // --- Story 212 (PR-1.3) — primitive restyle v2 ------------------------------
 export { UnassignedIcon } from "./lib/icons";
+
+// --- Story 214 (PR-2.2) — authentication v2 ---------------------------------
+export { AuthLayout } from "./components/auth-layout";
+export type { AuthFeature, AuthLayoutProps } from "./components/auth-layout";
+export { PasswordInput, PasswordToggle } from "./components/password-input";
+export type { PasswordInputProps, PasswordToggleProps } from "./components/password-input";
+export { ShowPasswordIcon, HidePasswordIcon } from "./lib/icons";

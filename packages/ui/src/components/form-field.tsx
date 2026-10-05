@@ -84,6 +84,13 @@ export interface FormFieldProps {
    * native `required` attribute, which would change submit behaviour.
    */
   required?: boolean;
+  /**
+   * Story 214 (PR-2.2) — a control that acts on the field (e.g. a password
+   * visibility toggle), drawn over the end of a default-height (md) control
+   * but rendered OUTSIDE the <label>, so its name never joins the field's
+   * accessible name ("Password", not "Password Show password").
+   */
+  action?: React.ReactNode;
 }
 
 const DENSITY = {
@@ -111,6 +118,7 @@ export function FormField({
   density = "compact",
   className,
   required = false,
+  action,
 }: FormFieldProps) {
   const generatedId = React.useId();
   const hintId = `${generatedId}-hint`;
@@ -123,35 +131,34 @@ export function FormField({
   // Caller's own description first, then ours. An empty result becomes
   // `undefined` so no `aria-describedby=""` is emitted.
   const describedBy =
-    [
-      control?.props["aria-describedby"],
-      hint ? hintId : undefined,
-      error ? errorId : undefined,
-    ]
+    [control?.props["aria-describedby"], hint ? hintId : undefined, error ? errorId : undefined]
       .filter(Boolean)
       .join(" ") || undefined;
 
   return (
     <div className={cn("flex flex-col gap-tight", DENSITY[density], className)}>
-      <label className="flex flex-col gap-tight">
-        <span>
-          {label}
-          {required && (
-            <span aria-hidden="true" className="ms-0.5 text-danger-foreground">
-              *
-            </span>
-          )}
-        </span>
-        {control
-          ? React.cloneElement(control, {
-              "aria-describedby": describedBy,
-              // `??`, not `||`: an explicit `aria-invalid={false}` from the
-              // caller is a real answer and must survive.
-              "aria-invalid": control.props["aria-invalid"] ?? (error ? true : undefined),
-              "aria-required": control.props["aria-required"] ?? (required || undefined),
-            })
-          : children}
-      </label>
+      <div className="relative">
+        <label className="flex flex-col gap-tight">
+          <span>
+            {label}
+            {required && (
+              <span aria-hidden="true" className="ms-0.5 text-danger-foreground">
+                *
+              </span>
+            )}
+          </span>
+          {control
+            ? React.cloneElement(control, {
+                "aria-describedby": describedBy,
+                // `??`, not `||`: an explicit `aria-invalid={false}` from the
+                // caller is a real answer and must survive.
+                "aria-invalid": control.props["aria-invalid"] ?? (error ? true : undefined),
+                "aria-required": control.props["aria-required"] ?? (required || undefined),
+              })
+            : children}
+        </label>
+        {action && <div className="absolute bottom-0 end-1 flex h-10 items-center">{action}</div>}
+      </div>
       {hint && (
         <span id={hintId} className="text-xs text-ink-subtle">
           {hint}

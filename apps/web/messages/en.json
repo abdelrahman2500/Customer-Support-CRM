@@ -55,9 +55,12 @@
     "title": "Sign in",
     "email": "Email",
     "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "signIn": "Sign in",
     "signingIn": "Signing in...",
     "loginFailed": "Sign-in failed. Check your email and password and try again.",
+    "forgotPasswordHint": "Forgot your password? Ask your administrator to reset it.",
     "marketing": {
       "headline": "Support your customers from one place.",
       "subheadline": "Track every ticket, reply faster, and keep your whole team aligned.",
