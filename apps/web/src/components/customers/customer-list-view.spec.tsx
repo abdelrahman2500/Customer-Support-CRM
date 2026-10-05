@@ -449,4 +449,29 @@ describe("CustomerListView", () => {
       expect(replace).not.toHaveBeenCalled();
     });
   });
+
+  // Story 222 (PR-4.1, RD-4.4) — the shared list toolbar and avatar rows.
+  it("announces the result count and shows an avatar beside each name", () => {
+    mockedUseCustomersQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: page(
+          [
+            {
+              id: "customer-1",
+              displayName: "Acme Inc.",
+              isActive: true,
+              createdAt: "2026-01-01T00:00:00.000Z",
+              anonymizedAt: null,
+            },
+          ],
+          { total: 41 },
+        ),
+      }) as never,
+    );
+    render(<CustomerListView />);
+    expect(screen.getByRole("status")).toHaveTextContent('list.summary:{"count":41}');
+    const link = screen.getByRole("link", { name: "Acme Inc." });
+    expect(link.parentElement?.querySelector("[aria-hidden='true']")).not.toBeNull();
+  });
 });

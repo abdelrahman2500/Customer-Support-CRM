@@ -532,6 +532,10 @@ describe("CustomerDetailView", () => {
       render(<CustomerDetailView customerId="customer-1" />);
       fireEvent.click(screen.getByText("list.active"));
       fireEvent.click(await screen.findByRole("option", { name: "list.inactive" }));
+      // Story 222 (RD-4.5) — a status change is confirmed first; same payload.
+      expect(mutate).not.toHaveBeenCalled();
+      const confirm = screen.getByRole("alertdialog");
+      fireEvent.click(within(confirm).getByRole("button", { name: "detail.deactivateConfirm" }));
 
       expect(mutate).toHaveBeenCalledWith({ isActive: false });
     });
@@ -693,6 +697,8 @@ describe("CustomerDetailView", () => {
       mockedUseCreateContactMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
+      // Story 222 (RD-4.5) — the add-contact form now opens in a dialog.
+      fireEvent.click(screen.getByRole("button", { name: "detail.addContactOpen" }));
       // "detail.contactFullNameLabel"/"detail.contactEmailLabel" also label
       // each existing contact row's inline-edit fields — scope to the
       // add-contact form itself (found via its own submit button).
@@ -711,9 +717,13 @@ describe("CustomerDetailView", () => {
           email: "new@acme.test",
         }),
       );
-      await waitFor(() =>
-        expect(within(form).getByLabelText("detail.contactFullNameLabel")).toHaveValue(""),
-      );
+      // Story 222 — success closes the dialog; reopening starts from an empty form.
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      fireEvent.click(screen.getByRole("button", { name: "detail.addContactOpen" }));
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("dialog")).getByLabelText("detail.contactFullNameLabel"),
+      ).toHaveValue("");
     });
 
     it("renders the backend's own message inline when adding a contact fails", async () => {
@@ -721,6 +731,8 @@ describe("CustomerDetailView", () => {
       mockedUseCreateContactMutation.mockReturnValue(idleMutation({ mutateAsync }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
+      // Story 222 (RD-4.5) — the add-contact form now opens in a dialog.
+      fireEvent.click(screen.getByRole("button", { name: "detail.addContactOpen" }));
       const form = screen.getByText("detail.addContactSubmit").closest("form") as HTMLFormElement;
       fireEvent.change(within(form).getByLabelText("detail.contactFullNameLabel"), {
         target: { value: "New Contact" },
@@ -761,12 +773,16 @@ describe("CustomerDetailView", () => {
     // trigger must agree rather than looking like a routine secondary action.
     it("styles the submit trigger as destructive, matching its own confirmation dialog", () => {
       render(<CustomerDetailView customerId="customer-1" />);
+      // Story 222 (RD-4.5) — the password form opens in a dialog per contact.
+      fireEvent.click(screen.getByRole("button", { name: /detail.portalPasswordOpenFor/ }));
 
       expect(screen.getByText("detail.portalPasswordSubmit")).toHaveClass("bg-danger-solid");
     });
 
     it("keeps the submit button disabled until the draft is at least 8 characters", () => {
       render(<CustomerDetailView customerId="customer-1" />);
+      // Story 222 (RD-4.5) — the password form opens in a dialog per contact.
+      fireEvent.click(screen.getByRole("button", { name: /detail.portalPasswordOpenFor/ }));
 
       const input = screen.getByPlaceholderText("detail.portalPasswordPlaceholder");
       const submit = screen.getByText("detail.portalPasswordSubmit");
@@ -784,6 +800,8 @@ describe("CustomerDetailView", () => {
       mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation({ mutate }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
+      // Story 222 (RD-4.5) — the password form opens in a dialog per contact.
+      fireEvent.click(screen.getByRole("button", { name: /detail.portalPasswordOpenFor/ }));
       const input = screen.getByPlaceholderText("detail.portalPasswordPlaceholder");
       fireEvent.change(input, { target: { value: "newpassword1" } });
       fireEvent.blur(input);
@@ -800,6 +818,8 @@ describe("CustomerDetailView", () => {
       mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation({ mutate }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
+      // Story 222 (RD-4.5) — the password form opens in a dialog per contact.
+      fireEvent.click(screen.getByRole("button", { name: /detail.portalPasswordOpenFor/ }));
       const input = screen.getByPlaceholderText("detail.portalPasswordPlaceholder");
       fireEvent.change(input, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "detail.portalPasswordSubmit" }));
@@ -824,6 +844,8 @@ describe("CustomerDetailView", () => {
       mockedUseSetContactPortalPasswordMutation.mockReturnValue(idleMutation({ mutate }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
+      // Story 222 (RD-4.5) — the password form opens in a dialog per contact.
+      fireEvent.click(screen.getByRole("button", { name: /detail.portalPasswordOpenFor/ }));
       const input = screen.getByPlaceholderText("detail.portalPasswordPlaceholder");
       fireEvent.change(input, { target: { value: "newpassword1" } });
       fireEvent.click(screen.getByRole("button", { name: "detail.portalPasswordSubmit" }));
@@ -833,9 +855,13 @@ describe("CustomerDetailView", () => {
         capturedOnSuccess?.();
       });
 
-      expect(input).toHaveValue("");
+      // Story 222 — success closes both dialogs and reports in the row;
+      // reopening starts from an empty field.
       expect(screen.getByText("detail.portalPasswordSuccess")).toBeInTheDocument();
       expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /detail.portalPasswordOpenFor/ }));
+      expect(screen.getByPlaceholderText("detail.portalPasswordPlaceholder")).toHaveValue("");
     });
 
     it("renders the backend's own message inline when the mutation fails", () => {
@@ -1329,6 +1355,8 @@ describe("CustomerDetailView", () => {
     );
 
     render(<CustomerDetailView customerId="customer-1" />);
+    // Story 222 (RD-4.5) — the field lives in the contact's portal dialog.
+    fireEvent.click(screen.getByRole("button", { name: /detail.portalPasswordOpenFor/ }));
 
     expect(screen.getByLabelText("detail.portalPasswordLabel")).toBeInTheDocument();
   });
@@ -1354,5 +1382,63 @@ describe("CustomerDetailView", () => {
 
     // The skeleton's own visuals are unchanged.
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+  });
+
+  // Story 222 (PR-4.1, RD-4.5) — customers v2.
+  describe("customers v2 (Story 222)", () => {
+    beforeEach(() => {
+      mockedUseCustomerQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: { id: "customer-1", displayName: "Acme Inc.", isActive: true, contacts: [] },
+        }) as never,
+      );
+    });
+
+    it("sends nothing when a status change is cancelled", async () => {
+      const mutate = vi.fn();
+      mockedUseUpdateCustomerMutation.mockReturnValue(idleMutation({ mutate }) as never);
+      render(<CustomerDetailView customerId="customer-1" />);
+      fireEvent.click(screen.getByText("list.active"));
+      fireEvent.click(await screen.findByRole("option", { name: "list.inactive" }));
+      const confirm = screen.getByRole("alertdialog");
+      expect(confirm).toHaveTextContent('detail.deactivateConfirmTitle:{"name":"Acme Inc."}');
+      fireEvent.click(within(confirm).getByRole("button", { name: /cancel/i }));
+      expect(mutate).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    });
+
+    it("opens the customer's tickets on the board, filtered to this customer", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: page([
+            {
+              id: "ticket-1",
+              subject: "Cannot log in",
+              status: "OPEN",
+              priority: "HIGH",
+              customerId: "customer-1",
+              createdAt: "2026-01-01T00:00:00.000Z",
+            },
+          ]),
+        }) as never,
+      );
+      render(<CustomerDetailView customerId="customer-1" />);
+      expect(screen.getByRole("link", { name: "detail.ticketsOnBoard" })).toHaveAttribute(
+        "href",
+        "/en/tickets?view=board&customerId=customer-1",
+      );
+    });
+
+    it("shows empty sections as empty states", () => {
+      mockedUseTicketsQuery.mockReturnValue(
+        queryResult({ isSuccess: true, data: page([]) }) as never,
+      );
+      render(<CustomerDetailView customerId="customer-1" />);
+      // The shared EmptyState panel, not a bare paragraph.
+      expect(screen.getByText("detail.ticketsEmpty").parentElement).toHaveClass("bg-surface-muted/60");
+      expect(screen.getByRole("button", { name: "detail.addContactOpen" })).toBeInTheDocument();
+    });
   });
 });

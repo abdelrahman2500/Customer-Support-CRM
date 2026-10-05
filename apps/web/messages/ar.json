@@ -487,7 +487,10 @@
         "cancelled": "تم إلغاء النقل.",
         "failed": "تعذر نقل {subject}: {reason}"
       },
-      "moveCollision": "غيّر شخص آخر هذه التذكرة أيضًا؛ تم تطبيق النقل الذي أجريته."
+      "moveCollision": "غيّر شخص آخر هذه التذكرة أيضًا؛ تم تطبيق النقل الذي أجريته.",
+      "customerFilter": "العميل: {name}",
+      "customerFilterRemove": "إزالة تصفية العميل ({name})",
+      "customerFallback": "هذا العميل"
     }
   },
   "customers": {
@@ -507,7 +510,12 @@
         "name": "الاسم",
         "status": "الحالة",
         "createdAt": "تاريخ الإنشاء"
-      }
+      },
+      "clearSearch": "مسح البحث",
+      "filters": "عوامل التصفية",
+      "closeFilters": "إغلاق عوامل التصفية",
+      "clearAll": "مسح الكل",
+      "summary": "{count, plural, one {عميل واحد} two {عميلان} few {# عملاء} many {# عميلًا} other {# عميل}}"
     },
     "detail": {
       "backToList": "العودة إلى العملاء",
@@ -568,7 +576,20 @@
       "anonymizedRetentionNote": "تمت إزالة التفاصيل التعريفية والوصول إلى البوابة. تم الاحتفاظ بالتذاكر وسجلات اتفاقية مستوى الخدمة وسجل التقارير، ولم يتم محو نص الرسائل والملاحظات وتعليقات الاستبيانات والملفات المرفوعة.",
       "anonymizeForbidden": "لا تملك صلاحية إخفاء هوية عميل.",
       "anonymizeFailed": "تعذّر إخفاء هوية هذا العميل. حاول مرة أخرى.",
-      "displayNameEdit": "تعديل"
+      "displayNameEdit": "تعديل",
+      "portalPasswordOpen": "تعيين كلمة مرور البوابة",
+      "portalPasswordOpenFor": "تعيين كلمة مرور البوابة لـ {name}",
+      "portalPasswordDialogTitle": "كلمة مرور البوابة لـ {name}",
+      "closeDialog": "إغلاق",
+      "addContactOpen": "إضافة جهة اتصال",
+      "addContactTitle": "إضافة جهة اتصال",
+      "activateConfirmTitle": "إعادة تنشيط {name}؟",
+      "activateConfirmDescription": "سيُعلَّم العميل نشطًا مرة أخرى في مساحة العمل.",
+      "activateConfirm": "إعادة التنشيط",
+      "deactivateConfirmTitle": "تعليم {name} كغير نشط؟",
+      "deactivateConfirmDescription": "سيُعلَّم العميل غير نشط في مساحة العمل. يمكنك إعادة تنشيطه في أي وقت.",
+      "deactivateConfirm": "تعليم كغير نشط",
+      "ticketsOnBoard": "عرض هذه التذاكر على اللوحة"
     },
     "create": {
       "title": "عميل جديد",

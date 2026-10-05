@@ -35,6 +35,14 @@ describe("board state", () => {
     expect(serializeBoardFilters({ sort: "slaUrgency" }).toString()).toBe("");
   });
 
+  it("narrows to one customer (Story 222)", () => {
+    const filters = parseBoardFilters(new URLSearchParams("customerId=c9"));
+    expect(filters.customerId).toBe("c9");
+    expect(serializeBoardFilters(filters).toString()).toBe("view=board&customerId=c9");
+    expect(columnQuery("OPEN", filters)).toMatchObject({ customerId: "c9" });
+    expect(activeFilterCount(filters)).toBe(1);
+  });
+
   it("maps quick views to filters and back, one scope at a time", () => {
     const base = { sort: "slaUrgency" as const, priority: "LOW" as const };
     const mine = withQuickView(base, "mine", "me");

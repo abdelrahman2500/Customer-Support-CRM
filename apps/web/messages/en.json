@@ -487,7 +487,10 @@
         "cancelled": "Move cancelled.",
         "failed": "Couldn't move {subject}: {reason}"
       },
-      "moveCollision": "This ticket was also changed by someone else; your move was applied."
+      "moveCollision": "This ticket was also changed by someone else; your move was applied.",
+      "customerFilter": "Customer: {name}",
+      "customerFilterRemove": "Remove the customer filter ({name})",
+      "customerFallback": "this customer"
     }
   },
   "customers": {
@@ -507,7 +510,12 @@
         "name": "Name",
         "status": "Status",
         "createdAt": "Created"
-      }
+      },
+      "clearSearch": "Clear search",
+      "filters": "Filters",
+      "closeFilters": "Close filters",
+      "clearAll": "Clear all",
+      "summary": "{count, plural, one {# customer} other {# customers}}"
     },
     "detail": {
       "backToList": "Back to customers",
@@ -568,7 +576,20 @@
       "anonymizedRetentionNote": "Identifying details and portal access were removed. Tickets, SLA records and reporting history were kept, and message text, notes, survey comments and uploaded files were not erased.",
       "anonymizeForbidden": "You don't have permission to anonymize a customer.",
       "anonymizeFailed": "Couldn't anonymize this customer. Please try again.",
-      "displayNameEdit": "Edit"
+      "displayNameEdit": "Edit",
+      "portalPasswordOpen": "Set portal password",
+      "portalPasswordOpenFor": "Set portal password for {name}",
+      "portalPasswordDialogTitle": "Portal password for {name}",
+      "closeDialog": "Close",
+      "addContactOpen": "Add contact",
+      "addContactTitle": "Add a contact",
+      "activateConfirmTitle": "Reactivate {name}?",
+      "activateConfirmDescription": "The customer is marked active again across the workspace.",
+      "activateConfirm": "Reactivate",
+      "deactivateConfirmTitle": "Mark {name} inactive?",
+      "deactivateConfirmDescription": "The customer is marked inactive across the workspace. You can reactivate them at any time.",
+      "deactivateConfirm": "Mark inactive",
+      "ticketsOnBoard": "View these tickets on the board"
     },
     "create": {
       "title": "New customer",

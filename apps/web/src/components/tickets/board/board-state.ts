@@ -28,6 +28,8 @@ export interface BoardFilters {
   search?: string;
   priority?: ListTicketsFilters["priority"];
   categoryId?: string;
+  /** Story 222 — one customer's tickets (from the customer page). */
+  customerId?: string;
   assignedToUserId?: string;
   unassigned?: boolean;
   /** "At risk" quick view: a client-side SLA filter over the loaded cards. */
@@ -44,6 +46,7 @@ export function parseBoardFilters(params: URLSearchParams): BoardFilters {
       ? { priority: params.get("priority") as ListTicketsFilters["priority"] }
       : {}),
     ...(params.get("categoryId") ? { categoryId: params.get("categoryId")! } : {}),
+    ...(params.get("customerId") ? { customerId: params.get("customerId")! } : {}),
     ...(params.get("assignedToUserId")
       ? { assignedToUserId: params.get("assignedToUserId")! }
       : {}),
@@ -57,6 +60,7 @@ export function serializeBoardFilters(filters: BoardFilters): URLSearchParams {
   if (filters.search) params.set("search", filters.search);
   if (filters.priority) params.set("priority", filters.priority);
   if (filters.categoryId) params.set("categoryId", filters.categoryId);
+  if (filters.customerId) params.set("customerId", filters.customerId);
   if (filters.assignedToUserId) params.set("assignedToUserId", filters.assignedToUserId);
   if (filters.unassigned) params.set("unassigned", "true");
   if (filters.risk) params.set("risk", "1");
@@ -101,6 +105,7 @@ export function activeFilterCount(filters: BoardFilters): number {
     filters.search,
     filters.priority,
     filters.categoryId,
+    filters.customerId,
     filters.assignedToUserId,
     filters.unassigned,
     filters.risk,
@@ -124,6 +129,7 @@ export function columnQuery(status: TicketStatus, filters: BoardFilters): ListTi
     ...(filters.search ? { search: filters.search } : {}),
     ...(filters.priority ? { priority: filters.priority } : {}),
     ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+    ...(filters.customerId ? { customerId: filters.customerId } : {}),
     ...(filters.assignedToUserId ? { assignedToUserId: filters.assignedToUserId } : {}),
     ...(filters.unassigned ? { unassigned: "true" as const } : {}),
   };

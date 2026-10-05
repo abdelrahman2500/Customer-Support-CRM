@@ -37,6 +37,17 @@ import {
   Textarea,
 } from "@crm/ui";
 import { BackLink } from "@crm/ui";
+import {
+  Avatar,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  EmptyState,
+  recipes,
+} from "@crm/ui";
 import { ErrorState } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/ticket-badges";
@@ -73,6 +84,9 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
   // which previously had no 403 check at all, is normalized like every
   // sibling mutation on this page.
   const [confirmPortalPasswordOpen, setConfirmPortalPasswordOpen] = useState(false);
+  /** Story 222 (PR-4.1, RD-4.5) — the password form lives in a dialog per
+   * contact instead of a field in every row; the confirm step is unchanged. */
+  const [portalDialogOpen, setPortalDialogOpen] = useState(false);
 
   function confirmSetPortalPassword() {
     portalPasswordMutation.mutate(
@@ -82,6 +96,12 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
           setPortalPasswordDraft("");
           setPortalPasswordSuccess(true);
           setConfirmPortalPasswordOpen(false);
+          setPortalDialogOpen(false);
+        },
+        // The row shows the error, so both dialogs step aside for it.
+        onError: () => {
+          setConfirmPortalPasswordOpen(false);
+          setPortalDialogOpen(false);
         },
       },
     );
@@ -100,7 +120,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
     <li className="flex flex-col gap-1 border-b border-rule-subtle pb-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div className="flex flex-1 flex-wrap items-center gap-2">
         <Input
-          className="w-36"
+          className="min-w-0 flex-1 basis-36"
           defaultValue={contact.fullName}
           aria-label={t("detail.contactFullNameLabel")}
           onChange={(event) => setFullNameDraft(event.target.value)}
@@ -112,7 +132,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
           }}
         />
         <Input
-          className="w-full sm:w-40"
+          className="min-w-0 flex-[2] basis-48"
           defaultValue={contact.email ?? ""}
           placeholder={t("detail.contactEmailLabel")}
           aria-label={t("detail.contactEmailLabel")}
@@ -125,7 +145,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
           }}
         />
         <Input
-          className="w-32"
+          className="min-w-0 flex-1 basis-36"
           defaultValue={contact.phone ?? ""}
           placeholder={t("detail.contactPhoneLabel")}
           aria-label={t("detail.contactPhoneLabel")}
@@ -156,44 +176,73 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
         </span>
       )}
 
-      <div className="flex flex-col gap-1 border-t border-rule pt-2 sm:w-full">
-        <span className="text-xs text-ink-subtle">{t("detail.portalPasswordLabel")}</span>
+      <div className="flex flex-col gap-1 border-t border-rule-subtle pt-2 sm:w-full">
         <div className="flex flex-wrap items-center gap-2">
-          <Input
-            className="w-full sm:w-40"
-            type="password"
-            aria-label={t("detail.portalPasswordLabel")}
-            placeholder={t("detail.portalPasswordPlaceholder")}
-            value={portalPasswordDraft}
-            onChange={(event) => {
-              setPortalPasswordDraft(event.target.value);
-              setPortalPasswordSuccess(false);
+          <Dialog
+            open={portalDialogOpen}
+            onOpenChange={(open) => {
+              setPortalDialogOpen(open);
+              if (open) setPortalPasswordSuccess(false);
             }}
-          />
-          {/* Story 98 — Design System & Visual Polish. Mirrors
-              UserRow's own password-reset button: this is genuinely
-              irreversible and its ConfirmDialog already renders a
-              destructive confirm button, so the trigger now agrees. */}
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            disabled={portalPasswordDraft.length < 8 || portalPasswordMutation.isPending}
-            onClick={() => setConfirmPortalPasswordOpen(true)}
           >
-            {portalPasswordMutation.isPending
-              ? t("detail.portalPasswordSubmitting")
-              : t("detail.portalPasswordSubmit")}
-          </Button>
-          <ConfirmDialog
-            open={confirmPortalPasswordOpen}
-            onOpenChange={setConfirmPortalPasswordOpen}
-            title={t("detail.portalPasswordConfirmTitle")}
-            description={t("detail.portalPasswordConfirmDescription")}
-            confirmLabel={t("detail.portalPasswordSubmit")}
-            onConfirm={confirmSetPortalPassword}
-            isPending={portalPasswordMutation.isPending}
-          />
+            <DialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label={t("detail.portalPasswordOpenFor", { name: contact.fullName })}
+              >
+                {t("detail.portalPasswordOpen")}
+              </Button>
+            </DialogTrigger>
+            <DialogContent
+              size="sm"
+              closeLabel={t("detail.closeDialog")}
+              aria-describedby={undefined}
+            >
+              <DialogHeader>
+                <DialogTitle>
+                  {t("detail.portalPasswordDialogTitle", { name: contact.fullName })}
+                </DialogTitle>
+              </DialogHeader>
+              <label className="flex flex-col gap-1 text-xs text-ink-muted">
+                {t("detail.portalPasswordLabel")}
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder={t("detail.portalPasswordPlaceholder")}
+                  value={portalPasswordDraft}
+                  onChange={(event) => {
+                    setPortalPasswordDraft(event.target.value);
+                    setPortalPasswordSuccess(false);
+                  }}
+                />
+              </label>
+              <DialogFooter>
+                {/* Story 98 — destructive, like its own confirmation. */}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={portalPasswordDraft.length < 8 || portalPasswordMutation.isPending}
+                  onClick={() => setConfirmPortalPasswordOpen(true)}
+                >
+                  {portalPasswordMutation.isPending
+                    ? t("detail.portalPasswordSubmitting")
+                    : t("detail.portalPasswordSubmit")}
+                </Button>
+              </DialogFooter>
+              <ConfirmDialog
+                open={confirmPortalPasswordOpen}
+                onOpenChange={setConfirmPortalPasswordOpen}
+                title={t("detail.portalPasswordConfirmTitle")}
+                description={t("detail.portalPasswordConfirmDescription")}
+                confirmLabel={t("detail.portalPasswordSubmit")}
+                onConfirm={confirmSetPortalPassword}
+                isPending={portalPasswordMutation.isPending}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
         {portalPasswordSuccess && (
           <p className="text-xs text-success-foreground">{t("detail.portalPasswordSuccess")}</p>
@@ -256,6 +305,9 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
  */
 function AddContactForm({ customerId }: { customerId: string }) {
   const t = useTranslations("customers");
+  /** Story 222 (PR-4.1, RD-4.5, recon RS-07) — the form opens in a dialog
+   * instead of a fixed-width inline row; the request is unchanged. */
+  const [open, setOpen] = useState(false);
   const errorMessage = useErrorMessage();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -278,6 +330,7 @@ function AddContactForm({ customerId }: { customerId: string }) {
       setEmail("");
       setPhone("");
       setIsPrimary(false);
+      setOpen(false);
     } catch (submitError) {
       setError(
         errorMessage(submitError, {
@@ -289,54 +342,63 @@ function AddContactForm({ customerId }: { customerId: string }) {
   }
 
   return (
-    <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={handleSubmit}>
-      <label className="flex flex-col gap-1 text-xs text-ink-muted">
-        {t("detail.contactFullNameLabel")}
-        <Input
-          className="w-36"
-          value={fullName}
-          onChange={(event) => setFullName(event.target.value)}
-          required
-          minLength={1}
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-ink-muted">
-        {t("detail.contactEmailLabel")}
-        <Input
-          className="w-full sm:w-40"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-ink-muted">
-        {t("detail.contactPhoneLabel")}
-        <Input className="w-32" value={phone} onChange={(event) => setPhone(event.target.value)} />
-      </label>
-      {/* Batch 6 (UX audit) — the shared `Checkbox`/`Label` pair, replacing
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="mt-3">
+          {t("detail.addContactOpen")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent size="sm" closeLabel={t("detail.closeDialog")} aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>{t("detail.addContactTitle")}</DialogTitle>
+        </DialogHeader>
+        <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
+            {t("detail.contactFullNameLabel")}
+            <Input
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              required
+              minLength={1}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
+            {t("detail.contactEmailLabel")}
+            <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-ink-muted">
+            {t("detail.contactPhoneLabel")}
+            <Input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} />
+          </label>
+          {/* Batch 6 (UX audit) — the shared `Checkbox`/`Label` pair, replacing
           a raw `<input type="checkbox">` with no focus-ring/keyboard parity
           with the rest of the app. */}
-      <div className="flex items-center gap-1.5">
-        <Checkbox
-          id={`add-contact-primary-${customerId}`}
-          checked={isPrimary}
-          onCheckedChange={(checked) => setIsPrimary(checked === true)}
-        />
-        <Label
-          htmlFor={`add-contact-primary-${customerId}`}
-          className="text-xs font-normal text-ink-muted"
-        >
-          {t("detail.primaryContact")}
-        </Label>
-      </div>
-      <Button type="submit" size="sm" disabled={mutation.isPending}>
-        {mutation.isPending ? t("detail.addContactSubmitting") : t("detail.addContactSubmit")}
-      </Button>
-      {error && (
-        <Alert variant="destructive" className="w-full">
-          {error}
-        </Alert>
-      )}
-    </form>
+          <div className="flex items-center gap-1.5">
+            <Checkbox
+              id={`add-contact-primary-${customerId}`}
+              checked={isPrimary}
+              onCheckedChange={(checked) => setIsPrimary(checked === true)}
+            />
+            <Label
+              htmlFor={`add-contact-primary-${customerId}`}
+              className="text-xs font-normal text-ink-muted"
+            >
+              {t("detail.primaryContact")}
+            </Label>
+          </div>
+          {error && (
+            <Alert variant="destructive" className="w-full">
+              {error}
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button type="submit" size="sm" disabled={mutation.isPending}>
+              {mutation.isPending ? t("detail.addContactSubmitting") : t("detail.addContactSubmit")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -478,6 +540,9 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
   const relatedTicketsPage = ticketsQuery.data;
   const relatedTickets = relatedTicketsPage?.items ?? [];
   const updateCustomerMutation = useUpdateCustomerMutation(customerId);
+  /** Story 222 (RD-4.5) — a status change takes effect at once (an inactive
+   * customer cannot raise tickets), so it is confirmed first. */
+  const [pendingActive, setPendingActive] = useState<boolean | null>(null);
   const [displayNameDraft, setDisplayNameDraft] = useState<string | null>(null);
   /** Story 159 — the display name is a heading until an agent chooses to edit it. */
   const [editingName, setEditingName] = useState(false);
@@ -580,6 +645,8 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           screen. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
+          {/* Story 222 — the entity header leads with the customer's avatar. */}
+          <Avatar name={customer.displayName} size="lg" decorative />
           {editingName ? (
             <>
               <h1 className="sr-only">{customer.displayName}</h1>
@@ -632,9 +699,10 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           <Select
             value={customer.isActive ? "active" : "inactive"}
             disabled={updateCustomerMutation.isPending}
-            onValueChange={(value) =>
-              updateCustomerMutation.mutate({ isActive: value === "active" })
-            }
+            onValueChange={(value) => {
+              const active = value === "active";
+              if (active !== customer.isActive) setPendingActive(active);
+            }}
           >
             <SelectTrigger className="w-32" aria-label={t("list.filterStatus")}>
               <SelectValue />
@@ -644,6 +712,31 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               <SelectItem value="inactive">{t("list.inactive")}</SelectItem>
             </SelectContent>
           </Select>
+          <ConfirmDialog
+            open={pendingActive !== null}
+            onOpenChange={(open) => {
+              if (!open) setPendingActive(null);
+            }}
+            title={
+              pendingActive
+                ? t("detail.activateConfirmTitle", { name: customer.displayName })
+                : t("detail.deactivateConfirmTitle", { name: customer.displayName })
+            }
+            description={
+              pendingActive
+                ? t("detail.activateConfirmDescription")
+                : t("detail.deactivateConfirmDescription")
+            }
+            confirmLabel={
+              pendingActive ? t("detail.activateConfirm") : t("detail.deactivateConfirm")
+            }
+            onConfirm={() => {
+              if (pendingActive === null) return;
+              updateCustomerMutation.mutate({ isActive: pendingActive });
+              setPendingActive(null);
+            }}
+            isPending={updateCustomerMutation.isPending}
+          />
         </div>
         <Button size="sm" className="shrink-0" asChild>
           <Link href={`/${locale}/tickets/new?customerId=${customerId}`}>
@@ -685,19 +778,29 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               </Alert>
             )}
             {ticketsQuery.isSuccess && relatedTickets.length === 0 && (
-              <p className="mt-2 text-sm text-ink-subtle">{t("detail.ticketsEmpty")}</p>
+              <EmptyState className="mt-2" title={t("detail.ticketsEmpty")} />
+            )}
+            {/* Story 222 (PR-4.1, recon RS-05) — the tickets as mini cards
+                that wrap, and the whole set one link away on the board. */}
+            {ticketsQuery.isSuccess && relatedTickets.length > 0 && (
+              <Link
+                href={`/${locale}/tickets?view=board&customerId=${encodeURIComponent(customerId)}`}
+                className="focus-ring mt-2 inline-flex rounded-inner text-sm font-medium text-accent hover:underline"
+              >
+                {t("detail.ticketsOnBoard")}
+              </Link>
             )}
             {ticketsQuery.isSuccess && relatedTickets.length > 0 && (
-              <ul className="mt-2 flex flex-col gap-2 text-sm">
+              <ul className="mt-3 grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                 {relatedTickets.map((ticket) => (
                   <li
                     key={ticket.id}
-                    className="flex cursor-pointer flex-wrap items-center justify-between gap-2 border-b border-rule-subtle pb-2"
+                    className={`${recipes.card} ${recipes.liftable} flex cursor-pointer flex-col gap-2 p-3`}
                     onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
                   >
                     <Link
                       href={`/${locale}/tickets/${ticket.id}`}
-                      className="focus-ring rounded-sm font-medium text-ink-strong hover:underline"
+                      className="focus-ring min-w-0 break-words rounded-sm font-medium text-ink-strong hover:underline"
                       onClick={(event) => event.stopPropagation()}
                     >
                       {ticket.subject}
@@ -745,7 +848,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
               </Alert>
             )}
             {notesQuery.isSuccess && notesQuery.data.length === 0 && (
-              <p className="mt-2 text-sm text-ink-subtle">{t("detail.notesEmpty")}</p>
+              <EmptyState className="mt-2" title={t("detail.notesEmpty")} />
             )}
             {notesQuery.isSuccess && notesQuery.data.length > 0 && (
               <ol className="mt-2 flex flex-col gap-2 text-sm">
@@ -771,7 +874,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
         <div className="flex min-w-0 flex-col gap-6">
           <SectionCard title={t("detail.contactsHeading")}>
             {customer.contacts.length === 0 && (
-              <p className="mt-2 text-sm text-ink-subtle">{t("detail.contactsEmpty")}</p>
+              <EmptyState className="mt-2" title={t("detail.contactsEmpty")} />
             )}
             {customer.contacts.length > 0 && (
               <ul className="mt-2 flex flex-col gap-2 text-sm">

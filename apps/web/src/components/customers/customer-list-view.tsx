@@ -9,30 +9,19 @@ import { useCustomersQuery } from "@/hooks/use-tickets";
 import type { ListCustomersFilters } from "@/lib/tickets-api";
 import { useUrlFilters } from "@/lib/url-filters";
 import {
+  Avatar,
   Badge,
   Button,
   FetchingIndicator,
-  FilterBar,
-  Input,
+  FilterSelect,
+  ListToolbar,
   PageHeader,
   Pagination,
   QueryStateCard,
   Skeleton,
   TableSortHead,
 } from "@crm/ui";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@crm/ui";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 import { formatDateTime } from "@crm/ui";
 
 const ALL_VALUE = "__all__";
@@ -147,39 +136,38 @@ function CustomerListViewContent() {
         }
       />
 
-      {/* RM-10 — one filter per row below `sm`, mirrors `TicketListView`'s
-          own exact class change; unchanged, wrapped inline row at `sm`
-          and up. */}
-      <FilterBar>
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("list.searchLabel")}
-          <Input
-            className="w-full sm:w-auto sm:min-w-[10rem]"
-            defaultValue={filters.search ?? ""}
-            placeholder={t("list.searchPlaceholder")}
-            onBlur={(event) => updateFilter("search", event.target.value.trim() || ALL_VALUE)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("list.filterStatus")}
-          <Select
+      {/* Story 222 (PR-4.1, RD-4.4) — the shared list toolbar: search (same
+          blur/Enter commit), the status filter as a FilterSelect (a "Filters"
+          sheet on phones), a polite result count and clear-all. Same URL
+          parameters and the same request as before. */}
+      <ListToolbar
+        search={{
+          value: filters.search ?? "",
+          onCommit: (value) => updateFilter("search", value.trim() || ALL_VALUE),
+          label: t("list.searchLabel"),
+          placeholder: t("list.searchPlaceholder"),
+          clearLabel: t("list.clearSearch"),
+        }}
+        filters={
+          <FilterSelect
+            label={t("list.filterStatus")}
+            allValue={ALL_VALUE}
+            allLabel={t("list.filterAll")}
             value={filters.isActive ?? ALL_VALUE}
-            onValueChange={(value) => updateFilter("isActive", value)}
-          >
-            <SelectTrigger
-              className="w-full sm:w-auto sm:min-w-[10rem]"
-              aria-label={t("list.filterStatus")}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_VALUE}>{t("list.filterAll")}</SelectItem>
-              <SelectItem value="true">{t("list.active")}</SelectItem>
-              <SelectItem value="false">{t("list.inactive")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </label>
-      </FilterBar>
+            onChange={(value) => updateFilter("isActive", value)}
+            options={["true", "false"]}
+            renderLabel={(value) => (value === "true" ? t("list.active") : t("list.inactive"))}
+          />
+        }
+        filterCount={[filters.search, filters.isActive].filter(Boolean).length}
+        filtersLabel={t("list.filters")}
+        closeLabel={t("list.closeFilters")}
+        summary={page ? t("list.summary", { count: page.total }) : undefined}
+        onClearAll={() =>
+          setFilters((current) => ({ sortBy: current.sortBy, sortDir: current.sortDir }))
+        }
+        clearAllLabel={t("list.clearAll")}
+      />
 
       {/* Story S-7 — see `TicketListView` for why the error is split in
           two and why this branches on `isPending` rather than
@@ -238,13 +226,18 @@ function CustomerListViewContent() {
                 onClick={() => router.push(`/${locale}/customers/${customer.id}`)}
               >
                 <TableCell label={t("list.columns.name")} className="font-medium text-ink">
-                  <Link
-                    href={`/${locale}/customers/${customer.id}`}
-                    className="focus-ring rounded-sm hover:underline"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {customer.displayName}
-                  </Link>
+                  {/* Story 222 — an avatar beside the name (decorative: the
+                      name itself is the link's text). */}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Avatar name={customer.displayName} size="sm" decorative />
+                    <Link
+                      href={`/${locale}/customers/${customer.id}`}
+                      className="focus-ring min-w-0 break-words rounded-sm hover:underline"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {customer.displayName}
+                    </Link>
+                  </span>
                 </TableCell>
                 <TableCell label={t("list.columns.status")}>
                   <Badge variant={customer.isActive ? "success" : "secondary"}>

@@ -33,6 +33,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  CloseIcon,
   TicketsIcon,
   showToast,
 } from "@crm/ui";
@@ -40,7 +41,7 @@ import { useIsFetching } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { useMoveTicketMutation } from "@/hooks/use-move-ticket";
-import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
+import { useCurrentUserQuery, useCustomerQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useUrlFilters } from "@/lib/url-filters";
@@ -124,6 +125,32 @@ const SILENT_ANNOUNCEMENTS = {
  * card in its new column. Below `md` there is no drag: the menu moves, and
  * the switcher follows the card to its new column.
  */
+/** Story 222 — the board narrowed to one customer (from the customer page). */
+function CustomerFilterChip({
+  customerId,
+  onRemove,
+}: {
+  customerId: string;
+  onRemove: () => void;
+}) {
+  const t = useTranslations("tickets.board");
+  const customer = useCustomerQuery(customerId);
+  const name = customer.data?.displayName ?? t("customerFallback");
+  return (
+    <span className="inline-flex items-center gap-1 rounded-pill border border-rule bg-surface py-0.5 pe-1 ps-3 text-caption text-ink">
+      {t("customerFilter", { name })}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={t("customerFilterRemove", { name })}
+        className="focus-ring inline-flex h-5 w-5 items-center justify-center rounded-pill text-ink-subtle hover:bg-surface-muted hover:text-ink"
+      >
+        <CloseIcon aria-hidden="true" className="h-3.5 w-3.5" />
+      </button>
+    </span>
+  );
+}
+
 export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) {
   const t = useTranslations("tickets.board");
   const tList = useTranslations("tickets.list");
@@ -452,6 +479,12 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
         onClearAll={() => setFilters({ sort: filters.sort })}
         clearAllLabel={t("clearAll")}
       >
+        {filters.customerId && (
+          <CustomerFilterChip
+            customerId={filters.customerId}
+            onRemove={() => update({ customerId: undefined })}
+          />
+        )}
         <SegmentedControl
           aria-label={t("quickViewLabel")}
           dir={dir}
