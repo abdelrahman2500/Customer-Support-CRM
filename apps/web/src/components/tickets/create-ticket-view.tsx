@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -15,7 +15,18 @@ import {
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { TicketPriority } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, PageHeader, showSuccessToast } from "@crm/ui";
+import {
+  Button,
+  Card,
+  Combobox,
+  FormActions,
+  FormField,
+  FormSection,
+  Input,
+  PageHeader,
+  showSuccessToast,
+} from "@crm/ui";
+import { missingReason } from "@/lib/form-reason";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
@@ -59,6 +70,7 @@ const UNSET_CATEGORY = "__unset__";
  */
 export function CreateTicketView() {
   const t = useTranslations("tickets");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
@@ -124,176 +136,191 @@ export function CreateTicketView() {
     }
   }
 
+  // Story 225 (PR-4.4) — what still blocks the submit, said beside it.
+  const reasonId = useId();
+  const missing = [
+    ...(customerId ? [] : [t("create.customer")]),
+    ...(subject.trim() ? [] : [t("create.subject")]),
+  ];
+
   return (
-    <section className="flex max-w-md flex-col gap-4">
-      <PageHeader title={t("create.title")} />
+    <section className="flex max-w-3xl flex-col gap-section">
+      <PageHeader title={t("create.title")} description={tCommon("form.requiredHint")} />
 
-      {error && <Alert variant="destructive">{error}</Alert>}
-
-      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.customer")}
-          <Select
-            value={customerId}
-            onValueChange={handleCustomerChange}
-            disabled={customersQuery.isLoading}
-          >
-            <SelectTrigger aria-label={t("create.customer")}>
-              <SelectValue
+      <form onSubmit={handleSubmit}>
+        <Card className="flex flex-col gap-section p-surface">
+          <FormSection title={t("create.sectionCustomer")} columns={2}>
+            <FormField
+              label={t("create.customer")}
+              required
+              density="comfortable"
+              hint={
+                <Link className="underline" href={`/${locale}/customers/new`}>
+                  {t("create.createCustomerLink")}
+                </Link>
+              }
+            >
+              {/* Story 225 (PR-4.4) — a searchable picker: a branch can have
+                  hundreds of customers. Same value, same contact reset. */}
+              <Combobox
+                aria-label={t("create.customer")}
+                options={(customersQuery.data ?? []).map((customer) => ({
+                  value: customer.id,
+                  label: customer.displayName,
+                }))}
+                value={customerId || undefined}
+                onValueChange={handleCustomerChange}
                 placeholder={
                   customersQuery.isLoading ? t("create.optionsLoading") : t("create.selectCustomer")
                 }
+                searchLabel={t("create.searchCustomers")}
+                emptyText={t("create.noCustomerMatch")}
+                disabled={customersQuery.isLoading}
               />
-            </SelectTrigger>
-            <SelectContent>
-              {(customersQuery.data ?? []).map((customer) => (
-                <SelectItem key={customer.id} value={customer.id}>
-                  {customer.displayName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Link className="text-xs text-ink-subtle underline" href={`/${locale}/customers/new`}>
-            {t("create.createCustomerLink")}
-          </Link>
-        </label>
+            </FormField>
 
-        {customerId && (
-          <label className="flex flex-col gap-1 text-sm text-ink-strong">
-            {t("create.contact")}
-            <Select
-              value={contactId}
-              onValueChange={setContactId}
-              disabled={customerDetailQuery.isLoading}
+            {customerId && (
+              <FormField
+                label={t("create.contact")}
+                density="comfortable"
+                hint={customerDetailQuery.isLoading ? t("create.optionsLoading") : undefined}
+                error={customerDetailQuery.isError ? t("create.contactsLoadError") : undefined}
+              >
+                <Select
+                  value={contactId}
+                  onValueChange={setContactId}
+                  disabled={customerDetailQuery.isLoading}
+                >
+                  <SelectTrigger aria-label={t("create.contact")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNSET_CONTACT}>{t("create.noContactOption")}</SelectItem>
+                    {(customerDetailQuery.data?.contacts ?? []).map((contact) => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+            )}
+          </FormSection>
+
+          <FormSection title={t("create.sectionTicket")} columns={2}>
+            <FormField
+              label={t("create.subject")}
+              required
+              density="comfortable"
+              className="sm:col-span-2"
             >
-              <SelectTrigger aria-label={t("create.contact")}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNSET_CONTACT}>{t("create.noContactOption")}</SelectItem>
-                {(customerDetailQuery.data?.contacts ?? []).map((contact) => (
-                  <SelectItem key={contact.id} value={contact.id}>
-                    {contact.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {customerDetailQuery.isLoading && (
-              <span className="text-xs text-ink-subtle">{t("create.optionsLoading")}</span>
-            )}
-            {customerDetailQuery.isError && (
-              <span className="text-xs text-danger-foreground">
-                {t("create.contactsLoadError")}
-              </span>
-            )}
-          </label>
-        )}
+              <Input
+                value={subject}
+                onChange={(event) => setSubject(event.target.value)}
+                required
+                minLength={1}
+              />
+            </FormField>
+            <FormField label={t("create.category")} density="comfortable">
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger aria-label={t("create.category")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET_CATEGORY}>{t("create.categoryDefault")}</SelectItem>
+                  {(categoriesQuery.data ?? []).map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label={t("create.priority")} density="comfortable">
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger aria-label={t("create.priority")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET_PRIORITY}>{t("create.priorityDefault")}</SelectItem>
+                  {PRIORITY_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </FormSection>
 
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.subject")}
-          <Input
-            value={subject}
-            onChange={(event) => setSubject(event.target.value)}
-            required
-            minLength={1}
-          />
-        </label>
+          <FormSection title={t("create.sectionRouting")} columns={2}>
+            <FormField
+              label={t("create.department")}
+              density="comfortable"
+              hint={departmentsQuery.isLoading ? t("create.optionsLoading") : undefined}
+              error={departmentsQuery.isError ? t("create.departmentLoadError") : undefined}
+            >
+              <Select
+                value={departmentId}
+                onValueChange={setDepartmentId}
+                disabled={departmentsQuery.isLoading}
+              >
+                <SelectTrigger aria-label={t("create.department")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET_DEPARTMENT}>{t("create.departmentDefault")}</SelectItem>
+                  {(departmentsQuery.data ?? []).map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField
+              label={t("create.assignedAgent")}
+              density="comfortable"
+              hint={usersQuery.isLoading ? t("create.optionsLoading") : undefined}
+              error={usersQuery.isError ? t("create.assignedAgentLoadError") : undefined}
+            >
+              <Select
+                value={assignedToUserId}
+                onValueChange={setAssignedToUserId}
+                disabled={usersQuery.isLoading}
+              >
+                <SelectTrigger aria-label={t("create.assignedAgent")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET_ASSIGNEE}>{t("create.assignedAgentDefault")}</SelectItem>
+                  {(usersQuery.data ?? []).map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </FormSection>
 
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.category")}
-          <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger aria-label={t("create.category")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSET_CATEGORY}>{t("create.categoryDefault")}</SelectItem>
-              {(categoriesQuery.data ?? []).map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.priority")}
-          <Select value={priority} onValueChange={setPriority}>
-            <SelectTrigger aria-label={t("create.priority")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSET_PRIORITY}>{t("create.priorityDefault")}</SelectItem>
-              {PRIORITY_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.department")}
-          <Select
-            value={departmentId}
-            onValueChange={setDepartmentId}
-            disabled={departmentsQuery.isLoading}
+          <FormActions
+            error={error}
+            reason={missing.length > 0 ? missingReason(tCommon, locale, missing) : undefined}
+            reasonId={reasonId}
           >
-            <SelectTrigger aria-label={t("create.department")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSET_DEPARTMENT}>{t("create.departmentDefault")}</SelectItem>
-              {(departmentsQuery.data ?? []).map((department) => (
-                <SelectItem key={department.id} value={department.id}>
-                  {department.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {departmentsQuery.isLoading && (
-            <span className="text-xs text-ink-subtle">{t("create.optionsLoading")}</span>
-          )}
-          {departmentsQuery.isError && (
-            <span className="text-xs text-danger-foreground">
-              {t("create.departmentLoadError")}
-            </span>
-          )}
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.assignedAgent")}
-          <Select
-            value={assignedToUserId}
-            onValueChange={setAssignedToUserId}
-            disabled={usersQuery.isLoading}
-          >
-            <SelectTrigger aria-label={t("create.assignedAgent")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSET_ASSIGNEE}>{t("create.assignedAgentDefault")}</SelectItem>
-              {(usersQuery.data ?? []).map((user) => (
-                <SelectItem key={user.id} value={user.id}>
-                  {user.fullName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {usersQuery.isLoading && (
-            <span className="text-xs text-ink-subtle">{t("create.optionsLoading")}</span>
-          )}
-          {usersQuery.isError && (
-            <span className="text-xs text-danger-foreground">
-              {t("create.assignedAgentLoadError")}
-            </span>
-          )}
-        </label>
-
-        <Button type="submit" disabled={mutation.isPending || !customerId} className="self-start">
-          {mutation.isPending ? t("create.submitting") : t("create.submit")}
-        </Button>
+            <Button
+              type="submit"
+              disabled={mutation.isPending || !customerId}
+              aria-describedby={missing.length > 0 ? reasonId : undefined}
+            >
+              {mutation.isPending ? t("create.submitting") : t("create.submit")}
+            </Button>
+            <Button type="button" variant="ghost" asChild>
+              <Link href={`/${locale}/tickets`}>{tCommon("form.cancel")}</Link>
+            </Button>
+          </FormActions>
+        </Card>
       </form>
     </section>
   );

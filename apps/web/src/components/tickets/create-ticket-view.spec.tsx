@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NextIntlClientProvider } from "next-intl";
 import { CreateTicketView } from "./create-ticket-view";
 import {
@@ -74,6 +75,8 @@ function renderWithLocale(locale: "en" | "ar" = "en") {
   );
 }
 
+// Story 225 (PR-4.4) — required fields show an aria-hidden "*" after their
+// label text, so required-field label queries allow it.
 describe("CreateTicketView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,7 +104,10 @@ describe("CreateTicketView", () => {
     renderWithLocale("en");
 
     expect(screen.getByText("New ticket")).toBeInTheDocument();
-    expect(screen.getByText("Acme Inc.")).toBeInTheDocument();
+    // Story 225 — the customer picker is a searchable Combobox: its options
+    // exist once it is opened.
+    fireEvent.click(screen.getByRole("combobox", { name: "Customer" }));
+    expect(screen.getByRole("option", { name: "Acme Inc." })).toBeInTheDocument();
   });
 
   it("renders the form (Arabic)", () => {
@@ -134,7 +140,7 @@ describe("CreateTicketView", () => {
 
     fireEvent.click(screen.getByText("Select a customer"));
     fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
-    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Cannot log in" } });
+    fireEvent.change(screen.getByLabelText(/^Subject\*?$/), { target: { value: "Cannot log in" } });
     fireEvent.click(within(screen.getByText("Category").closest("label")!).getByRole("combobox"));
     fireEvent.click(await screen.findByRole("option", { name: "billing" }));
     fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
@@ -158,7 +164,7 @@ describe("CreateTicketView", () => {
 
     fireEvent.click(screen.getByText("Select a customer"));
     fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
-    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Cannot log in" } });
+    fireEvent.change(screen.getByLabelText(/^Subject\*?$/), { target: { value: "Cannot log in" } });
     expect(mockedShowSuccessToast).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
@@ -174,7 +180,7 @@ describe("CreateTicketView", () => {
 
     fireEvent.click(screen.getByText("Select a customer"));
     fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
-    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "x" } });
+    fireEvent.change(screen.getByLabelText(/^Subject\*?$/), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
 
     await screen.findByText("Customer not found");
@@ -189,7 +195,7 @@ describe("CreateTicketView", () => {
 
     fireEvent.click(screen.getByText("Select a customer"));
     fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
-    fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "x" } });
+    fireEvent.change(screen.getByLabelText(/^Subject\*?$/), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
 
     expect(await screen.findByText("Customer not found")).toBeInTheDocument();
@@ -261,7 +267,9 @@ describe("CreateTicketView", () => {
       const customerCombobox = screen.getAllByRole("combobox")[0] as HTMLElement;
       fireEvent.click(customerCombobox);
       fireEvent.click(await screen.findByRole("option", { name: "Widgets Co." }));
-      fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Billing question" } });
+      fireEvent.change(screen.getByLabelText(/^Subject\*?$/), {
+        target: { value: "Billing question" },
+      });
       fireEvent.click(screen.getByRole("button", { name: "Create ticket" }));
 
       await waitFor(() =>
@@ -371,8 +379,9 @@ describe("CreateTicketView", () => {
       expect(within(contactCombobox).getByText("Jane Doe")).toBeInTheDocument();
 
       const customerCombobox = screen.getAllByRole("combobox")[0] as HTMLElement;
-      fireEvent.click(customerCombobox);
-      fireEvent.click(await screen.findByRole("option", { name: "Widgets Co." }));
+      const user = userEvent.setup();
+      await user.click(customerCombobox);
+      await user.click(await screen.findByRole("option", { name: "Widgets Co." }));
 
       expect(within(contactCombobox).getByText("No specific contact")).toBeInTheDocument();
     });
@@ -418,7 +427,9 @@ describe("CreateTicketView", () => {
 
       fireEvent.click(screen.getByText("Select a customer"));
       fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
-      fireEvent.change(screen.getByLabelText("Subject"), { target: { value: "Cannot log in" } });
+      fireEvent.change(screen.getByLabelText(/^Subject\*?$/), {
+        target: { value: "Cannot log in" },
+      });
 
       // Indices, once a customer is selected: 0 customer, 1 contact,
       // 2 category, 3 priority, 4 department, 5 assignee.
@@ -492,7 +503,10 @@ describe("CreateTicketView", () => {
 
       renderWithLocale("en");
 
-      const label = screen.getByText("Loading…").closest("label")!;
+      const label =
+        screen.getByText(
+          "Loading…",
+        ).parentElement!; /* Story 225 — the hint sits under the field, beside its label */
       expect(within(label).getByRole("combobox")).toBeDisabled();
     });
 
@@ -501,7 +515,10 @@ describe("CreateTicketView", () => {
 
       renderWithLocale("en");
 
-      const label = screen.getByText("Loading…").closest("label")!;
+      const label =
+        screen.getByText(
+          "Loading…",
+        ).parentElement!; /* Story 225 — the hint sits under the field, beside its label */
       expect(within(label).getByRole("combobox")).toBeDisabled();
     });
 
@@ -516,7 +533,10 @@ describe("CreateTicketView", () => {
       fireEvent.click(screen.getByText("Select a customer"));
       fireEvent.click(await screen.findByRole("option", { name: "Acme Inc." }));
 
-      const label = screen.getByText("Loading…").closest("label")!;
+      const label =
+        screen.getByText(
+          "Loading…",
+        ).parentElement!; /* Story 225 — the hint sits under the field, beside its label */
       expect(within(label).getByRole("combobox")).toBeDisabled();
     });
 

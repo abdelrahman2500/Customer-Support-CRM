@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
@@ -8,7 +9,17 @@ import { useCreateSlaPolicyMutation } from "@/hooks/use-sla-policies";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import type { SlaPolicyPriority } from "@/lib/sla-policies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, PageHeader, showSuccessToast } from "@crm/ui";
+import {
+  Button,
+  Card,
+  FormActions,
+  FormField,
+  FormSection,
+  Input,
+  PageHeader,
+  showSuccessToast,
+} from "@crm/ui";
+import { missingReason } from "@/lib/form-reason";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 const PRIORITY_OPTIONS: SlaPolicyPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
@@ -30,6 +41,7 @@ const UNSET_CATEGORY = "__unset__";
  */
 export function CreateSlaPolicyView() {
   const t = useTranslations("slaPolicies");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
@@ -78,83 +90,101 @@ export function CreateSlaPolicyView() {
     }
   }
 
+  // Story 225 (PR-4.4) — what still blocks the submit, said beside it.
+  const reasonId = useId();
+  const missing = [
+    ...(responseTargetMinutes ? [] : [t("create.responseTarget")]),
+    ...(resolutionTargetMinutes ? [] : [t("create.resolutionTarget")]),
+  ];
+
   return (
-    <section className="flex max-w-md flex-col gap-4">
-      <PageHeader title={t("create.title")} />
+    <section className="flex max-w-3xl flex-col gap-section">
+      <PageHeader title={t("create.title")} description={tCommon("form.requiredHint")} />
 
-      {error && <Alert variant="destructive">{error}</Alert>}
+      <form onSubmit={handleSubmit}>
+        <Card className="flex flex-col gap-section p-surface">
+          <FormSection
+            title={t("create.sectionScope")}
+            description={t("create.sectionScopeHint")}
+            columns={2}
+          >
+            <FormField label={t("create.department")} density="comfortable">
+              <Input
+                value={departmentId}
+                onChange={(event) => setDepartmentId(event.target.value)}
+                placeholder={t("create.departmentPlaceholder")}
+              />
+            </FormField>
+            <FormField label={t("create.category")} density="comfortable">
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger aria-label={t("create.category")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET_CATEGORY}>{t("create.categoryDefault")}</SelectItem>
+                  {(categoriesQuery.data ?? []).map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label={t("create.priority")} density="comfortable">
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger aria-label={t("create.priority")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET_PRIORITY}>{t("create.priorityDefault")}</SelectItem>
+                  {PRIORITY_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </FormSection>
 
-      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.department")}
-          <Input
-            value={departmentId}
-            onChange={(event) => setDepartmentId(event.target.value)}
-            placeholder={t("create.departmentPlaceholder")}
-          />
-        </label>
+          <FormSection title={t("create.sectionTargets")} columns={2}>
+            <FormField label={t("create.responseTarget")} required density="comfortable">
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={responseTargetMinutes}
+                onChange={(event) => setResponseTargetMinutes(event.target.value)}
+                required
+              />
+            </FormField>
+            <FormField label={t("create.resolutionTarget")} required density="comfortable">
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={resolutionTargetMinutes}
+                onChange={(event) => setResolutionTargetMinutes(event.target.value)}
+                required
+              />
+            </FormField>
+          </FormSection>
 
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.category")}
-          <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger aria-label={t("create.category")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSET_CATEGORY}>{t("create.categoryDefault")}</SelectItem>
-              {(categoriesQuery.data ?? []).map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.priority")}
-          <Select value={priority} onValueChange={setPriority}>
-            <SelectTrigger aria-label={t("create.priority")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSET_PRIORITY}>{t("create.priorityDefault")}</SelectItem>
-              {PRIORITY_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.responseTarget")}
-          <Input
-            type="number"
-            value={responseTargetMinutes}
-            onChange={(event) => setResponseTargetMinutes(event.target.value)}
-            required
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.resolutionTarget")}
-          <Input
-            type="number"
-            value={resolutionTargetMinutes}
-            onChange={(event) => setResolutionTargetMinutes(event.target.value)}
-            required
-          />
-        </label>
-
-        <Button
-          type="submit"
-          disabled={mutation.isPending || !responseTargetMinutes || !resolutionTargetMinutes}
-          className="self-start"
-        >
-          {mutation.isPending ? t("create.submitting") : t("create.submit")}
-        </Button>
+          <FormActions
+            error={error}
+            reason={missing.length > 0 ? missingReason(tCommon, locale, missing) : undefined}
+            reasonId={reasonId}
+          >
+            <Button
+              type="submit"
+              disabled={mutation.isPending || !responseTargetMinutes || !resolutionTargetMinutes}
+              aria-describedby={missing.length > 0 ? reasonId : undefined}
+            >
+              {mutation.isPending ? t("create.submitting") : t("create.submit")}
+            </Button>
+            <Button type="button" variant="ghost" asChild>
+              <Link href={`/${locale}/sla-policies`}>{tCommon("form.cancel")}</Link>
+            </Button>
+          </FormActions>
+        </Card>
       </form>
     </section>
   );

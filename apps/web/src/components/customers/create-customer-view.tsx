@@ -1,12 +1,22 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCreateCustomerMutation } from "@/hooks/use-tickets";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, PageHeader } from "@crm/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  FormActions,
+  FormField,
+  FormSection,
+  Input,
+  PageHeader,
+} from "@crm/ui";
+import { missingReason } from "@/lib/form-reason";
 
 /**
  * Story 25 — Create Customer (plan Task 3). Submits only `{ displayName }`
@@ -20,6 +30,7 @@ import { Alert, Button, Input, PageHeader } from "@crm/ui";
  */
 export function CreateCustomerView() {
   const t = useTranslations("customers");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const { locale } = useParams<{ locale: string }>();
   const [displayName, setDisplayName] = useState("");
@@ -46,9 +57,13 @@ export function CreateCustomerView() {
     }
   }
 
+  // Story 225 (PR-4.4) — what still blocks the submit, said beside it.
+  const reasonId = useId();
+  const missing = displayName.trim() ? [] : [t("create.displayName")];
+
   return (
-    <section className="flex max-w-md flex-col gap-4">
-      <PageHeader title={t("create.title")} />
+    <section className="flex max-w-2xl flex-col gap-section">
+      <PageHeader title={t("create.title")} description={tCommon("form.requiredHint")} />
 
       {created && (
         <Alert variant="success">
@@ -59,21 +74,35 @@ export function CreateCustomerView() {
         </Alert>
       )}
 
-      {error && <Alert variant="destructive">{error}</Alert>}
-
-      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.displayName")}
-          <Input
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            required
-            minLength={1}
-          />
-        </label>
-        <Button type="submit" disabled={mutation.isPending} className="self-start">
-          {mutation.isPending ? t("create.submitting") : t("create.submit")}
-        </Button>
+      <form onSubmit={handleSubmit}>
+        <Card className="flex flex-col gap-section p-surface">
+          <FormSection title={t("create.sectionDetails")}>
+            <FormField label={t("create.displayName")} required density="comfortable">
+              <Input
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                required
+                minLength={1}
+              />
+            </FormField>
+          </FormSection>
+          <FormActions
+            error={error}
+            reason={missing.length > 0 ? missingReason(tCommon, locale, missing) : undefined}
+            reasonId={reasonId}
+          >
+            <Button
+              type="submit"
+              disabled={mutation.isPending}
+              aria-describedby={missing.length > 0 ? reasonId : undefined}
+            >
+              {mutation.isPending ? t("create.submitting") : t("create.submit")}
+            </Button>
+            <Button type="button" variant="ghost" asChild>
+              <Link href={`/${locale}/customers`}>{tCommon("form.cancel")}</Link>
+            </Button>
+          </FormActions>
+        </Card>
       </form>
     </section>
   );

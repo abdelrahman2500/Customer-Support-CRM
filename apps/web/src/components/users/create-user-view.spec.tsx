@@ -273,4 +273,22 @@ describe("CreateUserView", () => {
     expect(screen.getByRole("combobox", { name: "Department" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Role" })).toBeInTheDocument();
   });
+
+  // Story 225 (PR-4.4) — the form-section recipe.
+  it("marks required fields and says what still blocks the disabled submit", () => {
+    mockedUseCreateUserMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never);
+    renderWithLocale("en");
+
+    expect(screen.getByLabelText(/^Email\*?$/)).toHaveAttribute("aria-required", "true");
+    const submit = screen.getByRole("button", { name: "Create user" });
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveAccessibleDescription(
+      "Still needed: Email, Password, Full name, Branch, and Role.",
+    );
+    expect(screen.getByRole("group", { name: "Branch and role" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cancel" })).toHaveAttribute("href", "/en/users");
+  });
 });

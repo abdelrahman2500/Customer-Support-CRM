@@ -35,6 +35,8 @@ function renderWithLocale(locale: "en" | "ar" = "en") {
   );
 }
 
+// Story 225 (PR-4.4) — required fields show an aria-hidden "*" after their
+// label text, so required-field label queries allow it.
 describe("CreateArticleView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,10 +79,10 @@ describe("CreateArticleView", () => {
 
     expect(screen.getByRole("button", { name: "Create article" })).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "How to reset a password" } });
+    fireEvent.change(screen.getByLabelText(/^Title\*?$/), { target: { value: "How to reset a password" } });
     expect(screen.getByRole("button", { name: "Create article" })).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("Body"), { target: { value: "Step-by-step..." } });
+    fireEvent.change(screen.getByLabelText(/^Body\*?$/), { target: { value: "Step-by-step..." } });
     expect(screen.getByRole("button", { name: "Create article" })).not.toBeDisabled();
   });
 
@@ -90,10 +92,10 @@ describe("CreateArticleView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "How to reset a password" } });
+    fireEvent.change(screen.getByLabelText(/^Title\*?$/), { target: { value: "How to reset a password" } });
     fireEvent.click(within(screen.getByText("Category").closest("label")!).getByRole("combobox"));
     fireEvent.click(await screen.findByRole("option", { name: "account" }));
-    fireEvent.change(screen.getByLabelText("Body"), { target: { value: "Step-by-step..." } });
+    fireEvent.change(screen.getByLabelText(/^Body\*?$/), { target: { value: "Step-by-step..." } });
     fireEvent.click(screen.getByRole("button", { name: "Create article" }));
 
     await waitFor(() =>
@@ -112,8 +114,8 @@ describe("CreateArticleView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "How to reset a password" } });
-    fireEvent.change(screen.getByLabelText("Body"), { target: { value: "Step-by-step..." } });
+    fireEvent.change(screen.getByLabelText(/^Title\*?$/), { target: { value: "How to reset a password" } });
+    fireEvent.change(screen.getByLabelText(/^Body\*?$/), { target: { value: "Step-by-step..." } });
     fireEvent.click(screen.getByRole("button", { name: "Create article" }));
 
     await waitFor(() =>
@@ -130,14 +132,14 @@ describe("CreateArticleView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "How to reset a password" } });
-    fireEvent.change(screen.getByLabelText("Body"), { target: { value: "Step-by-step..." } });
+    fireEvent.change(screen.getByLabelText(/^Title\*?$/), { target: { value: "How to reset a password" } });
+    fireEvent.change(screen.getByLabelText(/^Body\*?$/), { target: { value: "Step-by-step..." } });
     fireEvent.click(screen.getByRole("button", { name: "Create article" }));
 
     expect(await screen.findByText("Title already exists")).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Title")).toHaveValue("How to reset a password");
-    expect(screen.getByLabelText("Body")).toHaveValue("Step-by-step...");
+    expect(screen.getByLabelText(/^Title\*?$/)).toHaveValue("How to reset a password");
+    expect(screen.getByLabelText(/^Body\*?$/)).toHaveValue("Step-by-step...");
   });
 
   it("shows the shared network-error fallback for a non-ApiError failure", async () => {
@@ -146,8 +148,8 @@ describe("CreateArticleView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "How to reset a password" } });
-    fireEvent.change(screen.getByLabelText("Body"), { target: { value: "Step-by-step..." } });
+    fireEvent.change(screen.getByLabelText(/^Title\*?$/), { target: { value: "How to reset a password" } });
+    fireEvent.change(screen.getByLabelText(/^Body\*?$/), { target: { value: "Step-by-step..." } });
     fireEvent.click(screen.getByRole("button", { name: "Create article" }));
 
     // Batch 1 (UX audit) — a non-`ApiError` rejection is a network failure,
@@ -165,8 +167,8 @@ describe("CreateArticleView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "How to reset a password" } });
-    fireEvent.change(screen.getByLabelText("Body"), { target: { value: "Step-by-step..." } });
+    fireEvent.change(screen.getByLabelText(/^Title\*?$/), { target: { value: "How to reset a password" } });
+    fireEvent.change(screen.getByLabelText(/^Body\*?$/), { target: { value: "Step-by-step..." } });
 
     expect(screen.getByRole("button", { name: "Creating..." })).toBeDisabled();
   });

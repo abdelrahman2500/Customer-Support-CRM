@@ -1,13 +1,24 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useCreateArticleMutation } from "@/hooks/use-knowledge-base";
 import { useKbCategoriesQuery } from "@/hooks/use-kb-categories";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, PageHeader, Textarea } from "@crm/ui";
+import {
+  Button,
+  Card,
+  FormActions,
+  FormField,
+  FormSection,
+  Input,
+  PageHeader,
+  Textarea,
+} from "@crm/ui";
+import { missingReason } from "@/lib/form-reason";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 /** RM-27 — the free-text category `Input` became a `Select` sourced from
@@ -29,6 +40,7 @@ const UNSET_CATEGORY = "__unset__";
  */
 export function CreateArticleView() {
   const t = useTranslations("knowledgeBase");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
@@ -62,52 +74,68 @@ export function CreateArticleView() {
     }
   }
 
+  // Story 225 (PR-4.4) — what still blocks the submit, said beside it.
+  const reasonId = useId();
+  const missing = [
+    ...(title.trim() ? [] : [t("create.articleTitle")]),
+    ...(body.trim() ? [] : [t("create.body")]),
+  ];
+
   return (
-    <section className="flex max-w-md flex-col gap-4">
-      <PageHeader title={t("create.title")} />
+    <section className="flex max-w-3xl flex-col gap-section">
+      <PageHeader title={t("create.title")} description={tCommon("form.requiredHint")} />
 
-      {error && <Alert variant="destructive">{error}</Alert>}
+      <form onSubmit={handleSubmit}>
+        <Card className="flex flex-col gap-section p-surface">
+          <FormSection title={t("create.sectionArticle")} columns={2}>
+            <FormField label={t("create.articleTitle")} required density="comfortable">
+              <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
+            </FormField>
+            <FormField label={t("create.category")} density="comfortable">
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger aria-label={t("create.category")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET_CATEGORY}>{t("create.categoryDefault")}</SelectItem>
+                  {(categoriesQuery.data ?? []).map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </FormSection>
 
-      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.articleTitle")}
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
-        </label>
+          <FormSection title={t("create.sectionContent")}>
+            <FormField label={t("create.body")} required density="comfortable">
+              <Textarea
+                rows={8}
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                required
+              />
+            </FormField>
+          </FormSection>
 
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.category")}
-          <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger aria-label={t("create.category")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSET_CATEGORY}>{t("create.categoryDefault")}</SelectItem>
-              {(categoriesQuery.data ?? []).map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.body")}
-          <Textarea
-            rows={6}
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            required
-          />
-        </label>
-
-        <Button
-          type="submit"
-          disabled={mutation.isPending || !title.trim() || !body.trim()}
-          className="self-start"
-        >
-          {mutation.isPending ? t("create.submitting") : t("create.submit")}
-        </Button>
+          <FormActions
+            error={error}
+            reason={missing.length > 0 ? missingReason(tCommon, locale, missing) : undefined}
+            reasonId={reasonId}
+          >
+            <Button
+              type="submit"
+              disabled={mutation.isPending || !title.trim() || !body.trim()}
+              aria-describedby={missing.length > 0 ? reasonId : undefined}
+            >
+              {mutation.isPending ? t("create.submitting") : t("create.submit")}
+            </Button>
+            <Button type="button" variant="ghost" asChild>
+              <Link href={`/${locale}/knowledge-base`}>{tCommon("form.cancel")}</Link>
+            </Button>
+          </FormActions>
+        </Card>
       </form>
     </section>
   );

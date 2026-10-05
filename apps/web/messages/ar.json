@@ -49,6 +49,11 @@
       "hoursMinutes": "{hours, number} س {minutes, number} د",
       "minutes": "{minutes, number} د",
       "lessThanMinute": "أقل من دقيقة"
+    },
+    "form": {
+      "cancel": "إلغاء",
+      "missing": "ما زال مطلوبًا: {fields}.",
+      "requiredHint": "الحقول المعلَّمة بـ * مطلوبة."
     }
   },
   "auth": {
@@ -410,7 +415,12 @@
       "createFailed": "تعذّر إنشاء التذكرة. حاول مرة أخرى.",
       "createSuccess": "تم إنشاء التذكرة.",
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
-      "optionsLoading": "جارٍ التحميل…"
+      "optionsLoading": "جارٍ التحميل…",
+      "sectionCustomer": "العميل",
+      "sectionTicket": "التذكرة",
+      "sectionRouting": "التوجيه",
+      "searchCustomers": "ابحث في العملاء",
+      "noCustomerMatch": "لا يوجد عميل مطابق."
     },
     "board": {
       "viewLabel": "طريقة العرض",
@@ -599,7 +609,8 @@
       "success": "تم إنشاء العميل \"{name}\".",
       "createTicketLink": "إنشاء تذكرة له",
       "createFailed": "تعذّر إنشاء العميل. حاول مرة أخرى.",
-      "createForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء."
+      "createForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "sectionDetails": "العميل"
     }
   },
   "users": {
@@ -665,7 +676,9 @@
       "submitting": "جارٍ الإنشاء...",
       "createFailed": "تعذّر إنشاء المستخدم. حاول مرة أخرى.",
       "createSuccess": "تم إنشاء المستخدم \"{name}\".",
-      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء."
+      "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "sectionPerson": "الشخص وتسجيل الدخول",
+      "sectionAccess": "الفرع والدور"
     }
   },
   "slaPolicies": {
@@ -709,7 +722,10 @@
       "submit": "إنشاء السياسة",
       "submitting": "جارٍ الإنشاء...",
       "createFailed": "تعذّر إنشاء سياسة اتفاقية الخدمة. حاول مرة أخرى.",
-      "createSuccess": "تم إنشاء سياسة اتفاقية مستوى الخدمة."
+      "createSuccess": "تم إنشاء سياسة اتفاقية مستوى الخدمة.",
+      "sectionScope": "ينطبق على",
+      "sectionScopeHint": "اترك هذه الحقول فارغة لسياسة تنطبق على كل التذاكر.",
+      "sectionTargets": "الأهداف"
     }
   },
   "roles": {
@@ -978,7 +994,9 @@
       "submit": "إنشاء المقالة",
       "submitting": "جارٍ الإنشاء...",
       "createFailed": "تعذّر إنشاء المقالة. حاول مرة أخرى.",
-      "createForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء."
+      "createForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
+      "sectionArticle": "المقالة",
+      "sectionContent": "المحتوى"
     },
     "detail": {
       "titleLabel": "عنوان المقالة",

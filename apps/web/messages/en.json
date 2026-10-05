@@ -49,6 +49,11 @@
       "hoursMinutes": "{hours, number}h {minutes, number}m",
       "minutes": "{minutes, number}m",
       "lessThanMinute": "<1m"
+    },
+    "form": {
+      "cancel": "Cancel",
+      "missing": "Still needed: {fields}.",
+      "requiredHint": "Fields marked * are required."
     }
   },
   "auth": {
@@ -410,7 +415,12 @@
       "createFailed": "Couldn't create the ticket. Please try again.",
       "createSuccess": "Ticket created.",
       "actionForbidden": "You don't have permission to perform that action.",
-      "optionsLoading": "Loading…"
+      "optionsLoading": "Loading…",
+      "sectionCustomer": "Customer",
+      "sectionTicket": "Ticket",
+      "sectionRouting": "Routing",
+      "searchCustomers": "Search customers",
+      "noCustomerMatch": "No customer matches."
     },
     "board": {
       "viewLabel": "View",
@@ -599,7 +609,8 @@
       "success": "Customer \"{name}\" was created.",
       "createTicketLink": "Create a ticket for them",
       "createFailed": "Couldn't create the customer. Please try again.",
-      "createForbidden": "You don't have permission to create a customer."
+      "createForbidden": "You don't have permission to create a customer.",
+      "sectionDetails": "Customer"
     }
   },
   "users": {
@@ -665,7 +676,9 @@
       "submitting": "Creating...",
       "createFailed": "Couldn't create the user. Please try again.",
       "createSuccess": "User \"{name}\" created.",
-      "actionForbidden": "You don't have permission to perform that action."
+      "actionForbidden": "You don't have permission to perform that action.",
+      "sectionPerson": "Person and sign-in",
+      "sectionAccess": "Branch and role"
     }
   },
   "slaPolicies": {
@@ -709,7 +722,10 @@
       "submit": "Create policy",
       "submitting": "Creating...",
       "createFailed": "Couldn't create the SLA policy. Please try again.",
-      "createSuccess": "SLA policy created."
+      "createSuccess": "SLA policy created.",
+      "sectionScope": "Applies to",
+      "sectionScopeHint": "Leave these empty for a policy that applies to every ticket.",
+      "sectionTargets": "Targets"
     }
   },
   "roles": {
@@ -978,7 +994,9 @@
       "submit": "Create article",
       "submitting": "Creating...",
       "createFailed": "Couldn't create the article. Please try again.",
-      "createForbidden": "You don't have permission to create an article."
+      "createForbidden": "You don't have permission to create an article.",
+      "sectionArticle": "Article",
+      "sectionContent": "Content"
     },
     "detail": {
       "titleLabel": "Article title",

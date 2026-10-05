@@ -1,13 +1,24 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useBranchesQuery, useCreateUserMutation, useDepartmentsQuery } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, Input, PageHeader, showSuccessToast } from "@crm/ui";
+import {
+  Button,
+  Card,
+  FormActions,
+  FormField,
+  FormSection,
+  Input,
+  PageHeader,
+  showSuccessToast,
+} from "@crm/ui";
+import { missingReason } from "@/lib/form-reason";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 
 const UNSET_DEPARTMENT = "__unset__";
@@ -32,6 +43,7 @@ const UNSET_DEPARTMENT = "__unset__";
  */
 export function CreateUserView() {
   const t = useTranslations("users");
+  const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
@@ -74,112 +86,133 @@ export function CreateUserView() {
     }
   }
 
+  // Story 225 (PR-4.4) — what still blocks the submit, said beside it.
+  const reasonId = useId();
+  const missing = [
+    ...(email ? [] : [t("create.email")]),
+    ...(password ? [] : [t("create.password")]),
+    ...(fullName ? [] : [t("create.fullName")]),
+    ...(branchId ? [] : [t("create.branch")]),
+    ...(roleId ? [] : [t("create.role")]),
+  ];
+
   return (
-    <section className="flex max-w-md flex-col gap-4">
-      <PageHeader title={t("create.title")} />
+    <section className="flex max-w-3xl flex-col gap-section">
+      <PageHeader title={t("create.title")} description={tCommon("form.requiredHint")} />
 
-      {error && <Alert variant="destructive">{error}</Alert>}
+      <form onSubmit={handleSubmit}>
+        <Card className="flex flex-col gap-section p-surface">
+          <FormSection title={t("create.sectionPerson")} columns={2}>
+            <FormField label={t("create.fullName")} required density="comfortable">
+              <Input
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                required
+                minLength={1}
+              />
+            </FormField>
+            <FormField label={t("create.email")} required density="comfortable">
+              <Input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </FormField>
+            <FormField
+              label={t("create.password")}
+              required
+              density="comfortable"
+              hint={t("create.passwordHint")}
+            >
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                minLength={8}
+              />
+            </FormField>
+          </FormSection>
 
-      <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.email")}
-          <Input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </label>
+          <FormSection title={t("create.sectionAccess")} columns={2}>
+            <FormField
+              label={t("create.branch")}
+              required
+              density="comfortable"
+              error={branchesQuery.isError ? t("create.branchLoadError") : undefined}
+            >
+              <Select value={branchId} onValueChange={setBranchId}>
+                <SelectTrigger aria-label={t("create.branch")}>
+                  <SelectValue placeholder={t("create.selectBranch")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(branchesQuery.data ?? []).map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField
+              label={t("create.department")}
+              density="comfortable"
+              error={departmentsQuery.isError ? t("create.departmentLoadError") : undefined}
+            >
+              <Select value={departmentId} onValueChange={setDepartmentId}>
+                <SelectTrigger aria-label={t("create.department")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNSET_DEPARTMENT}>{t("create.departmentDefault")}</SelectItem>
+                  {(departmentsQuery.data ?? []).map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField
+              label={t("create.role")}
+              required
+              density="comfortable"
+              error={rolesQuery.isError ? t("create.roleLoadError") : undefined}
+            >
+              <Select value={roleId} onValueChange={setRoleId}>
+                <SelectTrigger aria-label={t("create.role")}>
+                  <SelectValue placeholder={t("create.selectRole")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(rolesQuery.data ?? []).map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </FormSection>
 
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.password")}
-          <Input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            minLength={8}
-          />
-          <span className="text-xs text-ink-subtle">{t("create.passwordHint")}</span>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.fullName")}
-          <Input
-            value={fullName}
-            onChange={(event) => setFullName(event.target.value)}
-            required
-            minLength={1}
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.branch")}
-          <Select value={branchId} onValueChange={setBranchId}>
-            <SelectTrigger aria-label={t("create.branch")}>
-              <SelectValue placeholder={t("create.selectBranch")} />
-            </SelectTrigger>
-            <SelectContent>
-              {(branchesQuery.data ?? []).map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {branchesQuery.isError && (
-            <span className="text-xs text-danger-foreground">{t("create.branchLoadError")}</span>
-          )}
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.department")}
-          <Select value={departmentId} onValueChange={setDepartmentId}>
-            <SelectTrigger aria-label={t("create.department")}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={UNSET_DEPARTMENT}>{t("create.departmentDefault")}</SelectItem>
-              {(departmentsQuery.data ?? []).map((department) => (
-                <SelectItem key={department.id} value={department.id}>
-                  {department.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {departmentsQuery.isError && (
-            <span className="text-xs text-danger-foreground">
-              {t("create.departmentLoadError")}
-            </span>
-          )}
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-ink-strong">
-          {t("create.role")}
-          <Select value={roleId} onValueChange={setRoleId}>
-            <SelectTrigger aria-label={t("create.role")}>
-              <SelectValue placeholder={t("create.selectRole")} />
-            </SelectTrigger>
-            <SelectContent>
-              {(rolesQuery.data ?? []).map((role) => (
-                <SelectItem key={role.id} value={role.id}>
-                  {role.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {rolesQuery.isError && (
-            <span className="text-xs text-danger-foreground">{t("create.roleLoadError")}</span>
-          )}
-        </label>
-
-        <Button
-          type="submit"
-          disabled={mutation.isPending || !email || !password || !fullName || !branchId || !roleId}
-          className="self-start"
-        >
-          {mutation.isPending ? t("create.submitting") : t("create.submit")}
-        </Button>
+          <FormActions
+            error={error}
+            reason={missing.length > 0 ? missingReason(tCommon, locale, missing) : undefined}
+            reasonId={reasonId}
+          >
+            <Button
+              type="submit"
+              disabled={mutation.isPending || missing.length > 0}
+              aria-describedby={missing.length > 0 ? reasonId : undefined}
+            >
+              {mutation.isPending ? t("create.submitting") : t("create.submit")}
+            </Button>
+            <Button type="button" variant="ghost" asChild>
+              <Link href={`/${locale}/users`}>{tCommon("form.cancel")}</Link>
+            </Button>
+          </FormActions>
+        </Card>
       </form>
     </section>
   );

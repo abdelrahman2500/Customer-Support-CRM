@@ -353,3 +353,6 @@ export { ShowPasswordIcon, HidePasswordIcon } from "./lib/icons";
 
 // --- Story 217 (PR-3.2) — board card moves ----------------------------------
 export { DragHandleIcon, MoreActionsIcon } from "./lib/icons";
+
+// --- Story 225 (PR-4.4) — the form-section recipe -------------------------
+export { FormActions, FormSection } from "./components/form-layout";

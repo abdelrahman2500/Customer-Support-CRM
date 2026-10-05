@@ -35,6 +35,8 @@ function renderWithLocale(locale: "en" | "ar" = "en") {
   );
 }
 
+// Story 225 (PR-4.4) — required fields show an aria-hidden "*" after their
+// label text, so required-field label queries allow it.
 describe("CreateSlaPolicyView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,12 +80,12 @@ describe("CreateSlaPolicyView", () => {
 
     expect(screen.getByRole("button", { name: "Create policy" })).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("Response target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Response target \(minutes\)\*?$/), {
       target: { value: "30" },
     });
     expect(screen.getByRole("button", { name: "Create policy" })).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText("Resolution target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Resolution target \(minutes\)\*?$/), {
       target: { value: "240" },
     });
     expect(screen.getByRole("button", { name: "Create policy" })).not.toBeDisabled();
@@ -95,10 +97,10 @@ describe("CreateSlaPolicyView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Response target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Response target \(minutes\)\*?$/), {
       target: { value: "0" },
     });
-    fireEvent.change(screen.getByLabelText("Resolution target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Resolution target \(minutes\)\*?$/), {
       target: { value: "240" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create policy" }));
@@ -122,10 +124,10 @@ describe("CreateSlaPolicyView", () => {
     });
     fireEvent.click(within(screen.getByText("Category").closest("label")!).getByRole("combobox"));
     fireEvent.click(await screen.findByRole("option", { name: "billing" }));
-    fireEvent.change(screen.getByLabelText("Response target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Response target \(minutes\)\*?$/), {
       target: { value: "30" },
     });
-    fireEvent.change(screen.getByLabelText("Resolution target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Resolution target \(minutes\)\*?$/), {
       target: { value: "240" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create policy" }));
@@ -147,10 +149,10 @@ describe("CreateSlaPolicyView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Response target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Response target \(minutes\)\*?$/), {
       target: { value: "15" },
     });
-    fireEvent.change(screen.getByLabelText("Resolution target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Resolution target \(minutes\)\*?$/), {
       target: { value: "60" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create policy" }));
@@ -172,10 +174,10 @@ describe("CreateSlaPolicyView", () => {
     fireEvent.change(screen.getByLabelText("Department ID"), {
       target: { value: "unknown-dept" },
     });
-    fireEvent.change(screen.getByLabelText("Response target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Response target \(minutes\)\*?$/), {
       target: { value: "30" },
     });
-    fireEvent.change(screen.getByLabelText("Resolution target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Resolution target \(minutes\)\*?$/), {
       target: { value: "240" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create policy" }));
@@ -183,8 +185,8 @@ describe("CreateSlaPolicyView", () => {
     expect(await screen.findByText("Department not found")).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Department ID")).toHaveValue("unknown-dept");
-    expect(screen.getByLabelText("Response target (minutes)")).toHaveValue(30);
-    expect(screen.getByLabelText("Resolution target (minutes)")).toHaveValue(240);
+    expect(screen.getByLabelText(/^Response target \(minutes\)\*?$/)).toHaveValue(30);
+    expect(screen.getByLabelText(/^Resolution target \(minutes\)\*?$/)).toHaveValue(240);
   });
 
   it("disables the submit button while the mutation is pending", () => {
@@ -195,10 +197,10 @@ describe("CreateSlaPolicyView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Response target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Response target \(minutes\)\*?$/), {
       target: { value: "30" },
     });
-    fireEvent.change(screen.getByLabelText("Resolution target (minutes)"), {
+    fireEvent.change(screen.getByLabelText(/^Resolution target \(minutes\)\*?$/), {
       target: { value: "240" },
     });
 

@@ -26,6 +26,8 @@ function renderWithLocale(locale: "en" | "ar" = "en") {
   );
 }
 
+// Story 225 (PR-4.4) — required fields show an aria-hidden "*" after their
+// label text, so required-field label queries allow it.
 describe("CreateCustomerView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,7 +62,7 @@ describe("CreateCustomerView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Customer name"), {
+    fireEvent.change(screen.getByLabelText(/^Customer name\*?$/), {
       target: { value: "Acme Inc." },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create customer" }));
@@ -79,7 +81,7 @@ describe("CreateCustomerView", () => {
 
     renderWithLocale("en");
 
-    fireEvent.change(screen.getByLabelText("Customer name"), { target: { value: "x" } });
+    fireEvent.change(screen.getByLabelText(/^Customer name\*?$/), { target: { value: "x" } });
     fireEvent.click(screen.getByRole("button", { name: "Create customer" }));
 
     expect(await screen.findByText("displayName must not be empty")).toBeInTheDocument();
