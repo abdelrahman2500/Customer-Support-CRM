@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { act, render, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TicketChatCard } from "./ticket-chat-card";
 import {
@@ -9,6 +9,7 @@ import {
   useTicketMessagesQuery,
 } from "@/hooks/use-ticket-messages";
 import {
+  useCreateTicketNoteMutation,
   useCurrentUserQuery,
   useTicketEscalationsQuery,
   useTicketHistoryQuery,
@@ -38,6 +39,8 @@ vi.mock("@/hooks/use-ticket-messages", () => ({
 vi.mock("@/hooks/use-tickets", () => ({
   useUsersQuery: vi.fn(),
   useCurrentUserQuery: vi.fn(),
+  // Story 207 — the composer's Internal note mode.
+  useCreateTicketNoteMutation: vi.fn(),
   // Story 206 — the timeline's other sources.
   useTicketNotesQuery: vi.fn(),
   useTicketHistoryQuery: vi.fn(),
@@ -47,6 +50,12 @@ vi.mock("@/hooks/use-tickets", () => ({
 vi.mock("@/hooks/use-quick-replies", () => ({
   useQuickRepliesQuery: vi.fn(),
 }));
+
+/** Story 207 (RD-3.7, recon A11Y-09) — the reply field is named by its own
+ * label now, not by its placeholder; it is the same field as before. */
+function replyBox() {
+  return screen.getByRole("textbox", { name: "detail.composerReplyLabel" });
+}
 
 function queryResult(overrides: Record<string, unknown>) {
   return {
@@ -145,6 +154,15 @@ describe("TicketChatCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     route.locale = "en";
+    // Story 207 — drafts persist per ticket for the session; start clean.
+    window.sessionStorage.clear();
+    vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({ id: "note-new" }),
+      isPending: false,
+      isError: false,
+      error: null,
+    } as never);
     vi.mocked(useUsersQuery).mockReturnValue(
       queryResult({
         data: [{ id: "agent-2", fullName: "Sam Colleague" }],
@@ -269,7 +287,7 @@ describe("TicketChatCard", () => {
     } as never);
 
     render(<TicketChatCard ticketId="ticket-1" />);
-    const textarea = screen.getByLabelText("detail.chatPlaceholder");
+    const textarea = replyBox();
     fireEvent.change(textarea, { target: { value: "Let me look into that." } });
     fireEvent.click(screen.getByText("detail.chatSend"));
 
@@ -292,7 +310,7 @@ describe("TicketChatCard", () => {
     } as never);
 
     render(<TicketChatCard ticketId="ticket-1" />);
-    const textarea = screen.getByLabelText("detail.chatPlaceholder");
+    const textarea = replyBox();
     fireEvent.change(textarea, { target: { value: "hello" } });
     fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
     expect(mutateAsync).not.toHaveBeenCalled();
@@ -303,7 +321,10 @@ describe("TicketChatCard", () => {
     });
   });
 
-  it("disables the composer while sending", () => {
+  // Story 207 (RD-3.7, recon A11Y-09) — the field used to be disabled while
+  // sending, which dropped the agent's focus; it now stays enabled and only
+  // Send is disabled (still reading "Sending").
+  it("keeps the field enabled while sending, with Send disabled and reading Sending", () => {
     vi.mocked(useTicketMessagesQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
@@ -317,8 +338,8 @@ describe("TicketChatCard", () => {
 
     render(<TicketChatCard ticketId="ticket-1" />);
 
-    expect(screen.getByLabelText("detail.chatPlaceholder")).toBeDisabled();
-    expect(screen.getByText("detail.chatSending")).toBeInTheDocument();
+    expect(replyBox()).toBeEnabled();
+    expect(screen.getByRole("button", { name: "detail.chatSending" })).toBeDisabled();
   });
 
   it("shows the shared forbidden text, not the raw backend message, for a 403 send failure", async () => {
@@ -334,7 +355,7 @@ describe("TicketChatCard", () => {
     } as never);
 
     render(<TicketChatCard ticketId="ticket-1" />);
-    fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+    fireEvent.change(replyBox(), {
       target: { value: "hello" },
     });
     fireEvent.click(screen.getByText("detail.chatSend"));
@@ -358,7 +379,7 @@ describe("TicketChatCard", () => {
     } as never);
 
     render(<TicketChatCard ticketId="ticket-1" />);
-    fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+    fireEvent.change(replyBox(), {
       target: { value: "hello" },
     });
     fireEvent.click(screen.getByText("detail.chatSend"));
@@ -381,7 +402,7 @@ describe("TicketChatCard", () => {
     } as never);
 
     render(<TicketChatCard ticketId="ticket-1" />);
-    fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+    fireEvent.change(replyBox(), {
       target: { value: "hello" },
     });
     fireEvent.click(screen.getByText("detail.chatSend"));
@@ -519,7 +540,7 @@ describe("TicketChatCard", () => {
       } as never);
 
       render(<TicketChatCard ticketId="ticket-1" />);
-      fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+      fireEvent.change(replyBox(), {
         target: { value: "How can I help?" },
       });
       fireEvent.click(screen.getByText("detail.chatSend"));
@@ -556,7 +577,7 @@ describe("TicketChatCard", () => {
 
       render(<TicketChatCard ticketId="ticket-1" />);
       fireEvent.click(screen.getByRole("checkbox", { name: "detail.sendByEmailLabel" }));
-      fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+      fireEvent.change(replyBox(), {
         target: { value: "Your invoice is attached." },
       });
       fireEvent.click(screen.getByText("detail.chatSend"));
@@ -584,7 +605,7 @@ describe("TicketChatCard", () => {
 
       render(<TicketChatCard ticketId="ticket-1" />);
       fireEvent.click(screen.getByRole("checkbox", { name: "detail.sendByEmailLabel" }));
-      fireEvent.change(screen.getByLabelText("detail.chatPlaceholder"), {
+      fireEvent.change(replyBox(), {
         target: { value: "hello" },
       });
       fireEvent.click(screen.getByText("detail.chatSend"));
@@ -628,7 +649,7 @@ describe("TicketChatCard", () => {
       fireEvent.click(screen.getByRole("combobox"));
       fireEvent.click(await screen.findByRole("option", { name: "Password reset" }));
 
-      expect(screen.getByLabelText("detail.chatPlaceholder")).toHaveValue(quickReply.body);
+      expect(replyBox()).toHaveValue(quickReply.body);
     });
 
     it("appends the selected quick reply's body to existing draft text rather than overwriting it", async () => {
@@ -641,7 +662,7 @@ describe("TicketChatCard", () => {
 
       render(<TicketChatCard ticketId="ticket-1" />);
 
-      const textarea = screen.getByLabelText("detail.chatPlaceholder");
+      const textarea = replyBox();
       fireEvent.change(textarea, { target: { value: "Thanks for reaching out." } });
 
       fireEvent.click(screen.getByRole("combobox"));
@@ -906,20 +927,199 @@ describe("TicketChatCard", () => {
       expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
       expect(screen.queryByRole("log")).not.toBeInTheDocument();
     });
+  });
 
-    it("captions the caller's note composer as internal, below the reply composer", () => {
+  // Story 207 (RD-3.7, recon TW-04/A11Y-05/A11Y-09) — one composer, two modes.
+  describe("composer v2 (Story 207)", () => {
+    beforeEach(() => {
       vi.mocked(useTicketMessagesQuery).mockReturnValue(
         queryResult({ data: [], isSuccess: true }) as never,
       );
+    });
 
-      render(
-        <TicketChatCard ticketId="ticket-1" noteComposer={<textarea aria-label="note composer" />} />,
+    function noteBox() {
+      return screen.getByRole("combobox", { name: "detail.composerNoteLabel" });
+    }
+
+    async function noteMode(user = userEvent.setup()) {
+      await user.click(screen.getByRole("tab", { name: "detail.internalNoteLabel" }));
+    }
+
+    it("offers Reply and Internal note as named modes, Reply first, with one field at a time", async () => {
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      const modes = screen.getByRole("tablist", { name: "detail.composerModeLabel" });
+      const [reply, note] = within(modes).getAllByRole("tab");
+      expect(reply).toHaveTextContent("detail.composerModeReply");
+      expect(reply).toHaveAttribute("aria-selected", "true");
+      expect(note).toHaveTextContent("detail.internalNoteLabel");
+      expect(replyBox()).toHaveAttribute("placeholder", "detail.chatPlaceholder");
+
+      await noteMode();
+      expect(note).toHaveAttribute("aria-selected", "true");
+      expect(noteBox()).toHaveAttribute("placeholder", "detail.notesPlaceholder");
+      expect(noteBox()).toHaveClass("bg-warning-subtle");
+      expect(screen.getByText("detail.composerNoteHint")).toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: "detail.composerReplyLabel" })).not.toBeInTheDocument();
+    });
+
+    it("never sends a reply on an Enter that confirms an IME composition", () => {
+      const mutateAsync = vi.fn().mockResolvedValue(myOwnMessage);
+      vi.mocked(useCreateTicketMessageMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      fireEvent.change(replyBox(), { target: { value: "مرحبا" } });
+      fireEvent.compositionStart(replyBox());
+      fireEvent.keyDown(replyBox(), { key: "Enter", isComposing: true });
+      expect(mutateAsync).not.toHaveBeenCalled();
+
+      fireEvent.compositionEnd(replyBox());
+      fireEvent.keyDown(replyBox(), { key: "Enter" });
+      expect(mutateAsync).toHaveBeenCalledWith({ body: "مرحبا" });
+    });
+
+    it("keeps focus in the field after sending with the button", async () => {
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      fireEvent.change(replyBox(), { target: { value: "On it." } });
+      const send = screen.getByRole("button", { name: "detail.chatSend" });
+      send.focus();
+      await act(async () => {
+        fireEvent.click(send);
+      });
+
+      await vi.waitFor(() => expect(replyBox()).toHaveValue(""));
+      expect(replyBox()).toHaveFocus();
+    });
+
+    it("sends a note with the notes mutation, exactly { body }, and clears it", async () => {
+      const user = userEvent.setup();
+      const noteMutateAsync = vi.fn().mockResolvedValue({ id: "note-new" });
+      const replyMutateAsync = vi.fn();
+      vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: noteMutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      vi.mocked(useCreateTicketMessageMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: replyMutateAsync,
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      await noteMode(user);
+      fireEvent.change(noteBox(), { target: { value: "  Checked the logs.  " } });
+      fireEvent.keyDown(noteBox(), { key: "Enter" });
+
+      await vi.waitFor(() => expect(noteMutateAsync).toHaveBeenCalledWith({ body: "Checked the logs." }));
+      expect(replyMutateAsync).not.toHaveBeenCalled();
+      await vi.waitFor(() => expect(noteBox()).toHaveValue(""));
+    });
+
+    it("shows the note's own error copy when adding a note fails", async () => {
+      const user = userEvent.setup();
+      vi.mocked(useCreateTicketNoteMutation).mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockRejectedValue(new ApiError("internals", 500)),
+        isPending: false,
+        isError: false,
+        error: null,
+      } as never);
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      await noteMode(user);
+      fireEvent.change(noteBox(), { target: { value: "A note" } });
+      fireEvent.click(screen.getByRole("button", { name: "detail.notesSubmit" }));
+
+      expect(await screen.findByText("detail.notesCreateFailed")).toBeInTheDocument();
+      expect(noteBox()).toHaveValue("A note");
+    });
+
+    it("picks a mention from the keyboard: ArrowDown, then Enter", async () => {
+      const user = userEvent.setup();
+      vi.mocked(useUsersQuery).mockReturnValue(
+        queryResult({
+          data: [
+            { id: "u1", fullName: "Jane Doe" },
+            { id: "u2", fullName: "Janet Roe" },
+          ],
+          isSuccess: true,
+        }) as never,
       );
+      render(<TicketChatCard ticketId="ticket-1" />);
 
-      const noteComposer = screen.getByLabelText("note composer");
-      const reply = screen.getByLabelText("detail.chatPlaceholder");
-      expect(reply.compareDocumentPosition(noteComposer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(noteComposer.parentElement).toHaveTextContent("detail.internalNoteLabel");
+      await noteMode(user);
+      fireEvent.change(noteBox(), { target: { value: "Ask @Jan" } });
+      expect(noteBox()).toHaveAttribute("aria-expanded", "true");
+      const listbox = screen.getByRole("listbox", { name: "detail.mentionSuggestions" });
+      expect(within(listbox).getAllByRole("option")).toHaveLength(2);
+
+      fireEvent.keyDown(noteBox(), { key: "ArrowDown" });
+      fireEvent.keyDown(noteBox(), { key: "Enter" });
+
+      expect(noteBox()).toHaveValue("Ask @Janet Roe ");
+      expect(noteBox()).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("keeps each mode's draft for the session, per ticket, and clears it on send", async () => {
+      const user = userEvent.setup();
+      const { unmount } = render(<TicketChatCard ticketId="ticket-1" />);
+
+      fireEvent.change(replyBox(), { target: { value: "Half a reply" } });
+      await noteMode(user);
+      fireEvent.change(noteBox(), { target: { value: "Half a note" } });
+      unmount();
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+      expect(replyBox()).toHaveValue("Half a reply");
+      await noteMode(user);
+      expect(noteBox()).toHaveValue("Half a note");
+
+      fireEvent.keyDown(noteBox(), { key: "Enter" });
+      await vi.waitFor(() => expect(noteBox()).toHaveValue(""));
+      expect(window.sessionStorage.getItem("crm.ticketDraft.ticket-1.note")).toBeNull();
+      expect(window.sessionStorage.getItem("crm.ticketDraft.ticket-1.reply")).toBe("Half a reply");
+    });
+
+    it("does not carry a draft to another ticket", () => {
+      window.sessionStorage.setItem("crm.ticketDraft.ticket-1.reply", "For ticket one");
+
+      render(<TicketChatCard ticketId="ticket-2" />);
+
+      expect(replyBox()).toHaveValue("");
+    });
+
+    it("shows the Enter and Shift+Enter hint", () => {
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      const keys = screen.getAllByText((_, element) => element?.tagName === "KBD");
+      expect(keys.map((key) => key.textContent)).toEqual(["Enter", "Shift", "Enter"]);
+      expect(screen.getByText(/detail\.composerHintSend/)).toBeInTheDocument();
+    });
+
+    it("follows the reading direction between modes: in Arabic, ArrowLeft moves to Internal note", async () => {
+      const user = userEvent.setup();
+      route.locale = "ar";
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      screen.getByRole("tab", { name: "detail.composerModeReply" }).focus();
+      await user.keyboard("{ArrowLeft}");
+
+      expect(screen.getByRole("tab", { name: "detail.internalNoteLabel" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
     });
   });
 });

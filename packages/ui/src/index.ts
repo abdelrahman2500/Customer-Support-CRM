@@ -157,6 +157,8 @@ export { Combobox } from "./components/combobox";
 export type { ComboboxOption, ComboboxProps } from "./components/combobox";
 export { MessageThread } from "./components/message-thread";
 export type { MessageThreadItem, MessageThreadProps } from "./components/message-thread";
+export { Composer } from "./components/composer";
+export type { ComposerProps, ComposerSuggestion } from "./components/composer";
 export { MessageBubble } from "./components/message-bubble";
 export type { MessageBubbleProps } from "./components/message-bubble";
 export type { ErrorStateProps } from "./components/error-state";

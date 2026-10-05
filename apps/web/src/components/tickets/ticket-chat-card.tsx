@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { FormEvent, KeyboardEvent, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -11,6 +11,7 @@ import {
   useTicketMessagesQuery,
 } from "@/hooks/use-ticket-messages";
 import {
+  useCreateTicketNoteMutation,
   useCurrentUserQuery,
   useTicketEscalationsQuery,
   useTicketHistoryQuery,
@@ -23,7 +24,6 @@ import { historyEventKey } from "@/lib/history-event";
 import { localeDirection } from "@/i18n/direction";
 import {
   Alert,
-  Button,
   Checkbox,
   Label,
   LoadingStatus,
@@ -33,13 +33,14 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-  Textarea,
 } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import {
   Avatar,
+  Composer,
   HistoryEventIcon,
   InternalNoteIcon,
+  Kbd,
   MessageBubble,
   MessageThread,
   WarningIcon,
@@ -108,16 +109,12 @@ type TimelineEntry = MessageThreadItem & { kind: TimelineKind };
  * three more cards; their content, fallbacks and loading/error/empty
  * messages carry over unchanged. Notes have their own bordered warning
  * surface, a lock and the words "Internal note", so they never read as a
- * reply. A filter (tabs) narrows the thread to one kind. The note composer
- * is the caller's (`noteComposer`) until RD-3.7 merges the two composers.
+ * reply. A filter (tabs) narrows the thread to one kind.
+ *
+ * Story 207 (RD-3.7) — one composer below it, in Reply or Internal note
+ * mode (`TicketComposer`).
  */
-export function TicketChatCard({
-  ticketId,
-  noteComposer,
-}: {
-  ticketId: string;
-  noteComposer?: ReactNode;
-}) {
+export function TicketChatCard({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
@@ -355,19 +352,7 @@ export function TicketChatCard({
         })}
       </Tabs>
 
-      <ChatComposer ticketId={ticketId} />
-
-      {noteComposer && (
-        // Story 206 — until RD-3.7 merges the composers, the note composer
-        // is captioned the same way a note is marked in the thread.
-        <div className="mt-section border-t border-rule-subtle pt-stack">
-          <p className="flex items-center gap-tight text-caption font-medium text-warning-foreground">
-            <InternalNoteIcon aria-hidden="true" className="size-3.5" />
-            {t("detail.internalNoteLabel")}
-          </p>
-          {noteComposer}
-        </div>
-      )}
+      <TicketComposer ticketId={ticketId} />
     </SectionCard>
   );
 }
@@ -409,24 +394,95 @@ function TimelineEvent({
   );
 }
 
-/** Enter sends, Shift+Enter inserts a newline — the composer never assumes
- * a send succeeds (Design item 5's rule, unchanged): a rejected mutation
- * renders inline and leaves the draft in the textarea so nothing typed is
- * lost.
+type ComposerMode = "reply" | "note";
+const COMPOSER_MODES: ComposerMode[] = ["reply", "note"];
+
+/** Story 207 — where a mode's unsent draft lives for the session. */
+function draftKey(ticketId: string, mode: ComposerMode): string {
+  return `crm.ticketDraft.${ticketId}.${mode}`;
+}
+
+function readDraft(key: string): string {
+  try {
+    return window.sessionStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeDraft(key: string, body: string): void {
+  try {
+    if (body) window.sessionStorage.setItem(key, body);
+    else window.sessionStorage.removeItem(key);
+  } catch {
+    // Storage blocked or full: the draft just isn't kept.
+  }
+}
+
+/** Story 207 — one mode's body, mirrored to sessionStorage: restored after
+ * mount (never during render, so server and client markup agree), written
+ * on every change, and cleared with the field once a send succeeds. */
+function useDraft(ticketId: string, mode: ComposerMode) {
+  const key = draftKey(ticketId, mode);
+  const [body, setBodyState] = useState("");
+
+  useEffect(() => {
+    const saved = readDraft(key);
+    if (saved) setBodyState(saved);
+  }, [key]);
+
+  const setBody = useCallback(
+    (next: string | ((current: string) => string)) => {
+      setBodyState((current) => {
+        const value = typeof next === "function" ? next(current) : next;
+        writeDraft(key, value);
+        return value;
+      });
+    },
+    [key],
+  );
+
+  return [body, setBody] as const;
+}
+
+/**
+ * Story 207 (RD-3.7, recon TW-04/A11Y-05/A11Y-09) — the ticket's one
+ * composer, with a Reply mode and an Internal note mode. It replaces the
+ * Live Chat composer below and the separate note form (`AddNoteForm`) that
+ * used to sit under it; both modes keep their own payloads, copy and error
+ * handling exactly.
  *
- * Story 91 — gains a quick-reply picker above the textarea. Reads
- * `useQuickRepliesQuery()` directly (no prop drilling, mirrors every other
- * hook this component already calls); while the query is loading or has
- * failed, the picker is simply omitted — it never blocks the composer's
- * core send/receive flow (mirrors `BranchNotifications`/`PortalNotifications`'s
- * own "never break the primary flow" resilience rule). Selecting a reply
- * inserts its body into the draft — replaces it when empty, else appends
- * with a blank-line separator so nothing already typed is discarded. */
-function ChatComposer({ ticketId }: { ticketId: string }) {
+ * - The shell (`Composer`) sends on Enter but never mid-IME-composition,
+ *   never disables the field, and returns focus to it after a send.
+ * - Each mode has its own accessible name (not its placeholder); the mode
+ *   tabs announce the switch, and the note mode is tinted and says who can
+ *   see it.
+ * - Each mode keeps its own draft, for the session, per ticket.
+ *
+ * Reply mode, from Story 78/91/RM-15 unchanged: Enter sends, Shift+Enter
+ * inserts a newline; a rejected send renders inline and keeps the draft;
+ * the quick-reply picker (omitted while loading or failed — it never blocks
+ * the composer) inserts a reply's body into an empty draft or appends it
+ * after a blank line; "Send by email" appears only once an `EMAIL` adapter
+ * is configured and then switches the endpoint.
+ *
+ * Note mode, from Story 50/RM-06 unchanged: a basic `@mention` affordance —
+ * only the trailing `@word...` run at the very end of the body is an active
+ * mention trigger, and only when the `@` starts the note or follows
+ * whitespace (the backend parser's own boundary rule in
+ * `ticket-mentions.ts`). Picking a suggestion inserts the exact `fullName`
+ * the backend's `parseMentions` matches against. The suggestions are now a
+ * listbox driven from the keyboard (A11Y-05).
+ */
+function TicketComposer({ ticketId }: { ticketId: string }) {
   const t = useTranslations("tickets");
+  const { locale } = useParams<{ locale: string }>();
   const errorMessage = useErrorMessage();
-  const [body, setBody] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<ComposerMode>("reply");
+
+  // Reply mode.
+  const [replyBody, setReplyBody] = useDraft(ticketId, "reply");
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [selectedQuickReplyId, setSelectedQuickReplyId] = useState("");
   const [sendAsEmail, setSendAsEmail] = useState(false);
   const mutation = useCreateTicketMessageMutation(ticketId);
@@ -436,34 +492,29 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
   const activeQuickReplies = (quickRepliesQuery.data ?? []).filter((reply) => reply.isActive);
   const activeMutation = sendAsEmail ? emailMutation : mutation;
 
-  async function send(): Promise<void> {
-    const trimmed = body.trim();
+  // Note mode.
+  const [noteBody, setNoteBody] = useDraft(ticketId, "note");
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const noteMutation = useCreateTicketNoteMutation(ticketId);
+  const usersQuery = useUsersQuery();
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+
+  async function sendReply(): Promise<void> {
+    const trimmed = replyBody.trim();
     if (!trimmed || activeMutation.isPending) {
       return;
     }
-    setError(null);
+    setReplyError(null);
     try {
       await activeMutation.mutateAsync({ body: trimmed });
-      setBody("");
+      setReplyBody("");
     } catch (submitError) {
-      setError(
+      setReplyError(
         errorMessage(submitError, {
           forbidden: t("detail.actionForbidden"),
           generic: t("detail.chatSendFailed"),
         }),
       );
-    }
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    void send();
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      void send();
     }
   }
 
@@ -473,51 +524,166 @@ function ChatComposer({ ticketId }: { ticketId: string }) {
     if (!quickReply) {
       return;
     }
-    setBody((current) => (current.trim() ? `${current}\n\n${quickReply.body}` : quickReply.body));
+    setReplyBody((current) =>
+      current.trim() ? `${current}\n\n${quickReply.body}` : quickReply.body,
+    );
   }
 
+  const mentionQuery = useMemo(() => {
+    const lastAt = noteBody.lastIndexOf("@");
+    if (lastAt === -1) {
+      return null;
+    }
+    const charBefore = noteBody[lastAt - 1];
+    if (charBefore !== undefined && !/\s/.test(charBefore)) {
+      return null; // `@` mid-word — never a mention trigger.
+    }
+    const rest = noteBody.slice(lastAt + 1);
+    return /\s/.test(rest) ? null : rest;
+  }, [noteBody]);
+
+  const mentionMatches = useMemo(() => {
+    if (mentionQuery === null || suggestionsDismissed) {
+      return [];
+    }
+    const query = mentionQuery.toLowerCase();
+    return (usersQuery.data ?? [])
+      .filter((user) => user.fullName.toLowerCase().includes(query))
+      .slice(0, 5);
+  }, [mentionQuery, suggestionsDismissed, usersQuery.data]);
+
+  function selectMention(fullName: string): void {
+    const lastAt = noteBody.lastIndexOf("@");
+    if (lastAt === -1) {
+      return;
+    }
+    setNoteBody(`${noteBody.slice(0, lastAt)}@${fullName} `);
+  }
+
+  async function sendNote(): Promise<void> {
+    setNoteError(null);
+    try {
+      await noteMutation.mutateAsync({ body: noteBody.trim() });
+      setNoteBody("");
+    } catch (submitError) {
+      setNoteError(
+        errorMessage(submitError, {
+          forbidden: t("detail.actionForbidden"),
+          generic: t("detail.notesCreateFailed"),
+        }),
+      );
+    }
+  }
+
+  const hint = (
+    <span className="hidden sm:inline">
+      <Kbd>Enter</Kbd> {t("detail.composerHintSend")} · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd>{" "}
+      {t("detail.composerHintNewline")}
+    </span>
+  );
+
   return (
-    <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
-      {activeQuickReplies.length > 0 && (
-        <Select value={selectedQuickReplyId} onValueChange={insertQuickReply}>
-          <SelectTrigger className="w-full sm:w-64" aria-label={t("detail.quickReplyPlaceholder")}>
-            <SelectValue placeholder={t("detail.quickReplyPlaceholder")} />
-          </SelectTrigger>
-          <SelectContent>
-            {activeQuickReplies.map((reply) => (
-              <SelectItem key={reply.id} value={reply.id}>
-                {reply.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-      <Textarea
-        rows={2}
-        value={body}
-        placeholder={t("detail.chatPlaceholder")}
-        disabled={activeMutation.isPending}
-        aria-label={t("detail.chatPlaceholder")}
-        onChange={(event) => setBody(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      {emailStatusQuery.data?.configured && (
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id={`send-as-email-${ticketId}`}
-            checked={sendAsEmail}
-            disabled={activeMutation.isPending}
-            onCheckedChange={(checked) => setSendAsEmail(checked === true)}
+    // Sticky at the bottom of the conversation card, so the composer stays
+    // in reach while the agent reads a long timeline above it.
+    <div className="sticky bottom-0 z-10 mt-3 border-t border-rule-subtle bg-surface pt-stack">
+      <Tabs
+        value={mode}
+        onValueChange={(value) => setMode(value as ComposerMode)}
+        dir={localeDirection(locale)}
+      >
+        <TabsList aria-label={t("detail.composerModeLabel")}>
+          {COMPOSER_MODES.map((value) => (
+            <TabsTrigger key={value} value={value} className="inline-flex items-center gap-tight">
+              {value === "note" && <InternalNoteIcon aria-hidden="true" className="size-3.5" />}
+              {value === "reply" ? t("detail.composerModeReply") : t("detail.internalNoteLabel")}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="reply" className="pt-2">
+          <Composer
+            label={t("detail.composerReplyLabel")}
+            placeholder={t("detail.chatPlaceholder")}
+            rows={2}
+            value={replyBody}
+            onValueChange={setReplyBody}
+            onSubmit={sendReply}
+            canSubmit={!activeMutation.isPending && replyBody.trim().length > 0}
+            pending={activeMutation.isPending}
+            submitLabel={activeMutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
+            hint={hint}
+            toolbar={
+              activeQuickReplies.length > 0 && (
+                <Select value={selectedQuickReplyId} onValueChange={insertQuickReply}>
+                  <SelectTrigger
+                    className="w-full sm:w-64"
+                    aria-label={t("detail.quickReplyPlaceholder")}
+                  >
+                    <SelectValue placeholder={t("detail.quickReplyPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeQuickReplies.map((reply) => (
+                      <SelectItem key={reply.id} value={reply.id}>
+                        {reply.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            }
+            footer={
+              emailStatusQuery.data?.configured && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id={`send-as-email-${ticketId}`}
+                    checked={sendAsEmail}
+                    disabled={activeMutation.isPending}
+                    onCheckedChange={(checked) => setSendAsEmail(checked === true)}
+                  />
+                  <Label htmlFor={`send-as-email-${ticketId}`}>
+                    {t("detail.sendByEmailLabel")}
+                  </Label>
+                </div>
+              )
+            }
+            error={replyError && <Alert variant="destructive">{replyError}</Alert>}
           />
-          <Label htmlFor={`send-as-email-${ticketId}`}>{t("detail.sendByEmailLabel")}</Label>
-        </div>
-      )}
-      <div>
-        <Button type="submit" size="sm" disabled={activeMutation.isPending || !body.trim()}>
-          {activeMutation.isPending ? t("detail.chatSending") : t("detail.chatSend")}
-        </Button>
-      </div>
-      {error && <Alert variant="destructive">{error}</Alert>}
-    </form>
+        </TabsContent>
+
+        <TabsContent value="note" className="pt-2">
+          <p className="mb-2 flex items-center gap-tight text-caption text-warning-foreground">
+            <InternalNoteIcon aria-hidden="true" className="size-3.5" />
+            {t("detail.composerNoteHint")}
+          </p>
+          <Composer
+            label={t("detail.composerNoteLabel")}
+            placeholder={t("detail.notesPlaceholder")}
+            tone="note"
+            value={noteBody}
+            onValueChange={(value) => {
+              setSuggestionsDismissed(false);
+              setNoteBody(value);
+            }}
+            onSubmit={sendNote}
+            canSubmit={!noteMutation.isPending && noteBody.trim().length > 0}
+            pending={noteMutation.isPending}
+            submitLabel={
+              noteMutation.isPending ? t("detail.notesSubmitting") : t("detail.notesSubmit")
+            }
+            hint={hint}
+            suggestions={{
+              label: t("detail.mentionSuggestions"),
+              options: mentionMatches.map((user) => ({ id: user.id, label: user.fullName })),
+              onPick: (id) => {
+                const user = mentionMatches.find((match) => match.id === id);
+                if (user) selectMention(user.fullName);
+              },
+              onDismiss: () => setSuggestionsDismissed(true),
+            }}
+            error={noteError && <Alert variant="destructive">{noteError}</Alert>}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

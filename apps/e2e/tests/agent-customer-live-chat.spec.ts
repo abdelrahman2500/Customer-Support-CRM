@@ -114,9 +114,14 @@ async function signInAsCustomer(page: Page, email: string, password: string): Pr
  * textarea only after `mutateAsync` resolves, and re-enable the disabled
  * Send button at the same point. An empty textarea is therefore proof
  * that the real `POST` returned 2xx.
+ *
+ * Story 207 (RD-3.7, recon A11Y-09) — found by its placeholder, the same
+ * "Type a message..." field in both apps: the agent workspace's reply field
+ * is named by its own label now ("Reply to the customer"), not by that
+ * placeholder.
  */
 async function sendChatMessage(page: Page, body: string): Promise<void> {
-  const composer = page.getByLabel("Type a message...");
+  const composer = page.getByPlaceholder("Type a message...");
   await composer.fill(body);
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(composer).toHaveValue("");

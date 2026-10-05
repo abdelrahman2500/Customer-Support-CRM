@@ -166,6 +166,13 @@ async function showTimeline(filter: "notes" | "events") {
     .click(screen.getByRole("tab", { name: `detail.timelineFilter.${filter}` }));
 }
 
+/** Story 207 (RD-3.7, recon TW-04) — notes are written in the conversation
+ * composer's Internal note mode now, not in a form of their own; this picks
+ * that mode (Radix tabs activate on mouse down). */
+function noteMode() {
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "detail.internalNoteLabel" }));
+}
+
 const baseTicket = {
   id: "ticket-1",
   subject: "Cannot log in",
@@ -187,6 +194,8 @@ const baseTicket = {
 describe("TicketDetailView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Story 207 — composer drafts persist per ticket for the session.
+    window.sessionStorage.clear();
     vi.mocked(useCustomersQuery).mockReturnValue(
       queryResult({
         data: [{ id: "customer-1", displayName: "Acme Inc." }],
@@ -531,7 +540,12 @@ describe("TicketDetailView", () => {
         expect(screen.getByRole("combobox", { name: field })).toBeInTheDocument();
       }
       expect(screen.getByRole("button", { name: "sla.placeOnHold" })).toBeInTheDocument();
-      expect(screen.getByLabelText("detail.notesPlaceholder")).toBeInTheDocument();
+      // Story 207 (RD-3.7) — one composer, two modes: the reply field and,
+      // in Internal note mode, the note field (named by its own label now,
+      // not its placeholder — A11Y-09).
+      expect(screen.getByRole("textbox", { name: "detail.composerReplyLabel" })).toBeInTheDocument();
+      noteMode();
+      expect(screen.getByRole("combobox", { name: "detail.composerNoteLabel" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Acme Inc." })).toHaveAttribute(
         "href",
         "/en/customers/customer-1",
@@ -1384,8 +1398,12 @@ describe("TicketDetailView", () => {
       );
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      noteMode();
 
-      const textarea = screen.getByRole("textbox", { name: "detail.notesPlaceholder" });
+      // Story 207 (RD-3.7, recon A11Y-05/A11Y-09) — the note field is named by
+      // its own label rather than its placeholder, and is a combobox because
+      // it offers @mention suggestions.
+      const textarea = screen.getByRole("combobox", { name: "detail.composerNoteLabel" });
       expect(textarea).toBe(screen.getByPlaceholderText("detail.notesPlaceholder"));
 
       // Typing still drives the same submit-enabling behaviour.
@@ -1399,6 +1417,7 @@ describe("TicketDetailView", () => {
       );
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      noteMode();
 
       const submit = screen.getByText("detail.notesSubmit");
       expect(submit).toBeDisabled();
@@ -1424,6 +1443,7 @@ describe("TicketDetailView", () => {
       } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      noteMode();
 
       const textarea = screen.getByPlaceholderText(
         "detail.notesPlaceholder",
@@ -1452,6 +1472,7 @@ describe("TicketDetailView", () => {
       } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      noteMode();
 
       fireEvent.change(screen.getByPlaceholderText("detail.notesPlaceholder"), {
         target: { value: "A new note" },
@@ -1475,6 +1496,7 @@ describe("TicketDetailView", () => {
       } as never);
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      noteMode();
 
       fireEvent.change(screen.getByPlaceholderText("detail.notesPlaceholder"), {
         target: { value: "A new note" },
@@ -1493,6 +1515,7 @@ describe("TicketDetailView", () => {
       );
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      noteMode();
       // Story 206 (RD-3.6) — notes, history and escalations moved into the
       // timeline; each kind's empty message shows under its own filter.
       await showTimeline("events");
@@ -1510,6 +1533,7 @@ describe("TicketDetailView", () => {
       );
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      noteMode();
       // Story 206 (RD-3.6) — notes, history and escalations moved into the
       // timeline; each kind's empty message shows under its own filter.
       await showTimeline("events");
@@ -1537,12 +1561,14 @@ describe("TicketDetailView", () => {
 
       it("shows no suggestions until an @ is typed", () => {
         render(<TicketDetailView ticketId="ticket-1" />);
+        noteMode();
 
         expect(screen.queryByText("Jane Doe")).not.toBeInTheDocument();
       });
 
       it("shows matching agents once @ is typed, filtered as the query narrows", () => {
         render(<TicketDetailView ticketId="ticket-1" />);
+        noteMode();
         const textarea = screen.getByPlaceholderText("detail.notesPlaceholder");
 
         fireEvent.change(textarea, { target: { value: "@J" } });
@@ -1556,6 +1582,7 @@ describe("TicketDetailView", () => {
 
       it("does not show suggestions for an @ that isn't at a word boundary (mid-word, e.g. an email address)", () => {
         render(<TicketDetailView ticketId="ticket-1" />);
+        noteMode();
         const textarea = screen.getByPlaceholderText("detail.notesPlaceholder");
 
         fireEvent.change(textarea, { target: { value: "user@J" } });
@@ -1565,6 +1592,7 @@ describe("TicketDetailView", () => {
 
       it("closes the suggestions once the query no longer matches anyone", () => {
         render(<TicketDetailView ticketId="ticket-1" />);
+        noteMode();
         const textarea = screen.getByPlaceholderText("detail.notesPlaceholder");
 
         fireEvent.change(textarea, { target: { value: "@Nobody Like This" } });
@@ -1575,6 +1603,7 @@ describe("TicketDetailView", () => {
 
       it("inserts the full name and closes the dropdown when a suggestion is picked", () => {
         render(<TicketDetailView ticketId="ticket-1" />);
+        noteMode();
         const textarea = screen.getByPlaceholderText(
           "detail.notesPlaceholder",
         ) as HTMLTextAreaElement;
@@ -1588,6 +1617,7 @@ describe("TicketDetailView", () => {
 
       it("closes the dropdown on Escape without changing the note body", () => {
         render(<TicketDetailView ticketId="ticket-1" />);
+        noteMode();
         const textarea = screen.getByPlaceholderText(
           "detail.notesPlaceholder",
         ) as HTMLTextAreaElement;
@@ -1612,6 +1642,7 @@ describe("TicketDetailView", () => {
         } as never);
 
         render(<TicketDetailView ticketId="ticket-1" />);
+        noteMode();
         const textarea = screen.getByPlaceholderText(
           "detail.notesPlaceholder",
         ) as HTMLTextAreaElement;
