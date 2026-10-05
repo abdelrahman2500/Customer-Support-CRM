@@ -960,7 +960,14 @@
       "translation": {
         "translated": "العربية",
         "untranslated": "الإنجليزية فقط"
-      }
+      },
+      "clearSearch": "مسح البحث",
+      "filters": "عوامل التصفية",
+      "closeFilters": "إغلاق عوامل التصفية",
+      "clearAll": "مسح الكل",
+      "summary": "{count, plural, one {مقالة واحدة} two {مقالتان} few {# مقالات} many {# مقالة} other {# مقالة}}",
+      "rowActions": "إجراءات {title}",
+      "open": "فتح"
     },
     "create": {
       "title": "مقالة جديدة",
@@ -1017,7 +1024,14 @@
           "publishedAt": "تاريخ النشر"
         }
       },
-      "titleEdit": "تعديل"
+      "titleEdit": "تعديل",
+      "editArticle": "تحرير المقالة",
+      "doneEditing": "إنهاء التحرير",
+      "updatedLabel": "آخر تحديث",
+      "translationStatus": "الترجمة العربية",
+      "translationAvailable": "متوفرة",
+      "translationMissing": "لم تُترجم بعد",
+      "readLanguage": "لغة القراءة"
     }
   },
   "notificationHistory": {

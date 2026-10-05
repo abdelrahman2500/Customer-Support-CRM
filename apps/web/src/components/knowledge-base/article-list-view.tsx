@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -12,28 +12,21 @@ import { useUrlFilters } from "@/lib/url-filters";
 import {
   Badge,
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   FetchingIndicator,
-  FilterBar,
-  Input,
+  FilterSelect,
+  ListToolbar,
+  MoreActionsIcon,
   PageHeader,
   Pagination,
   QueryStateCard,
   Skeleton,
 } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@crm/ui";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 
 const ALL_CATEGORIES = "__all__";
 
@@ -139,34 +132,38 @@ function ArticleListViewContent() {
         }
       />
 
-      <FilterBar>
-        <Input
-          aria-label={t("list.searchLabel")}
-          placeholder={t("list.searchPlaceholder")}
-          value={search}
-          onChange={(event) => updateSearch(event.target.value)}
-          className="max-w-sm"
-        />
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("list.filterCategory")}
-          <Select value={categoryId ?? ALL_CATEGORIES} onValueChange={updateCategory}>
-            <SelectTrigger
-              className="w-full sm:w-auto sm:min-w-[10rem]"
-              aria-label={t("list.filterCategory")}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_CATEGORIES}>{t("list.filterCategoryAll")}</SelectItem>
-              {(categoriesQuery.data ?? []).map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-      </FilterBar>
+      {/* Story 223 (PR-4.2, RD-4.7) — the shared list toolbar. The search
+          stays live (every keystroke, as before), the category is a
+          FilterSelect, and a polite count sits beside clear-all. */}
+      <ListToolbar
+        search={{
+          value: search,
+          onCommit: updateSearch,
+          commitOnChange: true,
+          label: t("list.searchLabel"),
+          placeholder: t("list.searchPlaceholder"),
+          clearLabel: t("list.clearSearch"),
+        }}
+        filters={
+          <FilterSelect
+            label={t("list.filterCategory")}
+            allValue={ALL_CATEGORIES}
+            allLabel={t("list.filterCategoryAll")}
+            value={categoryId ?? ALL_CATEGORIES}
+            onChange={updateCategory}
+            options={(categoriesQuery.data ?? []).map((category) => category.id)}
+            renderLabel={(id) =>
+              categoriesQuery.data?.find((category) => category.id === id)?.name ?? id
+            }
+          />
+        }
+        filterCount={[search, categoryId].filter(Boolean).length}
+        filtersLabel={t("list.filters")}
+        closeLabel={t("list.closeFilters")}
+        summary={articlePage ? t("list.summary", { count: articlePage.total }) : undefined}
+        onClearAll={() => setFilters({ search: "", categoryId: undefined, page: undefined })}
+        clearAllLabel={t("list.clearAll")}
+      />
 
       {/* Story S-7 — the two dashed blocks this replaces differed only in
           copy and CTA, and were selected by `search !== ""`. That is
@@ -176,7 +173,7 @@ function ArticleListViewContent() {
         isLoading={articlesQuery.isPending}
         isError={articlesQuery.isError && articles === undefined}
         isEmpty={articles !== undefined && articles.length === 0}
-        isFiltered={search !== ""}
+        isFiltered={search !== "" || categoryId !== undefined}
         loadingLabel={tCommon("loading")}
         loadingPlaceholder={
           <div className="flex flex-col gap-2">
@@ -266,6 +263,8 @@ function ArticleRow({ article }: { article: ArticleListItem }) {
   const { locale } = useParams<{ locale: string }>();
   const mutation = useUpdateArticleMutation(article.id);
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
+  // A menu pick that opens the confirm must not hand focus back to the menu.
+  const openingConfirm = useRef(false);
 
   function handleTogglePublishedClick() {
     if (article.status === "PUBLISHED") {
@@ -309,18 +308,43 @@ function ArticleRow({ article }: { article: ArticleListItem }) {
         </Badge>
       </TableCell>
       <TableCell label={t("list.columns.status")}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
           <Badge variant={article.status === "PUBLISHED" ? "success" : "secondary"}>
             {article.status === "PUBLISHED" ? t("list.published") : t("list.draft")}
           </Badge>
-          <Button
-            variant={article.status === "PUBLISHED" ? "destructive" : "outline"}
-            size="sm"
-            disabled={mutation.isPending}
-            onClick={handleTogglePublishedClick}
-          >
-            {article.status === "PUBLISHED" ? t("list.unpublish") : t("list.publish")}
-          </Button>
+          {/* Story 223 (RD-4.7) — publishing moves into the row's menu, so a
+              list of articles no longer reads as a wall of red buttons. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              disabled={mutation.isPending}
+              aria-label={t("list.rowActions", { title: article.title })}
+              className="focus-ring inline-flex h-8 w-8 items-center justify-center rounded-inner text-ink-subtle hover:bg-surface-muted hover:text-ink disabled:opacity-50"
+            >
+              <MoreActionsIcon aria-hidden="true" className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              onCloseAutoFocus={(event) => {
+                if (openingConfirm.current) {
+                  event.preventDefault();
+                  openingConfirm.current = false;
+                }
+              }}
+            >
+              <DropdownMenuItem asChild>
+                <Link href={`/${locale}/knowledge-base/${article.id}`}>{t("list.open")}</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                destructive={article.status === "PUBLISHED"}
+                onSelect={() => {
+                  if (article.status === "PUBLISHED") openingConfirm.current = true;
+                  handleTogglePublishedClick();
+                }}
+              >
+                {article.status === "PUBLISHED" ? t("list.unpublish") : t("list.publish")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <ConfirmDialog
             open={confirmUnpublishOpen}
             onOpenChange={setConfirmUnpublishOpen}

@@ -26,6 +26,7 @@ import {
   Skeleton,
 } from "@crm/ui";
 import { BackLink } from "@crm/ui";
+import { DescriptionItem, SegmentedControl } from "@crm/ui";
 import { ErrorState } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AttachmentsCard } from "@/components/attachments/attachments-card";
@@ -108,6 +109,9 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
    * focused yet — cannot steal focus on load. */
   const titleWasEditingRef = useRef(false);
   const [confirmUnpublishOpen, setConfirmUnpublishOpen] = useState(false);
+  /** Story 223 (PR-4.2, RD-4.7, recon KB-01) — an article opens to be read;
+   * "Edit article" switches to the editor (every save path unchanged). */
+  const [mode, setMode] = useState<"read" | "edit">("read");
 
   useEffect(() => {
     if (editingTitle) {
@@ -251,6 +255,15 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
           </div>
         )}
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant={mode === "read" ? "outline" : "ghost"}
+            size="sm"
+            aria-pressed={mode === "edit"}
+            onClick={() => setMode((current) => (current === "read" ? "edit" : "read"))}
+          >
+            {mode === "read" ? t("detail.editArticle") : t("detail.doneEditing")}
+          </Button>
           <Badge variant={article.status === "PUBLISHED" ? "success" : "secondary"}>
             {article.status === "PUBLISHED" ? t("list.published") : t("list.draft")}
           </Badge>
@@ -290,82 +303,184 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
           panel that renders on mount. `dir` is required, not decorative —
           Radix follows the document direction for arrow-key movement
           between tabs (see `packages/ui/src/components/tabs.tsx`). */}
-      <Tabs defaultValue="en" dir={localeDirection(locale)}>
-        <TabsList>
-          <TabsTrigger value="en">{t("detail.locales.en")}</TabsTrigger>
-          <TabsTrigger value="ar">{t("detail.locales.ar")}</TabsTrigger>
-        </TabsList>
+      {mode === "read" ? (
+        <ArticleReadView
+          articleId={articleId}
+          body={article.body}
+          categoryName={
+            (categoriesQuery.data ?? []).find((category) => category.id === article.categoryId)
+              ?.name ?? null
+          }
+          updatedAt={article.updatedAt}
+          locale={locale}
+        />
+      ) : (
+        // Story 223 (RD-4.7, recon RTL-04) — the editor opens on the UI's language.
+        <Tabs defaultValue={locale === "ar" ? "ar" : "en"} dir={localeDirection(locale)}>
+          <TabsList>
+            <TabsTrigger value="en">{t("detail.locales.en")}</TabsTrigger>
+            <TabsTrigger value="ar">{t("detail.locales.ar")}</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="en" className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-xs text-ink-muted">
-            {t("detail.categoryLabel")}
-            <Select
-              value={article.categoryId ?? undefined}
-              disabled={mutation.isPending || categoriesQuery.isLoading}
-              onValueChange={(value) => mutation.mutate({ categoryId: value })}
-            >
-              <SelectTrigger aria-label={t("detail.categoryLabel")} className="max-w-xs">
-                <SelectValue
-                  placeholder={
-                    categoriesQuery.isLoading ? t("detail.optionsLoading") : t("detail.noCategory")
+          <TabsContent value="en" className="flex flex-col gap-4">
+            <label className="flex flex-col gap-1 text-xs text-ink-muted">
+              {t("detail.categoryLabel")}
+              <Select
+                value={article.categoryId ?? undefined}
+                disabled={mutation.isPending || categoriesQuery.isLoading}
+                onValueChange={(value) => mutation.mutate({ categoryId: value })}
+              >
+                <SelectTrigger aria-label={t("detail.categoryLabel")} className="max-w-xs">
+                  <SelectValue
+                    placeholder={
+                      categoriesQuery.isLoading
+                        ? t("detail.optionsLoading")
+                        : t("detail.noCategory")
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {(categoriesQuery.data ?? []).map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {categoriesQuery.isError && (
+                <span className="text-xs text-danger-foreground">
+                  {t("detail.categoryLoadError")}
+                </span>
+              )}
+            </label>
+
+            <label className="flex flex-col gap-1 text-xs text-ink-muted">
+              {t("detail.bodyLabel")}
+              <Textarea
+                rows={10}
+                // Batch 5 (UX audit) — controlled, same revert-on-error rationale
+                // as the title field above.
+                value={bodyDraft ?? article.body}
+                onChange={(event) => setBodyDraft(event.target.value)}
+                onBlur={() => {
+                  const value = bodyDraft?.trim();
+                  if (value && bodyDraft !== article.body) {
+                    mutation.mutate({ body: value }, { onError: () => setBodyDraft(article.body) });
                   }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {(categoriesQuery.data ?? []).map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {categoriesQuery.isError && (
-              <span className="text-xs text-danger-foreground">
-                {t("detail.categoryLoadError")}
-              </span>
-            )}
-          </label>
+                }}
+              />
+            </label>
 
-          <label className="flex flex-col gap-1 text-xs text-ink-muted">
-            {t("detail.bodyLabel")}
-            <Textarea
-              rows={10}
-              // Batch 5 (UX audit) — controlled, same revert-on-error rationale
-              // as the title field above.
-              value={bodyDraft ?? article.body}
-              onChange={(event) => setBodyDraft(event.target.value)}
-              onBlur={() => {
-                const value = bodyDraft?.trim();
-                if (value && bodyDraft !== article.body) {
-                  mutation.mutate({ body: value }, { onError: () => setBodyDraft(article.body) });
-                }
+            <AttachmentsCard
+              owner={{ type: "kb-article", id: articleId }}
+              locale={locale}
+              strings={{
+                heading: t("detail.attachmentsHeading"),
+                error: t("detail.attachmentsError"),
+                empty: t("detail.attachmentsEmpty"),
+                uploading: t("detail.attachmentsUploading"),
+                uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+                uploadForbidden: t("detail.actionForbidden"),
+                uploadLabel: t("detail.attachmentsUploadLabel"),
+                dropHint: t("detail.attachmentsDropHint"),
               }}
             />
-          </label>
+          </TabsContent>
 
-          <AttachmentsCard
-            owner={{ type: "kb-article", id: articleId }}
-            locale={locale}
-            strings={{
-              heading: t("detail.attachmentsHeading"),
-              error: t("detail.attachmentsError"),
-              empty: t("detail.attachmentsEmpty"),
-              uploading: t("detail.attachmentsUploading"),
-              uploadFailedFallback: t("detail.attachmentsUploadFailed"),
-              uploadForbidden: t("detail.actionForbidden"),
-              uploadLabel: t("detail.attachmentsUploadLabel"),
-              dropHint: t("detail.attachmentsDropHint"),
-            }}
-          />
+          <TabsContent value="ar">
+            <ArticleTranslationEditor articleId={articleId} />
+          </TabsContent>
+        </Tabs>
+      )}
 
-          <ArticleVersionHistory articleId={articleId} />
-        </TabsContent>
-
-        <TabsContent value="ar">
-          <ArticleTranslationEditor articleId={articleId} />
-        </TabsContent>
-      </Tabs>
+      {/* Reference material, in both modes. */}
+      {mode === "read" && (
+        <AttachmentsCard
+          owner={{ type: "kb-article", id: articleId }}
+          locale={locale}
+          strings={{
+            heading: t("detail.attachmentsHeading"),
+            error: t("detail.attachmentsError"),
+            empty: t("detail.attachmentsEmpty"),
+            uploading: t("detail.attachmentsUploading"),
+            uploadFailedFallback: t("detail.attachmentsUploadFailed"),
+            uploadForbidden: t("detail.actionForbidden"),
+            uploadLabel: t("detail.attachmentsUploadLabel"),
+            dropHint: t("detail.attachmentsDropHint"),
+          }}
+        />
+      )}
+      <ArticleVersionHistory articleId={articleId} />
     </section>
+  );
+}
+
+/**
+ * Story 223 (PR-4.2, RD-4.7, recon KB-01) — the article as a reader meets it:
+ * facts (category, last update, Arabic translation status), then the body
+ * at reading size and measure. When an Arabic translation exists, the
+ * language switch reads it (right to left), starting on the UI's language.
+ * Plain text, as stored — rich text is out of scope (§10).
+ */
+function ArticleReadView({
+  articleId,
+  body,
+  categoryName,
+  updatedAt,
+  locale,
+}: {
+  articleId: string;
+  body: string;
+  categoryName: string | null;
+  updatedAt: string;
+  locale: string;
+}) {
+  const t = useTranslations("knowledgeBase");
+  const translationsQuery = useArticleTranslationsQuery(articleId);
+  const arabic = translationsQuery.data?.find((row) => row.locale === "AR");
+  const [language, setLanguage] = useState<"en" | "ar">(locale === "ar" ? "ar" : "en");
+  const reading = language === "ar" && arabic ? "ar" : "en";
+
+  return (
+    <article className="flex flex-col gap-section">
+      <dl className="flex flex-wrap gap-x-section gap-y-stack">
+        <DescriptionItem term={t("detail.categoryLabel")}>
+          {categoryName ?? t("detail.noCategory")}
+        </DescriptionItem>
+        <DescriptionItem term={t("detail.updatedLabel")}>
+          <time dateTime={updatedAt}>{formatDateTime(updatedAt, locale)}</time>
+        </DescriptionItem>
+        <DescriptionItem term={t("detail.translationStatus")}>
+          {translationsQuery.isSuccess
+            ? arabic
+              ? t("detail.translationAvailable")
+              : t("detail.translationMissing")
+            : "—"}
+        </DescriptionItem>
+      </dl>
+      {arabic && (
+        <SegmentedControl
+          aria-label={t("detail.readLanguage")}
+          dir={localeDirection(locale)}
+          size="sm"
+          className="self-start"
+          options={[
+            { value: "en", label: t("detail.locales.en") },
+            { value: "ar", label: t("detail.locales.ar") },
+          ]}
+          value={reading}
+          onValueChange={(value) => setLanguage(value as "en" | "ar")}
+        />
+      )}
+      {reading === "ar" && arabic ? (
+        <div lang="ar" dir="rtl" className="flex max-w-prose flex-col gap-stack">
+          <h2 className="text-heading text-ink">{arabic.title}</h2>
+          <p className="whitespace-pre-wrap text-body-lg text-ink">{arabic.body}</p>
+        </div>
+      ) : (
+        <p className="max-w-prose whitespace-pre-wrap text-body-lg text-ink">{body}</p>
+      )}
+    </article>
   );
 }
 

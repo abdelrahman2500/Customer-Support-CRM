@@ -45,6 +45,23 @@ describe("ListToolbar", () => {
     expect(onCommit).toHaveBeenLastCalledWith("refund");
   });
 
+  it("commits on every keystroke when the search is live (Story 223)", () => {
+    const onCommit = vi.fn();
+    renderToolbar({
+      search: {
+        value: "",
+        onCommit,
+        label: "Search articles",
+        clearLabel: "Clear",
+        commitOnChange: true,
+      },
+    });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search articles" }), {
+      target: { value: "pass" },
+    });
+    expect(onCommit).toHaveBeenLastCalledWith("pass");
+  });
+
   it("clears the search with its named button", () => {
     const { onCommit } = renderToolbar();
     const search = screen.getByPlaceholderText("Search by subject or category...");

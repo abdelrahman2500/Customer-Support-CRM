@@ -30,6 +30,8 @@ export interface ListToolbarSearch {
   label: string;
   placeholder?: string;
   clearLabel: string;
+  /** Story 223 — commit on every keystroke (a live search), not on blur/Enter. */
+  commitOnChange?: boolean;
 }
 
 export interface ListToolbarProps {
@@ -50,7 +52,14 @@ export interface ListToolbarProps {
   className?: string;
 }
 
-function SearchField({ value, onCommit, label, placeholder, clearLabel }: ListToolbarSearch) {
+function SearchField({
+  value,
+  onCommit,
+  label,
+  placeholder,
+  clearLabel,
+  commitOnChange = false,
+}: ListToolbarSearch) {
   const [draft, setDraft] = React.useState(value);
   React.useEffect(() => setDraft(value), [value]);
 
@@ -61,7 +70,10 @@ function SearchField({ value, onCommit, label, placeholder, clearLabel }: ListTo
       placeholder={placeholder}
       startIcon={SearchIcon}
       value={draft}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => {
+        setDraft(event.target.value);
+        if (commitOnChange) onCommit(event.target.value);
+      }}
       onBlur={() => draft !== value && onCommit(draft)}
       onKeyDown={(event) => {
         if (event.key === "Enter") {

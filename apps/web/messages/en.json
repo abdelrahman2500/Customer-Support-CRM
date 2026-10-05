@@ -960,7 +960,14 @@
       "translation": {
         "translated": "Arabic",
         "untranslated": "English only"
-      }
+      },
+      "clearSearch": "Clear search",
+      "filters": "Filters",
+      "closeFilters": "Close filters",
+      "clearAll": "Clear all",
+      "summary": "{count, plural, one {# article} other {# articles}}",
+      "rowActions": "Actions for {title}",
+      "open": "Open"
     },
     "create": {
       "title": "New article",
@@ -1017,7 +1024,14 @@
           "publishedAt": "Published at"
         }
       },
-      "titleEdit": "Edit"
+      "titleEdit": "Edit",
+      "editArticle": "Edit article",
+      "doneEditing": "Done editing",
+      "updatedLabel": "Last updated",
+      "translationStatus": "Arabic translation",
+      "translationAvailable": "Available",
+      "translationMissing": "Not translated yet",
+      "readLanguage": "Reading language"
     }
   },
   "notificationHistory": {

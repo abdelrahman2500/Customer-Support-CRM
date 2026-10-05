@@ -191,6 +191,12 @@ describe("ArticleDetailView", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "detail.titleEdit" })).toBeInTheDocument();
     expect(screen.queryByDisplayValue("How to reset a password")).not.toBeInTheDocument();
+    // Story 223 (RD-4.7) — read mode first: the body as text, the category as a fact.
+    expect(screen.getByText("Step-by-step instructions...").tagName).toBe("P");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getByText("account")).toBeInTheDocument();
+    // Story 223 (RD-4.7) — the article opens in read mode; this edits it.
+    fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
     expect(screen.getByRole("combobox", { name: "detail.categoryLabel" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("Step-by-step instructions...")).toBeInTheDocument();
     expect(screen.getByText("list.draft")).toBeInTheDocument();
@@ -235,6 +241,8 @@ describe("ArticleDetailView", () => {
     } as never);
 
     render(<ArticleDetailView articleId="article-1" />);
+    // Story 223 (RD-4.7) — the article opens in read mode; this edits it.
+    fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
 
     fireEvent.click(screen.getByRole("combobox", { name: "detail.categoryLabel" }));
     fireEvent.click(await screen.findByRole("option", { name: "billing" }));
@@ -658,6 +666,8 @@ describe("ArticleDetailView", () => {
 
     it("renders an English and an Arabic tab, with English active by default", async () => {
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
 
       expect(screen.getByRole("tab", { name: "detail.locales.en" })).toHaveAttribute(
         "aria-selected",
@@ -673,6 +683,8 @@ describe("ArticleDetailView", () => {
 
     it("shows the Arabic translation editor once the Arabic tab is selected", async () => {
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       expect(screen.getByText("detail.translations.heading")).toBeInTheDocument();
@@ -690,6 +702,8 @@ describe("ArticleDetailView", () => {
       );
 
       const { container } = render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
@@ -697,6 +711,8 @@ describe("ArticleDetailView", () => {
 
     it("treats an empty translations array as 'none yet', not an error", async () => {
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       expect(screen.getByText("detail.translations.none")).toBeInTheDocument();
@@ -717,6 +733,8 @@ describe("ArticleDetailView", () => {
       );
 
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       expect(screen.getByRole("textbox", { name: "detail.translations.titleLabel" })).toHaveValue(
@@ -730,6 +748,8 @@ describe("ArticleDetailView", () => {
 
     it("renders the Arabic fields right-to-left", async () => {
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       expect(
@@ -750,6 +770,8 @@ describe("ArticleDetailView", () => {
       } as never);
 
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       fireEvent.change(screen.getByRole("textbox", { name: "detail.translations.titleLabel" }), {
@@ -784,6 +806,8 @@ describe("ArticleDetailView", () => {
       );
 
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
       fireEvent.click(screen.getByText("detail.translations.save"));
 
@@ -802,6 +826,8 @@ describe("ArticleDetailView", () => {
       } as never);
 
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       expect(screen.getByText("detail.translations.saving").closest("button")).toBeDisabled();
@@ -809,6 +835,8 @@ describe("ArticleDetailView", () => {
 
     it("disables save when either field is empty or whitespace-only", async () => {
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       // Both empty (no translation yet).
@@ -843,6 +871,8 @@ describe("ArticleDetailView", () => {
       } as never);
 
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       expect(screen.getByText("detail.translations.saveFailed")).toBeInTheDocument();
@@ -857,6 +887,8 @@ describe("ArticleDetailView", () => {
       } as never);
 
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       expect(screen.getByText("detail.actionForbidden")).toBeInTheDocument();
@@ -868,6 +900,8 @@ describe("ArticleDetailView", () => {
       );
 
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
 
       expect(screen.getByText("detail.translations.loadError")).toBeInTheDocument();
@@ -882,6 +916,8 @@ describe("ArticleDetailView", () => {
       );
 
       render(<ArticleDetailView articleId="article-1" />);
+      // Story 223 (RD-4.7) — the editor (and its language tabs) is behind "Edit article".
+      fireEvent.click(screen.getByRole("button", { name: "detail.editArticle" }));
       await openArabicTab();
       fireEvent.change(screen.getByRole("textbox", { name: "detail.translations.bodyLabel" }), {
         target: { value: "نص معدّل" },
@@ -932,5 +968,51 @@ describe("ArticleDetailView", () => {
     expect(root).toHaveClass("flex", "flex-col", "gap-3");
     expect(root?.querySelectorAll(".animate-pulse")).toHaveLength(2);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  // Story 223 (PR-4.2, RD-4.7, recon KB-01 / RTL-04).
+  describe("read mode (Story 223)", () => {
+    beforeEach(() => {
+      vi.mocked(useArticleQuery).mockReturnValue(
+        queryResult({ data: baseArticle, isSuccess: true }) as never,
+      );
+    });
+
+    it("opens to be read, with its facts, and switches to the editor and back", () => {
+      render(<ArticleDetailView articleId="article-1" />);
+      const toggle = screen.getByRole("button", { name: "detail.editArticle" });
+      expect(toggle).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByText("detail.translationMissing")).toBeInTheDocument();
+      expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+
+      fireEvent.click(toggle);
+      expect(screen.getByRole("tablist")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "detail.doneEditing" }));
+      expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    });
+
+    it("reads the Arabic translation when there is one", () => {
+      vi.mocked(useArticleTranslationsQuery).mockReturnValue(
+        queryResult({
+          data: [
+            {
+              id: "translation-1",
+              articleId: "article-1",
+              locale: "AR",
+              title: "إعادة تعيين كلمة المرور",
+              body: "تعليمات خطوة بخطوة",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+      render(<ArticleDetailView articleId="article-1" />);
+      expect(screen.getByText("detail.translationAvailable")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("radio", { name: "detail.locales.ar" }));
+      const arabic = screen.getByText("تعليمات خطوة بخطوة");
+      expect(arabic.closest("[dir='rtl']")).toHaveAttribute("lang", "ar");
+    });
   });
 });

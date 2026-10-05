@@ -159,7 +159,8 @@ describe("ArticleListView", () => {
     expect(screen.getByText("How to reset a password")).toBeInTheDocument();
     expect(screen.getByText("account")).toBeInTheDocument();
     expect(screen.getByText("list.draft")).toBeInTheDocument();
-    expect(screen.getByText("list.publish")).toBeInTheDocument();
+    // Story 223 (RD-4.7) — the publish action lives in the row's menu.
+    expect(screen.getByRole("button", { name: /list\.rowActions/ })).toBeInTheDocument();
   });
 
   it("navigates to the detail route when an article title is clicked", () => {
@@ -196,7 +197,9 @@ describe("ArticleListView", () => {
     mockedUseUpdateArticleMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
     render(<ArticleListView />);
-    fireEvent.click(screen.getByText("list.publish"));
+    // Story 223 (RD-4.7) — publishing moved into the row's menu.
+    fireEvent.pointerDown(screen.getByRole("button", { name: /list\.rowActions/ }), { button: 0, ctrlKey: false });
+    fireEvent.click(screen.getByRole("menuitem", { name: "list.publish" }));
 
     expect(mutate).toHaveBeenCalledWith({ status: "PUBLISHED" });
   });
@@ -214,7 +217,9 @@ describe("ArticleListView", () => {
     mockedUseUpdateArticleMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
     render(<ArticleListView />);
-    fireEvent.click(screen.getByRole("button", { name: "list.unpublish" }));
+    // Story 223 (RD-4.7) — publishing moved into the row's menu.
+    fireEvent.pointerDown(screen.getByRole("button", { name: /list\.rowActions/ }), { button: 0, ctrlKey: false });
+    fireEvent.click(screen.getByRole("menuitem", { name: "list.unpublish" }));
 
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
@@ -233,7 +238,9 @@ describe("ArticleListView", () => {
     mockedUseUpdateArticleMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
     render(<ArticleListView />);
-    fireEvent.click(screen.getByRole("button", { name: "list.unpublish" }));
+    // Story 223 (RD-4.7) — publishing moved into the row's menu.
+    fireEvent.pointerDown(screen.getByRole("button", { name: /list\.rowActions/ }), { button: 0, ctrlKey: false });
+    fireEvent.click(screen.getByRole("menuitem", { name: "list.unpublish" }));
     const dialog = screen.getByRole("alertdialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "list.unpublish" }));
 
@@ -403,7 +410,10 @@ describe("ArticleListView", () => {
 
       render(<ArticleListView />);
 
-      const status = screen.getByRole("status");
+      // Story 223 — the toolbar's result count is a status region too.
+      const status = screen
+        .getAllByRole("status")
+        .find((region) => region.textContent?.includes("updating")) as HTMLElement;
       expect(status).toHaveTextContent("updating");
       expect(status).toHaveAttribute("aria-live", "polite");
     });
