@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useUrlFilters } from "@/lib/url-filters";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import {
   useAgentPerformanceQuery,
@@ -23,18 +24,20 @@ import { useDepartmentsQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { BarChart, DonutGauge, RatingBar, ticketStatusBarColor } from "./report-charts";
 import { ApiError } from "@/lib/api";
-import { formatRemaining } from "@/lib/sla";
 import {
   Alert,
   Button,
   Card,
   Checkbox,
+  ErrorState,
   FilterSelect,
   Input,
   Label,
+  ListToolbar,
   LoadingStatus,
   PageHeader,
   Skeleton,
+  StatCard,
 } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -65,14 +68,75 @@ const ALL_WIDGET_TYPES: ReportWidgetType[] = [
  * "$0.0034" — AI per-call costs are routinely sub-cent, so a fixed 2-decimal
  * `Intl.NumberFormat` "currency" style would round every real value to
  * "$0.00"; 4 decimals is the smallest fixed precision that still shows a
- * typical single Claude call's cost as a nonzero number. */
-function formatUsd(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
+ * typical single Claude call's cost as a nonzero number.
+ *
+ * Story 228 — formatted for the UI locale (it was fixed to `en-US`), with
+ * Latin digits in Arabic (PD-8). */
+function formatUsd(amount: number, locale: string): string {
+  return new Intl.NumberFormat(latinDigits(locale), {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 4,
     maximumFractionDigits: 4,
   }).format(amount);
+}
+
+/** Story 228 (PD-8) — numbers keep Latin digits in Arabic. */
+function latinDigits(locale: string): string {
+  return `${locale}-u-nu-latn`;
+}
+
+/** Story 228 — a duration in the UI language ("2h 15m" / "2 س 15 د"),
+ * floored to minutes like the `formatRemaining` it replaces here. */
+function formatDuration(ms: number, t: ReturnType<typeof useTranslations>): string {
+  const totalMinutes = Math.max(1, Math.floor(ms / 60_000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? t("units.hoursMinutes", { hours, minutes }) : t("units.minutes", { minutes });
+}
+
+/** Story 228 — the page's filters live in the URL, so a filtered report can
+ * be reloaded, bookmarked and shared. `view` is the selected saved view. */
+type ReportFilters = ReportDateRange & { view?: string };
+
+function parseReportFilters(params: URLSearchParams): ReportFilters {
+  const filters: ReportFilters = {};
+  const text = (key: string) => params.get(key) || undefined;
+  const from = text("from");
+  const to = text("to");
+  const departmentId = text("department");
+  const assignedToUserId = text("agent");
+  const categoryId = text("category");
+  const view = text("view");
+  if (from) filters.from = from;
+  if (to) filters.to = to;
+  if (departmentId) filters.departmentId = departmentId;
+  if (assignedToUserId) filters.assignedToUserId = assignedToUserId;
+  if (categoryId) filters.categoryId = categoryId;
+  if (params.get("crossBranch") === "1") filters.crossBranch = true;
+  if (view) filters.view = view;
+  return filters;
+}
+
+function serializeReportFilters(filters: ReportFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  if (filters.departmentId) params.set("department", filters.departmentId);
+  if (filters.assignedToUserId) params.set("agent", filters.assignedToUserId);
+  if (filters.categoryId) params.set("category", filters.categoryId);
+  if (filters.crossBranch) params.set("crossBranch", "1");
+  if (filters.view) params.set("view", filters.view);
+  return params;
+}
+
+type FailureKind = "forbidden" | "invalidRange" | "error";
+
+function failureKind(query: QueryLike): FailureKind | null {
+  if (!query.isError) return null;
+  if (query.error instanceof ApiError && query.error.status === 403) return "forbidden";
+  if (query.error instanceof ApiError && query.error.status === 400) return "invalidRange";
+  return "error";
 }
 
 /**
@@ -186,8 +250,28 @@ function formatUsd(amount: number): string {
 export function ReportsView() {
   const t = useTranslations("reporting");
   const ticketLabels = useTicketLabels();
-  const [range, setRange] = useState<ReportDateRange>({});
-  const [selectedDashboardId, setSelectedDashboardId] = useState<string | null>(null);
+  const locale = useLocale();
+  const [filters, setFilters] = useUrlFilters(parseReportFilters, serializeReportFilters);
+  const { view, ...range } = filters;
+  const selectedDashboardId = view ?? null;
+  const setRange = (update: (prev: ReportDateRange) => ReportDateRange) =>
+    setFilters((prev) => {
+      const { view: currentView, ...prevRange } = prev;
+      return { ...update(prevRange), ...(currentView ? { view: currentView } : {}) };
+    });
+  const setSelectedDashboardId = (id: string | null) =>
+    setFilters((prev) => {
+      const next = { ...prev };
+      delete next.view;
+      return id ? { ...next, view: id } : next;
+    });
+  const filterCount = [
+    range.from || range.to,
+    range.departmentId,
+    range.assignedToUserId,
+    range.categoryId,
+    range.crossBranch,
+  ].filter(Boolean).length;
   const [showSaveForm, setShowSaveForm] = useState(false);
   /** Story 166 — both buttons inside the save form unmount the form that
    * contains them, so the activated control removes itself and focus falls to
@@ -454,14 +538,9 @@ export function ReportsView() {
         );
 
       case "RESOLUTION_TIME":
-        // Story 99 — reuses `formatRemaining(ms)` (`apps/web/src/lib/sla.ts`)
-        // rather than a new duration formatter: its logic (floor to
-        // minutes, split into hours/minutes) is generic duration
-        // formatting, not inherently a countdown, despite the function's
-        // name predating this use case. A multi-day resolution time
-        // renders as e.g. "52h 30m" rather than "2d 4h 30m" — a minor,
-        // accepted readability trade-off in exchange for zero new
-        // formatting code.
+        // Story 99 — hours and minutes; a multi-day resolution time renders
+        // as e.g. "52h 30m". Story 228 — through `formatDuration`, so the
+        // units follow the UI language.
         return (
           <ReportCard
             heading={t("resolutionTime.heading")}
@@ -477,7 +556,7 @@ export function ReportsView() {
             {resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.resolvedCount > 0 && (
               <div className="flex flex-col gap-1 text-sm">
                 <span className="text-2xl font-semibold text-ink">
-                  {formatRemaining(resolutionTimeQuery.data.averageResolutionMs ?? 0)}
+                  {formatDuration(resolutionTimeQuery.data.averageResolutionMs ?? 0, t)}
                 </span>
                 <span className="text-ink-subtle">
                   {t("resolutionTime.detail", { count: resolutionTimeQuery.data.resolvedCount })}
@@ -510,7 +589,7 @@ export function ReportsView() {
                 <div className="flex flex-col gap-1">
                   <span className="text-2xl font-semibold text-ink">
                     {aiUsageQuery.data.totalCostUsd !== null
-                      ? formatUsd(aiUsageQuery.data.totalCostUsd)
+                      ? formatUsd(aiUsageQuery.data.totalCostUsd, locale)
                       : t("aiUsage.costUnknown")}
                   </span>
                   <span className="text-ink-subtle">
@@ -527,7 +606,7 @@ export function ReportsView() {
                       <span className="text-ink-muted">{row.feature}</span>
                       <span className="font-medium text-ink">
                         {row.totalCostUsd !== null
-                          ? formatUsd(row.totalCostUsd)
+                          ? formatUsd(row.totalCostUsd, locale)
                           : t("aiUsage.costUnknown")}
                       </span>
                     </li>
@@ -584,145 +663,194 @@ export function ReportsView() {
     }
   }
 
+  // Story 228 — the queries behind the widgets on screen. When every one of
+  // them fails the same way (e.g. a caller without the report permission),
+  // the page says so once instead of repeating it in every card.
+  const widgetQueries: Record<ReportWidgetType, QueryLike> = {
+    TICKET_VOLUME: ticketVolumeQuery,
+    SLA_COMPLIANCE: slaComplianceQuery,
+    CSAT: csatQuery,
+    AGENT_PERFORMANCE: agentPerformanceQuery,
+    TICKET_AGING: ticketAgingQuery,
+    RESOLUTION_TIME: resolutionTimeQuery,
+    AI_USAGE: aiUsageQuery,
+    TICKET_VOLUME_BY_CATEGORY: ticketVolumeByCategoryQuery,
+  };
+  const failures = widgetTypesToRender.map((widgetType) => failureKind(widgetQueries[widgetType]));
+  const pageFailure =
+    failures.length > 1 && failures.every((kind) => kind !== null && kind === failures[0])
+      ? failures[0]
+      : null;
+
+  const numberFormat = new Intl.NumberFormat(latinDigits(locale));
+  const ticketTotal = ticketVolumeQuery.isSuccess
+    ? ticketVolumeQuery.data.reduce((sum, row) => sum + row.count, 0)
+    : undefined;
+  const complianceRate =
+    slaComplianceQuery.isSuccess && slaComplianceQuery.data.complianceRate !== null
+      ? new Intl.NumberFormat(latinDigits(locale), { style: "percent" }).format(
+          slaComplianceQuery.data.complianceRate,
+        )
+      : undefined;
+  const averageRating =
+    csatQuery.isSuccess && csatQuery.data.averageRating !== null
+      ? new Intl.NumberFormat(latinDigits(locale), {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        }).format(csatQuery.data.averageRating)
+      : undefined;
+  const averageResolution =
+    resolutionTimeQuery.isSuccess && resolutionTimeQuery.data.averageResolutionMs !== null
+      ? formatDuration(resolutionTimeQuery.data.averageResolutionMs, t)
+      : undefined;
+
+  const filterControls = (
+    <>
+      <label className="flex flex-col gap-tight text-xs text-ink-muted">
+        {t("dateRange.fromLabel")}
+        <Input
+          type="date"
+          value={range.from ?? ""}
+          onChange={(event) =>
+            setRange((prev) => ({ ...prev, from: event.target.value || undefined }))
+          }
+          className="w-full sm:w-40"
+        />
+      </label>
+      <label className="flex flex-col gap-tight text-xs text-ink-muted">
+        {t("dateRange.toLabel")}
+        <Input
+          type="date"
+          value={range.to ?? ""}
+          onChange={(event) =>
+            setRange((prev) => ({ ...prev, to: event.target.value || undefined }))
+          }
+          className="w-full sm:w-40"
+        />
+      </label>
+      <FilterSelect
+        allValue={ALL_VALUE}
+        allLabel={t("filters.all")}
+        label={t("filters.department")}
+        value={range.departmentId ?? ALL_VALUE}
+        onChange={(value) =>
+          setRange((prev) => ({ ...prev, departmentId: value === ALL_VALUE ? undefined : value }))
+        }
+        options={(departmentsQuery.data ?? []).map((department) => department.id)}
+        renderLabel={(id) => departmentsQuery.data?.find((d) => d.id === id)?.name ?? id}
+      />
+      <FilterSelect
+        allValue={ALL_VALUE}
+        allLabel={t("filters.all")}
+        label={t("filters.agent")}
+        value={range.assignedToUserId ?? ALL_VALUE}
+        onChange={(value) =>
+          setRange((prev) => ({
+            ...prev,
+            assignedToUserId: value === ALL_VALUE ? undefined : value,
+          }))
+        }
+        options={(usersQuery.data ?? []).map((user) => user.id)}
+        renderLabel={(id) => usersQuery.data?.find((u) => u.id === id)?.fullName ?? id}
+      />
+      <FilterSelect
+        allValue={ALL_VALUE}
+        allLabel={t("filters.all")}
+        label={t("filters.category")}
+        value={range.categoryId ?? ALL_VALUE}
+        onChange={(value) =>
+          setRange((prev) => ({ ...prev, categoryId: value === ALL_VALUE ? undefined : value }))
+        }
+        options={(categoriesQuery.data ?? []).map((category) => category.id)}
+        renderLabel={(id) => categoriesQuery.data?.find((c) => c.id === id)?.name ?? id}
+      />
+      {/* Batch 6 (UX audit) — the shared `Checkbox`/`Label` pair,
+          replacing a raw `<input type="checkbox">`. Story 228 — `self-end`
+          lines it up with the inputs beside their labels. */}
+      <div className="flex h-10 items-center gap-2 sm:self-end">
+        <Checkbox
+          id="reports-cross-branch"
+          checked={range.crossBranch ?? false}
+          onCheckedChange={(checked) =>
+            setRange((prev) => ({ ...prev, crossBranch: checked === true }))
+          }
+        />
+        <Label htmlFor="reports-cross-branch" className="text-xs font-normal text-ink-muted">
+          {t("filters.crossBranch")}
+        </Label>
+      </div>
+    </>
+  );
+
   return (
     <section className="flex flex-col gap-6">
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} description={t("description")} />
 
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("dateRange.fromLabel")}
-          <Input
-            type="date"
-            value={range.from ?? ""}
-            onChange={(event) =>
-              setRange((prev) => ({ ...prev, from: event.target.value || undefined }))
-            }
-            className="w-full sm:w-40"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("dateRange.toLabel")}
-          <Input
-            type="date"
-            value={range.to ?? ""}
-            onChange={(event) =>
-              setRange((prev) => ({ ...prev, to: event.target.value || undefined }))
-            }
-            className="w-full sm:w-40"
-          />
-        </label>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setRange({})}
-          disabled={!range.from && !range.to}
-        >
-          {t("dateRange.clear")}
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap items-end gap-2">
-        <FilterSelect
-          allValue={ALL_VALUE}
-          allLabel={t("filters.all")}
-          label={t("filters.department")}
-          value={range.departmentId ?? ALL_VALUE}
-          onChange={(value) =>
-            setRange((prev) => ({ ...prev, departmentId: value === ALL_VALUE ? undefined : value }))
-          }
-          options={(departmentsQuery.data ?? []).map((department) => department.id)}
-          renderLabel={(id) => departmentsQuery.data?.find((d) => d.id === id)?.name ?? id}
-        />
-        <FilterSelect
-          allValue={ALL_VALUE}
-          allLabel={t("filters.all")}
-          label={t("filters.agent")}
-          value={range.assignedToUserId ?? ALL_VALUE}
-          onChange={(value) =>
-            setRange((prev) => ({
-              ...prev,
-              assignedToUserId: value === ALL_VALUE ? undefined : value,
-            }))
-          }
-          options={(usersQuery.data ?? []).map((user) => user.id)}
-          renderLabel={(id) => usersQuery.data?.find((u) => u.id === id)?.fullName ?? id}
-        />
-        <FilterSelect
-          allValue={ALL_VALUE}
-          allLabel={t("filters.all")}
-          label={t("filters.category")}
-          value={range.categoryId ?? ALL_VALUE}
-          onChange={(value) =>
-            setRange((prev) => ({ ...prev, categoryId: value === ALL_VALUE ? undefined : value }))
-          }
-          options={(categoriesQuery.data ?? []).map((category) => category.id)}
-          renderLabel={(id) => categoriesQuery.data?.find((c) => c.id === id)?.name ?? id}
-        />
-        {/* Batch 6 (UX audit) — the shared `Checkbox`/`Label` pair,
-            replacing a raw `<input type="checkbox">`. */}
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="reports-cross-branch"
-            checked={range.crossBranch ?? false}
-            onCheckedChange={(checked) =>
-              setRange((prev) => ({ ...prev, crossBranch: checked === true }))
-            }
-          />
-          <Label htmlFor="reports-cross-branch" className="text-xs font-normal text-ink-muted">
-            {t("filters.crossBranch")}
-          </Label>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("dashboards.pickerLabel")}
-          {/* Batch 6 (UX audit) — the shared `Select`, replacing a raw
-              native `<select>` with no matching focus ring/keyboard-ARIA
-              parity with the rest of the app. `ALL_VALUE` stands in for
-              the "no dashboard selected" empty string, mirroring every
-              other `Select` on this page. */}
-          <Select
-            value={selectedDashboardId ?? ALL_VALUE}
-            onValueChange={(value) => setSelectedDashboardId(value === ALL_VALUE ? null : value)}
-          >
-            <SelectTrigger
-              className="w-full sm:w-auto sm:min-w-[10rem]"
-              aria-label={t("dashboards.pickerLabel")}
+      {/* Story 228 — one toolbar: the period and the filters together
+          (in a sheet on a phone), "Clear all", and the saved views beside
+          them. */}
+      <ListToolbar
+        filters={filterControls}
+        filterCount={filterCount}
+        filtersLabel={t("filters.label")}
+        closeLabel={t("filters.close")}
+        onClearAll={() => setRange(() => ({}))}
+        clearAllLabel={t("filters.clearAll")}
+        className="[&>div:first-child]:items-end"
+        actions={
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-tight text-xs text-ink-muted">
+              {t("dashboards.pickerLabel")}
+              {/* Batch 6 (UX audit) — the shared `Select`, replacing a raw
+                  native `<select>` with no matching focus ring/keyboard-ARIA
+                  parity with the rest of the app. `ALL_VALUE` stands in for
+                  the "no dashboard selected" empty string, mirroring every
+                  other `Select` on this page. */}
+              <Select
+                value={selectedDashboardId ?? ALL_VALUE}
+                onValueChange={(value) =>
+                  setSelectedDashboardId(value === ALL_VALUE ? null : value)
+                }
+              >
+                <SelectTrigger
+                  className="w-full sm:w-auto sm:min-w-[10rem]"
+                  aria-label={t("dashboards.pickerLabel")}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_VALUE}>{t("dashboards.allReports")}</SelectItem>
+                  {dashboards.map((dashboard) => (
+                    <SelectItem key={dashboard.id} value={dashboard.id}>
+                      {dashboard.isShared
+                        ? t("dashboards.sharedOptionLabel", { name: dashboard.name })
+                        : dashboard.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              ref={saveViewTriggerRef}
+              onClick={() => setShowSaveForm(true)}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_VALUE}>{t("dashboards.allReports")}</SelectItem>
-              {dashboards.map((dashboard) => (
-                <SelectItem key={dashboard.id} value={dashboard.id}>
-                  {dashboard.isShared
-                    ? t("dashboards.sharedOptionLabel", { name: dashboard.name })
-                    : dashboard.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <Button
-          variant="outline"
-          size="sm"
-          ref={saveViewTriggerRef}
-          onClick={() => setShowSaveForm(true)}
-        >
-          {t("dashboards.saveCurrentView")}
-        </Button>
-        {selectedDashboard?.isOwner && (
-          <>
-            <Button variant="outline" size="sm" onClick={handleToggleShare}>
-              {selectedDashboard.isShared ? t("dashboards.unshare") : t("dashboards.share")}
+              {t("dashboards.saveCurrentView")}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(true)}>
-              {t("dashboards.delete")}
-            </Button>
-          </>
-        )}
-      </div>
+            {selectedDashboard?.isOwner && (
+              <>
+                <Button variant="outline" size="sm" onClick={handleToggleShare}>
+                  {selectedDashboard.isShared ? t("dashboards.unshare") : t("dashboards.share")}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+                  {t("dashboards.delete")}
+                </Button>
+              </>
+            )}
+          </div>
+        }
+      />
 
       {selectedDashboard && (
         <ConfirmDialog
@@ -774,11 +902,68 @@ export function ReportsView() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        {widgetTypesToRender.map((widgetType) => (
-          <Fragment key={widgetType}>{renderWidget(widgetType)}</Fragment>
-        ))}
-      </div>
+      {pageFailure ? (
+        <ErrorState
+          title={
+            pageFailure === "forbidden"
+              ? t("forbidden")
+              : pageFailure === "invalidRange"
+                ? t("dateRange.invalidRange")
+                : t("error")
+          }
+          tone={pageFailure === "forbidden" ? "neutral" : "danger"}
+          headingLevel={2}
+          actions={
+            pageFailure === "error" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  widgetTypesToRender.forEach((widgetType) => widgetQueries[widgetType].refetch())
+                }
+              >
+                {t("retry")}
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : (
+        <>
+          {/* Story 228 — the period's headline numbers, from the same
+              queries the cards below read. */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard
+              label={t("kpi.tickets")}
+              value={ticketTotal === undefined ? undefined : numberFormat.format(ticketTotal)}
+              loading={ticketVolumeQuery.isLoading}
+            />
+            <StatCard
+              label={t("kpi.slaCompliance")}
+              value={complianceRate}
+              loading={slaComplianceQuery.isLoading}
+            />
+            <StatCard
+              label={t("kpi.csat")}
+              value={averageRating}
+              hint={averageRating === undefined ? undefined : t("kpi.csatScale")}
+              loading={csatQuery.isLoading}
+            />
+            <StatCard
+              label={t("kpi.resolutionTime")}
+              value={averageResolution}
+              loading={resolutionTimeQuery.isLoading}
+            />
+          </div>
+
+          {/* Story 228 — three columns at most: six squeezed every card
+              heading to a word per line. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {widgetTypesToRender.map((widgetType) => (
+              <Fragment key={widgetType}>{renderWidget(widgetType)}</Fragment>
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 }

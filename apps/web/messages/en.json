@@ -869,7 +869,7 @@
     "filterEntityTypePlaceholder": "e.g. ticket",
     "filterFrom": "From",
     "filterTo": "To",
-    "filterClear": "Clear",
+    "filterClear": "Clear all",
     "systemActor": "System",
     "noEntityId": "—",
     "noBranch": "—",
@@ -882,7 +882,38 @@
       "entityId": "Entity ID",
       "branch": "Branch",
       "ipAddress": "IP address",
-      "diff": "Diff"
+      "diff": "Changes"
+    },
+    "filtersLabel": "Filters",
+    "closeFilters": "Close filters",
+    "closeChanges": "Close",
+    "viewChanges": "View changes",
+    "viewChangesFor": "View changes: {action}, {when}",
+    "actions": {
+      "auth_login": "Signed in",
+      "auth_login_failed": "Sign-in failed",
+      "auth_login_blocked": "Sign-in blocked",
+      "auth_account_locked": "Account locked",
+      "auth_logout": "Signed out",
+      "auth_branch_switched": "Switched branch",
+      "user_unlocked": "User unlocked",
+      "user_branch_assignment_granted": "Branch access granted",
+      "user_password_reset": "Password reset",
+      "user_password_changed": "Password changed",
+      "user_reassigned": "User reassigned",
+      "role_updated": "Role updated",
+      "role_permissions_updated": "Role permissions updated"
+    },
+    "httpVerbs": {
+      "POST": "Create",
+      "PUT": "Replace",
+      "PATCH": "Update",
+      "DELETE": "Delete"
+    },
+    "entityTypes": {
+      "user": "User",
+      "role": "Role",
+      "http_request": "Request"
     }
   },
   "dashboard": {
@@ -1113,7 +1144,6 @@
     "dateRange": {
       "fromLabel": "From",
       "toLabel": "To",
-      "clear": "Clear",
       "invalidRange": "The selected date range is invalid — \"From\" must not be after \"To\"."
     },
     "filters": {
@@ -1121,7 +1151,10 @@
       "department": "Department",
       "agent": "Agent",
       "category": "Category",
-      "crossBranch": "Aggregate across every branch"
+      "crossBranch": "Aggregate across every branch",
+      "label": "Filters",
+      "close": "Close",
+      "clearAll": "Clear all"
     },
     "ticketVolume": {
       "heading": "Ticket Volume by Status",
@@ -1179,6 +1212,18 @@
       "shareLabel": "Share with branch",
       "save": "Save",
       "cancel": "Cancel"
+    },
+    "description": "How the team is doing over the period and filters you choose.",
+    "kpi": {
+      "tickets": "Tickets",
+      "slaCompliance": "SLA compliance",
+      "csat": "Average CSAT",
+      "csatScale": "out of 5",
+      "resolutionTime": "Average resolution time"
+    },
+    "units": {
+      "hoursMinutes": "{hours}h {minutes}m",
+      "minutes": "{minutes}m"
     }
   },
   "automationRules": {

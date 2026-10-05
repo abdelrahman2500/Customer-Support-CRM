@@ -869,7 +869,7 @@
     "filterEntityTypePlaceholder": "مثال: ticket",
     "filterFrom": "من",
     "filterTo": "إلى",
-    "filterClear": "مسح",
+    "filterClear": "مسح الكل",
     "systemActor": "النظام",
     "noEntityId": "—",
     "noBranch": "—",
@@ -882,7 +882,38 @@
       "entityId": "معرّف الكيان",
       "branch": "الفرع",
       "ipAddress": "عنوان IP",
-      "diff": "الفرق"
+      "diff": "التغييرات"
+    },
+    "filtersLabel": "المرشحات",
+    "closeFilters": "إغلاق المرشحات",
+    "closeChanges": "إغلاق",
+    "viewChanges": "عرض التغييرات",
+    "viewChangesFor": "عرض التغييرات: {action}، {when}",
+    "actions": {
+      "auth_login": "تسجيل الدخول",
+      "auth_login_failed": "فشل تسجيل الدخول",
+      "auth_login_blocked": "حظر تسجيل الدخول",
+      "auth_account_locked": "قفل الحساب",
+      "auth_logout": "تسجيل الخروج",
+      "auth_branch_switched": "تبديل الفرع",
+      "user_unlocked": "إلغاء قفل المستخدم",
+      "user_branch_assignment_granted": "منح الوصول إلى فرع",
+      "user_password_reset": "إعادة تعيين كلمة المرور",
+      "user_password_changed": "تغيير كلمة المرور",
+      "user_reassigned": "إعادة إسناد المستخدم",
+      "role_updated": "تحديث الدور",
+      "role_permissions_updated": "تحديث صلاحيات الدور"
+    },
+    "httpVerbs": {
+      "POST": "إنشاء",
+      "PUT": "استبدال",
+      "PATCH": "تحديث",
+      "DELETE": "حذف"
+    },
+    "entityTypes": {
+      "user": "مستخدم",
+      "role": "دور",
+      "http_request": "طلب"
     }
   },
   "dashboard": {
@@ -1113,7 +1144,6 @@
     "dateRange": {
       "fromLabel": "من",
       "toLabel": "إلى",
-      "clear": "مسح",
       "invalidRange": "النطاق الزمني المحدد غير صالح — يجب ألا يكون تاريخ \"من\" بعد تاريخ \"إلى\"."
     },
     "filters": {
@@ -1121,7 +1151,10 @@
       "department": "القسم",
       "agent": "الوكيل",
       "category": "الفئة",
-      "crossBranch": "التجميع عبر جميع الفروع"
+      "crossBranch": "التجميع عبر جميع الفروع",
+      "label": "المرشحات",
+      "close": "إغلاق",
+      "clearAll": "مسح الكل"
     },
     "ticketVolume": {
       "heading": "حجم التذاكر حسب الحالة",
@@ -1179,6 +1212,18 @@
       "shareLabel": "المشاركة مع الفرع",
       "save": "حفظ",
       "cancel": "إلغاء"
+    },
+    "description": "أداء الفريق خلال الفترة والمرشحات التي تختارها.",
+    "kpi": {
+      "tickets": "التذاكر",
+      "slaCompliance": "الالتزام باتفاقية مستوى الخدمة",
+      "csat": "متوسط رضا العملاء",
+      "csatScale": "من 5",
+      "resolutionTime": "متوسط وقت الحل"
+    },
+    "units": {
+      "hoursMinutes": "{hours} س {minutes} د",
+      "minutes": "{minutes} د"
     }
   },
   "automationRules": {

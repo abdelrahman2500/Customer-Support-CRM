@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useAuditLogsQuery } from "@/hooks/use-audit-logs";
@@ -11,25 +11,144 @@ import {
   Alert,
   Badge,
   Button,
+  DescriptionItem,
+  DescriptionList,
   FetchingIndicator,
   Input,
+  ListToolbar,
   LoadingStatus,
   PageHeader,
   Pagination,
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
   Skeleton,
 } from "@crm/ui";
 import { EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@crm/ui";
 import { formatDateTime } from "@crm/ui";
 
-function DiffCell({ diff }: { diff: unknown }) {
+/** Story 228 — the actions the API records by name (the identity
+ * domain's own audit trail). Anything else is shown as recorded. */
+const NAMED_ACTIONS = new Set([
+  "auth.login",
+  "auth.login_failed",
+  "auth.login_blocked",
+  "auth.account_locked",
+  "auth.logout",
+  "auth.branch_switched",
+  "user.unlocked",
+  "user.branch_assignment_granted",
+  "user.password_reset",
+  "user.password_changed",
+  "user.reassigned",
+  "role.updated",
+  "role.permissions_updated",
+]);
+const ENTITY_TYPES = new Set(["user", "role", "http_request"]);
+const HTTP_ACTION = /^(POST|PUT|PATCH|DELETE) (\S+)$/;
+
+type AuditT = ReturnType<typeof useTranslations<"auditLogs">>;
+type AuditKey = Parameters<AuditT>[0];
+
+/**
+ * Story 228 — an action in the reader's language. Named actions have their
+ * own label; the request trail every mutation leaves ("PATCH /tickets/:id")
+ * reads as its verb ("Update") with the path beside it. Anything else is
+ * shown as recorded, which is also what the action filter matches.
+ */
+function describeAction(action: string, t: AuditT): { label: string; path?: string } {
+  if (NAMED_ACTIONS.has(action)) {
+    return { label: t(`actions.${action.replace(".", "_")}` as AuditKey) };
+  }
+  const http = HTTP_ACTION.exec(action);
+  if (http) {
+    return { label: t(`httpVerbs.${http[1]}` as AuditKey), path: http[2] };
+  }
+  return { label: action };
+}
+
+function entityTypeLabel(entityType: string, t: AuditT): string {
+  return ENTITY_TYPES.has(entityType) ? t(`entityTypes.${entityType}` as AuditKey) : entityType;
+}
+
+function ActionCell({ action }: { action: string }) {
   const t = useTranslations("auditLogs");
-  if (diff === null || diff === undefined) {
+  const { label, path } = describeAction(action, t);
+  return (
+    <span className="flex min-w-0 flex-wrap items-center gap-tight">
+      <Badge variant="outline">{label}</Badge>
+      {path && (
+        <code dir="ltr" className="break-all text-caption text-ink-subtle">
+          {path}
+        </code>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Story 228 — the change set opens in a Sheet instead of stretching the
+ * row with a JSON block; the Sheet also carries the entry's full record.
+ */
+function DiffCell({ log, actor, when }: { log: AuditLogSummary; actor: ReactNode; when: string }) {
+  const t = useTranslations("auditLogs");
+  if (log.diff === null || log.diff === undefined) {
     return <span className="text-ink-subtle">{t("noDiff")}</span>;
   }
+  const { label } = describeAction(log.action, t);
   return (
-    <div className="max-w-xs overflow-x-auto">
-      <pre className="whitespace-pre text-xs text-ink-muted">{JSON.stringify(diff, null, 2)}</pre>
-    </div>
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={t("viewChangesFor", { action: label, when })}
+        >
+          {t("viewChanges")}
+        </Button>
+      </SheetTrigger>
+      <SheetContent closeLabel={t("closeChanges")}>
+        <SheetHeader>
+          <SheetTitle>{label}</SheetTitle>
+          <SheetDescription>{when}</SheetDescription>
+        </SheetHeader>
+        <SheetBody className="flex flex-col gap-section">
+          <DescriptionList columns={2}>
+            <DescriptionItem term={t("columns.actor")}>{actor}</DescriptionItem>
+            <DescriptionItem term={t("columns.action")}>
+              <code dir="ltr" className="break-all text-caption">
+                {log.action}
+              </code>
+            </DescriptionItem>
+            <DescriptionItem term={t("columns.entityType")}>
+              {entityTypeLabel(log.entityType, t)}
+            </DescriptionItem>
+            <DescriptionItem term={t("columns.entityId")}>
+              {log.entityId ?? t("noEntityId")}
+            </DescriptionItem>
+            <DescriptionItem term={t("columns.branch")}>
+              {log.branchId ?? t("noBranch")}
+            </DescriptionItem>
+            <DescriptionItem term={t("columns.ipAddress")}>
+              {log.ipAddress ?? t("noIpAddress")}
+            </DescriptionItem>
+          </DescriptionList>
+          <section className="flex flex-col gap-tight">
+            <h3 className="text-label text-ink">{t("columns.diff")}</h3>
+            <pre
+              dir="ltr"
+              className="overflow-x-auto rounded-control bg-surface-muted p-3 text-xs text-ink-muted"
+            >
+              {JSON.stringify(log.diff, null, 2)}
+            </pre>
+          </section>
+        </SheetBody>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -89,6 +208,9 @@ export function AuditLogView() {
    * pages, which keeps the first request identical to the pre-S-8a one.
    */
   const [filters, setFilters] = useState<AuditLogFilters>({});
+  /** Story 228 — the two text filters commit on blur, so they hold their
+   * own text; "Clear all" remounts them to empty them too. */
+  const [clearCount, setClearCount] = useState(0);
   const auditLogsQuery = useAuditLogsQuery(filters);
   const usersQuery = useUsersQuery();
 
@@ -137,53 +259,63 @@ export function AuditLogView() {
         }
       />
 
-      <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("filterAction")}
-          <Input
-            className="min-w-[10rem]"
-            defaultValue={filters.action ?? ""}
-            placeholder={t("filterActionPlaceholder")}
-            onBlur={(event) => updateFilter("action", event.target.value.trim())}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("filterEntityType")}
-          <Input
-            className="min-w-[10rem]"
-            defaultValue={filters.entityType ?? ""}
-            placeholder={t("filterEntityTypePlaceholder")}
-            onBlur={(event) => updateFilter("entityType", event.target.value.trim())}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("filterFrom")}
-          <Input
-            type="date"
-            className="w-full sm:w-40"
-            value={filters.from ?? ""}
-            onChange={(event) => updateFilter("from", event.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-muted">
-          {t("filterTo")}
-          <Input
-            type="date"
-            className="w-full sm:w-40"
-            value={filters.to ?? ""}
-            onChange={(event) => updateFilter("to", event.target.value)}
-          />
-        </label>
-        <Button
-          variant="outline"
-          size="sm"
-          className="self-end"
-          onClick={() => setFilters({})}
-          disabled={!filters.action && !filters.entityType && !filters.from && !filters.to}
-        >
-          {t("filterClear")}
-        </Button>
-      </div>
+      {/* Story 228 — the shared list toolbar: the filters (in a sheet on
+          a phone) and "Clear all" once any is set. */}
+      <ListToolbar
+        filterCount={
+          [filters.action, filters.entityType, filters.from || filters.to].filter(Boolean).length
+        }
+        filtersLabel={t("filtersLabel")}
+        closeLabel={t("closeFilters")}
+        onClearAll={() => {
+          setFilters({});
+          setClearCount((count) => count + 1);
+        }}
+        clearAllLabel={t("filterClear")}
+        className="[&>div:first-child]:items-end"
+        filters={
+          <>
+            <label className="flex flex-col gap-1 text-xs text-ink-muted">
+              {t("filterAction")}
+              <Input
+                className="min-w-[10rem]"
+                key={`action-${clearCount}`}
+                defaultValue={filters.action ?? ""}
+                placeholder={t("filterActionPlaceholder")}
+                onBlur={(event) => updateFilter("action", event.target.value.trim())}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-ink-muted">
+              {t("filterEntityType")}
+              <Input
+                className="min-w-[10rem]"
+                key={`entityType-${clearCount}`}
+                defaultValue={filters.entityType ?? ""}
+                placeholder={t("filterEntityTypePlaceholder")}
+                onBlur={(event) => updateFilter("entityType", event.target.value.trim())}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-ink-muted">
+              {t("filterFrom")}
+              <Input
+                type="date"
+                className="w-full sm:w-40"
+                value={filters.from ?? ""}
+                onChange={(event) => updateFilter("from", event.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-ink-muted">
+              {t("filterTo")}
+              <Input
+                type="date"
+                className="w-full sm:w-40"
+                value={filters.to ?? ""}
+                onChange={(event) => updateFilter("to", event.target.value)}
+              />
+            </label>
+          </>
+        }
+      />
 
       {/* Story S-8a — `isPending`, not `isLoading`: with placeholder data
           in play the query only reports `pending` on a genuine first load,
@@ -239,9 +371,11 @@ export function AuditLogView() {
                     <ActorCell actorId={log.actorId} nameById={actorNameById} />
                   </TableCell>
                   <TableCell label={t("columns.action")}>
-                    <Badge variant="outline">{log.action}</Badge>
+                    <ActionCell action={log.action} />
                   </TableCell>
-                  <TableCell label={t("columns.entityType")}>{log.entityType}</TableCell>
+                  <TableCell label={t("columns.entityType")}>
+                    {entityTypeLabel(log.entityType, t)}
+                  </TableCell>
                   <TableCell label={t("columns.entityId")} className="text-ink-subtle">
                     {log.entityId ?? <span className="text-ink-subtle">{t("noEntityId")}</span>}
                   </TableCell>
@@ -252,7 +386,11 @@ export function AuditLogView() {
                     {log.ipAddress ?? <span className="text-ink-subtle">{t("noIpAddress")}</span>}
                   </TableCell>
                   <TableCell label={t("columns.diff")}>
-                    <DiffCell diff={log.diff} />
+                    <DiffCell
+                      log={log}
+                      actor={<ActorCell actorId={log.actorId} nameById={actorNameById} />}
+                      when={formatDateTime(log.createdAt, locale)}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

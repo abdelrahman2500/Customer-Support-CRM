@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { AuditLogView } from "./audit-log-view";
 import { useAuditLogsQuery } from "@/hooks/use-audit-logs";
 import { useUsersQuery } from "@/hooks/use-tickets";
@@ -207,8 +207,37 @@ describe("AuditLogView", () => {
 
     render(<AuditLogView />);
 
-    expect(screen.getByText(/"status"/)).toBeInTheDocument();
-    expect(screen.getByText(/"RESOLVED"/)).toBeInTheDocument();
+    // Story 228 — the change set opens in a Sheet from the row.
+    fireEvent.click(screen.getByText("viewChanges"));
+    const sheet = screen.getByRole("dialog");
+    expect(within(sheet).getByText(/"status"/)).toBeInTheDocument();
+    expect(within(sheet).getByText(/"RESOLVED"/)).toBeInTheDocument();
+    expect(within(sheet).getByText("branch-1")).toBeInTheDocument();
+  });
+
+  it("names a recorded action and entity type in the reader's language", () => {
+    mockedUseAuditLogsQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: page([
+          { ...baseLog, id: "log-a", action: "auth.login_failed", entityType: "user" },
+          {
+            ...baseLog,
+            id: "log-b",
+            action: "PATCH /api/v1/tickets/:id",
+            entityType: "http_request",
+          },
+        ]),
+      }) as never,
+    );
+
+    render(<AuditLogView />);
+
+    expect(screen.getByText("actions.auth_login_failed")).toBeInTheDocument();
+    expect(screen.getByText("entityTypes.user")).toBeInTheDocument();
+    expect(screen.getByText("httpVerbs.PATCH")).toBeInTheDocument();
+    expect(screen.getByText("/api/v1/tickets/:id")).toBeInTheDocument();
+    expect(screen.getByText("entityTypes.http_request")).toBeInTheDocument();
   });
 
   it("renders the no-diff placeholder for an entry with a null diff", () => {
@@ -288,19 +317,30 @@ describe("AuditLogView", () => {
       });
     });
 
-    it("the Clear button resets every filter and starts disabled", () => {
+    // Story 228 — the shared toolbar's "Clear all" appears once a filter
+    // is set (it replaces the always-present, disabled Clear button).
+    it("Clear all appears once a filter is set and resets every filter", () => {
       render(<AuditLogView />);
 
-      const clearButton = screen.getByText("filterClear");
-      expect(clearButton).toBeDisabled();
+      expect(screen.queryByText("filterClear")).not.toBeInTheDocument();
 
       const dateInputs = document.querySelectorAll('input[type="date"]');
       fireEvent.change(dateInputs[0]!, { target: { value: "2026-06-01" } });
-      expect(clearButton).not.toBeDisabled();
 
-      fireEvent.click(clearButton);
+      fireEvent.click(screen.getByText("filterClear"));
 
       expect(mockedUseAuditLogsQuery).toHaveBeenLastCalledWith({});
+    });
+
+    it("Clear all also empties the text filters", () => {
+      render(<AuditLogView />);
+
+      const input = screen.getByPlaceholderText("filterActionPlaceholder");
+      fireEvent.change(input, { target: { value: "auth.login" } });
+      fireEvent.blur(input);
+      fireEvent.click(screen.getByText("filterClear"));
+
+      expect(screen.getByPlaceholderText("filterActionPlaceholder")).toHaveValue("");
     });
   });
 

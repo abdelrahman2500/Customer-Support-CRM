@@ -34,6 +34,16 @@ URL.revokeObjectURL = vi.fn();
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
     vars ? `${key}:${JSON.stringify(vars)}` : key,
+  useLocale: () => "en",
+}));
+
+// Story 228 — the filters live in the URL (`useUrlFilters`).
+const replace = vi.fn();
+let searchParamsString = "";
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace }),
+  usePathname: () => "/en/reports",
+  useSearchParams: () => new URLSearchParams(searchParamsString),
 }));
 
 vi.mock("@/hooks/use-reporting", () => ({
@@ -93,6 +103,7 @@ function queryResult(overrides: Record<string, unknown>) {
 describe("ReportsView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsString = "";
     mockedUseTicketVolumeQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     mockedUseSlaComplianceQuery.mockReturnValue(
       queryResult({
@@ -281,7 +292,10 @@ describe("ReportsView", () => {
 
     render(<ReportsView />);
 
-    expect(screen.getByText("80%")).toBeInTheDocument();
+    // Story 228 — the KPI row repeats the rate, so the card's own text is
+    // looked for inside the card.
+    const card = screen.getByText("slaCompliance.heading").closest("div")!;
+    expect(within(card).getByText("80%")).toBeInTheDocument();
   });
 
   it("renders the CSAT card's populated average", () => {
@@ -412,7 +426,7 @@ describe("ReportsView", () => {
       fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
         target: { value: "2026-01-01" },
       });
-      fireEvent.click(screen.getByText("dateRange.clear"));
+      fireEvent.click(screen.getByText("filters.clearAll"));
 
       expect(screen.getByText("agentPerformance.modeLiveSnapshot")).toBeInTheDocument();
     });
@@ -499,16 +513,22 @@ describe("ReportsView", () => {
       });
       expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({ from: "2026-01-01" });
 
-      fireEvent.click(screen.getByText("dateRange.clear"));
+      fireEvent.click(screen.getByText("filters.clearAll"));
 
       expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({});
       expect(screen.getByLabelText("dateRange.fromLabel")).toHaveValue("");
     });
 
-    it("disables Clear when no range is selected", () => {
+    // Story 228 — the toolbar's "Clear all" replaces the date-only Clear
+    // button; like every list toolbar it appears only once a filter is set.
+    it("shows Clear all only once a filter is set", () => {
       render(<ReportsView />);
 
-      expect(screen.getByText("dateRange.clear")).toBeDisabled();
+      expect(screen.queryByText("filters.clearAll")).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
+        target: { value: "2026-01-01" },
+      });
+      expect(screen.getByText("filters.clearAll")).toBeInTheDocument();
     });
   });
 
@@ -661,7 +681,12 @@ describe("ReportsView", () => {
 
       render(<ReportsView />);
 
-      expect(screen.getByText("2h 15m")).toBeInTheDocument();
+      // Story 228 — the units are localized messages now; the KPI row
+      // repeats the duration, so the card's own text is looked for inside it.
+      const card = screen.getByText("resolutionTime.heading").closest("div")!;
+      expect(
+        within(card).getByText('units.hoursMinutes:{"hours":2,"minutes":15}'),
+      ).toBeInTheDocument();
       expect(screen.getByText('resolutionTime.detail:{"count":4}')).toBeInTheDocument();
     });
 
@@ -1083,6 +1108,101 @@ describe("ReportsView", () => {
       expect(await screen.findByText("export.error")).toBeInTheDocument();
       // The card's own (empty-state) content is still there.
       expect(screen.getByText("ticketVolume.empty")).toBeInTheDocument();
+    });
+  });
+  // Story 228 — Insights redesign.
+  describe("filters in the URL (Story 228)", () => {
+    it("reads the period, the filters and the saved view from the URL", () => {
+      searchParamsString =
+        "from=2026-01-01&to=2026-01-31&department=department-1&agent=user-1&category=category-1&crossBranch=1&view=dashboard-1";
+
+      render(<ReportsView />);
+
+      expect(mockedUseTicketVolumeQuery).toHaveBeenLastCalledWith({
+        from: "2026-01-01",
+        to: "2026-01-31",
+        departmentId: "department-1",
+        assignedToUserId: "user-1",
+        categoryId: "category-1",
+        crossBranch: true,
+      });
+    });
+
+    it("writes a changed filter back to the URL", () => {
+      render(<ReportsView />);
+
+      fireEvent.change(screen.getByLabelText("dateRange.fromLabel"), {
+        target: { value: "2026-01-01" },
+      });
+
+      expect(replace).toHaveBeenLastCalledWith("/en/reports?from=2026-01-01", { scroll: false });
+    });
+  });
+
+  describe("KPI row (Story 228)", () => {
+    it("sums the ticket volume and shows the period's headline numbers", () => {
+      mockedUseTicketVolumeQuery.mockReturnValue(
+        queryResult({
+          data: [
+            { status: "OPEN", count: 3 },
+            { status: "RESOLVED", count: 9 },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+      mockedUseCsatSummaryQuery.mockReturnValue(
+        queryResult({ data: { responseCount: 4, averageRating: 4.5 }, isSuccess: true }) as never,
+      );
+
+      render(<ReportsView />);
+
+      expect(screen.getByText("kpi.tickets").parentElement).toHaveTextContent("12");
+      expect(screen.getByText("kpi.csat").parentElement).toHaveTextContent("4.5");
+    });
+
+    it("shows a dash, not zero, for a rate with nothing to measure", () => {
+      render(<ReportsView />);
+
+      expect(screen.getByText("kpi.slaCompliance").parentElement).toHaveTextContent("—");
+    });
+  });
+
+  describe("page-level failure (Story 228)", () => {
+    function failEvery(error: ApiError) {
+      const mocks: { mockReturnValue: (value: never) => unknown }[] = [
+        mockedUseTicketVolumeQuery,
+        mockedUseSlaComplianceQuery,
+        mockedUseCsatSummaryQuery,
+        mockedUseAgentPerformanceQuery,
+        mockedUseTicketAgingQuery,
+        mockedUseResolutionTimeQuery,
+        mockedUseAiUsageQuery,
+        mockedUseTicketVolumeByCategoryQuery,
+      ];
+      for (const mocked of mocks) {
+        mocked.mockReturnValue(queryResult({ isError: true, error }) as never);
+      }
+    }
+
+    it("says forbidden once, not once per card, when every report is forbidden", () => {
+      failEvery(new ApiError("Forbidden", 403));
+
+      render(<ReportsView />);
+
+      expect(screen.getAllByText("forbidden")).toHaveLength(1);
+      expect(screen.queryByText("ticketVolume.heading")).not.toBeInTheDocument();
+      // The toolbar stays, so the filter that caused it can be changed.
+      expect(screen.getByLabelText("filters.crossBranch")).toBeInTheDocument();
+    });
+
+    it("offers one retry that refetches every report when every report fails", () => {
+      failEvery(new ApiError("Server error", 500));
+
+      render(<ReportsView />);
+
+      expect(screen.getAllByText("error")).toHaveLength(1);
+      fireEvent.click(screen.getByText("retry"));
+      expect(mockedUseTicketVolumeQuery.mock.results.at(-1)!.value.refetch).toHaveBeenCalled();
     });
   });
 });
