@@ -432,7 +432,36 @@
       "filteredEmpty": "لا توجد تذاكر تطابق عوامل التصفية",
       "unassigned": "غير مسندة",
       "unknownAgent": "موظف",
-      "cardDescription": "{status} · أولوية {priority} · {assignee}"
+      "cardDescription": "{status} · أولوية {priority} · {assignee}",
+      "moveHandle": "نقل {subject}",
+      "cardActions": "إجراءات {subject}",
+      "moveTo": "نقل إلى",
+      "confirm": {
+        "RESOLVED": {
+          "question": "حل هذه التذكرة؟",
+          "action": "حل"
+        },
+        "CLOSED": {
+          "question": "إغلاق هذه التذكرة؟",
+          "action": "إغلاق التذكرة"
+        },
+        "notified": "سيتم إشعار العميل.",
+        "cancel": "إلغاء"
+      },
+      "moveErrors": {
+        "forbidden": "ليست لديك صلاحية لنقل هذه التذكرة.",
+        "notFound": "هذه التذكرة لم تعد متاحة.",
+        "generic": "تعذر نقل هذه التذكرة. حاول مرة أخرى."
+      },
+      "announce": {
+        "instructions": "لنقل تذكرة، اضغط المسافة أو Enter على مقبضها. استخدم مفتاحي الأسهم الأيمن والأيسر لاختيار حالة، ثم المسافة أو Enter للإفلات، أو Escape للإلغاء.",
+        "pickedUp": "تم التقاط {subject}. استخدم مفاتيح الأسهم لاختيار حالة، والمسافة للإفلات.",
+        "over": "{subject} فوق {status}.",
+        "notOver": "{subject} ليست فوق أي حالة.",
+        "moved": "تم نقل {subject} إلى {status}.",
+        "cancelled": "تم إلغاء النقل.",
+        "failed": "تعذر نقل {subject}: {reason}"
+      }
     }
   },
   "customers": {

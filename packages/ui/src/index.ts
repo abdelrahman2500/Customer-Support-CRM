@@ -350,3 +350,6 @@ export type { AuthFeature, AuthLayoutProps } from "./components/auth-layout";
 export { PasswordInput, PasswordToggle } from "./components/password-input";
 export type { PasswordInputProps, PasswordToggleProps } from "./components/password-input";
 export { ShowPasswordIcon, HidePasswordIcon } from "./lib/icons";
+
+// --- Story 217 (PR-3.2) — board card moves ----------------------------------
+export { DragHandleIcon, MoreActionsIcon } from "./lib/icons";

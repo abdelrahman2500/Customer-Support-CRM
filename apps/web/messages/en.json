@@ -432,7 +432,36 @@
       "filteredEmpty": "No tickets match these filters",
       "unassigned": "Unassigned",
       "unknownAgent": "Agent",
-      "cardDescription": "{status} · {priority} priority · {assignee}"
+      "cardDescription": "{status} · {priority} priority · {assignee}",
+      "moveHandle": "Move {subject}",
+      "cardActions": "Actions for {subject}",
+      "moveTo": "Move to",
+      "confirm": {
+        "RESOLVED": {
+          "question": "Resolve this ticket?",
+          "action": "Resolve"
+        },
+        "CLOSED": {
+          "question": "Close this ticket?",
+          "action": "Close ticket"
+        },
+        "notified": "The customer is notified.",
+        "cancel": "Cancel"
+      },
+      "moveErrors": {
+        "forbidden": "You don't have permission to move this ticket.",
+        "notFound": "This ticket is no longer available.",
+        "generic": "Couldn't move this ticket. Try again."
+      },
+      "announce": {
+        "instructions": "To move a ticket, press Space or Enter on its handle. Use the left and right arrow keys to choose a status, then Space or Enter to drop it, or Escape to cancel.",
+        "pickedUp": "Picked up {subject}. Use the arrow keys to choose a status, Space to drop.",
+        "over": "{subject} is over {status}.",
+        "notOver": "{subject} is not over a status.",
+        "moved": "Moved {subject} to {status}.",
+        "cancelled": "Move cancelled.",
+        "failed": "Couldn't move {subject}: {reason}"
+      }
     }
   },
   "customers": {

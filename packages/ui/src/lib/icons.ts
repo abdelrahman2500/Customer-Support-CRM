@@ -144,3 +144,6 @@ export { UserRound as UnassignedIcon } from "lucide-react";
 
 // Story 214 (PR-2.2) — the password visibility toggle (sign-in screens).
 export { Eye as ShowPasswordIcon, EyeOff as HidePasswordIcon } from "lucide-react";
+
+// Story 217 (PR-3.2) — a card's drag handle and its "more actions" menu.
+export { GripVertical as DragHandleIcon, Ellipsis as MoreActionsIcon } from "lucide-react";

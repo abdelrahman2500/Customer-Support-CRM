@@ -1,8 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  pointerWithin,
+  rectIntersection,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import {
   Board,
   Button,
@@ -18,8 +33,12 @@ import {
   SelectTrigger,
   SelectValue,
   TicketsIcon,
+  showToast,
 } from "@crm/ui";
 import { useIsFetching } from "@tanstack/react-query";
+import { ApiError } from "@/lib/api";
+import { useErrorMessage } from "@/hooks/use-error-message";
+import { useMoveTicketMutation } from "@/hooks/use-move-ticket";
 import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
@@ -45,49 +64,71 @@ import {
 } from "./board-state";
 import { TicketBoardColumn, type ColumnReport } from "./ticket-board-column";
 import { TicketCard } from "./ticket-card";
+import { BoardCard } from "./board-card";
+import { columnCoordinates, needsConfirmation } from "./board-moves";
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
 const ALL = "__all__";
 
-/** Below `md` the board shows one column at a time (tickets-kanban-ux.md §7). */
-function useIsDesktop(): boolean {
-  const [desktop, setDesktop] = useState(true);
+function useMediaQuery(query: string, initial: boolean): boolean {
+  const [matches, setMatches] = useState(initial);
   useEffect(() => {
-    const media = window.matchMedia("(min-width: 768px)");
-    const update = () => setDesktop(media.matches);
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
     update();
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
-  }, []);
-  return desktop;
+  }, [query]);
+  return matches;
 }
+
+/** The pointer decides when there is one; the keyboard drag uses the card's rect. */
+const collisionDetection: CollisionDetection = (args) => {
+  const within = pointerWithin(args);
+  return within.length > 0 ? within : rectIntersection(args);
+};
+
+type MoveVia = "pointer" | "keyboard" | "menu";
+
+const SILENT_ANNOUNCEMENTS = {
+  onDragStart: () => undefined,
+  onDragMove: () => undefined,
+  onDragOver: () => undefined,
+  onDragEnd: () => undefined,
+  onDragCancel: () => undefined,
+};
 
 /**
  * Story 216 (PR-3.1, tickets-kanban-ux.md) — the Tickets board, the default
  * view of `/tickets` (decision PD-3): four status columns of cards under one
  * toolbar (search, quick views, filters, sort, summary), the Closed column
- * folded by default, and a column switcher below `md`. Read-only in this
- * Story; moving cards is PR-3.2.
+ * folded by default, and a column switcher below `md`.
  *
  * Every filter lives in the URL (`useUrlFilters`), with the list view's
  * parameter names, so a filtered board is shareable and survives reloads.
  * The search keeps the list's placeholder and on-blur/Enter commit.
+ *
+ * Story 217 (PR-3.2, tickets-kanban-ux.md §5) — cards move by pointer drag,
+ * keyboard drag (the handle) or the "Move to" menu, all through one
+ * `requestMove`: Open ↔ In progress is immediate, Resolved/Closed wait on
+ * the card's confirm popover (PD-5). Moves are optimistic and roll back on
+ * error with a toast keyed by the failure; every outcome is announced in a
+ * polite live region, and a keyboard or menu move puts focus back on the
+ * card in its new column. Below `md` there is no drag: the menu moves, and
+ * the switcher follows the card to its new column.
  */
-export function TicketBoardView({
-  viewSwitcher,
-  renderCardActions,
-}: {
-  viewSwitcher?: ReactNode;
-  /** PR-3.2 — the card's menu and drag handle. */
-  renderCardActions?: (ticket: TicketListItem) => ReactNode;
-}) {
+export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) {
   const t = useTranslations("tickets.board");
   const tList = useTranslations("tickets.list");
   const tCommon = useTranslations("common");
   const labels = useTicketLabels();
+  const errorMessage = useErrorMessage();
   const { locale } = useParams<{ locale: string }>();
   const dir = localeDirection(locale);
-  const desktop = useIsDesktop();
+  // Below `md` the board shows one column at a time (tickets-kanban-ux.md §7).
+  const desktop = useMediaQuery("(min-width: 768px)", true);
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)", false);
+  const moveMutation = useMoveTicketMutation();
 
   const [filters, setFilters] = useUrlFilters(parseBoardFilters, serializeBoardFilters);
   const currentUserQuery = useCurrentUserQuery();
@@ -143,18 +184,149 @@ export function TicketBoardView({
     setFilters((current) => ({ ...current, ...next }));
   }
 
+  const assigneeNameOf = (ticket: TicketListItem) =>
+    ticket.assignedToUserId
+      ? (userNameById.get(ticket.assignedToUserId) ?? t("unknownAgent"))
+      : null;
+
+  // --- Moving cards (Story 217) ---------------------------------------------
+  const [dragging, setDragging] = useState<TicketListItem | null>(null);
+  const [overStatus, setOverStatus] = useState<TicketStatus | null>(null);
+  const [confirm, setConfirm] = useState<{
+    ticket: TicketListItem;
+    to: TicketStatus;
+    via: MoveVia;
+  } | null>(null);
+  // Where focus should land once the moved card renders in its new column.
+  const [focusRequest, setFocusRequest] = useState<{ id: string; status: TicketStatus } | null>(
+    null,
+  );
+  const [announcement, setAnnouncement] = useState({ text: "", key: 0 });
+  const announce = useCallback(
+    (text: string) => setAnnouncement((current) => ({ text, key: current.key + 1 })),
+    [],
+  );
+
+  const moveFailureReason = (error: unknown) =>
+    error instanceof ApiError && error.status === 404
+      ? t("moveErrors.notFound")
+      : errorMessage(error, {
+          forbidden: t("moveErrors.forbidden"),
+          generic: t("moveErrors.generic"),
+        });
+
+  const performMove = (ticket: TicketListItem, to: TicketStatus, via: MoveVia) => {
+    const status = labels.status(to);
+    moveMutation.mutate(
+      { ticket, to },
+      {
+        onSuccess: () => announce(t("announce.moved", { subject: ticket.subject, status })),
+        onError: (error) => {
+          const reason = moveFailureReason(error);
+          setFocusRequest(null);
+          showToast(reason, { tone: "error" });
+          announce(t("announce.failed", { subject: ticket.subject, reason }));
+        },
+      },
+    );
+    if (via !== "pointer") setFocusRequest({ id: ticket.id, status: to });
+    if (!desktop) setMobileStatus(to);
+  };
+
+  const requestMove = (ticket: TicketListItem, to: TicketStatus, via: MoveVia) => {
+    if (to === ticket.status) {
+      announce(t("announce.cancelled"));
+      return;
+    }
+    if (needsConfirmation(to)) setConfirm({ ticket, to, via });
+    else performMove(ticket, to, via);
+  };
+  // The card is memoized; its callbacks read the latest state through a ref.
+  const latest = useRef({ requestMove, performMove, confirm });
+  latest.current = { requestMove, performMove, confirm };
+
+  const onMoveRequest = useCallback(
+    (ticket: TicketListItem, to: TicketStatus) => latest.current.requestMove(ticket, to, "menu"),
+    [],
+  );
+  const onConfirm = useCallback(() => {
+    const pending = latest.current.confirm;
+    if (!pending) return;
+    setConfirm(null);
+    // Focus was in the popover, so it follows the card even after a pointer drop.
+    latest.current.performMove(pending.ticket, pending.to, "menu");
+  }, []);
+  const onCancel = useCallback(() => {
+    if (!latest.current.confirm) return;
+    setConfirm(null);
+    announce(t("announce.cancelled"));
+  }, [announce, t]);
+  const onFocused = useCallback(() => setFocusRequest(null), []);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: columnCoordinates }),
+  );
+
+  function onDragStart(event: DragStartEvent) {
+    const ticket = (event.active.data.current?.ticket as TicketListItem | undefined) ?? null;
+    setDragging(ticket);
+    if (ticket) announce(t("announce.pickedUp", { subject: ticket.subject }));
+  }
+  function onDragOver(event: DragOverEvent) {
+    const over = (event.over?.id as TicketStatus | undefined) ?? null;
+    setOverStatus(over);
+    const subject = (event.active.data.current?.ticket as TicketListItem | undefined)?.subject;
+    if (subject) {
+      announce(
+        over
+          ? t("announce.over", { subject, status: labels.status(over) })
+          : t("announce.notOver", { subject }),
+      );
+    }
+  }
+  function onDragEnd(event: DragEndEvent) {
+    const ticket = event.active.data.current?.ticket as TicketListItem | undefined;
+    setDragging(null);
+    setOverStatus(null);
+    if (!ticket) return;
+    const via: MoveVia = event.activatorEvent instanceof KeyboardEvent ? "keyboard" : "pointer";
+    if (!event.over) {
+      announce(t("announce.cancelled"));
+      return;
+    }
+    requestMove(ticket, event.over.id as TicketStatus, via);
+  }
+  function onDragCancel() {
+    setDragging(null);
+    setOverStatus(null);
+    announce(t("announce.cancelled"));
+  }
+
   const renderCard = (ticket: TicketListItem) => (
-    <TicketCard
+    <BoardCard
       ticket={ticket}
       locale={locale}
-      assigneeName={
-        ticket.assignedToUserId
-          ? (userNameById.get(ticket.assignedToUserId) ?? t("unknownAgent"))
-          : null
-      }
-      actions={renderCardActions?.(ticket)}
+      assigneeName={assigneeNameOf(ticket)}
+      draggable={desktop}
+      confirming={confirm?.ticket.id === ticket.id ? confirm.to : null}
+      focusRequested={focusRequest?.id === ticket.id && focusRequest.status === ticket.status}
+      onMoveRequest={onMoveRequest}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      onFocused={onFocused}
     />
   );
+
+  const countDeltaOf = (status: TicketStatus) =>
+    dragging && overStatus && overStatus !== dragging.status
+      ? status === dragging.status
+        ? -1
+        : status === overStatus
+          ? 1
+          : 0
+      : 0;
 
   const filtersNode = (
     <>
@@ -297,26 +469,57 @@ export function TicketBoardView({
               onValueChange={(value) => setMobileStatus(value as TicketStatus)}
             />
           )}
-          <Board
-            aria-label={t("boardLabel")}
-            className="md:h-[calc(100dvh-17rem)] md:min-h-[28rem]"
+          <DndContext
+            sensors={sensors}
+            collisionDetection={collisionDetection}
+            onDragStart={onDragStart}
+            onDragOver={onDragOver}
+            onDragEnd={onDragEnd}
+            onDragCancel={onDragCancel}
+            accessibility={{
+              screenReaderInstructions: { draggable: t("announce.instructions") },
+              // dnd-kit's own region is assertive; the spec asks for polite,
+              // so every drag message goes through the board's region below.
+              announcements: SILENT_ANNOUNCEMENTS,
+            }}
           >
-            {BOARD_STATUSES.map((status) => (
-              <TicketBoardColumn
-                key={status}
-                status={status}
-                filters={filters}
-                collapsed={desktop && status === "CLOSED" && closedCollapsed}
-                onToggleCollapsed={status === "CLOSED" && desktop ? toggleClosed : undefined}
-                renderCard={renderCard}
-                onReport={onReport}
-                hiddenBelowMd={!desktop && status !== mobileStatus}
-                fullWidth={!desktop}
-              />
-            ))}
-          </Board>
+            <Board
+              aria-label={t("boardLabel")}
+              className="md:h-[calc(100dvh-17rem)] md:min-h-[28rem]"
+            >
+              {BOARD_STATUSES.map((status) => (
+                <TicketBoardColumn
+                  key={status}
+                  status={status}
+                  filters={filters}
+                  collapsed={desktop && status === "CLOSED" && closedCollapsed}
+                  onToggleCollapsed={status === "CLOSED" && desktop ? toggleClosed : undefined}
+                  renderCard={renderCard}
+                  onReport={onReport}
+                  hiddenBelowMd={!desktop && status !== mobileStatus}
+                  fullWidth={!desktop}
+                  countDelta={countDeltaOf(status)}
+                  dragSource={dragging?.status ?? null}
+                />
+              ))}
+            </Board>
+            <DragOverlay dropAnimation={reducedMotion ? null : undefined}>
+              {dragging && (
+                <TicketCard
+                  ticket={dragging}
+                  locale={locale}
+                  assigneeName={assigneeNameOf(dragging)}
+                  className="cursor-grabbing shadow-overlay motion-safe:scale-[1.02]"
+                />
+              )}
+            </DragOverlay>
+          </DndContext>
         </>
       )}
+      {/* Always mounted, so the first message lands in an existing region. */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        <span key={announcement.key}>{announcement.text}</span>
+      </div>
     </section>
   );
 }

@@ -26,6 +26,12 @@ vi.mock("@tanstack/react-query", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-query")>()),
   useIsFetching: () => 0,
 }));
+const mutate = vi.fn();
+vi.mock("@/hooks/use-move-ticket", () => ({ useMoveTicketMutation: () => ({ mutate }) }));
+vi.mock("@/hooks/use-error-message", () => ({
+  useErrorMessage: () => (error: unknown, copy: { forbidden: string; generic: string }) =>
+    (error as { status?: number }).status === 403 ? copy.forbidden : copy.generic,
+}));
 
 /** Story 216 (PR-3.1, tickets-kanban-ux.md) — the board view. */
 function card(id: string, status: TicketStatus, subject: string): TicketListItem {
@@ -125,7 +131,9 @@ describe("TicketBoardView", () => {
 
   it("sums the column totals into a polite summary", () => {
     render(<TicketBoardView />);
-    expect(screen.getByRole("status")).toHaveTextContent('summary:{"count":78}');
+    // Story 217: dnd-kit adds its own (empty) role=status region, so the
+    // summary is found by its text and must still sit in a status region.
+    expect(screen.getByText('summary:{"count":78}').closest('[role="status"]')).not.toBeNull();
   });
 
   it("folds the Closed column by default and remembers it when expanded", () => {
@@ -224,5 +232,121 @@ describe("TicketBoardView", () => {
     // Closed is shown unfolded on phones.
     await user.click(within(switcher).getByRole("radio", { name: /ticketStatus\.CLOSED/ }));
     expect(screen.getByRole("link", { name: "Old shipment" })).toBeInTheDocument();
+  });
+});
+
+/** Story 217 (PR-3.2, tickets-kanban-ux.md §5) — moving cards. */
+describe("TicketBoardView moves", () => {
+  const liveRegion = () => document.querySelector('[aria-live="polite"][aria-atomic="true"]')!;
+
+  async function openMenu(user: ReturnType<typeof userEvent.setup>, subject: string) {
+    await user.click(
+      screen.getByRole("button", { name: `cardActions:${JSON.stringify({ subject })}` }),
+    );
+    return screen.getByRole("menu");
+  }
+
+  it("offers the other statuses in the card's Move to menu and moves Open → In progress at once", async () => {
+    const user = userEvent.setup();
+    render(<TicketBoardView />);
+    const menu = await openMenu(user, "Invoice shows the old price");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["ticketStatus.IN_PROGRESS", "ticketStatus.RESOLVED", "ticketStatus.CLOSED"]);
+    await user.click(within(menu).getByRole("menuitem", { name: "ticketStatus.IN_PROGRESS" }));
+
+    expect(mutate).toHaveBeenCalledTimes(1);
+    const [input, options] = mutate.mock.calls[0]!;
+    expect(input).toMatchObject({ ticket: { id: "t1" }, to: "IN_PROGRESS" });
+    options.onSuccess();
+    await vi.waitFor(() => expect(liveRegion()).toHaveTextContent(/announce\.moved/));
+  });
+
+  it("asks before resolving, with focus on Resolve; Cancel sends nothing and announces it", async () => {
+    const user = userEvent.setup();
+    render(<TicketBoardView />);
+    await user.click(
+      within(await openMenu(user, "Invoice shows the old price")).getByRole("menuitem", {
+        name: "ticketStatus.RESOLVED",
+      }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("confirm.RESOLVED.question");
+    expect(dialog).toHaveTextContent("confirm.notified");
+    await vi.waitFor(() =>
+      expect(within(dialog).getByRole("button", { name: "confirm.RESOLVED.action" })).toHaveFocus(),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "confirm.cancel" }));
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(liveRegion()).toHaveTextContent("announce.cancelled");
+  });
+
+  it("closes the confirm on Escape without a request, and moves on confirm", async () => {
+    const user = userEvent.setup();
+    render(<TicketBoardView />);
+    await user.click(
+      within(await openMenu(user, "Webhook deliveries failing")).getByRole("menuitem", {
+        name: "ticketStatus.CLOSED",
+      }),
+    );
+    await screen.findByRole("dialog");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+
+    await user.click(
+      within(await openMenu(user, "Webhook deliveries failing")).getByRole("menuitem", {
+        name: "ticketStatus.CLOSED",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "confirm.CLOSED.action" }));
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ ticket: expect.objectContaining({ id: "t2" }), to: "CLOSED" }),
+      expect.anything(),
+    );
+  });
+
+  it("explains a failed move by its error and announces it", async () => {
+    const user = userEvent.setup();
+    render(<TicketBoardView />);
+    await user.click(
+      within(await openMenu(user, "Invoice shows the old price")).getByRole("menuitem", {
+        name: "ticketStatus.IN_PROGRESS",
+      }),
+    );
+    const [, options] = mutate.mock.calls[0]!;
+    options.onError(Object.assign(new Error("nope"), { status: 403 }));
+    await vi.waitFor(() =>
+      expect(liveRegion()).toHaveTextContent(/announce\.failed.*moveErrors\.forbidden/),
+    );
+  });
+
+  it("gives desktop cards a named drag handle, and phones only the menu — following the moved card", async () => {
+    const { unmount } = render(<TicketBoardView />);
+    expect(
+      screen.getByRole("button", {
+        name: `moveHandle:${JSON.stringify({ subject: "Invoice shows the old price" })}`,
+      }),
+    ).toBeInTheDocument();
+    unmount();
+
+    setDesktop(false);
+    const user = userEvent.setup();
+    render(<TicketBoardView />);
+    expect(screen.queryByRole("button", { name: /moveHandle/ })).not.toBeInTheDocument();
+    await user.click(
+      within(await openMenu(user, "Invoice shows the old price")).getByRole("menuitem", {
+        name: "ticketStatus.IN_PROGRESS",
+      }),
+    );
+    const switcher = screen.getByRole("radiogroup", { name: "columnSwitcher" });
+    expect(
+      within(switcher).getByRole("radio", { name: /ticketStatus\.IN_PROGRESS/ }),
+    ).toBeChecked();
   });
 });

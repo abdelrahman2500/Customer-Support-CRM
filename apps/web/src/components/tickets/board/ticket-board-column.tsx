@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import { useDroppable } from "@dnd-kit/core";
 import { ticketStatusPresentation } from "@crm/shared";
-import { BoardColumn, Button, ErrorState, LoadingStatus, Skeleton, recipes } from "@crm/ui";
+import { BoardColumn, Button, ErrorState, LoadingStatus, Skeleton, cn, recipes } from "@crm/ui";
 import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useTicketBoardColumnQuery } from "@/hooks/use-ticket-board";
@@ -25,6 +26,10 @@ export interface ColumnReport {
  * with retry, a status-specific empty state, and "Show N more" (25 at a
  * time — no infinite scroll, so focus order stays predictable). The
  * collapsed rail (Closed, by default) is the same column folded.
+ *
+ * Story 217 (PR-3.2) — every column, folded or not, is a drop target: while
+ * a card from another column is over it, it takes an accent ring and a
+ * soft tint, and both counts preview the move (`countDelta`).
  */
 export function TicketBoardColumn({
   status,
@@ -35,6 +40,8 @@ export function TicketBoardColumn({
   onReport,
   hiddenBelowMd,
   fullWidth = false,
+  countDelta = 0,
+  dragSource = null,
 }: {
   status: TicketStatus;
   filters: BoardFilters;
@@ -46,6 +53,10 @@ export function TicketBoardColumn({
   hiddenBelowMd: boolean;
   /** Single-column (phone) layout: the column takes the full width. */
   fullWidth?: boolean;
+  /** +1 / −1 while a dragged card would land here / leave from here. */
+  countDelta?: number;
+  /** The status the card being dragged comes from, while a drag is active. */
+  dragSource?: TicketStatus | null;
 }) {
   const t = useTranslations("tickets.board");
   const tCommon = useTranslations("common");
@@ -54,6 +65,8 @@ export function TicketBoardColumn({
   const spine = statusSpine(status);
   const Icon = TICKET_ICON[ticketStatusPresentation(status).icon];
   const statusLabel = labels.status(status);
+  const { setNodeRef, isOver } = useDroppable({ id: status, data: { status } });
+  const dropTarget = isOver && dragSource !== null && dragSource !== status;
 
   const loaded = useMemo(() => query.data?.pages.flatMap((page) => page.items) ?? [], [query.data]);
   const tickets = useMemo(
@@ -62,19 +75,25 @@ export function TicketBoardColumn({
   );
   const total = query.data?.pages[0]?.total;
   const count = filters.risk ? tickets.length : total;
+  const shownCount = count === undefined ? undefined : Math.max(0, count + countDelta);
   useEffect(() => {
     onReport({ status, total: count, shown: tickets.length });
   }, [onReport, status, count, tickets.length]);
 
   const remaining = total === undefined ? 0 : total - loaded.length;
-  const visibility = `${hiddenBelowMd ? "hidden md:flex" : "flex"}${fullWidth ? " w-full" : ""}`;
+  const visibility = cn(
+    hiddenBelowMd ? "hidden md:flex" : "flex",
+    fullWidth && "w-full",
+    dropTarget && "bg-accent-surface/60 ring-2 ring-accent",
+  );
   const icon = <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-subtle" />;
 
   if (collapsed) {
     return (
       <BoardColumn
+        ref={setNodeRef}
         title={statusLabel}
-        count={count}
+        count={shownCount}
         spine={spine}
         icon={icon}
         collapsed
@@ -88,8 +107,9 @@ export function TicketBoardColumn({
 
   return (
     <BoardColumn
+      ref={setNodeRef}
       title={statusLabel}
-      count={count}
+      count={shownCount}
       spine={spine}
       icon={icon}
       aria-label={t("columnLabel", { status: statusLabel, count: count ?? 0 })}
