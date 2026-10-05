@@ -69,6 +69,13 @@ const contact = {
   preferredLocale: null,
 };
 
+/** Story 200 (RD-2.6) — "signed in as", language, theme and sign-out live in
+ * the user menu now, so a test that drives one of them opens it first. */
+const userMenuTriggerName = `userMenu.trigger:${JSON.stringify({ name: contact.fullName })}`;
+function openUserMenu() {
+  fireEvent.click(screen.getByRole("button", { name: userMenuTriggerName }));
+}
+
 describe("PortalHeader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,6 +92,7 @@ describe("PortalHeader", () => {
 
   it("renders the signed-in contact's name", () => {
     render(<PortalHeader contact={contact} />);
+    openUserMenu();
 
     expect(
       screen.getByText(`signedInAs:${JSON.stringify({ name: contact.fullName })}`),
@@ -140,6 +148,7 @@ describe("PortalHeader", () => {
 
   it("calls the real logout, then clears the local token and query cache, and redirects to login, on sign-out", async () => {
     render(<PortalHeader contact={contact} />);
+    openUserMenu();
 
     fireEvent.click(screen.getByText("signOut"));
 
@@ -155,6 +164,7 @@ describe("PortalHeader", () => {
     mockedLogout.mockRejectedValue(new Error("network down"));
 
     render(<PortalHeader contact={contact} />);
+    openUserMenu();
 
     fireEvent.click(screen.getByText("signOut"));
 
@@ -164,16 +174,20 @@ describe("PortalHeader", () => {
 
   // Story 82 — Branding — Live Logo/Color Consumption.
   describe("branding consumption (Story 82)", () => {
-    it("renders no logo, and the signedInAs link unchanged, when no branding is configured", () => {
+    // Story 200 (RD-2.6, recon PT-03) — the brand block links home: the app
+    // name without a logo, the logo once configured. "Signed in as" moved
+    // into the user menu.
+    it("renders no logo, and the app name as the home link, when no branding is configured", () => {
       render(<PortalHeader contact={contact} />);
 
       expect(screen.queryByRole("img")).not.toBeInTheDocument();
-      expect(
-        screen.getByText(`signedInAs:${JSON.stringify({ name: contact.fullName })}`),
-      ).toBeInTheDocument();
+      const brand = screen.getByRole("link", { name: "appName" });
+      expect(brand).toHaveAttribute("href", "/en/home");
+      expect(brand).toHaveClass("focus-ring", "min-w-0");
+      expect(screen.getByText("appName")).toHaveClass("truncate");
     });
 
-    it("renders the branch logo alongside the signedInAs link once one is configured", () => {
+    it("renders the branch logo as the home link once one is configured, capped below sm", () => {
       mockedUseBrandingQuery.mockReturnValue({
         data: {
           logoUrl: "https://example.com/logo.png",
@@ -184,10 +198,10 @@ describe("PortalHeader", () => {
 
       render(<PortalHeader contact={contact} />);
 
-      expect(screen.getByRole("img")).toHaveAttribute("src", "https://example.com/logo.png");
-      expect(
-        screen.getByText(`signedInAs:${JSON.stringify({ name: contact.fullName })}`),
-      ).toBeInTheDocument();
+      const logo = screen.getByRole("img");
+      expect(logo).toHaveAttribute("src", "https://example.com/logo.png");
+      expect(logo).toHaveClass("max-w-32", "sm:max-w-none", "object-contain");
+      expect(logo.closest("a")).toHaveAttribute("href", "/en/home");
     });
 
     // Story 183 (RD-1.6) — branding goes through the controlled model:
@@ -223,7 +237,8 @@ describe("PortalHeader", () => {
 
       render(<PortalHeader contact={contact} />);
 
-      expect(screen.queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /navUnread/ })).not.toBeInTheDocument();
+      expect(screen.queryByText("5")).not.toBeInTheDocument();
     });
 
     it("renders no badge when the unread count is 0", () => {
@@ -234,7 +249,8 @@ describe("PortalHeader", () => {
 
       render(<PortalHeader contact={contact} />);
 
-      expect(screen.queryByLabelText(/unreadNotificationsLabel/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /navUnread/ })).not.toBeInTheDocument();
+      expect(screen.queryByText("5")).not.toBeInTheDocument();
     });
 
     it("renders the unread count as a badge next to the notifications link once it is positive", () => {
@@ -245,8 +261,11 @@ describe("PortalHeader", () => {
 
       render(<PortalHeader contact={contact} />);
 
-      const badge = screen.getByLabelText(/unreadNotificationsLabel/);
-      expect(badge).toHaveTextContent("5");
+      // Story 200 (RD-2.6, recon A11Y-11) — the count is part of the link's
+      // own accessible name; the visual badge is aria-hidden.
+      const link = screen.getByRole("link", { name: `navUnread:${JSON.stringify({ count: 5 })}` });
+      expect(link).toHaveAttribute("href", "/en/notifications");
+      expect(within(link).getByText("5")).toHaveAttribute("aria-hidden", "true");
     });
   });
 
@@ -333,7 +352,74 @@ describe("PortalHeader", () => {
       await clickUser.click(screen.getByRole("button", { name: "nav.menuLabel" }));
       const menu = await screen.findByRole("menu");
 
-      expect(within(menu).getByLabelText(/unreadNotificationsLabel/)).toHaveTextContent("5");
+      const item = within(menu).getByRole("menuitem", {
+        name: `navUnread:${JSON.stringify({ count: 5 })}`,
+      });
+      expect(within(item).getByText("5")).toHaveAttribute("aria-hidden", "true");
+    });
+  });
+
+  // Story 200 (RD-2.6) — portal header v2.
+  describe("header v2 (Story 200)", () => {
+    it("adds an explicit Home item first, current on /home", () => {
+      render(<PortalHeader contact={contact} />);
+
+      const nav = screen.getByRole("navigation", { name: "nav.label" });
+      const links = within(nav).getAllByRole("link");
+      expect(links[0]).toHaveAttribute("href", "/en/home");
+      expect(links[0]).toHaveTextContent("nav.home");
+      expect(links[0]).toHaveAttribute("aria-current", "page");
+    });
+
+    it("opens a labelled account menu holding identity, language, theme and sign-out", () => {
+      render(<PortalHeader contact={contact} />);
+      openUserMenu();
+
+      const menu = screen.getByRole("dialog", { name: "userMenu.label" });
+      expect(
+        within(menu).getByText(`signedInAs:${JSON.stringify({ name: contact.fullName })}`),
+      ).toHaveClass("truncate");
+      expect(within(menu).getByLabelText("languageSwitcher.label")).toBeInTheDocument();
+      expect(within(menu).getByLabelText("themeSwitcher.label")).toBeInTheDocument();
+      expect(within(menu).getByRole("button", { name: "signOut" })).toBeInTheDocument();
+    });
+
+    it("closes the account menu on Escape and returns focus to its trigger", async () => {
+      const ue = userEvent.setup();
+      render(<PortalHeader contact={contact} />);
+
+      const trigger = screen.getByRole("button", { name: userMenuTriggerName });
+      await ue.click(trigger);
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      await ue.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(trigger).toHaveFocus();
+    });
+
+    it("keeps the header to one row with the hamburger inside it", () => {
+      render(<PortalHeader contact={contact} />);
+
+      const header = screen.getByRole("banner");
+      expect(header).not.toHaveClass("flex-wrap");
+      expect(header).toContainElement(screen.getByRole("button", { name: "nav.menuLabel" }));
+    });
+
+    it("uses only logical-direction classes, menu included", () => {
+      render(<PortalHeader contact={contact} />);
+      openUserMenu();
+
+      const header = screen.getByRole("banner");
+      const menu = screen.getByRole("dialog");
+      for (const element of [
+        header,
+        ...header.querySelectorAll("[class]"),
+        ...menu.querySelectorAll("[class]"),
+      ]) {
+        const classes = element.className.toString().split(/\s+/);
+        expect(classes.some((c) => /^(ml|mr|pl|pr|left|right|text-left|text-right)-/.test(c))).toBe(
+          false,
+        );
+      }
     });
   });
 
@@ -341,6 +427,7 @@ describe("PortalHeader", () => {
   describe("language switcher (Story 119)", () => {
     it("renders a switcher pre-selecting the current URL locale", () => {
       render(<PortalHeader contact={contact} />);
+      openUserMenu();
 
       expect(screen.getByLabelText("languageSwitcher.label")).toHaveValue("en");
     });
@@ -348,6 +435,7 @@ describe("PortalHeader", () => {
     it("persists the new locale and navigates to the same page under the new locale segment", async () => {
       pathname = "/en/tickets";
       render(<PortalHeader contact={contact} />);
+      openUserMenu();
 
       fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
         target: { value: "ar" },
@@ -362,6 +450,7 @@ describe("PortalHeader", () => {
       pathname = "/en/tickets";
 
       render(<PortalHeader contact={contact} />);
+      openUserMenu();
       fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
         target: { value: "ar" },
       });
@@ -371,6 +460,7 @@ describe("PortalHeader", () => {
 
     it("does nothing when re-selecting the already-active locale", async () => {
       render(<PortalHeader contact={contact} />);
+      openUserMenu();
 
       fireEvent.change(screen.getByLabelText("languageSwitcher.label"), {
         target: { value: "en" },

@@ -58,6 +58,10 @@
   "home": {
     "signedInAs": "Signed in as {name}",
     "signOut": "Sign out",
+    "userMenu": {
+      "label": "Account",
+      "trigger": "Account menu for {name}"
+    },
     "realtimeReconnecting": "Live updates are disconnected. Reconnecting…",
     "welcomeHeading": "Your support home",
     "welcomeBody": "Track the tickets you've raised, find answers in the knowledge base, or start a new conversation with our team.",
@@ -91,6 +95,7 @@
       }
     },
     "nav": {
+      "home": "Home",
       "label": "Portal navigation",
       "menuLabel": "Open navigation menu"
     }
@@ -220,6 +225,7 @@
   },
   "notifications": {
     "nav": "Notifications",
+    "navUnread": "Notifications, {count} unread",
     "regionLabel": "Notifications",
     "dismiss": "Dismiss",
     "viewTicket": "View ticket",

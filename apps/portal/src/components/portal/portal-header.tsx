@@ -13,6 +13,7 @@ import { clearQueryCache } from "@/lib/query-client-registry";
 import { useRealtimeConnectionIssue } from "@/lib/realtime-connection";
 import {
   Alert,
+  Avatar,
   Badge,
   Button,
   DropdownMenu,
@@ -21,6 +22,10 @@ import {
   DropdownMenuTrigger,
   MenuIcon,
   NativeSelect,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Separator,
   ThemeSwitcher,
   BrandScope,
   deriveBrandTokens,
@@ -85,6 +90,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const tChat = useTranslations("chat");
   const tNotifications = useTranslations("notifications");
   const tAccount = useTranslations("account");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const pathname = usePathname();
   const { locale } = useParams<{ locale: string }>();
@@ -140,13 +146,14 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
     return pathname === href || pathname?.startsWith(`${href}/`) === true;
   }
 
+  const homeHref = `/${locale}/home`;
   const ticketsHref = `/${locale}/tickets`;
   const knowledgeBaseHref = `/${locale}/knowledge-base`;
   const chatHref = `/${locale}/chat`;
   const notificationsHref = `/${locale}/notifications`;
   const accountHref = `/${locale}/account`;
   const linkClassName = (href: string) =>
-    `flex items-center gap-1.5 rounded-md px-2 py-1.5 text-ink-muted hover:bg-surface-muted hover:text-ink focus-ring ${
+    `flex items-center gap-1.5 rounded-control px-2 py-1.5 text-ink-muted hover:bg-surface-muted hover:text-ink focus-ring ${
       isActiveHref(href) ? "bg-surface-muted font-medium text-ink" : ""
     }`;
 
@@ -156,113 +163,149 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const navItems: Array<{
     href: string;
     label: string;
-    badge?: { count: number; ariaLabel: string };
+    /** Story 200 (RD-2.6, recon A11Y-11) — the link's whole accessible name
+     * when it must say more than its label (the unread count); the visual
+     * badge is then aria-hidden so it is not announced twice. */
+    ariaLabel?: string;
+    badge?: { count: number };
   }> = [
+    // Story 200 (RD-2.6, recon PT-03) — an explicit Home item; the signed-in
+    // name no longer doubles as the way home.
+    { href: homeHref, label: t("nav.home") },
     { href: ticketsHref, label: tTickets("nav") },
     { href: knowledgeBaseHref, label: tKnowledgeBase("nav") },
     { href: chatHref, label: tChat("nav") },
-    {
-      href: notificationsHref,
-      label: tNotifications("nav"),
-      badge:
-        unreadCountQuery.isSuccess && unreadCount > 0
-          ? {
-              count: unreadCount,
-              ariaLabel: tNotifications("unreadNotificationsLabel", { count: unreadCount }),
-            }
-          : undefined,
-    },
-    // Story 147 - appended last, mirroring how every nav entry since
-    // Story 53 has been added to this array.
+    unreadCountQuery.isSuccess && unreadCount > 0
+      ? {
+          href: notificationsHref,
+          label: tNotifications("nav"),
+          ariaLabel: tNotifications("navUnread", { count: unreadCount }),
+          badge: { count: unreadCount },
+        }
+      : { href: notificationsHref, label: tNotifications("nav") },
     { href: accountHref, label: tAccount("nav") },
   ];
 
+  /** The visual unread badge — aria-hidden: the count lives in the link's name. */
+  const unreadBadge = (item: (typeof navItems)[number]) =>
+    item.badge && (
+      <Badge variant="destructive" aria-hidden="true" className="tabular-nums">
+        {item.badge.count}
+      </Badge>
+    );
+
   return (
     <BrandScope tokens={brandTokens}>
-      <header
-        className="flex flex-wrap items-center justify-between gap-y-2 border-b-2 border-brand bg-surface px-6 py-3"
-      >
-        <div className="flex items-center gap-2">
-          {brandingQuery.data?.logoUrl && (
+      {/* Story 200 (RD-2.6) — header v2, mirroring the agent header (Story
+          195): one row of [hamburger below sm] [brand → home] [nav] … [user
+          menu]. Language, theme and sign-out moved into the user menu, a
+          Popover (it holds native selects); their handlers are unchanged. */}
+      <header className="flex items-center gap-2 border-b-2 border-brand bg-surface px-4 py-3 sm:gap-4 sm:px-6">
+        {/* RM-11 — the hamburger, below `sm` only; the flat `<nav>` takes
+            over at `sm` and up. */}
+        <div className="sm:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon-sm" aria-label={t("nav.menuLabel")}>
+                <MenuIcon className="h-4 w-4" aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {navItems.map((item) => (
+                <DropdownMenuItem key={item.href} asChild>
+                  <Link
+                    href={item.href}
+                    aria-label={item.ariaLabel}
+                    aria-current={isActiveHref(item.href) ? "page" : undefined}
+                  >
+                    {item.label}
+                    {unreadBadge(item)}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Recon PT-03/RS-06 — the brand links home, truncates (`min-w-0`)
+            and carries a focus ring; a configured logo is capped below `sm`
+            exactly like the agent header's (Story 173). */}
+        <Link
+          href={homeHref}
+          className="focus-ring flex min-w-0 shrink items-center gap-2 rounded-inner"
+        >
+          {brandingQuery.data?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={brandingQuery.data.logoUrl} alt={t("logoAlt")} className="h-8 w-auto rounded-inner bg-logo-plate p-0.5" />
+            <img
+              src={brandingQuery.data.logoUrl}
+              alt={t("logoAlt")}
+              className="h-8 w-auto max-w-32 rounded-inner bg-logo-plate object-contain p-0.5 sm:max-w-none"
+            />
+          ) : (
+            <span className="truncate font-semibold text-ink">{tCommon("appName")}</span>
           )}
-          <Link href={`/${locale}/home`} className="rounded-md px-2 py-1.5 font-semibold text-ink">
-            {t("signedInAs", { name: contact.fullName })}
-          </Link>
-          {/* RM-11 — the hamburger toggle only, below `sm`; the flat `<nav>`
-              below takes over at `sm` and up. */}
-          <div className="sm:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" aria-label={t("nav.menuLabel")}>
-                  <MenuIcon className="h-4 w-4" aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {navItems.map((item) => (
-                  <DropdownMenuItem key={item.href} asChild>
-                    <Link
-                      href={item.href}
-                      aria-current={isActiveHref(item.href) ? "page" : undefined}
-                    >
-                      {item.label}
-                      {item.badge && (
-                        <Badge variant="destructive" aria-label={item.badge.ariaLabel}>
-                          {item.badge.count}
-                        </Badge>
-                      )}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          <nav
-            aria-label={t("nav.label")}
-            className="hidden flex-wrap items-center gap-4 text-sm sm:flex"
-          >
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={isActiveHref(item.href) ? "page" : undefined}
-                className={linkClassName(item.href)}
-              >
-                {item.label}
-                {item.badge && (
-                  <Badge variant="destructive" aria-label={item.badge.ariaLabel}>
-                    {item.badge.count}
-                  </Badge>
-                )}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Story 182 (RD-1.5) — the shared NativeSelect (with the token
-              focus ring it lacked, recon A11Y-08) and the theme switcher. */}
-          <NativeSelect
-            aria-label={t("languageSwitcher.label")}
-            value={locale}
-            onValueChange={(value) => void handleSwitchLocale(value)}
-            options={LOCALES.map((localeOption) => ({
-              value: localeOption,
-              label: t(`languageSwitcher.options.${localeOption}`),
-            }))}
-          />
-          <ThemeSwitcher
-            label={t("themeSwitcher.label")}
-            optionLabels={{
-              system: t("themeSwitcher.options.system"),
-              light: t("themeSwitcher.options.light"),
-              dark: t("themeSwitcher.options.dark"),
-            }}
-          />
-          <Button type="button" onClick={handleSignOut} variant="outline" className="px-3">
-            {t("signOut")}
-          </Button>
-        </div>
+        </Link>
+
+        <nav
+          aria-label={t("nav.label")}
+          className="hidden min-w-0 flex-1 flex-wrap items-center gap-1 text-sm sm:flex"
+        >
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-label={item.ariaLabel}
+              aria-current={isActiveHref(item.href) ? "page" : undefined}
+              className={linkClassName(item.href)}
+            >
+              {item.label}
+              {unreadBadge(item)}
+            </Link>
+          ))}
+        </nav>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={t("userMenu.trigger", { name: contact.fullName })}
+              className="ms-auto min-w-0 shrink-0 gap-2 px-1 sm:px-2"
+            >
+              <Avatar name={contact.fullName} size="sm" decorative />
+              <span className="hidden max-w-40 truncate sm:inline">{contact.fullName}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" aria-label={t("userMenu.label")} className="flex flex-col gap-3">
+            <p className="min-w-0 truncate text-sm text-ink-muted">
+              {t("signedInAs", { name: contact.fullName })}
+            </p>
+            {/* Story 182 (RD-1.5) — the shared NativeSelect and theme switcher. */}
+            <NativeSelect
+              aria-label={t("languageSwitcher.label")}
+              className="w-full"
+              value={locale}
+              onValueChange={(value) => void handleSwitchLocale(value)}
+              options={LOCALES.map((localeOption) => ({
+                value: localeOption,
+                label: t(`languageSwitcher.options.${localeOption}`),
+              }))}
+            />
+            <ThemeSwitcher
+              label={t("themeSwitcher.label")}
+              className="w-full"
+              optionLabels={{
+                system: t("themeSwitcher.options.system"),
+                light: t("themeSwitcher.options.light"),
+                dark: t("themeSwitcher.options.dark"),
+              }}
+            />
+            <Separator />
+            <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleSignOut}>
+              {t("signOut")}
+            </Button>
+          </PopoverContent>
+        </Popover>
       </header>
       {/* Batch 7 (UX audit) — mirrors `WorkspaceNav`'s own connection
           banner. Non-destructive: live ticket updates/chat replies simply
