@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { fetchCurrentContact } from "@/lib/auth-server";
+import { fetchBranding } from "@/lib/branding-server";
 import { PortalHeader } from "@/components/portal/portal-header";
 import { PortalNotifications } from "@/components/portal/portal-notifications";
 import { SuccessToaster } from "@/components/portal/success-toaster";
@@ -24,7 +25,9 @@ export default async function CustomerLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const contact = await fetchCurrentContact();
+  // Story 229 — branding is read in the same request, so the header's
+  // first paint already carries the logo and brand colour.
+  const [contact, branding] = await Promise.all([fetchCurrentContact(), fetchBranding()]);
   if (!contact) {
     redirect(`/${locale}/login`);
   }
@@ -37,10 +40,12 @@ export default async function CustomerLayout({
       <a href="#main-content" className="skip-link">
         {t("skipToMainContent")}
       </a>
-      <PortalHeader contact={contact} />
+      <PortalHeader contact={contact} initialBranding={branding} />
       <PortalNotifications customerId={contact.customerId} />
+      {/* Story 229 — one reading-width column, shared with the header's
+          own inner row so the brand, the nav and the content line up. */}
       <main id="main-content" className="flex-1 px-page-x py-page-y">
-        {children}
+        <div className="mx-auto w-full max-w-5xl">{children}</div>
       </main>
       {/* Story 94 — one generic success-feedback renderer for the whole
           authenticated session; deliberately separate from

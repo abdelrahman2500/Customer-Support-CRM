@@ -295,8 +295,10 @@ function CreateTicketForm() {
     }
   }
 
+  // Story 229 — `#new-ticket` is where the home page's "Raise a ticket"
+  // card lands.
   return (
-    <SectionCard title={t("list.createHeading")}>
+    <SectionCard id="new-ticket" className="scroll-mt-4" title={t("list.createHeading")}>
       <form className="mt-3 flex flex-col gap-3" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1 text-sm text-ink-strong">
           {t("list.createSubjectLabel")}

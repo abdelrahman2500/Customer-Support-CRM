@@ -204,6 +204,26 @@ describe("PortalHeader", () => {
       expect(logo.closest("a")).toHaveAttribute("href", "/en/home");
     });
 
+    // Story 229 — the layout reads branding server-side and seeds the query
+    // with it, so the first paint already has the logo and brand colour.
+    it("seeds the branding query with the server-read branding", () => {
+      const initialBranding = {
+        logoUrl: "https://example.com/logo.png",
+        primaryColor: "#112233",
+        secondaryColor: null,
+      };
+
+      render(<PortalHeader contact={contact} initialBranding={initialBranding} />);
+
+      expect(mockedUseBrandingQuery).toHaveBeenCalledWith(initialBranding);
+    });
+
+    it("seeds nothing when the server could not read branding", () => {
+      render(<PortalHeader contact={contact} initialBranding={null} />);
+
+      expect(mockedUseBrandingQuery).toHaveBeenCalledWith(undefined);
+    });
+
     // Story 183 (RD-1.6) — branding goes through the controlled model:
     // BrandScope sets the `--brand` token the header's edge reads.
     it("leaves the brand token unset when no branding is configured", () => {

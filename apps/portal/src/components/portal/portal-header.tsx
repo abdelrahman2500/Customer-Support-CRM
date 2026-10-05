@@ -7,6 +7,7 @@ import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router"
 import { useTranslations } from "next-intl";
 import type { AuthenticatedContact } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
+import type { BrandingSummary } from "@/lib/branding-api";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
 import { clearAccessToken, logout, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
@@ -83,7 +84,14 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * `navItems` array feeds both lists" and "`DropdownMenuContent` only
  * mounts once opened, so the two link sets never coexist" reasoning.
  */
-export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
+export function PortalHeader({
+  contact,
+  initialBranding,
+}: {
+  contact: AuthenticatedContact;
+  /** Story 229 — the server-read branding (`fetchBranding()`), or `null`. */
+  initialBranding?: BrandingSummary | null;
+}) {
   const t = useTranslations("home");
   const tTickets = useTranslations("tickets");
   const tKnowledgeBase = useTranslations("knowledgeBase");
@@ -94,7 +102,7 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
   const router = useRouter();
   const pathname = usePathname();
   const { locale } = useParams<{ locale: string }>();
-  const brandingQuery = useBrandingQuery();
+  const brandingQuery = useBrandingQuery(initialBranding ?? undefined);
   // Story 183 (RD-1.6) — the controlled branding model: Tier 1 brand edge
   // always, Tier 2 accent only when the derived colours pass their gates.
   // BrandScope also mirrors the variables onto <html>, so the whole page
@@ -200,112 +208,117 @@ export function PortalHeader({ contact }: { contact: AuthenticatedContact }) {
           195): one row of [hamburger below sm] [brand → home] [nav] … [user
           menu]. Language, theme and sign-out moved into the user menu, a
           Popover (it holds native selects); their handlers are unchanged. */}
-      <header className="flex items-center gap-2 border-b-2 border-brand bg-surface px-4 py-3 sm:gap-4 sm:px-6">
-        {/* RM-11 — the hamburger, below `sm` only; the flat `<nav>` takes
-            over at `sm` and up. */}
-        <div className="sm:hidden">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon-sm" aria-label={t("nav.menuLabel")}>
-                <MenuIcon className="h-4 w-4" aria-hidden />
+      {/* Story 229 (PR-5.1) — the portal's lighter chrome: a white header
+          with the brand stripe along its top, lifted off the canvas by a
+          hairline shadow; its row shares the content's reading width. */}
+      <header className="border-t-[3px] border-brand bg-surface px-page-x shadow-sm">
+        <div className="mx-auto flex w-full max-w-5xl items-center gap-2 py-3 sm:gap-4">
+          {/* RM-11 — the hamburger; the flat `<nav>` takes over at `lg` (Story
+              229 — six links no longer fit beside the brand at tablet width). */}
+          <div className="lg:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon-sm" aria-label={t("nav.menuLabel")}>
+                  <MenuIcon className="h-4 w-4" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {navItems.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link
+                      href={item.href}
+                      aria-label={item.ariaLabel}
+                      aria-current={isActiveHref(item.href) ? "page" : undefined}
+                    >
+                      {item.label}
+                      {unreadBadge(item)}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Recon PT-03/RS-06 — the brand links home, truncates (`min-w-0`)
+              and carries a focus ring; a configured logo is capped below `sm`
+              exactly like the agent header's (Story 173). */}
+          <Link
+            href={homeHref}
+            className="focus-ring flex min-w-0 shrink items-center gap-2 rounded-inner"
+          >
+            {brandingQuery.data?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={brandingQuery.data.logoUrl}
+                alt={t("logoAlt")}
+                className="h-8 w-auto max-w-32 rounded-inner bg-logo-plate object-contain p-0.5 sm:max-w-none"
+              />
+            ) : (
+              <span className="truncate font-semibold text-ink">{tCommon("appName")}</span>
+            )}
+          </Link>
+
+          <nav
+            aria-label={t("nav.label")}
+            className="hidden min-w-0 flex-1 flex-wrap items-center gap-1 text-sm lg:flex"
+          >
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-label={item.ariaLabel}
+                aria-current={isActiveHref(item.href) ? "page" : undefined}
+                className={linkClassName(item.href)}
+              >
+                {item.label}
+                {unreadBadge(item)}
+              </Link>
+            ))}
+          </nav>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={t("userMenu.trigger", { name: contact.fullName })}
+                className="ms-auto min-w-0 shrink-0 gap-2 px-1 sm:px-2"
+              >
+                <Avatar name={contact.fullName} size="sm" decorative />
+                <span className="hidden max-w-40 truncate sm:inline">{contact.fullName}</span>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {navItems.map((item) => (
-                <DropdownMenuItem key={item.href} asChild>
-                  <Link
-                    href={item.href}
-                    aria-label={item.ariaLabel}
-                    aria-current={isActiveHref(item.href) ? "page" : undefined}
-                  >
-                    {item.label}
-                    {unreadBadge(item)}
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </PopoverTrigger>
+            <PopoverContent align="end" aria-label={t("userMenu.label")} className="flex flex-col gap-3">
+              <p className="min-w-0 truncate text-sm text-ink-muted">
+                {t("signedInAs", { name: contact.fullName })}
+              </p>
+              {/* Story 182 (RD-1.5) — the shared NativeSelect and theme switcher. */}
+              <NativeSelect
+                aria-label={t("languageSwitcher.label")}
+                className="w-full"
+                value={locale}
+                onValueChange={(value) => void handleSwitchLocale(value)}
+                options={LOCALES.map((localeOption) => ({
+                  value: localeOption,
+                  label: t(`languageSwitcher.options.${localeOption}`),
+                }))}
+              />
+              <ThemeSwitcher
+                label={t("themeSwitcher.label")}
+                className="w-full"
+                optionLabels={{
+                  system: t("themeSwitcher.options.system"),
+                  light: t("themeSwitcher.options.light"),
+                  dark: t("themeSwitcher.options.dark"),
+                }}
+              />
+              <Separator />
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleSignOut}>
+                {t("signOut")}
+              </Button>
+            </PopoverContent>
+          </Popover>
         </div>
-
-        {/* Recon PT-03/RS-06 — the brand links home, truncates (`min-w-0`)
-            and carries a focus ring; a configured logo is capped below `sm`
-            exactly like the agent header's (Story 173). */}
-        <Link
-          href={homeHref}
-          className="focus-ring flex min-w-0 shrink items-center gap-2 rounded-inner"
-        >
-          {brandingQuery.data?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={brandingQuery.data.logoUrl}
-              alt={t("logoAlt")}
-              className="h-8 w-auto max-w-32 rounded-inner bg-logo-plate object-contain p-0.5 sm:max-w-none"
-            />
-          ) : (
-            <span className="truncate font-semibold text-ink">{tCommon("appName")}</span>
-          )}
-        </Link>
-
-        <nav
-          aria-label={t("nav.label")}
-          className="hidden min-w-0 flex-1 flex-wrap items-center gap-1 text-sm sm:flex"
-        >
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-label={item.ariaLabel}
-              aria-current={isActiveHref(item.href) ? "page" : undefined}
-              className={linkClassName(item.href)}
-            >
-              {item.label}
-              {unreadBadge(item)}
-            </Link>
-          ))}
-        </nav>
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={t("userMenu.trigger", { name: contact.fullName })}
-              className="ms-auto min-w-0 shrink-0 gap-2 px-1 sm:px-2"
-            >
-              <Avatar name={contact.fullName} size="sm" decorative />
-              <span className="hidden max-w-40 truncate sm:inline">{contact.fullName}</span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" aria-label={t("userMenu.label")} className="flex flex-col gap-3">
-            <p className="min-w-0 truncate text-sm text-ink-muted">
-              {t("signedInAs", { name: contact.fullName })}
-            </p>
-            {/* Story 182 (RD-1.5) — the shared NativeSelect and theme switcher. */}
-            <NativeSelect
-              aria-label={t("languageSwitcher.label")}
-              className="w-full"
-              value={locale}
-              onValueChange={(value) => void handleSwitchLocale(value)}
-              options={LOCALES.map((localeOption) => ({
-                value: localeOption,
-                label: t(`languageSwitcher.options.${localeOption}`),
-              }))}
-            />
-            <ThemeSwitcher
-              label={t("themeSwitcher.label")}
-              className="w-full"
-              optionLabels={{
-                system: t("themeSwitcher.options.system"),
-                light: t("themeSwitcher.options.light"),
-                dark: t("themeSwitcher.options.dark"),
-              }}
-            />
-            <Separator />
-            <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleSignOut}>
-              {t("signOut")}
-            </Button>
-          </PopoverContent>
-        </Popover>
       </header>
       {/* Batch 7 (UX audit) — mirrors `WorkspaceNav`'s own connection
           banner. Non-destructive: live ticket updates/chat replies simply

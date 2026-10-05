@@ -78,9 +78,6 @@
       "heading": "Knowledge base",
       "viewAll": "Browse all"
     },
-    "explore": {
-      "heading": "Explore"
-    },
     "logoAlt": "Company logo",
     "languageSwitcher": {
       "label": "Language",
@@ -101,6 +98,21 @@
       "home": "Home",
       "label": "Portal navigation",
       "menuLabel": "Open navigation menu"
+    },
+    "actions": {
+      "label": "What would you like to do?",
+      "newTicket": {
+        "title": "Raise a ticket",
+        "body": "Tell us what's wrong and we'll get back to you."
+      },
+      "searchHelp": {
+        "title": "Search help articles",
+        "body": "Answers to common questions, any time."
+      },
+      "askAssistant": {
+        "title": "Ask the assistant",
+        "body": "Get an instant answer, or reach our team."
+      }
     }
   },
   "tickets": {

@@ -104,6 +104,8 @@ describe("board state", () => {
       border: "border-info-solid",
       dot: "bg-info-solid",
       top: "border-t-info-solid",
+      // Story 229 — the shared spine also names the inline-start edge alone.
+      start: "border-s-info-solid",
     });
     expect(statusSpine("IN_PROGRESS").border).toBe("border-progress-solid");
     expect(statusSpine("RESOLVED").border).toBe("border-success-solid");

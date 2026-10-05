@@ -1,4 +1,5 @@
-import { ticketStatusPresentation, type PresentationTone } from "@crm/shared";
+import { ticketStatusPresentation } from "@crm/shared";
+import { toneSpine, type Spine } from "@crm/ui";
 import type { ListTicketsFilters, TicketListItem, TicketStatus } from "@/lib/tickets-api";
 import { deriveSlaStatus } from "@/lib/sla";
 
@@ -143,32 +144,12 @@ export function isAtRiskTicket(ticket: TicketListItem, now: Date = new Date()): 
 
 /**
  * The status spine: one hue per status, used by the column, its dot and the
- * switcher — and (Story 219) `top`, the ticket header's top edge. Literal
- * class names, so Tailwind generates every one.
+ * switcher — and (Story 219) `top`, the ticket header's top edge. Story 229
+ * — the hues live in `@crm/ui`'s `toneSpine`, so the portal shows the
+ * same ones.
  */
-const SPINE: Record<PresentationTone, { border: string; dot: string; top: string }> = {
-  info: { border: "border-info-solid", dot: "bg-info-solid", top: "border-t-info-solid" },
-  progress: {
-    border: "border-progress-solid",
-    dot: "bg-progress-solid",
-    top: "border-t-progress-solid",
-  },
-  success: {
-    border: "border-success-solid",
-    dot: "bg-success-solid",
-    top: "border-t-success-solid",
-  },
-  neutral: { border: "border-rule-control", dot: "bg-rule-control", top: "border-t-rule-control" },
-  warning: {
-    border: "border-warning-solid",
-    dot: "bg-warning-solid",
-    top: "border-t-warning-solid",
-  },
-  danger: { border: "border-danger-solid", dot: "bg-danger-solid", top: "border-t-danger-solid" },
-};
-
-export function statusSpine(status: TicketStatus): { border: string; dot: string; top: string } {
-  return SPINE[ticketStatusPresentation(status).tone];
+export function statusSpine(status: TicketStatus): Spine {
+  return toneSpine(ticketStatusPresentation(status).tone);
 }
 
 /** Browser-only view conveniences (never shared state). */

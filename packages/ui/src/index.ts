@@ -32,6 +32,8 @@ export { cn } from "./lib/cn";
 export { recipes } from "./lib/recipes";
 export type { Recipe } from "./lib/recipes";
 export { formatDate, formatDateTime, formatRelative, formatTime } from "./lib/format-date";
+export { toneSpine } from "./lib/status-spine";
+export type { Spine, SpineTone } from "./lib/status-spine";
 export type { DateInput } from "./lib/format-date";
 export { contrastRatio, hexToRgb, parseChannels, relativeLuminance, toChannels } from "./lib/color";
 export type { Rgb } from "./lib/color";

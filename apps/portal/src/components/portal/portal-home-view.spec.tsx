@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { PortalHomeView } from "./portal-home-view";
 import { useMyTicketsQuery } from "@/hooks/use-portal-tickets";
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
@@ -257,7 +257,9 @@ describe("PortalHomeView (Story 136)", () => {
     expect(screen.getByText("Article kb-1")).toBeInTheDocument();
   });
 
-  it("links to the four existing portal destinations and adds no new route", () => {
+  // Story 229 — the "Explore" link row (which also listed notifications) is
+  // replaced by three action cards; notifications stay in the header nav.
+  it("links only to existing portal destinations and adds no new route", () => {
     render(<PortalHomeView />);
 
     const hrefs = screen
@@ -268,9 +270,43 @@ describe("PortalHomeView (Story 136)", () => {
     expect(hrefs).toContain("/en/tickets");
     expect(hrefs).toContain("/en/knowledge-base");
     expect(hrefs).toContain("/en/chat");
-    expect(hrefs).toContain("/en/notifications");
     // Every destination is one that already existed before this story.
-    const known = /^\/en\/(tickets|knowledge-base|chat|notifications)(\/|$)/;
+    const known = /^\/en\/(tickets|knowledge-base|chat)(\/|#|$)/;
     expect(hrefs.every((href) => known.test(href))).toBe(true);
+  });
+
+  describe("action cards (Story 229)", () => {
+    it("offers the three things a customer comes to do", () => {
+      render(<PortalHomeView />);
+
+      const actions = screen.getByRole("navigation", { name: "actions.label" });
+      expect(within(actions).getByText("actions.newTicket.title").closest("a")).toHaveAttribute(
+        "href",
+        "/en/tickets#new-ticket",
+      );
+      expect(within(actions).getByText("actions.searchHelp.title").closest("a")).toHaveAttribute(
+        "href",
+        "/en/knowledge-base",
+      );
+      expect(within(actions).getByText("actions.askAssistant.title").closest("a")).toHaveAttribute(
+        "href",
+        "/en/chat",
+      );
+    });
+  });
+
+  it("gives each recent ticket the status spine agents see (Story 229)", () => {
+    mockedUseMyTicketsQuery.mockReturnValue(
+      queryResult({
+        isSuccess: true,
+        data: page([ticket("ticket-1", { status: "RESOLVED" })]),
+      }) as never,
+    );
+
+    render(<PortalHomeView />);
+
+    expect(screen.getByText("Subject ticket-1").closest("a")).toHaveClass(
+      "border-s-success-solid",
+    );
   });
 });
