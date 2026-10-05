@@ -43,11 +43,9 @@ const APP_ROOTS = [path.resolve(__dirname, ".."), path.resolve(__dirname, "../..
  */
 const INTENTIONALLY_UNLABELLED: { file: string; because: string; count: number }[] = [
   { file: "api-keys/api-keys-view.tsx", because: "actions cell (Revoke)", count: 1 },
-  {
-    file: "roles/role-list-view.tsx",
-    because: "actions cell + colSpan permissions panel",
-    count: 2,
-  },
+  // Story 226 — the permissions panel became a Sheet; only the actions cell remains.
+  { file: "roles/role-list-view.tsx", because: "actions cell", count: 1 },
+  { file: "users/user-list-view.tsx", because: "actions cell (Edit, Story 226)", count: 1 },
   { file: "settings/my-sessions-view.tsx", because: "actions cell (Sign out)", count: 1 },
   {
     file: "webhook-subscriptions/webhook-subscriptions-view.tsx",

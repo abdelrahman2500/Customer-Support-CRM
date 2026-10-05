@@ -641,7 +641,8 @@
         "fullName": "Name",
         "roles": "Roles",
         "status": "Status",
-        "presence": "Presence"
+        "presence": "Presence",
+        "actions": "Actions"
       },
       "roleLabel": "Role",
       "departmentLabel": "Department",
@@ -655,7 +656,15 @@
       "passwordResetSuccess": "Password reset.",
       "optionsLoading": "Loading…",
       "online": "Online",
-      "offline": "Offline"
+      "offline": "Offline",
+      "edit": "Edit",
+      "editUser": "Edit {name}",
+      "closeEditor": "Close",
+      "sectionDetails": "Details",
+      "sectionAccess": "Role and department",
+      "sectionStatus": "Account status",
+      "clearSearch": "Clear search",
+      "summary": "{count, plural, one {# user} other {# users}}"
     },
     "create": {
       "title": "New user",
@@ -764,7 +773,9 @@
         "permissionCount": "Permissions",
         "visibility": "Ticket visibility",
         "actions": "Actions"
-      }
+      },
+      "closePermissions": "Close",
+      "permissionsFor": "Permissions for {name}"
     }
   },
   "businessHours": {

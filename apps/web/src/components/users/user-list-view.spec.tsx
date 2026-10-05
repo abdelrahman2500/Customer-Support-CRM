@@ -189,6 +189,11 @@ const baseUser = {
   lockedUntil: null,
 };
 
+/** Story 226 (PR-4.5) — a user's controls live in their editor Sheet. */
+function openEditor(index = 0) {
+  fireEvent.click(screen.getAllByRole("button", { name: /^Edit / })[index]!);
+}
+
 function renderView() {
   return render(
     <NextIntlClientProvider locale="en" messages={enMessages}>
@@ -257,10 +262,12 @@ describe("UserListView", () => {
     );
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
     expect(screen.getByDisplayValue("agent@example.com")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Ada Lovelace")).toBeInTheDocument();
-    expect(screen.getByText("Active")).toBeInTheDocument();
+    // Story 226 — the row shows the badge too; these are the editor's.
+    expect(within(screen.getByRole("dialog")).getByText("Active")).toBeInTheDocument();
     expect(screen.getByText("Deactivate")).toBeInTheDocument();
     // Story 108 — before any agent.presence.changed event has arrived,
     // presence is unknown and renders as the safe default, Offline.
@@ -319,6 +326,7 @@ describe("UserListView", () => {
     );
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
     const roleCombobox = screen.getAllByRole("combobox")[0] as HTMLElement;
     expect(within(roleCombobox).getByText("Agent")).toBeInTheDocument();
@@ -330,6 +338,7 @@ describe("UserListView", () => {
     );
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
     const departmentCombobox = screen.getAllByRole("combobox")[1] as HTMLElement;
     expect(within(departmentCombobox).getByText("Support")).toBeInTheDocument();
@@ -344,6 +353,7 @@ describe("UserListView", () => {
     );
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
     const departmentCombobox = screen.getAllByRole("combobox")[1] as HTMLElement;
     expect(within(departmentCombobox).getByText("No department")).toBeInTheDocument();
@@ -364,6 +374,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const input = screen.getByDisplayValue("Ada Lovelace");
       fireEvent.change(input, { target: { value: "Ada L." } });
@@ -386,6 +397,7 @@ describe("UserListView", () => {
       mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const input = screen.getByDisplayValue("agent@example.com");
       fireEvent.change(input, { target: { value: "new@example.com" } });
@@ -405,6 +417,7 @@ describe("UserListView", () => {
       mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const input = screen.getByDisplayValue("agent@example.com");
       fireEvent.blur(input);
@@ -425,6 +438,7 @@ describe("UserListView", () => {
     mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
     fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
 
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
@@ -443,6 +457,7 @@ describe("UserListView", () => {
     );
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
     fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
     const dialog = screen.getByRole("alertdialog");
@@ -463,6 +478,7 @@ describe("UserListView", () => {
     mockedUseUpdateUserMutation.mockReturnValue(mutationResult({ mutate: renameMutate }) as never);
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
     fireEvent.click(screen.getByRole("button", { name: "Activate" }));
 
     expect(renameMutate).toHaveBeenCalledWith({ isActive: true });
@@ -484,6 +500,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const roleCombobox = screen.getAllByRole("combobox")[0] as HTMLElement;
       fireEvent.click(roleCombobox);
@@ -503,6 +520,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const departmentCombobox = screen.getAllByRole("combobox")[1] as HTMLElement;
       fireEvent.click(departmentCombobox);
@@ -521,6 +539,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const departmentCombobox = screen.getAllByRole("combobox")[1] as HTMLElement;
       fireEvent.click(departmentCombobox);
@@ -538,6 +557,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(screen.getByRole("combobox", { name: "Role" })).toBeInTheDocument();
       expect(screen.getByRole("combobox", { name: "Department" })).toBeInTheDocument();
@@ -552,6 +572,7 @@ describe("UserListView", () => {
     mockedUseDepartmentsQuery.mockReturnValue(queryResult({ isError: true }) as never);
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
     expect(screen.getByText("Couldn't load roles.")).toBeInTheDocument();
     expect(screen.getByText("Couldn't load departments.")).toBeInTheDocument();
@@ -566,6 +587,7 @@ describe("UserListView", () => {
     mockedUseDepartmentsQuery.mockReturnValue(queryResult({ isLoading: true }) as never);
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
     const roleCombobox = screen.getAllByRole("combobox")[0] as HTMLElement;
     const departmentCombobox = screen.getAllByRole("combobox")[1] as HTMLElement;
@@ -584,6 +606,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       // The email cell shares this same `mutation` and now also renders on
       // 403 (its own, richer 3-way block — see "3-way error handling on the
@@ -591,7 +614,8 @@ describe("UserListView", () => {
       // cell to keep testing this describe block's original, narrower
       // intent (the fullName field's own 2-way block) rather than tripping
       // over the duplicate text node the email cell also renders.
-      const fullNameCell = screen.getAllByRole("cell")[1]!;
+      // Story 226 — the details and their errors live in the editor Sheet.
+      const fullNameCell = screen.getByRole("dialog");
       expect(
         within(fullNameCell).getByText("You don't have permission to perform that action."),
       ).toBeInTheDocument();
@@ -606,8 +630,10 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
-      const fullNameCell = screen.getAllByRole("cell")[1]!;
+      // Story 226 — the details and their errors live in the editor Sheet.
+      const fullNameCell = screen.getByRole("dialog");
       expect(
         within(fullNameCell).getByText("That change couldn't be saved. Please try again."),
       ).toBeInTheDocument();
@@ -624,8 +650,10 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
-      const emailCell = screen.getAllByRole("cell")[0]!;
+      // Story 226 — the details and their errors live in the editor Sheet.
+      const emailCell = screen.getByRole("dialog");
       expect(
         within(emailCell).getByText("You don't have permission to perform that action."),
       ).toBeInTheDocument();
@@ -643,8 +671,10 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
-      const emailCell = screen.getAllByRole("cell")[0]!;
+      // Story 226 — the details and their errors live in the editor Sheet.
+      const emailCell = screen.getByRole("dialog");
       expect(
         within(emailCell).getByText("A user with this email already exists"),
       ).toBeInTheDocument();
@@ -663,8 +693,10 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
-      const emailCell = screen.getAllByRole("cell")[0]!;
+      // Story 226 — the details and their errors live in the editor Sheet.
+      const emailCell = screen.getByRole("dialog");
       expect(
         within(emailCell).getByText(
           "Couldn't reach the server. Check your connection and try again.",
@@ -683,6 +715,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(
         screen.getByText("You don't have permission to perform that action."),
@@ -701,6 +734,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(screen.getByText("Cannot assign an inactive role")).toBeInTheDocument();
     });
@@ -717,6 +751,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(screen.getByText("This user already has this exact assignment")).toBeInTheDocument();
     });
@@ -730,6 +765,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(
         screen.getByText("Couldn't reach the server. Check your connection and try again."),
@@ -748,6 +784,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(screen.getByRole("button", { name: "Reset password" })).toHaveClass("bg-danger-solid");
     });
@@ -758,6 +795,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const passwordInput = screen.getByPlaceholderText(
         "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
@@ -780,6 +818,7 @@ describe("UserListView", () => {
       mockedUseResetPasswordMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const passwordInput = screen.getByPlaceholderText(
         "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
@@ -802,6 +841,7 @@ describe("UserListView", () => {
       mockedUseResetPasswordMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const passwordInput = screen.getByPlaceholderText(
         "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
@@ -828,6 +868,7 @@ describe("UserListView", () => {
       mockedUseResetPasswordMutation.mockReturnValue(mutationResult() as never);
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const passwordInput = screen.getByPlaceholderText(
         "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
@@ -851,6 +892,7 @@ describe("UserListView", () => {
       mockedUseResetPasswordMutation.mockReturnValue(mutationResult({ mutate }) as never);
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const passwordInput = screen.getByPlaceholderText(
         "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
@@ -882,6 +924,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(
         screen.getByText("You don't have permission to perform that action."),
@@ -900,6 +943,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(screen.getByText("Password must be at least 8 characters")).toBeInTheDocument();
     });
@@ -913,6 +957,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(
         screen.getByText("Couldn't reach the server. Check your connection and try again."),
@@ -939,6 +984,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const input = screen.getByDisplayValue("agent@example.com");
       fireEvent.change(input, { target: { value: "new@example.com" } });
@@ -970,6 +1016,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       const passwordInput = screen.getByPlaceholderText(
         "New password (min. 8 characters, at least 3 of: uppercase, lowercase, number, symbol)",
@@ -1034,8 +1081,10 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
-      expect(screen.getByText("Locked")).toBeInTheDocument();
+      // Story 226 — the row shows the badge too; this is the editor's.
+      expect(within(screen.getByRole("dialog")).getByText("Locked")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Unlock" })).toBeInTheDocument();
     });
 
@@ -1052,6 +1101,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
       fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
 
       expect(unlockMutate).toHaveBeenCalledWith();
@@ -1068,6 +1118,7 @@ describe("UserListView", () => {
       mockedUseUnlockUserMutation.mockReturnValue(mutationResult({ isPending: true }) as never);
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(screen.getByRole("button", { name: "Unlock" })).toBeDisabled();
     });
@@ -1084,6 +1135,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
       expect(
         screen.getByText("You don't have permission to perform that action."),
@@ -1115,6 +1167,7 @@ describe("UserListView", () => {
       );
 
       renderView();
+      openEditor(); // Story 226 — the controls live in the user's editor Sheet
       fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
 
       expect(unlockMutate).toHaveBeenCalledOnce();
@@ -1201,6 +1254,7 @@ describe("UserListView", () => {
     );
 
     renderView();
+    openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
     // The same elements the spec already asserts on by display value are now
     // reachable by an accessible name.
@@ -1213,5 +1267,20 @@ describe("UserListView", () => {
 
     // A password input exposes no role, so it is located by its label.
     expect(screen.getAllByLabelText("New password").length).toBeGreaterThan(0);
+  });
+
+  // Story 226 (PR-4.5) — the row reads; the Sheet edits.
+  it("shows each user as a readable row with a named Edit that opens their editor", () => {
+    mockedUseUsersQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: page([baseUser]) }) as never,
+    );
+    renderView();
+
+    const row = screen.getAllByRole("row")[1]!;
+    expect(within(row).getByText("agent@example.com")).toBeInTheDocument();
+    expect(within(row).getByText("Agent")).toBeInTheDocument();
+    expect(within(row).queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: "Edit Ada Lovelace" }));
+    expect(screen.getByRole("dialog", { name: "Edit Ada Lovelace" })).toBeInTheDocument();
   });
 });

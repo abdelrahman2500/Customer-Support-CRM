@@ -19,6 +19,14 @@ import {
   Input,
   Label,
   QueryStateCard,
+  Sheet,
+  SheetBody,
+  SheetClose,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
   showSuccessToast,
   Skeleton,
   Table,
@@ -43,6 +51,16 @@ import {
  * rejects a rename/deactivate on either (Design item 5); this is a
  * client-side courtesy only, the backend remains the actual source of truth. */
 const PROTECTED_ROLE_NAMES = new Set(["SuperAdmin", "Agent"]);
+
+/** Story 226 — permissions grouped by resource ("ticket:read" → "ticket"). */
+function groupPermissions(permissions: PermissionSummary[]): [string, PermissionSummary[]][] {
+  const groups = new Map<string, PermissionSummary[]>();
+  for (const permission of permissions) {
+    const resource = permission.key.split(":")[0] ?? permission.key;
+    groups.set(resource, [...(groups.get(resource) ?? []), permission]);
+  }
+  return [...groups.entries()].sort(([x], [y]) => x.localeCompare(y));
+}
 
 function RoleRow({
   role,
@@ -164,9 +182,67 @@ function RoleRow({
                 />
               </>
             )}
-            <Button type="button" variant="outline" size="sm" onClick={onToggle}>
-              {expanded ? t("list.collapse") : t("list.expand")}
-            </Button>
+            {/* Story 226 (PR-4.5) — permissions open in a Sheet, grouped by
+                resource, instead of a full-width row under the table. */}
+            <Sheet open={expanded} onOpenChange={onToggle}>
+              <SheetTrigger asChild>
+                <Button type="button" variant="outline" size="sm">
+                  {t("list.expand")}
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                size="md"
+                closeLabel={t("list.closePermissions")}
+                aria-describedby={undefined}
+              >
+                <SheetHeader>
+                  <SheetTitle>{t("list.permissionsFor", { name: role.name })}</SheetTitle>
+                </SheetHeader>
+                <SheetBody className="flex flex-col gap-section">
+                  {allPermissions.length === 0 ? (
+                    <p className="text-sm text-ink-subtle">{t("list.noPermissions")}</p>
+                  ) : (
+                    groupPermissions(allPermissions).map(([resource, permissions]) => (
+                      <fieldset key={resource} className="flex flex-col gap-stack">
+                        <legend className="text-subhead text-ink">{resource}</legend>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {permissions.map((permission) => (
+                            <div key={permission.id} className="flex items-center gap-1.5">
+                              <Checkbox
+                                id={`permission-${role.id}-${permission.id}`}
+                                checked={role.permissions.includes(permission.key)}
+                                onCheckedChange={() => togglePermission(permission.key)}
+                              />
+                              <Label
+                                htmlFor={`permission-${role.id}-${permission.id}`}
+                                className="font-mono text-caption font-normal text-ink-strong"
+                              >
+                                {permission.key}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </fieldset>
+                    ))
+                  )}
+                  {permissionsMutation.isError && (
+                    <p className="text-xs text-danger-foreground">
+                      {errorMessage(permissionsMutation.error, {
+                        forbidden: t("list.actionForbidden"),
+                        generic: t("list.actionFailed"),
+                      })}
+                    </p>
+                  )}
+                </SheetBody>
+                <SheetFooter>
+                  <SheetClose asChild>
+                    <Button type="button" variant="outline" size="sm">
+                      {t("list.collapse")}
+                    </Button>
+                  </SheetClose>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
           </div>
           {hasError && (
             <p className="mt-1 text-xs text-danger-foreground">
@@ -178,40 +254,6 @@ function RoleRow({
           )}
         </TableCell>
       </TableRow>
-      {expanded && (
-        <TableRow>
-          <TableCell colSpan={4}>
-            <h3 className="text-xs font-semibold text-ink-strong">
-              {t("list.permissionsAssignHeading")}
-            </h3>
-            {allPermissions.length === 0 ? (
-              <p className="mt-1 text-sm text-ink-subtle">{t("list.noPermissions")}</p>
-            ) : (
-              <div className="mt-2 flex flex-wrap gap-3">
-                {allPermissions.map((permission) => (
-                  // Batch 6 (UX audit) — the shared `Checkbox`/`Label` pair
-                  // (mirrors `ChatComposer`'s "send by email" checkbox),
-                  // replacing a raw `<input type="checkbox">` with no
-                  // focus-ring/keyboard parity with the rest of the app.
-                  <div key={permission.id} className="flex items-center gap-1.5">
-                    <Checkbox
-                      id={`permission-${role.id}-${permission.id}`}
-                      checked={role.permissions.includes(permission.key)}
-                      onCheckedChange={() => togglePermission(permission.key)}
-                    />
-                    <Label
-                      htmlFor={`permission-${role.id}-${permission.id}`}
-                      className="text-sm font-normal text-ink-strong"
-                    >
-                      {permission.key}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            )}
-          </TableCell>
-        </TableRow>
-      )}
     </>
   );
 }

@@ -641,7 +641,8 @@
         "fullName": "الاسم",
         "roles": "الأدوار",
         "status": "الحالة",
-        "presence": "الحضور"
+        "presence": "الحضور",
+        "actions": "الإجراءات"
       },
       "roleLabel": "الدور",
       "departmentLabel": "القسم",
@@ -655,7 +656,15 @@
       "passwordResetSuccess": "تمت إعادة تعيين كلمة المرور.",
       "optionsLoading": "جارٍ التحميل…",
       "online": "متصل",
-      "offline": "غير متصل"
+      "offline": "غير متصل",
+      "edit": "تحرير",
+      "editUser": "تحرير {name}",
+      "closeEditor": "إغلاق",
+      "sectionDetails": "التفاصيل",
+      "sectionAccess": "الدور والقسم",
+      "sectionStatus": "حالة الحساب",
+      "clearSearch": "مسح البحث",
+      "summary": "{count, plural, one {مستخدم واحد} two {مستخدمان} few {# مستخدمين} many {# مستخدمًا} other {# مستخدم}}"
     },
     "create": {
       "title": "مستخدم جديد",
@@ -764,7 +773,9 @@
         "permissionCount": "عدد الصلاحيات",
         "visibility": "رؤية التذاكر",
         "actions": "الإجراءات"
-      }
+      },
+      "closePermissions": "إغلاق",
+      "permissionsFor": "صلاحيات {name}"
     }
   },
   "businessHours": {

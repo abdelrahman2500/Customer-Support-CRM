@@ -201,15 +201,16 @@ describe("RoleListView", () => {
 
     // "ticket:read"/"ticket:update" also render in the independent
     // all-permissions reference section below (same shared catalog query),
-    // so scope these assertions to the roles table.
-    const table = screen.getByRole("table");
-    expect(within(table).getByText("ticket:read")).toBeInTheDocument();
-    expect(within(table).getByText("ticket:update")).toBeInTheDocument();
-    expect(screen.getByText("Hide permissions")).toBeInTheDocument();
+    // so scope these assertions to the role's permissions Sheet (Story 226 —
+    // it replaced the panel that expanded inside the table).
+    const sheet = screen.getByRole("dialog", { name: "Permissions for Viewer" });
+    expect(within(sheet).getByText("ticket:read")).toBeInTheDocument();
+    expect(within(sheet).getByText("ticket:update")).toBeInTheDocument();
+    expect(within(sheet).getByRole("group", { name: "ticket" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Hide permissions"));
+    fireEvent.click(within(sheet).getByText("Hide permissions"));
 
-    expect(within(table).queryByText("ticket:read")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows a no-permissions message when the permission catalog itself is empty", () => {
