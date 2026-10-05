@@ -21,7 +21,8 @@ function readThemeBlock(source: string, selector: string): Map<string, Rgb> {
   const end = source.indexOf("}", start);
   const block = source.slice(start, end);
   const tokens = new Map<string, Rgb>();
-  for (const match of block.matchAll(/--([a-z-]+):\s*(\d+\s+\d+\s+\d+)\s*;/g)) {
+  // Story 210 (PR-1.1) — token names may carry digits (`--viz-1`).
+  for (const match of block.matchAll(/--([a-z0-9-]+):\s*(\d+\s+\d+\s+\d+)\s*;/g)) {
     tokens.set(match[1]!, parseChannels(match[2]!));
   }
   return tokens;
@@ -61,6 +62,22 @@ const LIGHT_PAIRS: Pair[] = [
     [`${family}-foreground`, `${family}-surface`, AA_TEXT],
     [`${family}-solid`, "surface", AA_NON_TEXT],
   ]),
+  // Story 210 (PR-1.1) — the ink chrome (rail and header band).
+  ["chrome-ink", "chrome", AA_TEXT],
+  ["chrome-ink", "chrome-raised", AA_TEXT],
+  ["chrome-ink", "chrome-active", AA_TEXT],
+  ["chrome-muted", "chrome", AA_TEXT],
+  ["chrome-muted", "chrome-raised", AA_TEXT],
+  ["chrome-accent", "chrome", AA_NON_TEXT],
+  ["chrome-accent", "chrome-active", AA_NON_TEXT],
+  // Story 210 — the chart palette on cards and the status spine on the canvas.
+  ...[1, 2, 3, 4, 5, 6].map((n): Pair => [`viz-${n}`, "surface", AA_NON_TEXT]),
+  ...(["info", "progress", "success"] as const).map((family): Pair => [
+    `${family}-solid`,
+    "surface-sunk",
+    AA_NON_TEXT,
+  ]),
+  ["rule-control", "surface-sunk", AA_NON_TEXT],
 ];
 
 describe("design token contrast (light)", () => {
@@ -89,6 +106,17 @@ describe("design token contrast (light)", () => {
     const rule = source.slice(source.indexOf("@media (prefers-reduced-motion: reduce)"));
     expect(rule).toContain("animation-duration: 0.01ms !important");
     expect(rule).toContain("transition-duration: 0.01ms !important");
+  });
+
+  // Story 210 (PR-1.1) — the page focus colour is too dark for the ink
+  // chrome, so chrome surfaces scope the ring to --chrome-accent instead.
+  it("scopes the focus ring to the chrome accent on chrome surfaces", () => {
+    const source = readFileSync(TOKENS, "utf8");
+    expect(source).toMatch(/\.on-chrome \{\s*--focus: var\(--chrome-accent\);/);
+    expect(contrastRatio(get("chrome-accent"), get("chrome"))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    expect(contrastRatio(get("chrome-accent"), get("chrome-raised"))).toBeGreaterThanOrEqual(
+      AA_NON_TEXT,
+    );
   });
 
   it("carries white text on the destructive fill and its hover", () => {

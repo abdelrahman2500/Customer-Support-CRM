@@ -1,6 +1,6 @@
 # Design Language (UI/UX)
 
-The visual and interaction language of both frontends (`apps/web`, `apps/portal`). The binding source for colour, typography, spacing, shape, motion, status semantics, theming and branch branding. Its rationale and the Story-by-Story rollout live in [`.squad/plans/crm-ui-ux-redesign/00-overview.md`](../../.squad/plans/crm-ui-ux-redesign/00-overview.md). A change to a decision here must update this file and say so in its Story.
+The visual and interaction language of both frontends (`apps/web`, `apps/portal`). The binding source for colour, typography, spacing, shape, motion, status semantics, theming and branch branding. Its rationale and rollout live in [`.squad/plans/crm-ui-ux-redesign/00-overview.md`](../../.squad/plans/crm-ui-ux-redesign/00-overview.md) (foundation, Stories 177–209) and, for the current visual language v2, [`.squad/plans/crm-product-redesign/visual-direction.md`](../../.squad/plans/crm-product-redesign/visual-direction.md) (Stories 210–235). A change to a decision here must update this file and say so in its Story.
 
 ## Layers
 
@@ -17,10 +17,12 @@ New primitives are introduced in the Story of their first consumer, never specul
 
 Semantic tokens only. Raw Tailwind palette classes (`bg-red-50`, `text-emerald-600`, …) and hex values are not used in component code. Each family has light and dark values; components never branch on theme.
 
-- **Neutrals:** `surface-sunk` (canvas) · `surface` (panels) · `surface-raised` (menus, dialogs, sticky bars) · `surface-muted` (hover/selected). Text `ink` › `ink-strong` › `ink-muted` › `ink-subtle`. Borders `rule-subtle` › `rule` › `rule-strong`, plus `rule-control` for the boundary of every form control (≥ 3:1).
+- **Neutrals:** `surface-sunk` (canvas — a warm paper neutral `#F6F5F2` in light mode since v2) · `surface` (panels) · `surface-raised` (menus, dialogs, sticky bars) · `surface-muted` (hover/selected). Text `ink` › `ink-strong` › `ink-muted` › `ink-subtle`. Borders `rule-subtle` › `rule` › `rule-strong`, plus `rule-control` for the boundary of every form control (≥ 3:1).
 - **Accent (core):** indigo. `accent` / `accent-hover` / `accent-active` / `accent-foreground` / `accent-surface`. Light `#4F46E5`, dark `#818CF8`.
 - **Focus:** `focus` (light `#4338CA`, dark `#A5B4FC`). Never branch-overridden.
 - **Semantic families:** `success`, `warning`, `danger`, `info` (sky), `progress` (violet, "work in progress"). Steps: `subtle` / `surface` / `border` / `solid` / `foreground`. **Only `foreground` is used for text**; `solid` is for fills, icons and indicators.
+- **Chrome (v2):** the ink navigation rail and header band — `chrome` / `chrome-raised` (hover) / `chrome-active` (current item) / `chrome-rule` / `chrome-ink` / `chrome-muted` / `chrome-accent`. The same deep ink (`#0E1726`) in both themes. A chrome surface carries `.on-chrome`, which scopes the focus ring to `chrome-accent`.
+- **Data visualisation (v2):** `viz-1` … `viz-6` (indigo, teal, amber, pink, sky, slate; lighter steps in dark), categorical and colour-blind-safe in that order, never branded. Status-encoded charts use the status tones instead. Colour is always paired with a label.
 - Every text/background pair used by the system meets WCAG 2.x AA (4.5:1 text, 3:1 non-text) in both themes.
 
 ## Status semantics
@@ -33,7 +35,7 @@ Status is always **icon + localized label + tone**; colour is never the only sig
 | Ticket priority | LOW / MEDIUM → neutral · HIGH → `warning` · URGENT → `danger` |
 | SLA | on-track → neutral · at-risk → `warning` · breached → `danger` · on-hold → neutral |
 
-Statuses never use `warning`/`danger`; priorities never use `info`/`progress`. **At-risk** is a presentation tier only: the governing target has ≤ 25% of its window (measured from ticket creation) or ≤ 60 minutes remaining, whichever comes first. It changes no business rule.
+Statuses never use `warning`/`danger`; priorities never use `info`/`progress`. **Status spine (v2):** each status's `solid` tone (CLOSED: `rule-control`) is also its 3px spine — the top edge of its board column, its dot and its distribution-bar segment. HIGH/URGENT tickets add a 3px inline-start **urgency edge** in `warning-solid`/`danger-solid`; other priorities stay neutral. **At-risk** is a presentation tier only: the governing target has ≤ 25% of its window (measured from ticket creation) or ≤ 60 minutes remaining, whichever comes first. It changes no business rule.
 
 ## Theme
 
@@ -53,13 +55,13 @@ Statuses never use `warning`/`danger`; priorities never use `info`/`progress`. *
 
 IBM Plex Sans + IBM Plex Sans Arabic (400/500/600). Named scale only: `caption` 12 · `label` 12/600 · `body-sm` 13 · `body` 14 (default UI) · `body-lg` 16 (reading) · `subhead` 16/600 · `heading` 18/600 · `title` 24/600 (page `h1`) · `display` 30/600 (KPIs, `tabular-nums`).
 
-Arabic: no `uppercase`, no letter-spacing (`:lang(ar)` resets it), slightly taller line-height. Arabic UI keeps `Intl`'s default Arabic-Indic digits. All dates, times and numbers go through `Intl` with the active locale.
+Arabic: no `uppercase`, no letter-spacing (`:lang(ar)` resets it), slightly taller line-height. The Arabic UI shows **Latin digits** — what `Intl` produces for `ar` in this runtime — and no `numberingSystem` override is added (product redesign PD-8, superseding the earlier Arabic-Indic intent). All dates, times and numbers go through `Intl` with the active locale. Counts, times and KPIs use `tabular-nums`.
 
 ## Spacing, shape, elevation, density
 
 - **Spacing tokens:** `tight` .25 · `inline` .5 · `stack` .75 · `surface` 1 · `section` 1.5 · `shell` 2 rem; `page-x`/`page-y` are responsive (1rem → 1.5rem at `sm` → 2rem at `lg`).
 - **Radius:** `control` 8px (buttons, inputs) · `surface` 12px (cards, dialogs, sheets) · `inner` 6px (nested items) · `pill`.
-- **Elevation:** `shadow-resting` (cards) · `shadow-raised` (menus, sticky bars) · `shadow-overlay` (dialogs, sheets, toasts).
+- **Elevation (v2 — borders before shadows):** four levels only. 0 flat on the canvas · 1 a card: `surface` + hairline, no shadow · 2 `shadow-raised`, only on the hover of something that can be picked up · 3 `shadow-overlay` for anything floating (dragged card, menu, popover, sheet, dialog, toast). The named recipes — `card`, `column`, `inner`, `liftable`, `floating`, `chrome` — are exported as `recipes` from `@crm/ui` (`packages/ui/src/lib/recipes.ts`).
 - **Density:** comfortable by default (controls 40px, `sm` 32px, `lg` 44px). Data-heavy tables use `Table density="compact"` inside comfortable page chrome. Targets ≥ 24px; primary touch targets ≥ 40px below `sm`.
 
 ## Iconography
@@ -72,4 +74,4 @@ lucide only, through `packages/ui/src/lib/icons.ts`. 16px inline, 20px navigatio
 
 ## Principles
 
-Conversation first · the header owns state and action · hierarchy over decoration · meaning is never colour-only · one pattern per job · comfortable shell, efficient data · progressive disclosure without hiding capability · parity by construction (ar/en, RTL/LTR, light/dark, every brand) · accessible by default · presentation, not behaviour.
+**v2:** wow on first impression, comfortable after eight hours — workflow first, decoration never · one signature used consistently (ink chrome, status spine, urgency edge, tabular numerals, hairlines) · colour means something, so it is scarce · borders before shadows · motion explains change · dense where people scan, airy where they read. **Foundation:** conversation first · the header owns state and action · hierarchy over decoration · meaning is never colour-only · one pattern per job · comfortable shell, efficient data · progressive disclosure without hiding capability · parity by construction (ar/en, RTL/LTR, light/dark, every brand) · accessible by default · presentation, not behaviour.

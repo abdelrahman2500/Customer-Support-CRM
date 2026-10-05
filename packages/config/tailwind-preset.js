@@ -82,6 +82,24 @@ const sharedThemeExtend = {
       foreground: token("accent-foreground"),
       surface: token("accent-surface"),
     },
+    // Story 210 (PR-1.1) — the ink navigation chrome and the chart palette.
+    chrome: {
+      DEFAULT: token("chrome"),
+      raised: token("chrome-raised"),
+      active: token("chrome-active"),
+      rule: token("chrome-rule"),
+      ink: token("chrome-ink"),
+      muted: token("chrome-muted"),
+      accent: token("chrome-accent"),
+    },
+    viz: {
+      1: token("viz-1"),
+      2: token("viz-2"),
+      3: token("viz-3"),
+      4: token("viz-4"),
+      5: token("viz-5"),
+      6: token("viz-6"),
+    },
     overlay: token("overlay"),
     "logo-plate": token("logo-plate"),
     brand: {

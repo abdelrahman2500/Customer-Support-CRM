@@ -64,7 +64,7 @@ export const CORE_PREVIEW_PALETTE = {
     accent: { accent: [79, 70, 229], hover: [67, 56, 202], active: [55, 48, 163], foreground: [255, 255, 255], surface: [238, 242, 255] },
     brand: [79, 70, 229],
     surface: [255, 255, 255],
-    sunk: [248, 250, 252],
+    sunk: [246, 245, 242],
     ink: [15, 23, 42],
     inkMuted: [71, 85, 105],
     rule: [226, 232, 240],

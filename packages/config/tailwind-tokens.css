@@ -80,7 +80,10 @@
      * Surfaces — the grounds things sit on.
      * ------------------------------------------------------------- */
     --surface: 255 255 255; /* was: white — cards, inputs, header */
-    --surface-sunk: 248 250 252; /* was: slate-50 — the page behind cards */
+    /* Story 210 (PR-1.1, visual language v2) — the canvas is a warm paper
+     * neutral (chroma ≤ 0.01): white cards read crisply on it without the
+     * page turning beige. Was slate-50 (248 250 252). */
+    --surface-sunk: 246 245 242; /* #F6F5F2 */
     --surface-muted: 241 245 249; /* was: slate-100 — hover, active nav, inset */
     /* Story 178 (RD-1.1) — floating and sticky surfaces (menus, dialogs,
      * sticky bars). White in light mode, a lighter step than `--surface`
@@ -217,6 +220,31 @@
     --progress-border: 221 214 254; /* violet-200 */
     --progress-solid: 124 58 237; /* violet-600 */
     --progress-foreground: 91 33 182; /* violet-800 — 7.57:1 on -surface */
+
+    /* ---------------------------------------------------------------
+     * Story 210 (PR-1.1) — CHROME: the ink navigation rail and header band,
+     * the product's signature silhouette. The SAME deep ink in light and
+     * dark mode (both dark blocks repeat these values, which the guard spec
+     * requires). Text on it: --chrome-ink ≥ 12:1, --chrome-muted ≥ 4.5:1 on
+     * --chrome and --chrome-raised; --chrome-accent marks the active item.
+     * ------------------------------------------------------------- */
+    --chrome: 14 23 38; /* #0E1726 */
+    --chrome-raised: 26 37 56; /* #1A2538 — hover */
+    --chrome-active: 35 49 74; /* #23314A — the current item */
+    --chrome-rule: 38 51 74; /* #26334A — dividers on chrome */
+    --chrome-ink: 241 245 249; /* #F1F5F9 */
+    --chrome-muted: 160 174 196; /* #A0AEC4 */
+    --chrome-accent: 165 180 252; /* #A5B4FC — indigo-300 */
+
+    /* Story 210 (PR-1.1) — the data-visualisation palette: categorical,
+     * colour-blind-safe order (no red/green neighbours), never branded, each
+     * ≥ 3:1 against --surface. Charts always pair colour with a label. */
+    --viz-1: 79 70 229; /* #4F46E5 indigo */
+    --viz-2: 13 148 136; /* #0D9488 teal */
+    --viz-3: 217 119 6; /* #D97706 amber */
+    --viz-4: 219 39 119; /* #DB2777 pink */
+    --viz-5: 2 132 199; /* #0284C7 sky */
+    --viz-6: 100 116 139; /* #64748B slate */
 
     /* ---------------------------------------------------------------
      * Radius. Exposed as a token so it is nameable, but Tailwind's own
@@ -381,6 +409,20 @@
     --progress-border: 91 33 182; /* #5B21B6 */
     --progress-solid: 167 139 250; /* #A78BFA */
     --progress-foreground: 196 181 253; /* #C4B5FD */
+    /* Story 210 (PR-1.1) — chrome is the same ink in both themes. */
+    --chrome: 14 23 38; /* #0E1726 */
+    --chrome-raised: 26 37 56; /* #1A2538 */
+    --chrome-active: 35 49 74; /* #23314A */
+    --chrome-rule: 38 51 74; /* #26334A */
+    --chrome-ink: 241 245 249; /* #F1F5F9 */
+    --chrome-muted: 160 174 196; /* #A0AEC4 */
+    --chrome-accent: 165 180 252; /* #A5B4FC */
+    --viz-1: 129 140 248; /* #818CF8 */
+    --viz-2: 45 212 191; /* #2DD4BF */
+    --viz-3: 251 191 36; /* #FBBF24 */
+    --viz-4: 244 114 182; /* #F472B6 */
+    --viz-5: 56 189 248; /* #38BDF8 */
+    --viz-6: 148 163 184; /* #94A3B8 */
     --elevation-resting: 0 1px 2px 0 rgb(0 0 0 / 0.4);
     --elevation-raised: 0 4px 12px -2px rgb(0 0 0 / 0.5);
     --elevation-overlay: 0 16px 40px -8px rgb(0 0 0 / 0.6);
@@ -436,6 +478,20 @@
       --progress-border: 91 33 182; /* #5B21B6 */
       --progress-solid: 167 139 250; /* #A78BFA */
       --progress-foreground: 196 181 253; /* #C4B5FD */
+      /* Story 210 (PR-1.1) — chrome is the same ink in both themes. */
+      --chrome: 14 23 38; /* #0E1726 */
+      --chrome-raised: 26 37 56; /* #1A2538 */
+      --chrome-active: 35 49 74; /* #23314A */
+      --chrome-rule: 38 51 74; /* #26334A */
+      --chrome-ink: 241 245 249; /* #F1F5F9 */
+      --chrome-muted: 160 174 196; /* #A0AEC4 */
+      --chrome-accent: 165 180 252; /* #A5B4FC */
+      --viz-1: 129 140 248; /* #818CF8 */
+      --viz-2: 45 212 191; /* #2DD4BF */
+      --viz-3: 251 191 36; /* #FBBF24 */
+      --viz-4: 244 114 182; /* #F472B6 */
+      --viz-5: 56 189 248; /* #38BDF8 */
+      --viz-6: 148 163 184; /* #94A3B8 */
       --elevation-resting: 0 1px 2px 0 rgb(0 0 0 / 0.4);
       --elevation-raised: 0 4px 12px -2px rgb(0 0 0 / 0.5);
       --elevation-overlay: 0 16px 40px -8px rgb(0 0 0 / 0.6);
@@ -523,6 +579,21 @@
 }
 
 @layer components {
+  /**
+   * Story 210 (PR-1.1) — on the ink chrome (rail, header band) the page focus
+   * colour (indigo-700) is too dark to see, in either theme. A chrome
+   * surface opts in with `.on-chrome`: inside it the ring uses
+   * --chrome-accent (≥ 3:1 on every chrome step) and its offset gap is the
+   * chrome itself rather than a white band.
+   */
+  .on-chrome {
+    --focus: var(--chrome-accent);
+  }
+  .on-chrome .focus-ring:focus-visible,
+  .on-chrome .focus-ring-always:focus {
+    --tw-ring-offset-color: rgb(var(--chrome));
+  }
+
   /**
    * The one focus treatment for the whole app.
    *
