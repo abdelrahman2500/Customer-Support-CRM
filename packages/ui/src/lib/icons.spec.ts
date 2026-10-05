@@ -60,6 +60,8 @@ const ROLES = [
   "PriorityMediumIcon",
   "PriorityHighIcon",
   "PriorityUrgentIcon",
+  "InternalNoteIcon",
+  "HistoryEventIcon",
 ] as const;
 
 describe("icon vocabulary", () => {

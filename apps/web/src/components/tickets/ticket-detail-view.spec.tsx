@@ -157,6 +157,15 @@ function queryResult(overrides: Record<string, unknown>) {
   };
 }
 
+/** Story 206 (RD-3.6) — notes, history and SLA escalations live in the
+ * conversation timeline now, not in cards of their own; this shows one
+ * kind, the way an agent would, through the timeline's filter. */
+async function showTimeline(filter: "notes" | "events") {
+  await userEvent
+    .setup()
+    .click(screen.getByRole("tab", { name: `detail.timelineFilter.${filter}` }));
+}
+
 const baseTicket = {
   id: "ticket-1",
   subject: "Cannot log in",
@@ -425,14 +434,15 @@ describe("TicketDetailView", () => {
     it("keeps every section that existed before the restructure", () => {
       renderLoaded();
 
-      for (const heading of [
-        "detail.slaHeading",
-        "detail.escalationsHeading",
-        "detail.historyHeading",
-        "detail.csatHeading",
-        "detail.notesHeading",
-      ]) {
+      for (const heading of ["detail.slaHeading", "detail.csatHeading"]) {
         expect(screen.getByText(heading)).toBeInTheDocument();
+      }
+      // Story 206 (RD-3.6) — escalations, history and notes are in the
+      // conversation timeline now, each reachable through its filter.
+      for (const filter of ["notes", "events"]) {
+        expect(
+          screen.getByRole("tab", { name: `detail.timelineFilter.${filter}` }),
+        ).toBeInTheDocument();
       }
     });
 
@@ -442,9 +452,11 @@ describe("TicketDetailView", () => {
       // The conversation is the agent's primary surface; it used to be the
       // fifth block on the page, after the metadata grid. Queried by its own
       // heading rather than a test-only attribute added to production code.
+      // Story 206 (RD-3.6) — History is part of the conversation timeline
+      // now, so the read-mostly section compared against is CSAT.
       const chat = screen.getByText("detail.chatHeading");
-      const history = screen.getByText("detail.historyHeading");
-      expect(chat.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const csat = screen.getByText("detail.csatHeading");
+      expect(chat.compareDocumentPosition(csat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("gives the page exactly one h1, carrying the subject", () => {
@@ -486,16 +498,21 @@ describe("TicketDetailView", () => {
       for (const heading of [
         "detail.chatHeading",
         "detail.aiHeading",
-        "detail.notesHeading",
         "detail.attachmentsHeading",
         "detail.kbReferencesHeading",
         "detail.contextPanelHeading",
         "detail.slaHeading",
-        "detail.escalationsHeading",
-        "detail.historyHeading",
         "detail.csatHeading",
       ]) {
         expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+      }
+      // Story 206 (RD-3.6) — the Notes, History and SLA Escalations cards
+      // became the conversation timeline; every kind stays one filter away.
+      const filters = screen.getByRole("tablist", { name: "detail.timelineFilterLabel" });
+      for (const filter of ["all", "conversation", "notes", "events"]) {
+        expect(
+          within(filters).getByRole("tab", { name: `detail.timelineFilter.${filter}` }),
+        ).toBeInTheDocument();
       }
     });
 
@@ -1026,10 +1043,11 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
 
-      // Story 203 (RD-3.3) — the section is collapsible now, so the title text
-      // sits inside its disclosure button; the card is found via closest().
-      const heading = screen.getByText("detail.escalationsHeading");
-      const card = heading.closest(".p-surface") as HTMLElement;
+      // Story 206 (RD-3.6) — escalations load as part of the conversation
+      // timeline, which shows its skeleton until every source has loaded.
+      const card = screen
+        .getByRole("heading", { name: "detail.chatHeading" })
+        .closest(".p-surface") as HTMLElement;
       expect(card.querySelector(".animate-pulse")).toBeInTheDocument();
     });
 
@@ -1043,12 +1061,15 @@ describe("TicketDetailView", () => {
       expect(screen.getByText("detail.escalationsError")).toBeInTheDocument();
     });
 
-    it("renders the empty message when there are no escalations", () => {
+    it("renders the empty message when there are no escalations", async () => {
       vi.mocked(useTicketEscalationsQuery).mockReturnValue(
         queryResult({ data: [], isSuccess: true }) as never,
       );
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      // Story 206 (RD-3.6) — notes, history and escalations moved into the
+      // timeline; each kind's empty message shows under its own filter.
+      await showTimeline("events");
 
       expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
     });
@@ -1087,12 +1108,14 @@ describe("TicketDetailView", () => {
       expect(screen.queryByText("response")).not.toBeInTheDocument();
       expect(screen.queryByText("resolution")).not.toBeInTheDocument();
 
-      expect(
-        screen.getByText(new Date(escalations[0]!.escalatedAt).toLocaleString("en")),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(new Date(escalations[1]!.escalatedAt).toLocaleString("en")),
-      ).toBeInTheDocument();
+      // Story 206 (RD-3.6) — in the day-grouped timeline the row shows the
+      // time; the full date and time is the `<time>` element's title.
+      for (const escalation of escalations) {
+        expect(screen.getByTitle(new Date(escalation.escalatedAt).toLocaleString("en"))).toHaveAttribute(
+          "dateTime",
+          escalation.escalatedAt,
+        );
+      }
     });
 
     it("falls back to the raw targetType string for an unrecognized value, without crashing", () => {
@@ -1115,7 +1138,7 @@ describe("TicketDetailView", () => {
       expect(screen.getByText("unknown")).toBeInTheDocument();
     });
 
-    it("does not interfere with the SLA card's own rendering", () => {
+    it("does not interfere with the SLA card's own rendering", async () => {
       vi.mocked(useTicketSlaTargetQuery).mockReturnValue(
         queryResult({ data: null, isSuccess: true }) as never,
       );
@@ -1131,10 +1154,13 @@ describe("TicketDetailView", () => {
         .getByRole("heading", { name: "detail.slaHeading" })
         .closest(".p-surface") as HTMLElement;
       expect(within(slaCard).getByText("sla.none")).toBeInTheDocument();
+      // Story 206 (RD-3.6) — notes, history and escalations moved into the
+      // timeline; each kind's empty message shows under its own filter.
+      await showTimeline("events");
       expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
     });
 
-    it("does not interfere with the History card's own rendering", () => {
+    it("does not interfere with the History card's own rendering", async () => {
       vi.mocked(useTicketHistoryQuery).mockReturnValue(
         queryResult({ data: [], isSuccess: true }) as never,
       );
@@ -1143,6 +1169,9 @@ describe("TicketDetailView", () => {
       );
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      // Story 206 (RD-3.6) — notes, history and escalations moved into the
+      // timeline; each kind's empty message shows under its own filter.
+      await showTimeline("events");
 
       expect(screen.getByText("detail.historyEmpty")).toBeInTheDocument();
       expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
@@ -1265,8 +1294,11 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
 
-      const heading = screen.getByText("detail.notesHeading");
-      const card = heading.parentElement as HTMLElement;
+      // Story 206 (RD-3.6) — notes load as part of the conversation
+      // timeline, which shows its skeleton until every source has loaded.
+      const card = screen
+        .getByRole("heading", { name: "detail.chatHeading" })
+        .closest(".p-surface") as HTMLElement;
       expect(card.querySelector(".animate-pulse")).toBeInTheDocument();
     });
 
@@ -1280,12 +1312,15 @@ describe("TicketDetailView", () => {
       expect(screen.getByText("detail.notesError")).toBeInTheDocument();
     });
 
-    it("renders the empty message when there are no notes", () => {
+    it("renders the empty message when there are no notes", async () => {
       vi.mocked(useTicketNotesQuery).mockReturnValue(
         queryResult({ data: [], isSuccess: true }) as never,
       );
 
       render(<TicketDetailView ticketId="ticket-1" />);
+      // Story 206 (RD-3.6) — notes, history and escalations moved into the
+      // timeline; each kind's empty message shows under its own filter.
+      await showTimeline("notes");
 
       expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
@@ -1314,9 +1349,12 @@ describe("TicketDetailView", () => {
 
       expect(screen.getByText("Jane Agent")).toBeInTheDocument();
       expect(screen.getByText("Called the customer back.")).toBeInTheDocument();
-      expect(
-        screen.getByText(new Date(notes[0]!.createdAt).toLocaleString("en")),
-      ).toBeInTheDocument();
+      // Story 206 (RD-3.6) — in the day-grouped timeline a note shows its
+      // time; the full date and time is the `<time>` element's title.
+      expect(screen.getByTitle(new Date(notes[0]!.createdAt).toLocaleString("en"))).toHaveAttribute(
+        "dateTime",
+        notes[0]!.createdAt,
+      );
     });
 
     it("falls back to the raw authorUserId when the author isn't found in the users list", () => {
@@ -1446,7 +1484,7 @@ describe("TicketDetailView", () => {
       expect(await screen.findByText("errors.network")).toBeInTheDocument();
     });
 
-    it("does not interfere with the History card's own rendering", () => {
+    it("does not interfere with the History card's own rendering", async () => {
       vi.mocked(useTicketHistoryQuery).mockReturnValue(
         queryResult({ data: [], isSuccess: true }) as never,
       );
@@ -1455,12 +1493,15 @@ describe("TicketDetailView", () => {
       );
 
       render(<TicketDetailView ticketId="ticket-1" />);
-
+      // Story 206 (RD-3.6) — notes, history and escalations moved into the
+      // timeline; each kind's empty message shows under its own filter.
+      await showTimeline("events");
       expect(screen.getByText("detail.historyEmpty")).toBeInTheDocument();
+      await showTimeline("notes");
       expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
 
-    it("does not interfere with the Escalations card's own rendering", () => {
+    it("does not interfere with the Escalations card's own rendering", async () => {
       vi.mocked(useTicketEscalationsQuery).mockReturnValue(
         queryResult({ data: [], isSuccess: true }) as never,
       );
@@ -1469,8 +1510,11 @@ describe("TicketDetailView", () => {
       );
 
       render(<TicketDetailView ticketId="ticket-1" />);
-
+      // Story 206 (RD-3.6) — notes, history and escalations moved into the
+      // timeline; each kind's empty message shows under its own filter.
+      await showTimeline("events");
       expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
+      await showTimeline("notes");
       expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
 
@@ -1646,7 +1690,7 @@ describe("TicketDetailView", () => {
       expect(screen.queryByText("detail.csatEmpty")).not.toBeInTheDocument();
     });
 
-    it("does not interfere with the Notes card's own rendering", () => {
+    it("does not interfere with the Notes card's own rendering", async () => {
       vi.mocked(useTicketCsatQuery).mockReturnValue(
         queryResult({ data: undefined, isSuccess: true }) as never,
       );
@@ -1657,6 +1701,9 @@ describe("TicketDetailView", () => {
       render(<TicketDetailView ticketId="ticket-1" />);
 
       expect(screen.getByText("detail.csatEmpty")).toBeInTheDocument();
+      // Story 206 (RD-3.6) — notes, history and escalations moved into the
+      // timeline; each kind's empty message shows under its own filter.
+      await showTimeline("notes");
       expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
   });
@@ -1791,7 +1838,7 @@ describe("TicketDetailView", () => {
       await screen.findByText("File type not allowed");
     });
 
-    it("does not interfere with the Notes card's own rendering", () => {
+    it("does not interfere with the Notes card's own rendering", async () => {
       vi.mocked(useAttachmentsQuery).mockReturnValue(
         queryResult({ data: [], isSuccess: true }) as never,
       );
@@ -1802,6 +1849,9 @@ describe("TicketDetailView", () => {
       render(<TicketDetailView ticketId="ticket-1" />);
 
       expect(screen.getByText("detail.attachmentsEmpty")).toBeInTheDocument();
+      // Story 206 (RD-3.6) — notes, history and escalations moved into the
+      // timeline; each kind's empty message shows under its own filter.
+      await showTimeline("notes");
       expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
     });
   });
@@ -1974,11 +2024,12 @@ describe("TicketDetailView", () => {
       );
       return render(<TicketDetailView ticketId="ticket-1" />);
     }
+    // Story 206 (RD-3.6) — SLA escalations left the inspector for the
+    // conversation timeline.
     const SECTIONS = [
       "detail.propertiesHeading",
       "detail.contextPanelHeading",
       "detail.slaHeading",
-      "detail.escalationsHeading",
       "detail.csatHeading",
     ];
 

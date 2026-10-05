@@ -122,6 +122,11 @@ export {
   SignalMedium as PriorityMediumIcon,
   SignalHigh as PriorityHighIcon,
   OctagonAlert as PriorityUrgentIcon,
+
+  // Story 206 (RD-3.6) — the ticket timeline: an internal note (always
+  // paired with its "Internal note" text) and a history event row.
+  Lock as InternalNoteIcon,
+  GitCommitHorizontal as HistoryEventIcon,
 } from "lucide-react";
 
 /** The shape every icon above satisfies, for a component that accepts one. */

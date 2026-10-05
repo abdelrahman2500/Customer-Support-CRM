@@ -110,6 +110,8 @@ export {
   PriorityMediumIcon,
   PriorityHighIcon,
   PriorityUrgentIcon,
+  InternalNoteIcon,
+  HistoryEventIcon,
 } from "./lib/icons";
 export type { LucideIcon } from "./lib/icons";
 

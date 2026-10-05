@@ -13,9 +13,6 @@ import {
   useHoldTicketMutation,
   useResumeTicketMutation,
   useTicketCsatQuery,
-  useTicketEscalationsQuery,
-  useTicketHistoryQuery,
-  useTicketNotesQuery,
   useTicketQuery,
   useTicketSlaTargetQuery,
   useUpdateTicketMutation,
@@ -32,7 +29,6 @@ import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus } from "@/lib/sla";
 import { SlaIndicator } from "@/components/tickets/sla-indicator";
 import { TicketHeader, TicketHeaderActions } from "@/components/tickets/ticket-header";
-import { historyEventKey } from "@/lib/history-event";
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
@@ -53,19 +49,9 @@ import {
 import type { TicketPriority, TicketStatus } from "@/lib/tickets-api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { formatDateTime } from "@crm/ui";
 
 const STATUS_OPTIONS: TicketStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
 const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
-
-/** The only two real `targetType` values the backend ever emits (`response`/
- * `resolution` — see `SlaEscalationSummary`); an unrecognized value falls
- * back to the raw string rather than a missing-translation crash. Mirrors
- * `NotificationHistoryView`'s local `TARGET_TYPE_LABEL_KEYS` convention. */
-const TARGET_TYPE_LABEL_KEYS: Record<string, string> = {
-  response: "escalations.targetType.response",
-  resolution: "escalations.targetType.resolution",
-};
 
 /**
  * Story 23 — Ticket Detail (plan Task 8). Reads `GET /tickets/:id`,
@@ -219,11 +205,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   useTicketRealtime(ticketId);
 
   const ticketQuery = useTicketQuery(ticketId);
-  const historyQuery = useTicketHistoryQuery(ticketId);
   const csatQuery = useTicketCsatQuery(ticketId);
   const slaTargetQuery = useTicketSlaTargetQuery(ticketId);
-  const escalationsQuery = useTicketEscalationsQuery(ticketId);
-  const notesQuery = useTicketNotesQuery(ticketId);
   const usersQuery = useUsersQuery();
   // Story 202 (RD-3.2) — "Assign to me" needs the agent's own id.
   const currentUserQuery = useCurrentUserQuery();
@@ -413,7 +396,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           main column renders first, so a phone opens on the conversation. */}
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
-          <TicketChatCard ticketId={ticketId} />
+          {/* Story 206 (RD-3.6, recon TW-04) — the conversation is the ticket's
+              timeline: notes, history and SLA escalations now sit in it, in
+              time order, instead of three cards of their own. The note
+              composer goes with them, unchanged, until RD-3.7. */}
+          <TicketChatCard ticketId={ticketId} noteComposer={<AddNoteForm ticketId={ticketId} />} />
 
           <TicketAiCard
             ticketId={ticketId}
@@ -438,40 +425,6 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               </Link>
             </Alert>
           )}
-
-          <SectionCard title={t("detail.notesHeading")}>
-            {notesQuery.isLoading && (
-              <LoadingStatus label={tCommon("loading")} asChild>
-                <Skeleton className="mt-2 h-24 w-full" />
-              </LoadingStatus>
-            )}
-            {notesQuery.isError && (
-              <Alert variant="destructive" className="mt-2">
-                {t("detail.notesError")}
-              </Alert>
-            )}
-            {notesQuery.isSuccess && notesQuery.data.length === 0 && (
-              <p className="mt-2 text-sm text-ink-subtle">{t("detail.notesEmpty")}</p>
-            )}
-            {notesQuery.isSuccess && notesQuery.data.length > 0 && (
-              <ol className="mt-2 flex flex-col gap-2 text-sm">
-                {notesQuery.data.map((note) => (
-                  <li key={note.id} className="border-b border-rule-subtle pb-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-ink-strong">
-                        {userNameById.get(note.authorUserId) ?? note.authorUserId}
-                      </span>
-                      <span className="text-ink-subtle">
-                        {formatDateTime(note.createdAt, locale)}
-                      </span>
-                    </div>
-                    <p className="mt-1 whitespace-pre-wrap text-ink-strong">{note.body}</p>
-                  </li>
-                ))}
-              </ol>
-            )}
-            <AddNoteForm ticketId={ticketId} />
-          </SectionCard>
 
           <AttachmentsCard
             owner={{ type: "ticket", id: ticketId }}
@@ -737,75 +690,6 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                   </p>
                 )}
               </div>
-            )}
-          </SectionCard>
-
-          <SectionCard title={t("detail.escalationsHeading")} collapsible>
-            {escalationsQuery.isLoading && (
-              <LoadingStatus label={tCommon("loading")} asChild>
-                <Skeleton className="mt-2 h-24 w-full" />
-              </LoadingStatus>
-            )}
-            {escalationsQuery.isError && (
-              <Alert variant="destructive" className="mt-2">
-                {t("detail.escalationsError")}
-              </Alert>
-            )}
-            {escalationsQuery.isSuccess && escalationsQuery.data.length === 0 && (
-              <p className="mt-2 text-sm text-ink-subtle">{t("detail.escalationsEmpty")}</p>
-            )}
-            {escalationsQuery.isSuccess && escalationsQuery.data.length > 0 && (
-              <ol className="mt-2 flex flex-col gap-2 text-sm">
-                {escalationsQuery.data.map((escalation) => {
-                  const targetTypeLabelKey = TARGET_TYPE_LABEL_KEYS[escalation.targetType];
-                  return (
-                    <li
-                      key={escalation.id}
-                      className="flex items-center justify-between border-b border-rule-subtle pb-2"
-                    >
-                      <span className="font-medium text-ink-strong">
-                        {targetTypeLabelKey ? t(targetTypeLabelKey) : escalation.targetType}
-                      </span>
-                      <span className="text-ink-subtle">
-                        {formatDateTime(escalation.escalatedAt, locale)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </SectionCard>
-
-          <SectionCard title={t("detail.historyHeading")}>
-            {historyQuery.isLoading && (
-              <LoadingStatus label={tCommon("loading")} asChild>
-                <Skeleton className="mt-2 h-24 w-full" />
-              </LoadingStatus>
-            )}
-            {historyQuery.isError && (
-              <Alert variant="destructive" className="mt-2">
-                {t("detail.historyError")}
-              </Alert>
-            )}
-            {historyQuery.isSuccess && historyQuery.data.length === 0 && (
-              <p className="mt-2 text-sm text-ink-subtle">{t("detail.historyEmpty")}</p>
-            )}
-            {historyQuery.isSuccess && historyQuery.data.length > 0 && (
-              <ol className="mt-2 flex flex-col gap-2 text-sm">
-                {historyQuery.data.map((entry) => (
-                  <li
-                    key={entry.id}
-                    className="flex items-center justify-between border-b border-rule-subtle pb-2"
-                  >
-                    <span className="font-medium text-ink-strong">
-                      {t(`detail.historyEvent.${historyEventKey(entry.eventType)}`)}
-                    </span>
-                    <span className="text-ink-subtle">
-                      {formatDateTime(entry.createdAt, locale)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
             )}
           </SectionCard>
 

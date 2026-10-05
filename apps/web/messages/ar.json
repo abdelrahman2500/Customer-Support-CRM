@@ -209,6 +209,15 @@
       "departmentLoadError": "تعذّر تحميل الأقسام.",
       "chatHeading": "المحادثة",
       "chatNewMessages": "رسائل جديدة",
+      "timelineFilterLabel": "عرض",
+      "timelineFilter": {
+        "all": "الكل",
+        "conversation": "المحادثة",
+        "notes": "الملاحظات",
+        "events": "الأحداث"
+      },
+      "internalNoteLabel": "ملاحظة داخلية",
+      "timelineEscalated": "تصعيد اتفاقية مستوى الخدمة",
       "chatLoadError": "تعذّر تحميل هذه المحادثة.",
       "chatEmpty": "لا توجد رسائل حتى الآن.",
       "chatCustomerLabel": "العميل",

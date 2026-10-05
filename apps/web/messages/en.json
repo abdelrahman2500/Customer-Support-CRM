@@ -209,6 +209,15 @@
       "departmentLoadError": "Couldn't load departments.",
       "chatHeading": "Conversation",
       "chatNewMessages": "New messages",
+      "timelineFilterLabel": "Show",
+      "timelineFilter": {
+        "all": "All",
+        "conversation": "Conversation",
+        "notes": "Notes",
+        "events": "Events"
+      },
+      "internalNoteLabel": "Internal note",
+      "timelineEscalated": "SLA escalated",
       "chatLoadError": "Couldn't load this conversation.",
       "chatEmpty": "No messages yet.",
       "chatCustomerLabel": "Customer",

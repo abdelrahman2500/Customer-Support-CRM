@@ -10,12 +10,19 @@ import { cn } from "../lib/cn";
  * side. The meta line names the sender and the time, as a `<time>` whose
  * `title` carries the full date and time; `status` is the delivery slot.
  *
+ * Story 206 (RD-3.6, recon TW-04) — `tone="note"` is an internal note: a
+ * bordered warning surface. Tone is never the only cue, so a note also
+ * passes `label` (an icon and the words "Internal note"), shown first on
+ * the meta line.
+ *
  * Translation- and locale-free: the caller passes formatted labels.
  */
 export interface MessageBubbleProps {
   align: "start" | "end";
-  tone: "mine" | "other";
+  tone: "mine" | "other" | "note";
   sender: React.ReactNode;
+  /** Leads the meta line, e.g. the "Internal note" label of a note. */
+  label?: React.ReactNode;
   avatar?: React.ReactNode;
   /** ISO timestamp, for `<time dateTime>`. */
   at: string;
@@ -33,6 +40,7 @@ export function MessageBubble({
   align,
   tone,
   sender,
+  label,
   avatar,
   at,
   timeLabel,
@@ -67,13 +75,16 @@ export function MessageBubble({
             // --accent", so the pair stays legible under any accent.
             tone === "mine"
               ? "bg-accent text-accent-foreground"
-              : "bg-surface-muted text-ink-strong",
+              : tone === "note"
+                ? "border border-warning-border bg-warning-subtle text-ink-strong"
+                : "bg-surface-muted text-ink-strong",
           )}
         >
           {children}
         </div>
         <span className="text-xs text-ink-subtle">
-          {sender} ·{" "}
+          {label && <>{label} · </>}
+          <span>{sender}</span> ·{" "}
           <time dateTime={at} title={dateTimeLabel}>
             {timeLabel}
           </time>

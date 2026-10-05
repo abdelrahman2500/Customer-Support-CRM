@@ -166,6 +166,12 @@ test("a customer and an agent exchange live messages on the same ticket", async 
   await agentPage.goto(`/en/tickets/${ticketId}`);
   await expect(agentPage).toHaveURL(`/en/tickets/${ticketId}`);
   await expect(agentPage.getByRole("heading", { name: subject })).toBeVisible();
+  // Story 206 (RD-3.6) — the agent's conversation is a timeline that also
+  // holds notes, history and escalations; a fresh ticket's "All" view already
+  // shows its "Ticket created" event. This test is about messages, so it
+  // reads the timeline's "Conversation" filter — messages only — and every
+  // assertion and `li` count below is unchanged.
+  await agentPage.getByRole("tab", { name: "Conversation", exact: true }).click();
   // The conversation is empty and the composer is ready: the detail view is
   // mounted, so its `useTicketRealtime` effect has run.
   await expect(agentPage.getByText("No messages yet.")).toBeVisible();

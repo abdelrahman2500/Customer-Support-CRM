@@ -50,6 +50,24 @@ describe("MessageBubble", () => {
     expect(screen.getByText("09:00").parentElement).toHaveTextContent("Customer · 09:00 · Failed");
   });
 
+  // Story 206 (RD-3.6, recon TW-04) — an internal note.
+  it("marks an internal note with its own bordered surface and a leading label", () => {
+    renderBubble({ tone: "note", label: <span>Internal note</span>, sender: "Jane Agent" });
+
+    expect(screen.getByText("Hello there")).toHaveClass(
+      "border",
+      "border-warning-border",
+      "bg-warning-subtle",
+    );
+    expect(screen.getByText("Hello there")).not.toHaveClass("bg-accent");
+    expect(screen.getByText("Hello there")).not.toHaveClass("bg-surface-muted");
+    expect(screen.getByText("09:00").parentElement).toHaveTextContent(
+      "Internal note · Jane Agent · 09:00",
+    );
+    // The sender is its own element, so it can be found on its own.
+    expect(screen.getByText("Jane Agent").tagName).toBe("SPAN");
+  });
+
   it("keeps the avatar decorative and uses logical classes only", () => {
     const { container } = renderBubble();
 

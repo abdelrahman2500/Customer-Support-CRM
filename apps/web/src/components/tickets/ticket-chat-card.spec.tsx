@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { TicketChatCard } from "./ticket-chat-card";
 import {
   useCreateTicketEmailMessageMutation,
@@ -7,12 +8,20 @@ import {
   useEmailChannelStatusQuery,
   useTicketMessagesQuery,
 } from "@/hooks/use-ticket-messages";
-import { useCurrentUserQuery, useUsersQuery } from "@/hooks/use-tickets";
+import {
+  useCurrentUserQuery,
+  useTicketEscalationsQuery,
+  useTicketHistoryQuery,
+  useTicketNotesQuery,
+  useUsersQuery,
+} from "@/hooks/use-tickets";
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { ApiError } from "@/lib/api";
 
+// Story 206 — switchable, so one case can read the page as Arabic (RTL).
+const route = vi.hoisted(() => ({ locale: "en" }));
 vi.mock("next/navigation", () => ({
-  useParams: () => ({ locale: "en" }),
+  useParams: () => ({ locale: route.locale }),
 }));
 
 vi.mock("next-intl", () => ({
@@ -29,6 +38,10 @@ vi.mock("@/hooks/use-ticket-messages", () => ({
 vi.mock("@/hooks/use-tickets", () => ({
   useUsersQuery: vi.fn(),
   useCurrentUserQuery: vi.fn(),
+  // Story 206 — the timeline's other sources.
+  useTicketNotesQuery: vi.fn(),
+  useTicketHistoryQuery: vi.fn(),
+  useTicketEscalationsQuery: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-quick-replies", () => ({
@@ -131,6 +144,7 @@ const aiAssistantMessage = {
 describe("TicketChatCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    route.locale = "en";
     vi.mocked(useUsersQuery).mockReturnValue(
       queryResult({
         data: [{ id: "agent-2", fullName: "Sam Colleague" }],
@@ -162,6 +176,17 @@ describe("TicketChatCard", () => {
       queryResult({ data: { configured: false }, isSuccess: true }) as never,
     );
     vi.mocked(useQuickRepliesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    // Story 206 — no notes, history or escalations unless a test adds them,
+    // so every message-only case above reads exactly as it always has.
+    vi.mocked(useTicketNotesQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useTicketHistoryQuery).mockReturnValue(
+      queryResult({ data: [], isSuccess: true }) as never,
+    );
+    vi.mocked(useTicketEscalationsQuery).mockReturnValue(
       queryResult({ data: [], isSuccess: true }) as never,
     );
   });
@@ -663,6 +688,238 @@ describe("TicketChatCard", () => {
       const time = container.querySelector("time")!;
       expect(time).toHaveAttribute("dateTime", customerMessage.createdAt);
       expect(time.getAttribute("title")).toBeTruthy();
+    });
+  });
+
+  // Story 206 (RD-3.6, recon TW-04) — the unified timeline.
+  describe("unified timeline (Story 206)", () => {
+    const note = {
+      id: "note-1",
+      ticketId: "ticket-1",
+      authorUserId: "agent-2",
+      body: "Customer is on the legacy plan.",
+      createdAt: "2024-01-01T09:00:30.000Z",
+    };
+    const created = {
+      id: "history-1",
+      eventType: "ticket.created",
+      actorUserId: "agent-2",
+      snapshot: {},
+      createdAt: "2024-01-01T08:00:00.000Z",
+    };
+    const escalation = {
+      id: "escalation-1",
+      ticketId: "ticket-1",
+      branchId: "branch-1",
+      targetType: "response",
+      targetAt: "2024-01-01T09:01:30.000Z",
+      escalatedAt: "2024-01-01T09:01:45.000Z",
+    };
+
+    function renderTimeline() {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [customerMessage, myOwnMessage, colleagueMessage], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ data: [note], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketHistoryQuery).mockReturnValue(
+        queryResult({ data: [created], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketEscalationsQuery).mockReturnValue(
+        queryResult({ data: [escalation], isSuccess: true }) as never,
+      );
+      return render(<TicketChatCard ticketId="ticket-1" />);
+    }
+
+    function itemTexts() {
+      return within(screen.getByRole("log"))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent);
+    }
+
+    it("interleaves messages, notes, history and escalations in time order", () => {
+      renderTimeline();
+
+      const items = itemTexts();
+      expect(items).toHaveLength(6);
+      // 08:00 created · 09:00 customer · 09:00:30 note · 09:01 mine ·
+      // 09:01:45 escalation · 09:02 colleague
+      expect(items[0]).toContain("detail.historyEvent.created");
+      expect(items[1]).toContain(customerMessage.body);
+      expect(items[2]).toContain(note.body);
+      expect(items[3]).toContain(myOwnMessage.body);
+      expect(items[4]).toContain("detail.timelineEscalated");
+      expect(items[5]).toContain(colleagueMessage.body);
+    });
+
+    it("never lets a note pass for a reply: own surface, lock icon and an Internal note label", () => {
+      renderTimeline();
+
+      const body = screen.getByText(note.body);
+      expect(body).toHaveClass("bg-warning-subtle", "border-warning-border");
+      const reply = screen.getByText(colleagueMessage.body);
+      expect(reply).not.toHaveClass("bg-warning-subtle");
+
+      const item = body.closest("li") as HTMLElement;
+      expect(within(item).getByText("detail.internalNoteLabel")).toBeInTheDocument();
+      expect(item.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+      // The author is still named as before (Story 50), never "You".
+      expect(within(item).getByText("Sam Colleague")).toBeInTheDocument();
+    });
+
+    it("names a history event's actor when the loaded users resolve it, and no one otherwise", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketHistoryQuery).mockReturnValue(
+        queryResult({
+          data: [
+            created,
+            { ...created, id: "history-2", eventType: "ticket.updated", actorUserId: null },
+            { ...created, id: "history-3", eventType: "ticket.recategorized", actorUserId: "gone" },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      const [first, second, third] = within(screen.getByRole("log")).getAllByRole("listitem");
+      expect(first).toHaveTextContent("detail.historyEvent.created");
+      expect(within(first!).getByText("Sam Colleague")).toBeInTheDocument();
+      expect(second).toHaveTextContent("detail.historyEvent.updated");
+      expect(third).toHaveTextContent("detail.historyEvent.recategorized");
+      expect(third).not.toHaveTextContent("gone");
+      for (const item of [second!, third!]) {
+        expect(within(item).queryByText("Sam Colleague")).not.toBeInTheDocument();
+      }
+    });
+
+    it("labels an escalation with its target and keeps the raw-value fallback", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketEscalationsQuery).mockReturnValue(
+        queryResult({
+          data: [escalation, { ...escalation, id: "escalation-2", targetType: "unknown" }],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(screen.getAllByText("detail.timelineEscalated")).toHaveLength(2);
+      expect(screen.getByText("escalations.targetType.response")).toBeInTheDocument();
+      expect(screen.getByText("unknown")).toBeInTheDocument();
+      const time = screen.getAllByText((_, element) => element?.tagName === "TIME")[0]!;
+      expect(time).toHaveAttribute("dateTime", escalation.escalatedAt);
+      expect(time).toHaveAttribute("title", new Date(escalation.escalatedAt).toLocaleString("en"));
+    });
+
+    it("filters by kind from the keyboard, with arrow keys", async () => {
+      const user = userEvent.setup();
+      renderTimeline();
+
+      const tabs = screen.getByRole("tablist", { name: "detail.timelineFilterLabel" });
+      const all = within(tabs).getByRole("tab", { name: "detail.timelineFilter.all" });
+      expect(all).toHaveAttribute("aria-selected", "true");
+
+      all.focus();
+      await user.keyboard("{ArrowRight}");
+      expect(within(tabs).getByRole("tab", { name: "detail.timelineFilter.conversation" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(itemTexts()).toHaveLength(3);
+      expect(screen.queryByText(note.body)).not.toBeInTheDocument();
+
+      await user.keyboard("{ArrowRight}");
+      expect(itemTexts()).toEqual([expect.stringContaining(note.body)]);
+
+      await user.keyboard("{ArrowRight}");
+      const events = itemTexts();
+      expect(events).toHaveLength(2);
+      expect(events[0]).toContain("detail.historyEvent.created");
+      expect(events[1]).toContain("detail.timelineEscalated");
+      expect(screen.queryByText(customerMessage.body)).not.toBeInTheDocument();
+    });
+
+    it("follows the reading direction: in Arabic, ArrowLeft moves to the next filter", async () => {
+      const user = userEvent.setup();
+      route.locale = "ar";
+      renderTimeline();
+
+      const tabs = screen.getByRole("tablist", { name: "detail.timelineFilterLabel" });
+      within(tabs).getByRole("tab", { name: "detail.timelineFilter.all" }).focus();
+      await user.keyboard("{ArrowLeft}");
+
+      expect(
+        within(tabs).getByRole("tab", { name: "detail.timelineFilter.conversation" }),
+      ).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("shows each filter's own empty message", async () => {
+      const user = userEvent.setup();
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [customerMessage], isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+      // All has a message, so nothing reads as empty there.
+      expect(screen.queryByText("detail.chatEmpty")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("tab", { name: "detail.timelineFilter.notes" }));
+      expect(screen.getByText("detail.notesEmpty")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("tab", { name: "detail.timelineFilter.events" }));
+      expect(screen.getByText("detail.historyEmpty")).toBeInTheDocument();
+      expect(screen.getByText("detail.escalationsEmpty")).toBeInTheDocument();
+    });
+
+    it("keeps the rest of the timeline when one source fails, with that source's own error", async () => {
+      const user = userEvent.setup();
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [customerMessage], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketNotesQuery).mockReturnValue(
+        queryResult({ isError: true, error: new ApiError("Server error", 500) }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(screen.getByText("detail.notesError")).toBeInTheDocument();
+      expect(screen.getByText(customerMessage.body)).toBeInTheDocument();
+
+      await user.click(screen.getByRole("tab", { name: "detail.timelineFilter.conversation" }));
+      expect(screen.queryByText("detail.notesError")).not.toBeInTheDocument();
+    });
+
+    it("waits for every source before drawing the timeline", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [customerMessage], isSuccess: true }) as never,
+      );
+      vi.mocked(useTicketHistoryQuery).mockReturnValue(queryResult({ isLoading: true }) as never);
+
+      const { container } = render(<TicketChatCard ticketId="ticket-1" />);
+
+      expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+      expect(screen.queryByRole("log")).not.toBeInTheDocument();
+    });
+
+    it("captions the caller's note composer as internal, below the reply composer", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+
+      render(
+        <TicketChatCard ticketId="ticket-1" noteComposer={<textarea aria-label="note composer" />} />,
+      );
+
+      const noteComposer = screen.getByLabelText("note composer");
+      const reply = screen.getByLabelText("detail.chatPlaceholder");
+      expect(reply.compareDocumentPosition(noteComposer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(noteComposer.parentElement).toHaveTextContent("detail.internalNoteLabel");
     });
   });
 });
