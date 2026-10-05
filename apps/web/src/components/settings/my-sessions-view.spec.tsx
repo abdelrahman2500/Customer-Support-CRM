@@ -166,4 +166,22 @@ describe("MySessionsView", () => {
     // whose copy comes from `useErrorMessage`'s own `common.errors.network`.
     expect(screen.getByText("errors.network")).toBeInTheDocument();
   });
+
+  // Story 224 — a readable device name; the full agent stays in the title.
+  it("names a recognised device by browser and system", () => {
+    vi.mocked(useMySessionsQuery).mockReturnValue({
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      data: [
+        {
+          ...otherSession,
+          userAgent:
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/151.0 Safari/537.36",
+        },
+      ],
+    } as never);
+    render(<MySessionsView />);
+    expect(screen.getByText("Chrome · Windows")).toHaveAttribute("title", expect.stringContaining("Win64"));
+  });
 });

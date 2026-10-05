@@ -12,21 +12,50 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDateTime } from "@crm/ui";
 
 /**
+ * Story 224 — a readable device name ("Chrome · Windows") from a user agent;
+ * the full string stays in the title. Unrecognised agents show as they are.
+ */
+function describeUserAgent(userAgent: string): string {
+  const browser = (
+    [
+      [/Edg\//, "Edge"],
+      [/OPR\//, "Opera"],
+      [/Firefox\//, "Firefox"],
+      [/Chrome\//, "Chrome"],
+      [/Version\/.*Safari\//, "Safari"],
+    ] as const
+  ).find(([pattern]) => pattern.test(userAgent))?.[1];
+  const os = (
+    [
+      [/Windows/, "Windows"],
+      [/Android/, "Android"],
+      [/iPhone|iPad/, "iOS"],
+      [/Mac OS X/, "macOS"],
+      [/Linux/, "Linux"],
+    ] as const
+  ).find(([pattern]) => pattern.test(userAgent))?.[1];
+  if (browser && os) return `${browser} · ${os}`;
+  return browser ?? os ?? userAgent;
+}
+
+/**
  * Story 124 — Session/Device Management. Lists the caller's own active
  * sessions (one per logged-in device/browser — see the backend's
  * `SessionSummary` doc comment) with a "Sign out" action per non-current
  * row, mirroring `AiSettingsView`'s loading/error/empty shape and
  * `UserRow`'s per-row `ConfirmDialog` convention for an irreversible,
  * immediate-effect security action.
+ *
+ * Story 224 — `hosted`: a section of the Account page (an h2 under its h1).
  */
-export function MySessionsView() {
+export function MySessionsView({ hosted = false }: { hosted?: boolean } = {}) {
   const t = useTranslations("mySessions");
   const tCommon = useTranslations("common");
   const sessionsQuery = useMySessionsQuery();
 
   return (
     <section className="flex flex-col gap-4">
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader title={t("title")} description={t("description")} headingLevel={hosted ? 2 : 1} />
 
       {sessionsQuery.isLoading && (
         <LoadingStatus label={tCommon("loading")} className="flex flex-col gap-2">
@@ -88,7 +117,9 @@ function SessionRow({ session }: { session: SessionSummary }) {
           header key. The trailing actions cell takes none. */}
       <TableCell label={t("columns.device")}>
         <div className="flex items-center gap-2">
-          <span>{session.userAgent ?? t("unknownDevice")}</span>
+          <span title={session.userAgent ?? undefined} className="min-w-0 break-words">
+            {session.userAgent ? describeUserAgent(session.userAgent) : t("unknownDevice")}
+          </span>
           {session.isCurrent && <Badge variant="secondary">{t("thisDevice")}</Badge>}
         </div>
       </TableCell>
@@ -106,7 +137,7 @@ function SessionRow({ session }: { session: SessionSummary }) {
           <>
             <Button
               type="button"
-              variant="destructive"
+              variant="outline"
               size="sm"
               disabled={mutation.isPending}
               onClick={() => setConfirmOpen(true)}

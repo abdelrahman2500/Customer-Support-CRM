@@ -1,5 +1,4 @@
-import { MySessionsView } from "@/components/settings/my-sessions-view";
-import { ChangePasswordSection } from "@/components/settings/change-password-section";
+import { AccountView } from "@/components/settings/account-view";
 
 /** Story 147 — the second component on this page. `/my-sessions` is the
  * `account` nav group's personal account-security screen, and a password
@@ -8,10 +7,6 @@ import { ChangePasswordSection } from "@/components/settings/change-password-sec
  * `NotificationHistoryView`'s own "primary view plus a self-contained
  * settings section" composition. */
 export default function MySessionsPage() {
-  return (
-    <div className="flex flex-col gap-6">
-      <MySessionsView />
-      <ChangePasswordSection />
-    </div>
-  );
+  // Story 224 (PR-4.3) — profile facts, sessions and password in one Account area.
+  return <AccountView />;
 }

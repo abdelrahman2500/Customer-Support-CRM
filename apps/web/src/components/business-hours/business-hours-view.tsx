@@ -99,7 +99,8 @@ function DaysGrid({
         .sort((a, b) => a.weekday - b.weekday)
         .map((day) => (
           <div key={day.weekday} className="flex flex-wrap items-center gap-3">
-            <span className="w-24 text-sm font-medium text-ink-strong">
+            {/* Story 224 (RD-6.5) — a minimum, not a fixed width. */}
+            <span className="min-w-24 text-sm font-medium text-ink-strong">
               {t(`weekday.${WEEKDAY_KEYS[day.weekday]}`)}
             </span>
             {/* Batch 8 (UX audit) — the shared `Checkbox`/`Label` pair,

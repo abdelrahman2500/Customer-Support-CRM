@@ -728,4 +728,16 @@ describe("NotificationHistoryView", () => {
       await waitFor(() => expect(markRead).toHaveBeenCalledTimes(1));
     });
   });
+
+  // Story 224 (PR-4.3, RD-4.8) — history first; the event reads as text.
+  it("puts the history before the preferences and shows the event as text", () => {
+    mockedUseNotificationsQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: page([atRiskNotification]) }) as never,
+    );
+    render(<NotificationHistoryView />);
+    const table = screen.getByRole("table");
+    const preferences = screen.getByRole("heading", { name: /preferences.heading/ });
+    expect(table.compareDocumentPosition(preferences) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(table.closest(".overflow-x-auto")?.parentElement?.closest(".overflow-x-auto")).toBeFalsy();
+  });
 });

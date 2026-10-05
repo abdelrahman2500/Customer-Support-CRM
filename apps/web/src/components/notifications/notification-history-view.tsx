@@ -11,7 +11,6 @@ import { renderNotificationTemplate } from "@/lib/notification-template-render";
 import { ApiError } from "@/lib/api";
 import {
   Alert,
-  Badge,
   Button,
   EmptyState,
   FetchingIndicator,
@@ -98,7 +97,7 @@ function NotificationRow({
     <TableRow>
       {/* Story 150 — labels reuse each column's own header key. */}
       <TableCell label={t("columns.event")}>
-        <Badge variant="outline">{eventLabel}</Badge>
+        <span className="font-medium text-ink">{eventLabel}</span>
       </TableCell>
       <TableCell label={t("columns.ticket")}>
         <Link
@@ -264,8 +263,6 @@ export function NotificationHistoryView() {
         }
       />
 
-      <NotificationPreferencesSection />
-
       {/* Story S-8b — `isPending`, not `isLoading`: with placeholder data in
           play the query only reports `pending` on a true first load, so the
           skeleton appears once and never again for a page change. */}
@@ -295,36 +292,34 @@ export function NotificationHistoryView() {
       )}
 
       {notifications !== undefined && notifications.length > 0 && (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("columns.event")}</TableHead>
-                <TableHead>{t("columns.ticket")}</TableHead>
-                <TableHead>{t("columns.customer")}</TableHead>
-                <TableHead>{t("columns.target")}</TableHead>
-                <TableHead>{t("columns.loggedAt")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {/* Story S-8d — both names now arrive resolved on the row
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("columns.event")}</TableHead>
+              <TableHead>{t("columns.ticket")}</TableHead>
+              <TableHead>{t("columns.customer")}</TableHead>
+              <TableHead>{t("columns.target")}</TableHead>
+              <TableHead>{t("columns.loggedAt")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {/* Story S-8d — both names now arrive resolved on the row
                   itself, so this no longer joins two client-side maps built
                   from the whole ticket and customer lists. `?? undefined`
                   keeps `NotificationRow`s existing optional-prop contract,
                   which already renders the id / an unknown-customer label
                   when either is missing. */}
-              {notifications.map((notification) => (
-                <NotificationRow
-                  key={notification.id}
-                  notification={notification}
-                  ticketSubject={notification.ticketSubject ?? undefined}
-                  customerName={notification.customerName ?? undefined}
-                  template={resolveTemplate(notification.eventType)}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+            {notifications.map((notification) => (
+              <NotificationRow
+                key={notification.id}
+                notification={notification}
+                ticketSubject={notification.ticketSubject ?? undefined}
+                customerName={notification.customerName ?? undefined}
+                template={resolveTemplate(notification.eventType)}
+              />
+            ))}
+          </TableBody>
+        </Table>
       )}
 
       {/* Renders nothing while there is only one page (see `Pagination`), so
@@ -346,6 +341,8 @@ export function NotificationHistoryView() {
           })}
         />
       )}
+      {/* Story 224 (RD-4.8) — history first; the preferences follow it. */}
+      <NotificationPreferencesSection />
     </section>
   );
 }

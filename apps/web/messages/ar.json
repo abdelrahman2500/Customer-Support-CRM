@@ -141,7 +141,7 @@
       "webhookSubscriptions": "اشتراكات Webhook",
       "apiKeys": "مفاتيح API",
       "settings": "الإعدادات",
-      "mySessions": "جلساتي",
+      "mySessions": "حسابي",
       "groups": {
         "work": "العمل",
         "insights": "التحليلات",
@@ -1486,5 +1486,13 @@
     "signInAgain": "تسجيل الدخول مرة أخرى",
     "actionForbidden": "ليس لديك إذن لتغيير كلمة المرور هذه.",
     "actionFailed": "تعذر تغيير كلمة مرورك. يرجى المحاولة مرة أخرى."
+  },
+  "account": {
+    "title": "الحساب",
+    "description": "ملفك الشخصي، والأجهزة التي سجّلت الدخول منها، وكلمة المرور.",
+    "profileHeading": "الملف الشخصي",
+    "name": "الاسم",
+    "email": "البريد الإلكتروني",
+    "roles": "الأدوار"
   }
 }

@@ -141,7 +141,7 @@
       "webhookSubscriptions": "Webhook Subscriptions",
       "apiKeys": "API Keys",
       "settings": "Settings",
-      "mySessions": "My Sessions",
+      "mySessions": "My Account",
       "groups": {
         "work": "Work",
         "insights": "Insights",
@@ -1486,5 +1486,13 @@
     "signInAgain": "Sign in again",
     "actionForbidden": "You do not have permission to change this password.",
     "actionFailed": "Could not change your password. Please try again."
+  },
+  "account": {
+    "title": "Account",
+    "description": "Your profile, where you are signed in, and your password.",
+    "profileHeading": "Profile",
+    "name": "Name",
+    "email": "Email",
+    "roles": "Roles"
   }
 }

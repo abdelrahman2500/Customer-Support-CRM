@@ -3,6 +3,15 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsView } from "./settings-view";
 
+// Story 224 (RD-6.5) — the open tab is mirrored in ?tab=.
+const replace = vi.fn();
+let searchParamsString = "";
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
+  usePathname: () => "/en/settings",
+  useSearchParams: () => new URLSearchParams(searchParamsString),
+}));
+
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
   useLocale: () => "en",
@@ -76,5 +85,17 @@ describe("SettingsView", () => {
     expect(screen.getByText("ai panel content")).toHaveAttribute("data-hosted", "true");
     await user.click(screen.getByRole("tab", { name: "tabs.businessHours" }));
     expect(screen.getByText("business hours panel content")).toHaveAttribute("data-hosted", "true");
+  });
+
+  it("opens the tab named in ?tab= and writes the tab it switches to (Story 224)", async () => {
+    searchParamsString = "tab=businessHours";
+    render(<SettingsView />);
+    expect(screen.getByRole("tab", { name: "tabs.businessHours" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await userEvent.setup().click(screen.getByRole("tab", { name: "tabs.ai" }));
+    expect(replace).toHaveBeenLastCalledWith("/en/settings?tab=ai", { scroll: false });
+    searchParamsString = "";
   });
 });

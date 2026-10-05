@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { PageHeader, Tabs, TabsContent, TabsList, TabsTrigger } from "@crm/ui";
 import { BrandingView } from "@/components/admin/branding-view";
@@ -33,15 +35,37 @@ import { localeDirection } from "@/i18n/direction";
  * deep links/tests for no benefit — this page is an additional, faster
  * path to the same three screens, not a replacement for them.
  */
+const SETTINGS_TABS = ["branding", "ai", "businessHours"] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
 export function SettingsView() {
   const t = useTranslations("settings");
   const locale = useLocale();
+  // Story 224 (RD-6.5) — the open tab is in the URL (?tab=), so a tab can be
+  // linked to and survives a reload; switching replaces the URL, no new page.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requested = searchParams?.get("tab");
+  const fromUrl =
+    requested && SETTINGS_TABS.includes(requested as SettingsTab) ? requested : "branding";
+  const [tab, setTab] = useState(fromUrl);
+  // Back/Forward (or a link) changing ?tab= moves the tab too.
+  useEffect(() => setTab(fromUrl), [fromUrl]);
+  function selectTab(next: string) {
+    setTab(next);
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    if (next === "branding") params.delete("tab");
+    else params.set("tab", next);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
 
   return (
     <section className="flex flex-col gap-4">
       <PageHeader title={t("title")} description={t("description")} />
 
-      <Tabs defaultValue="branding" dir={localeDirection(locale)}>
+      <Tabs value={tab} onValueChange={selectTab} dir={localeDirection(locale)}>
         <TabsList>
           <TabsTrigger value="branding">{t("tabs.branding")}</TabsTrigger>
           <TabsTrigger value="ai">{t("tabs.ai")}</TabsTrigger>

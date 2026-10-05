@@ -116,7 +116,8 @@ test("an admin switches the workspace navigation to a sidebar, and it persists",
     ["webhook-subscriptions", "Webhook Subscriptions"],
     ["api-keys", "API Keys"],
     ["settings", "Settings"],
-    ["my-sessions", "My Sessions"],
+    // Story 224 (PR-4.3) — the page became the one Account area.
+    ["my-sessions", "My Account"],
   ];
   for (const [href, label] of EXPECTED_ITEMS) {
     const link = nav.locator(`a[href="/en/${href}"]`);
