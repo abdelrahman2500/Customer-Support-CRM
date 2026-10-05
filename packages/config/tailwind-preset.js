@@ -263,12 +263,19 @@ const sharedThemeExtend = {
     // keyframe would overwrite that for the duration of the animation.
     "zoom-in": { from: { opacity: "0", scale: "0.96" }, to: { opacity: "1", scale: "1" } },
     "zoom-out": { from: { opacity: "1", scale: "1" }, to: { opacity: "0", scale: "0.96" } },
+    // Story 211 (PR-1.2) — the Sheet enters from the inline-end edge. The
+    // individual `translate` property, offset by --sheet-from (100% in LTR,
+    // -100% in RTL, set by the Sheet), so one keyframe serves both directions.
+    "sheet-in": { from: { translate: "var(--sheet-from) 0" }, to: { translate: "0 0" } },
+    "sheet-out": { from: { translate: "0 0" }, to: { translate: "var(--sheet-from) 0" } },
   },
   animation: {
     "fade-in": "fade-in var(--duration-base) var(--ease-standard)",
     "fade-out": "fade-out var(--duration-fast) var(--ease-standard)",
     "zoom-in": "zoom-in var(--duration-base) var(--ease-standard)",
     "zoom-out": "zoom-out var(--duration-fast) var(--ease-standard)",
+    "sheet-in": "sheet-in var(--duration-slow) var(--ease-standard)",
+    "sheet-out": "sheet-out var(--duration-base) var(--ease-standard)",
   },
 };
 

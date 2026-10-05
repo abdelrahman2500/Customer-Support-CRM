@@ -314,3 +314,29 @@ export { Textarea } from "./components/textarea";
 export type { TextareaProps } from "./components/textarea";
 
 export { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "./components/tooltip";
+
+// --- Story 211 (PR-1.2) — primitive kit v2 ----------------------------------
+export {
+  Sheet,
+  SheetTrigger,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetBody,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+} from "./components/sheet";
+export type { SheetContentProps } from "./components/sheet";
+export { Switch } from "./components/switch";
+export type { SwitchProps } from "./components/switch";
+export { SegmentedControl } from "./components/segmented-control";
+export type { SegmentedControlProps, SegmentedOption } from "./components/segmented-control";
+export { ListToolbar } from "./components/list-toolbar";
+export type { ListToolbarProps, ListToolbarSearch } from "./components/list-toolbar";
+export { StatCard } from "./components/stat-card";
+export type { StatCardProps } from "./components/stat-card";
+export { BarChart, DonutGauge, RatingBar, DistributionBar } from "./components/charts";
+export type { BarChartRow, BarSegment, DistributionSegment } from "./components/charts";
+export { Board, BoardColumn } from "./components/board";
+export type { BoardColumnProps } from "./components/board";
