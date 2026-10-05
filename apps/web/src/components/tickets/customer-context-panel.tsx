@@ -37,9 +37,12 @@ const OTHER_TICKETS_LIMIT = 5;
 export function CustomerContextPanel({
   ticketId,
   customerId,
+  collapsible = false,
 }: {
   ticketId: string;
   customerId: string;
+  /** Story 203 (RD-3.3) — a collapsible inspector section on the ticket page. */
+  collapsible?: boolean;
 }) {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
@@ -62,7 +65,7 @@ export function CustomerContextPanel({
   );
 
   return (
-    <SectionCard title={t("detail.contextPanelHeading")}>
+    <SectionCard title={t("detail.contextPanelHeading")} collapsible={collapsible}>
       <div className="mt-3 flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-medium uppercase tracking-wide text-ink-subtle">

@@ -3,6 +3,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva } from "class-variance-authority";
 import type { VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
+import { CollapsibleSectionCard } from "./collapsible-section-card";
 
 /**
  * Story S-3 — a composable card, to replace the
@@ -176,6 +177,14 @@ export interface SectionCardProps extends Omit<React.HTMLAttributes<HTMLDivEleme
   actions?: React.ReactNode;
   /** Optional raised treatment, passed through to `Card`. */
   elevation?: CardProps["elevation"];
+  /**
+   * Story 203 (RD-3.3) — a disclosure: the heading becomes a toggle button
+   * and the body can be collapsed (client-only state). Without it, the
+   * output is exactly the node-for-node `Card` described above.
+   */
+  collapsible?: boolean;
+  /** With `collapsible`: whether the body starts open. Default `true`. */
+  defaultOpen?: boolean;
 }
 
 export function SectionCard({
@@ -183,10 +192,27 @@ export function SectionCard({
   headingLevel = "h2",
   actions,
   elevation,
+  collapsible = false,
+  defaultOpen = true,
   className,
   children,
   ...props
 }: SectionCardProps) {
+  if (collapsible) {
+    return (
+      <CollapsibleSectionCard
+        title={title}
+        headingLevel={headingLevel}
+        actions={actions}
+        elevation={elevation}
+        defaultOpen={defaultOpen}
+        className={className}
+        {...props}
+      >
+        {children}
+      </CollapsibleSectionCard>
+    );
+  }
   return (
     <Card elevation={elevation} className={cn("p-surface", className)} {...props}>
       {actions ? (

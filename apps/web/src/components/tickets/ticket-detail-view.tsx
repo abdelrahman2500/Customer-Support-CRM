@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -40,6 +40,8 @@ import {
   Badge,
   Button,
   Card,
+  DescriptionItem,
+  DescriptionList,
   LoadingStatus,
   SectionCard,
   showSuccessToast,
@@ -234,6 +236,24 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   // Story 201 (RD-3.1) — the subject edit state (Stories 42/156/166) moved,
   // verbatim, into TicketHeader along with the heading it edits.
   const [aiCategoryNoMatch, setAiCategoryNoMatch] = useState<string | null>(null);
+
+  /** Story 203 (RD-3.3) — the inspector sticks just under the sticky ticket
+   * header, whose height varies (subject length, wrapped facts, actions).
+   * Measured in place — wrapping the header would break its own `sticky` —
+   * and exposed as `--ticket-header-h`. Without ResizeObserver (jsdom) the
+   * variable falls back to 0px. */
+  const workspaceRef = useRef<HTMLElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const ticketLoaded = ticketQuery.data !== undefined;
+  useEffect(() => {
+    const header = workspaceRef.current?.querySelector(":scope > header");
+    if (!header || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() =>
+      setHeaderHeight(Math.ceil(header.getBoundingClientRect().height)),
+    );
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [ticketLoaded]);
   const [confirmHoldOpen, setConfirmHoldOpen] = useState(false);
 
   const userNameById = useMemo(() => {
@@ -297,7 +317,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const currentUserId = currentUserQuery.data?.id;
 
   return (
-    <section className="flex flex-col gap-6">
+    <section
+      ref={workspaceRef}
+      className="flex flex-col gap-6"
+      style={{ "--ticket-header-h": `${headerHeight}px` } as CSSProperties}
+    >
       {/* Story 201 (RD-3.1, recon TW-01) — identity and state at a glance:
           back link, short id, the subject h1 (its inline edit unchanged),
           status, priority, SLA, assignee, customer and times; sticky at lg. */}
@@ -438,189 +462,210 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           <TicketKbReferencesCard ticketId={ticketId} />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
-          <Card className="grid grid-cols-1 gap-4 p-surface sm:grid-cols-2 lg:grid-cols-1">
-            <Field label={t("detail.status")}>
-              <Select
-                value={ticket.status}
-                disabled={mutation.isPending}
-                onValueChange={(value) => updateStatus(value as TicketStatus)}
-              >
-                <SelectTrigger aria-label={t("detail.status")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Story 153 — `value` stays the raw enum (it is what the
+        {/* Story 203 (RD-3.3, recon TW-02) — the inspector: from lg it stays
+            beside the conversation, just under the sticky ticket header, and
+            scrolls on its own. Its max height also leaves out the page's
+            bottom gutter (`--space-page-y`), so at the very end of the page —
+            where sticky lets go at the grid's edge — it never slides under
+            the header. `-mx-1 px-1` keeps focus rings at the card edges from
+            being clipped by the scroll container. */}
+        <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-[var(--ticket-header-h,0px)] lg:-mx-1 lg:max-h-[calc(100vh_-_var(--ticket-header-h,0px)_-_var(--space-page-y))] lg:overflow-y-auto lg:px-1 lg:pb-stack">
+          {/* Story 203 (RD-3.3, recon TW-07) — the properties card has a
+              heading now (it was the one untitled card, breaking the
+              outline); the five controls inside are unchanged. */}
+          <SectionCard title={t("detail.propertiesHeading")} collapsible>
+            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
+              <Field label={t("detail.status")}>
+                <Select
+                  value={ticket.status}
+                  disabled={mutation.isPending}
+                  onValueChange={(value) => updateStatus(value as TicketStatus)}
+                >
+                  <SelectTrigger aria-label={t("detail.status")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Story 153 — `value` stays the raw enum (it is what the
                       mutation sends to the API); only the visible text is
                       localized. `SelectValue` above renders the selected
                       item's children, so the trigger follows automatically. */}
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {ticketLabels.status(option)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {ticketLabels.status(option)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            <Field label={t("detail.priority")}>
-              <Select
-                value={ticket.priority}
-                disabled={mutation.isPending}
-                onValueChange={(value) =>
-                  mutation.mutate(
-                    { priority: value as TicketPriority },
-                    {
-                      onSuccess: () =>
-                        showSuccessToast(
-                          t("detail.priorityUpdateSuccess", {
-                            priority: ticketLabels.priority(value),
-                          }),
-                        ),
-                    },
-                  )
-                }
-              >
-                <SelectTrigger aria-label={t("detail.priority")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORITY_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {ticketLabels.priority(option)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-
-            <Field label={t("detail.category")}>
-              <Select
-                value={ticket.categoryId ?? undefined}
-                disabled={mutation.isPending || categoriesQuery.isLoading}
-                onValueChange={(value) =>
-                  mutation.mutate(
-                    { categoryId: value },
-                    {
-                      // Batch 5 (UX audit) — mirrors the status/priority Selects
-                      // just above: every immediate-commit field on this page
-                      // now confirms itself the same way, not just two of five.
-                      onSuccess: () => {
-                        const category = (categoriesQuery.data ?? []).find((c) => c.id === value);
-                        showSuccessToast(
-                          t("detail.categoryUpdateSuccess", { category: category?.name ?? value }),
-                        );
+              <Field label={t("detail.priority")}>
+                <Select
+                  value={ticket.priority}
+                  disabled={mutation.isPending}
+                  onValueChange={(value) =>
+                    mutation.mutate(
+                      { priority: value as TicketPriority },
+                      {
+                        onSuccess: () =>
+                          showSuccessToast(
+                            t("detail.priorityUpdateSuccess", {
+                              priority: ticketLabels.priority(value),
+                            }),
+                          ),
                       },
-                    },
-                  )
-                }
-              >
-                <SelectTrigger aria-label={t("detail.category")}>
-                  <SelectValue
-                    placeholder={
-                      categoriesQuery.isLoading
-                        ? t("detail.optionsLoading")
-                        : t("detail.noCategory")
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {(categoriesQuery.data ?? []).map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {categoriesQuery.isError && (
-                <span className="text-xs text-danger-foreground">
-                  {t("detail.categoryLoadError")}
-                </span>
-              )}
-            </Field>
+                    )
+                  }
+                >
+                  <SelectTrigger aria-label={t("detail.priority")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITY_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {ticketLabels.priority(option)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            <Field label={t("detail.assignedAgent")}>
-              <Select
-                value={ticket.assignedToUserId ?? undefined}
-                disabled={mutation.isPending || usersQuery.isLoading}
-                onValueChange={(value) => updateAssignee(value)}
-              >
-                <SelectTrigger aria-label={t("detail.assignedAgent")}>
-                  <SelectValue
-                    placeholder={
-                      usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {(usersQuery.data ?? []).map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      <span className="flex w-full items-center justify-between gap-2">
-                        <span>{user.fullName}</span>
-                        {/* RM-06 — mirrors `UserListView`'s own presence Badge shape,
+              <Field label={t("detail.category")}>
+                <Select
+                  value={ticket.categoryId ?? undefined}
+                  disabled={mutation.isPending || categoriesQuery.isLoading}
+                  onValueChange={(value) =>
+                    mutation.mutate(
+                      { categoryId: value },
+                      {
+                        // Batch 5 (UX audit) — mirrors the status/priority Selects
+                        // just above: every immediate-commit field on this page
+                        // now confirms itself the same way, not just two of five.
+                        onSuccess: () => {
+                          const category = (categoriesQuery.data ?? []).find((c) => c.id === value);
+                          showSuccessToast(
+                            t("detail.categoryUpdateSuccess", {
+                              category: category?.name ?? value,
+                            }),
+                          );
+                        },
+                      },
+                    )
+                  }
+                >
+                  <SelectTrigger aria-label={t("detail.category")}>
+                    <SelectValue
+                      placeholder={
+                        categoriesQuery.isLoading
+                          ? t("detail.optionsLoading")
+                          : t("detail.noCategory")
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(categoriesQuery.data ?? []).map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {categoriesQuery.isError && (
+                  <span className="text-xs text-danger-foreground">
+                    {t("detail.categoryLoadError")}
+                  </span>
+                )}
+              </Field>
+
+              <Field label={t("detail.assignedAgent")}>
+                <Select
+                  value={ticket.assignedToUserId ?? undefined}
+                  disabled={mutation.isPending || usersQuery.isLoading}
+                  onValueChange={(value) => updateAssignee(value)}
+                >
+                  <SelectTrigger aria-label={t("detail.assignedAgent")}>
+                    <SelectValue
+                      placeholder={
+                        usersQuery.isLoading ? t("detail.optionsLoading") : t("list.unassigned")
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(usersQuery.data ?? []).map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        <span className="flex w-full items-center justify-between gap-2">
+                          <span>{user.fullName}</span>
+                          {/* RM-06 — mirrors `UserListView`'s own presence Badge shape,
                             just under this namespace's own key names. */}
-                        <Badge variant={presence[user.id] === "online" ? "success" : "secondary"}>
-                          {presence[user.id] === "online"
-                            ? t("detail.presenceOnline")
-                            : t("detail.presenceOffline")}
-                        </Badge>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+                          <Badge variant={presence[user.id] === "online" ? "success" : "secondary"}>
+                            {presence[user.id] === "online"
+                              ? t("detail.presenceOnline")
+                              : t("detail.presenceOffline")}
+                          </Badge>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            <Field label={t("detail.department")}>
-              <Select
-                value={ticket.departmentId ?? undefined}
-                disabled={mutation.isPending || departmentsQuery.isLoading}
-                onValueChange={(value) =>
-                  mutation.mutate(
-                    { departmentId: value },
-                    {
-                      onSuccess: () => {
-                        const department = (departmentsQuery.data ?? []).find(
-                          (d) => d.id === value,
-                        );
-                        showSuccessToast(
-                          t("detail.departmentUpdateSuccess", {
-                            department: department?.name ?? value,
-                          }),
-                        );
+              <Field label={t("detail.department")}>
+                <Select
+                  value={ticket.departmentId ?? undefined}
+                  disabled={mutation.isPending || departmentsQuery.isLoading}
+                  onValueChange={(value) =>
+                    mutation.mutate(
+                      { departmentId: value },
+                      {
+                        onSuccess: () => {
+                          const department = (departmentsQuery.data ?? []).find(
+                            (d) => d.id === value,
+                          );
+                          showSuccessToast(
+                            t("detail.departmentUpdateSuccess", {
+                              department: department?.name ?? value,
+                            }),
+                          );
+                        },
                       },
-                    },
-                  )
-                }
-              >
-                <SelectTrigger aria-label={t("detail.department")}>
-                  <SelectValue
-                    placeholder={
-                      departmentsQuery.isLoading
-                        ? t("detail.optionsLoading")
-                        : t("detail.noDepartment")
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {(departmentsQuery.data ?? []).map((department) => (
-                    <SelectItem key={department.id} value={department.id}>
-                      {department.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {departmentsQuery.isError && (
-                <span className="text-xs text-danger-foreground">
-                  {t("detail.departmentLoadError")}
+                    )
+                  }
+                >
+                  <SelectTrigger aria-label={t("detail.department")}>
+                    <SelectValue
+                      placeholder={
+                        departmentsQuery.isLoading
+                          ? t("detail.optionsLoading")
+                          : t("detail.noDepartment")
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(departmentsQuery.data ?? []).map((department) => (
+                      <SelectItem key={department.id} value={department.id}>
+                        {department.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {departmentsQuery.isError && (
+                  <span className="text-xs text-danger-foreground">
+                    {t("detail.departmentLoadError")}
+                  </span>
+                )}
+              </Field>
+            </div>
+            <DescriptionList className="mt-4">
+              <DescriptionItem term={t("detail.ticketIdFull")}>
+                <span className="break-all font-mono text-caption" dir="ltr">
+                  {ticket.id}
                 </span>
-              )}
-            </Field>
-          </Card>
+              </DescriptionItem>
+            </DescriptionList>
+          </SectionCard>
 
-          <CustomerContextPanel ticketId={ticketId} customerId={ticket.customerId} />
+          <CustomerContextPanel ticketId={ticketId} customerId={ticket.customerId} collapsible />
 
-          <SectionCard title={t("detail.slaHeading")}>
+          <SectionCard title={t("detail.slaHeading")} collapsible>
             {slaTargetQuery.isLoading && (
               <LoadingStatus label={tCommon("loading")} asChild>
                 <Skeleton className="mt-2 h-5 w-40" />
@@ -680,7 +725,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             )}
           </SectionCard>
 
-          <SectionCard title={t("detail.escalationsHeading")}>
+          <SectionCard title={t("detail.escalationsHeading")} collapsible>
             {escalationsQuery.isLoading && (
               <LoadingStatus label={tCommon("loading")} asChild>
                 <Skeleton className="mt-2 h-24 w-full" />
@@ -749,7 +794,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             )}
           </SectionCard>
 
-          <SectionCard title={t("detail.csatHeading")}>
+          <SectionCard title={t("detail.csatHeading")} collapsible>
             {csatQuery.isLoading && (
               <LoadingStatus label={tCommon("loading")} asChild>
                 <Skeleton className="mt-2 h-5 w-40" />

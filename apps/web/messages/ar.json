@@ -287,6 +287,8 @@
       "departmentUpdateSuccess": "تم تحديث القسم إلى {department}.",
       "optionsLoading": "جارٍ التحميل…",
       "subjectEdit": "تعديل",
+      "propertiesHeading": "الخصائص",
+      "ticketIdFull": "معرّف التذكرة",
       "actions": {
         "label": "إجراءات التذكرة",
         "assignToMe": "إسناد إليّ",

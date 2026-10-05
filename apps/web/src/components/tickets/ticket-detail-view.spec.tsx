@@ -1025,8 +1025,10 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
 
+      // Story 203 (RD-3.3) — the section is collapsible now, so the title text
+      // sits inside its disclosure button; the card is found via closest().
       const heading = screen.getByText("detail.escalationsHeading");
-      const card = heading.parentElement as HTMLElement;
+      const card = heading.closest(".p-surface") as HTMLElement;
       expect(card.querySelector(".animate-pulse")).toBeInTheDocument();
     });
 
@@ -1592,8 +1594,10 @@ describe("TicketDetailView", () => {
 
       render(<TicketDetailView ticketId="ticket-1" />);
 
+      // Story 203 (RD-3.3) — the section is collapsible now, so the title text
+      // sits inside its disclosure button; the card is found via closest().
       const heading = screen.getByText("detail.csatHeading");
-      const card = heading.parentElement as HTMLElement;
+      const card = heading.closest(".p-surface") as HTMLElement;
       expect(card.querySelector(".animate-pulse")).toBeInTheDocument();
     });
 
@@ -1955,6 +1959,83 @@ describe("TicketDetailView", () => {
       renderWith({ status: "OPEN", assignedToUserId: null });
 
       expect(within(actions()).getAllByRole("button")).toHaveLength(2);
+    });
+  });
+
+  /**
+   * Story 203 (RD-3.3, recon TW-02/TW-07) — the inspector: titled,
+   * collapsible sections, all open by default. Extends the Phase 3 guard.
+   */
+  describe("inspector (Story 203)", () => {
+    function renderLoaded() {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      return render(<TicketDetailView ticketId="ticket-1" />);
+    }
+    const SECTIONS = [
+      "detail.propertiesHeading",
+      "detail.contextPanelHeading",
+      "detail.slaHeading",
+      "detail.escalationsHeading",
+      "detail.csatHeading",
+    ];
+
+    it("titles the properties section and keeps every inspector section open by default", () => {
+      renderLoaded();
+
+      for (const name of SECTIONS) {
+        expect(screen.getByRole("heading", { level: 2, name })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name })).toHaveAttribute("aria-expanded", "true");
+      }
+    });
+
+    it("collapses and restores the properties section without losing a control", () => {
+      renderLoaded();
+      const toggle = screen.getByRole("button", { name: "detail.propertiesHeading" });
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("combobox", { name: "detail.status" })).not.toBeInTheDocument();
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      for (const field of [
+        "detail.status",
+        "detail.priority",
+        "detail.category",
+        "detail.assignedAgent",
+        "detail.department",
+      ]) {
+        expect(screen.getByRole("combobox", { name: field })).toBeInTheDocument();
+      }
+    });
+
+    it("shows the full ticket id in the properties section", () => {
+      renderLoaded();
+
+      const section = screen
+        .getByRole("heading", { name: "detail.propertiesHeading" })
+        .closest(".p-surface") as HTMLElement;
+      expect(within(section).getByText("detail.ticketIdFull").tagName).toBe("DT");
+      expect(within(section).getByText("ticket-1")).toHaveAttribute("dir", "ltr");
+    });
+
+    it("keeps the outline at one h1 with every section an h2", () => {
+      const { container } = renderLoaded();
+
+      const levels = [...container.querySelectorAll("h1, h2, h3, h4")].map((h) => h.tagName);
+      expect(levels.filter((l) => l === "H1")).toHaveLength(1);
+      expect(levels[0]).toBe("H1");
+    });
+
+    it("makes the inspector sticky and independently scrollable from lg", () => {
+      renderLoaded();
+
+      const inspector = screen
+        .getByRole("heading", { name: "detail.propertiesHeading" })
+        .closest(".p-surface")!.parentElement!;
+      expect(inspector).toHaveClass("lg:sticky", "lg:overflow-y-auto");
     });
   });
 });

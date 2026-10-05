@@ -287,6 +287,8 @@
       "departmentUpdateSuccess": "Department updated to {department}.",
       "optionsLoading": "Loading…",
       "subjectEdit": "Edit",
+      "propertiesHeading": "Properties",
+      "ticketIdFull": "Ticket ID",
       "actions": {
         "label": "Ticket actions",
         "assignToMe": "Assign to me",

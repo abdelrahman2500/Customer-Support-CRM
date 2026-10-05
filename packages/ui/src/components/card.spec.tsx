@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import {
   Card,
   CardContent,
@@ -203,6 +203,88 @@ describe("SectionCard (Story 154)", () => {
       </SectionCard>,
     );
 
+    expect(container.innerHTML).not.toMatch(/\b(ml|mr|pl|pr|text-left|text-right)-/);
+  });
+});
+
+/** Story 203 (RD-3.3) — SectionCard's collapsible (disclosure) mode. */
+describe("SectionCard collapsible (Story 203)", () => {
+  it("leaves the non-collapsible output exactly as it was — no toggle, no body wrapper", () => {
+    const { container } = render(
+      <SectionCard title="SLA">
+        <p>body</p>
+      </SectionCard>,
+    );
+    const card = container.firstElementChild!;
+    expect(card.children).toHaveLength(2);
+    expect(card.children[0]!.tagName).toBe("H2");
+    expect(card.children[1]!.tagName).toBe("P");
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("puts a disclosure button inside the heading, open by default, controlling the body", () => {
+    render(
+      <SectionCard title="SLA" collapsible>
+        <p>body</p>
+      </SectionCard>,
+    );
+    const heading = screen.getByRole("heading", { level: 2, name: "SLA" });
+    const toggle = screen.getByRole("button", { name: "SLA" });
+    expect(heading).toContainElement(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const body = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+    expect(body).toContainElement(screen.getByText("body"));
+    expect(body).not.toHaveAttribute("hidden");
+  });
+
+  it("hides the body when collapsed and restores it when expanded", () => {
+    render(
+      <SectionCard title="SLA" collapsible>
+        <p>body</p>
+      </SectionCard>,
+    );
+    const toggle = screen.getByRole("button", { name: "SLA" });
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("body").parentElement).toHaveAttribute("hidden");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("body")).toBeVisible();
+  });
+
+  it("can start collapsed, keeps the heading level, and keeps its actions", () => {
+    render(
+      <SectionCard
+        title="History"
+        headingLevel="h3"
+        collapsible
+        defaultOpen={false}
+        actions={<button type="button">Filter</button>}
+      >
+        <p>body</p>
+      </SectionCard>,
+    );
+    expect(screen.getByRole("heading", { level: 3, name: "History" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "History" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
+    expect(screen.getByText("body").parentElement).toHaveAttribute("hidden");
+  });
+
+  it("is a native button (keyboard operable) and uses logical classes only", () => {
+    const { container } = render(
+      <SectionCard title="SLA" collapsible>
+        <p>body</p>
+      </SectionCard>,
+    );
+    const toggle = screen.getByRole("button", { name: "SLA" });
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle).toHaveAttribute("type", "button");
+    expect(toggle).toHaveClass("focus-ring");
     expect(container.innerHTML).not.toMatch(/\b(ml|mr|pl|pr|text-left|text-right)-/);
   });
 });
