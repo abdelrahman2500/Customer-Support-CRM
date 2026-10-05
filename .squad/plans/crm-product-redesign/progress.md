@@ -9,7 +9,7 @@ Live status of the product redesign track.
 
 ## Status
 
-**Active roadmap — approved 2026-10-05.** No Story of this track has started; Story 210 (PR-1.1) begins on instruction. The next free Story number is **210**.
+**Active roadmap — approved 2026-10-05.** No Story of this track has started; Story 210 (PR-1.1) begins on instruction. The next free Story number is **211**.
 
 ## Approved decisions (2026-10-05)
 
@@ -36,8 +36,10 @@ Rules:
 
 | Track ID | Squad Story (intake) | Plan | Commit |
 |---|---|---|---|
+| PR-1.1 | [`stories/visual-language-v2/visual-language-v2/intake.md`](../../stories/visual-language-v2/visual-language-v2/intake.md) | [`visual-language-v2/210-story-visual-language-v2.md`](../visual-language-v2/210-story-visual-language-v2.md) | `3a525e2` |
 
 ## Stories
 
 | Track ID | Story | Summary | Verification | Commit | Push | Deferred |
 |---|---|---|---|---|---|---|
+| PR-1.1 | 210 Visual language v2: tokens and recipes | Warm paper canvas (light `surface-sunk` #F6F5F2); `chrome` family (same ink in both themes) with `.on-chrome` focus scope; `viz-1…6` chart palette; `recipes` (card/column/inner/liftable/floating/chrome, four elevation levels) in `@crm/ui`; design-language doc v2 (chrome, viz, status spine, urgency edge, Latin digits PD-8) | ui 523 · web 1589 (contrast pairs for chrome/viz/spine in light + dark; parser accepts digit names) · portal 454 ✓ · typecheck/lint ✓ · web + portal builds ✓ · harness 20/20 (dashboard, tickets, ticket, portal home, login × en/ar × light/dark @1280: 0 overflow, one h1, no errors) | `3a525e2` | ✅ | Found: the page focus colour is under 3:1 on the chrome → scoped ring. A concurrent session has uncommitted language/theme-switcher changes in the shared worktree; `index.ts` was staged hunk-only so they were not committed |
