@@ -386,6 +386,53 @@
       "createSuccess": "تم إنشاء التذكرة.",
       "actionForbidden": "لا تملك صلاحية تنفيذ هذا الإجراء.",
       "optionsLoading": "جارٍ التحميل…"
+    },
+    "board": {
+      "viewLabel": "طريقة العرض",
+      "views": {
+        "board": "لوحة",
+        "list": "قائمة"
+      },
+      "boardLabel": "لوحة التذاكر",
+      "quickViewLabel": "عرض سريع",
+      "quick": {
+        "all": "الكل",
+        "mine": "تذاكري",
+        "unassigned": "غير مسندة",
+        "atRisk": "معرّضة للخطر"
+      },
+      "sortLabel": "الترتيب",
+      "sort": {
+        "slaUrgency": "إلحاح اتفاقية الخدمة",
+        "updated": "آخر تحديث",
+        "newest": "الأحدث",
+        "oldest": "الأقدم"
+      },
+      "filters": "عوامل التصفية",
+      "closeFilters": "إغلاق عوامل التصفية",
+      "clearSearch": "مسح البحث",
+      "clearAll": "مسح الكل",
+      "summary": "{count, plural, zero {لا توجد تذاكر} one {تذكرة واحدة} two {تذكرتان} few {# تذاكر} many {# تذكرة} other {# تذكرة}}",
+      "summaryAtRisk": "{count, plural, zero {لا توجد تذاكر معرّضة للخطر} one {تذكرة واحدة معرّضة للخطر} other {# تذكرة معرّضة للخطر}} ضمن التذاكر المحمّلة",
+      "columnLabel": "{status}، {count, plural, zero {لا توجد تذاكر} one {تذكرة واحدة} two {تذكرتان} few {# تذاكر} many {# تذكرة} other {# تذكرة}}",
+      "columnCards": "تذاكر {status}",
+      "columnSwitcher": "الحالة",
+      "expandColumn": "إظهار {status} ({count})",
+      "collapseColumn": "طيّ",
+      "showMore": "عرض {count} إضافية",
+      "columnError": "تعذّر تحميل تذاكر {status}",
+      "retry": "إعادة المحاولة",
+      "empty": {
+        "OPEN": "لا توجد تذاكر مفتوحة — عمل رائع.",
+        "IN_PROGRESS": "لا شيء قيد المعالجة الآن.",
+        "RESOLVED": "لم يُحل شيء بعد.",
+        "CLOSED": "لا توجد تذاكر مغلقة."
+      },
+      "emptyAtRisk": "لا شيء معرّض للخطر هنا.",
+      "filteredEmpty": "لا توجد تذاكر تطابق عوامل التصفية",
+      "unassigned": "غير مسندة",
+      "unknownAgent": "موظف",
+      "cardDescription": "{status} · أولوية {priority} · {assignee}"
     }
   },
   "customers": {

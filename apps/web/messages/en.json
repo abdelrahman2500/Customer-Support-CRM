@@ -386,6 +386,53 @@
       "createSuccess": "Ticket created.",
       "actionForbidden": "You don't have permission to perform that action.",
       "optionsLoading": "Loading…"
+    },
+    "board": {
+      "viewLabel": "View",
+      "views": {
+        "board": "Board",
+        "list": "List"
+      },
+      "boardLabel": "Tickets board",
+      "quickViewLabel": "Quick view",
+      "quick": {
+        "all": "All",
+        "mine": "Mine",
+        "unassigned": "Unassigned",
+        "atRisk": "At risk"
+      },
+      "sortLabel": "Sort",
+      "sort": {
+        "slaUrgency": "SLA urgency",
+        "updated": "Recently updated",
+        "newest": "Newest",
+        "oldest": "Oldest"
+      },
+      "filters": "Filters",
+      "closeFilters": "Close filters",
+      "clearSearch": "Clear search",
+      "clearAll": "Clear all",
+      "summary": "{count, plural, one {# ticket} other {# tickets}}",
+      "summaryAtRisk": "{count, plural, one {# ticket at risk} other {# tickets at risk}} among the loaded tickets",
+      "columnLabel": "{status}, {count, plural, one {# ticket} other {# tickets}}",
+      "columnCards": "{status} tickets",
+      "columnSwitcher": "Status",
+      "expandColumn": "Show {status} ({count})",
+      "collapseColumn": "Collapse",
+      "showMore": "Show {count} more",
+      "columnError": "Couldn't load {status} tickets",
+      "retry": "Retry",
+      "empty": {
+        "OPEN": "No open tickets — nice work.",
+        "IN_PROGRESS": "Nothing in progress right now.",
+        "RESOLVED": "Nothing resolved yet.",
+        "CLOSED": "No closed tickets."
+      },
+      "emptyAtRisk": "Nothing at risk here.",
+      "filteredEmpty": "No tickets match these filters",
+      "unassigned": "Unassigned",
+      "unknownAgent": "Agent",
+      "cardDescription": "{status} · {priority} priority · {assignee}"
     }
   },
   "customers": {

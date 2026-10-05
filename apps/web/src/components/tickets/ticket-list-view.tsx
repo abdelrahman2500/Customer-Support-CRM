@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -109,15 +109,17 @@ function serializeTicketFilters(filters: ListTicketsFilters): URLSearchParams {
  * any component that calls it, per Next.js's own static-rendering
  * requirement — the real view moved to `TicketListViewContent`.
  */
-export function TicketListView() {
+/** Story 216 (PR-3.1) — the table is the secondary "List" view of
+ * /tickets; `viewSwitcher` (Board | List) sits in its header actions. */
+export function TicketListView({ viewSwitcher }: { viewSwitcher?: ReactNode } = {}) {
   return (
     <Suspense fallback={null}>
-      <TicketListViewContent />
+      <TicketListViewContent viewSwitcher={viewSwitcher} />
     </Suspense>
   );
 }
 
-function TicketListViewContent() {
+function TicketListViewContent({ viewSwitcher }: { viewSwitcher?: ReactNode }) {
   const t = useTranslations("tickets");
   const ticketLabels = useTicketLabels();
   const tCommon = useTranslations("common");
@@ -193,6 +195,7 @@ function TicketListViewContent() {
               active={ticketsQuery.isPlaceholderData}
               label={tCommon("updating")}
             />
+            {viewSwitcher}
             <Button size="sm" asChild>
               <Link href={`/${locale}/tickets/new`}>{t("list.createButton")}</Link>
             </Button>

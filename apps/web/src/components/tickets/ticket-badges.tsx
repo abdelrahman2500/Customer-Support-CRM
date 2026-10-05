@@ -39,7 +39,8 @@ const TONE_VARIANT: Record<PresentationTone, BadgeVariant> = {
   danger: "destructive",
 };
 
-const ICON: Record<TicketPresentationIcon, LucideIcon> = {
+/** Story 216 — exported for the board (column headers, card priority icons). */
+export const TICKET_ICON: Record<TicketPresentationIcon, LucideIcon> = {
   "status-open": StatusOpenIcon,
   "status-in-progress": StatusInProgressIcon,
   "status-resolved": StatusResolvedIcon,
@@ -54,7 +55,7 @@ export function TicketStatusBadge({ status, className }: { status: string; class
   const ticketLabels = useTicketLabels();
   const { tone, icon } = ticketStatusPresentation(status);
   return (
-    <Badge variant={TONE_VARIANT[tone]} icon={ICON[icon]} className={className}>
+    <Badge variant={TONE_VARIANT[tone]} icon={TICKET_ICON[icon]} className={className}>
       {ticketLabels.status(status)}
     </Badge>
   );
@@ -71,7 +72,7 @@ export function TicketPriorityBadge({
   const ticketLabels = useTicketLabels();
   const { tone, icon } = ticketPriorityPresentation(priority);
   return (
-    <Badge variant={TONE_VARIANT[tone]} icon={ICON[icon]} className={className}>
+    <Badge variant={TONE_VARIANT[tone]} icon={TICKET_ICON[icon]} className={className}>
       {ticketLabels.priority(priority)}
     </Badge>
   );
