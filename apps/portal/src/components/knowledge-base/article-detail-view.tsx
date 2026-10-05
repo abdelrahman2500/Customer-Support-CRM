@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Card, LoadingStatus, PageHeader, Skeleton } from "@crm/ui";
 import { BackLink } from "@crm/ui";
+import { StillNeedHelp } from "./still-need-help";
 import { Button, ErrorState } from "@crm/ui";
 import { usePublishedArticleQuery } from "@/hooks/use-portal-knowledge-base";
 import { ApiError } from "@/lib/api";
@@ -73,20 +74,29 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
     return null;
   }
 
+  // Story 231 (PR-5.3) — a reading layout: one prose-width column, the
+  // category above the title, body copy at reading size and line height,
+  // and "Still need help?" where the article ends.
   return (
-    <section className="flex flex-col gap-6">
+    <section className="mx-auto flex w-full max-w-3xl flex-col gap-section">
       {/* Story 189 — the shared BackLink: chevron flips in RTL, token focus ring. */}
       <BackLink asChild>
         <Link href={`/${locale}/knowledge-base`}>{t("detail.backToList")}</Link>
       </BackLink>
 
-      <Card className="p-surface">
-        <PageHeader title={article.title} />
-        {article.categoryName && (
-          <p className="mt-1 text-xs text-ink-subtle">{article.categoryName}</p>
-        )}
-        <p className="mt-3 whitespace-pre-wrap text-sm text-ink-strong">{article.body}</p>
+      <Card asChild className="p-surface sm:p-8">
+        <article>
+          {article.categoryName && (
+            <p className="mb-2 text-caption font-medium text-accent">{article.categoryName}</p>
+          )}
+          <PageHeader title={article.title} />
+          <div className="mt-4 whitespace-pre-wrap text-body-lg text-ink-strong">
+            {article.body}
+          </div>
+        </article>
       </Card>
+
+      <StillNeedHelp />
     </section>
   );
 }

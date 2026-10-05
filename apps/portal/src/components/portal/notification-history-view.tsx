@@ -125,18 +125,19 @@ export function NotificationHistoryView() {
   }, [ticketsQuery.data]);
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <PageHeader title={t("history.title")} />
-        {/* In the heading's own row, so it adds no height and cannot shift
-            the table below it — mirrors TicketListView exactly. */}
-        <FetchingIndicator
-          active={notificationsQuery.isPlaceholderData}
-          label={tCommon("updating")}
-        />
-      </div>
-
-      <NotificationPreferencesSection />
+    <section className="flex flex-col gap-section">
+      {/* The fetch indicator sits in the header's actions, so it adds no
+          height and cannot shift the table below it. */}
+      <PageHeader
+        title={t("history.title")}
+        description={t("history.description")}
+        actions={
+          <FetchingIndicator
+            active={notificationsQuery.isPlaceholderData}
+            label={tCommon("updating")}
+          />
+        }
+      />
 
       {/* Story 97 — Loading & Skeleton UX. A real, column-shaped table
           (matching the eventual populated table's own headers/columns
@@ -250,6 +251,11 @@ export function NotificationHistoryView() {
           })}
         />
       )}
+
+      {/* Story 231 (PR-5.3) — the history is the page; the preferences that
+          shape it follow it (they used to sit above it), as on the agent
+          side's notification settings (Story 224). */}
+      <NotificationPreferencesSection />
     </section>
   );
 }

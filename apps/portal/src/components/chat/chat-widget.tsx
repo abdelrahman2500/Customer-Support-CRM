@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTranslations } from "next-intl";
@@ -14,14 +13,29 @@ import {
 } from "@/hooks/use-chat";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, LoadingStatus, SectionCard, Skeleton, Textarea } from "@crm/ui";
+import {
+  AiSummaryIcon,
+  Alert,
+  Avatar,
+  Button,
+  Card,
+  Composer,
+  ConfirmDialog,
+  LoadingStatus,
+  MessageBubble,
+  MessageThread,
+  PageHeader,
+  Skeleton,
+  formatDate,
+  formatDateTime,
+  formatTime,
+} from "@crm/ui";
 
 /**
  * Story 80 — AI Portal Chatbot (Foundation). Crosses
  * `apps/web/src/components/tickets/ticket-ai-card.tsx`'s
- * PENDING/SUCCESS/ERROR/DISABLED conventions with
- * `apps/portal/src/components/tickets/ticket-chat-card.tsx`'s
- * message-list-plus-composer layout.
+ * PENDING/SUCCESS/ERROR/DISABLED conventions with the portal ticket
+ * conversation's message-list-plus-composer layout.
  *
  * A fresh chat session is started on mount (component-local state only,
  * no persistence beyond the mounted page) — an explicit, acceptable
@@ -29,8 +43,14 @@ import { Alert, Button, LoadingStatus, SectionCard, Skeleton, Textarea } from "@
  * message list (`useChatMessagesQuery`) is the single source of truth
  * for conversation history — a successful reply is read from there, not
  * rendered directly from the result-polling query, which exists only to
- * drive the "typing…"/error/disabled states for the single
+ * drive the "thinking"/error/disabled states for the single
  * most-recently-sent turn.
+ *
+ * Story 231 (PR-5.3) — the page gets its h1 (it had none) and becomes a
+ * full-height conversation on the shared `MessageThread` (`fill`),
+ * `MessageBubble` and `Composer`. "Thinking…" is announced through a
+ * polite `role="status"` line that stays mounted, and escalating to a
+ * person — which creates a ticket — asks for confirmation first.
  */
 export function ChatWidget() {
   const t = useTranslations("chat");
@@ -41,12 +61,12 @@ export function ChatWidget() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [pendingLogId, setPendingLogId] = useState<string | null>(null);
   const [escalateError, setEscalateError] = useState<string | null>(null);
+  const [confirmEscalate, setConfirmEscalate] = useState(false);
   const startSession = useStartChatSessionMutation();
   const messagesQuery = useChatMessagesQuery(sessionId);
   const resultQuery = useChatAiResultQuery(sessionId, pendingLogId);
   const escalate = useEscalateChatSessionMutation(sessionId ?? "");
   useChatRealtime(sessionId);
-  const listRef = useRef<HTMLOListElement>(null);
 
   async function handleEscalate(): Promise<void> {
     if (!sessionId || escalate.isPending) {
@@ -55,8 +75,10 @@ export function ChatWidget() {
     setEscalateError(null);
     try {
       const result = await escalate.mutateAsync();
+      setConfirmEscalate(false);
       router.push(`/${locale}/tickets/${result.ticketId}`);
     } catch (escalateSubmitError) {
+      setConfirmEscalate(false);
       setEscalateError(
         errorMessage(escalateSubmitError, {
           forbidden: t("actionForbidden"),
@@ -77,13 +99,6 @@ export function ChatWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const list = listRef.current;
-    if (list) {
-      list.scrollTop = list.scrollHeight;
-    }
-  }, [messagesQuery.data]);
-
   // Once a pending turn resolves (no longer PENDING), it has either
   // become a real ChatMessage (SUCCESS, now in messagesQuery.data) or
   // failed (ERROR/DISABLED, rendered inline below) — either way there is
@@ -94,93 +109,126 @@ export function ChatWidget() {
     }
   }, [resultQuery.isSuccess, resultQuery.data?.outcome]);
 
-  return (
-    <SectionCard title={t("heading")}>
-      {startSession.isError && (
-        <Alert variant="destructive" className="mt-2">
-          {t("startFailed")}
-        </Alert>
-      )}
-
-      {messagesQuery.isLoading && (
-        <LoadingStatus label={tCommon("loading")} asChild>
-          <Skeleton className="mt-2 h-40 w-full" />
-        </LoadingStatus>
-      )}
-      {messagesQuery.isError && (
-        <Alert variant="destructive" className="mt-2">
-          {t("loadError")}
-        </Alert>
-      )}
-      {messagesQuery.isSuccess && messagesQuery.data.length === 0 && (
-        <p className="mt-2 text-sm text-ink-subtle">{t("empty")}</p>
-      )}
-      {messagesQuery.isSuccess && messagesQuery.data.length > 0 && (
-        <ol
-          ref={listRef}
-          aria-label={t("heading")}
-          className="mt-2 flex max-h-80 flex-col gap-3 overflow-y-auto py-1"
-        >
-          {messagesQuery.data.map((message) => {
-            const isMine = message.role === "CUSTOMER";
-            return (
-              <li
-                key={message.id}
-                className={`flex flex-col gap-1 ${isMine ? "items-end" : "items-start"}`}
+  const messages = messagesQuery.data ?? [];
+  const thinking = Boolean(
+    pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "PENDING",
+  );
+  const items = messages.map((message) => {
+    const isMine = message.role === "CUSTOMER";
+    const sender = isMine ? t("youLabel") : t("assistantLabel");
+    return {
+      key: message.id,
+      at: message.createdAt,
+      node: (
+        <MessageBubble
+          align={isMine ? "end" : "start"}
+          tone={isMine ? "mine" : "other"}
+          sender={sender}
+          avatar={
+            isMine ? (
+              <Avatar name={sender} size="sm" decorative />
+            ) : (
+              <span
+                aria-hidden="true"
+                className="flex size-7 items-center justify-center rounded-full bg-accent-surface text-accent"
               >
-                <div
-                  className={`max-w-[80%] whitespace-pre-wrap rounded-md px-3 py-2 text-sm ${
-                    isMine ? "bg-accent text-accent-foreground" : "bg-surface-muted text-ink-strong"
-                  }`}
-                >
-                  {message.body}
-                </div>
-                <span className="text-xs text-ink-subtle">
-                  {isMine ? t("youLabel") : t("assistantLabel")}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+                <AiSummaryIcon className="size-4" />
+              </span>
+            )
+          }
+          at={message.createdAt}
+          timeLabel={formatTime(message.createdAt, locale)}
+          dateTimeLabel={formatDateTime(message.createdAt, locale)}
+        >
+          {message.body}
+        </MessageBubble>
+      ),
+    };
+  });
 
-      {pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "PENDING" && (
-        <p className="mt-2 text-sm text-ink-subtle">{t("typing")}</p>
-      )}
-      {pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "ERROR" && (
-        <Alert variant="destructive" className="mt-2">
-          {resultQuery.data.errorMessage ?? t("replyFailed")}
-        </Alert>
-      )}
-      {pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "DISABLED" && (
-        <p className="mt-2 rounded-md border border-rule bg-surface-sunk px-3 py-2 text-sm text-ink-muted">
-          {t("disabled")}
+  return (
+    <section className="flex h-[calc(100dvh-11rem)] min-h-[28rem] flex-col gap-section">
+      <PageHeader
+        title={t("heading")}
+        description={t("description")}
+        actions={
+          messagesQuery.isSuccess && messages.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmEscalate(true)}
+              disabled={escalate.isPending}
+            >
+              {escalate.isPending ? t("escalating") : t("escalate")}
+            </Button>
+          ) : undefined
+        }
+      />
+
+      {escalateError && <Alert variant="destructive">{escalateError}</Alert>}
+
+      <ConfirmDialog
+        open={confirmEscalate}
+        onOpenChange={setConfirmEscalate}
+        title={t("escalateConfirmTitle")}
+        description={t("escalateConfirmBody")}
+        confirmLabel={t("escalateConfirm")}
+        cancelLabel={t("escalateCancel")}
+        workingLabel={t("escalating")}
+        onConfirm={() => void handleEscalate()}
+        isPending={escalate.isPending}
+      />
+
+      <Card className="flex min-h-0 flex-1 flex-col p-surface">
+        {startSession.isError && <Alert variant="destructive">{t("startFailed")}</Alert>}
+
+        {messagesQuery.isLoading && (
+          <LoadingStatus label={tCommon("loading")} asChild>
+            <Skeleton className="h-40 w-full" />
+          </LoadingStatus>
+        )}
+        {messagesQuery.isError && <Alert variant="destructive">{t("loadError")}</Alert>}
+        {messagesQuery.isSuccess && messages.length === 0 && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+            <span
+              aria-hidden="true"
+              className="flex size-10 items-center justify-center rounded-full bg-accent-surface text-accent"
+            >
+              <AiSummaryIcon className="size-5" />
+            </span>
+            <p className="text-sm text-ink-subtle">{t("empty")}</p>
+          </div>
+        )}
+        {items.length > 0 && (
+          <MessageThread
+            fill
+            label={t("heading")}
+            items={items}
+            formatDay={(at) => formatDate(at, locale)}
+            newMessagesLabel={t("newMessages")}
+          />
+        )}
+
+        {/* Always mounted, so the change to "Thinking…" is announced. */}
+        <p role="status" className="mt-2 text-sm text-ink-subtle empty:hidden">
+          {thinking ? t("typing") : ""}
         </p>
-      )}
+        {pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "ERROR" && (
+          <Alert variant="destructive" className="mt-2">
+            {resultQuery.data.errorMessage ?? t("replyFailed")}
+          </Alert>
+        )}
+        {pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "DISABLED" && (
+          <Alert className="mt-2">{t("disabled")}</Alert>
+        )}
 
-      {messagesQuery.isSuccess && messagesQuery.data.length > 0 && (
-        <div className="mt-3 flex flex-col gap-2 border-t border-rule pt-3">
-          <Button
-            type="button"
-            onClick={() => void handleEscalate()}
-            disabled={escalate.isPending}
-            variant="outline"
-            className="w-fit"
-          >
-            {escalate.isPending ? t("escalating") : t("escalate")}
-          </Button>
-          {escalateError && <Alert variant="destructive">{escalateError}</Alert>}
-        </div>
-      )}
-
-      <ChatComposer sessionId={sessionId} onSent={setPendingLogId} />
-    </SectionCard>
+        <ChatComposer sessionId={sessionId} onSent={setPendingLogId} />
+      </Card>
+    </section>
   );
 }
 
-/** Enter sends, Shift+Enter inserts a newline — mirrors
- * `TicketChatCard`'s own composer exactly. Disabled until a session
- * exists; never assumes a send succeeds. */
+/** Never assumes a send succeeds; sending waits for a session. */
 function ChatComposer({
   sessionId,
   onSent,
@@ -211,39 +259,20 @@ function ChatComposer({
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    void send();
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      void send();
-    }
-  }
-
   return (
-    <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
-      <Textarea
-        rows={2}
-        value={body}
-        placeholder={t("placeholder")}
-        disabled={mutation.isPending || !sessionId}
-        aria-label={t("placeholder")}
-        onChange={(event) => setBody(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <div>
-        <Button
-          type="submit"
-          disabled={mutation.isPending || !sessionId || !body.trim()}
-          className="w-fit"
-        >
-          {mutation.isPending ? t("sending") : t("send")}
-        </Button>
-      </div>
-      {error && <Alert variant="destructive">{error}</Alert>}
-    </form>
+    <Composer
+      className="mt-3"
+      label={t("composerLabel")}
+      placeholder={t("placeholder")}
+      rows={2}
+      value={body}
+      onValueChange={setBody}
+      onSubmit={send}
+      canSubmit={Boolean(sessionId) && !mutation.isPending && body.trim().length > 0}
+      pending={mutation.isPending}
+      submitLabel={mutation.isPending ? t("sending") : t("send")}
+      hint={t("hint")}
+      error={error && <Alert variant="destructive">{error}</Alert>}
+    />
   );
 }

@@ -24,7 +24,7 @@ export function AccountView() {
   const t = useTranslations("account");
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="mx-auto flex w-full max-w-3xl flex-col gap-section">
       <PageHeader title={t("title")} description={t("description")} />
       <ChangePasswordSection />
     </section>

@@ -132,7 +132,7 @@ describe("ChatWidget", () => {
     );
 
     render(<ChatWidget />);
-    fireEvent.change(screen.getByLabelText("placeholder"), { target: { value: "Hi there" } });
+    fireEvent.change(screen.getByLabelText("composerLabel"), { target: { value: "Hi there" } });
     fireEvent.click(screen.getByText("send"));
 
     await vi.waitFor(() => {
@@ -155,7 +155,7 @@ describe("ChatWidget", () => {
     );
 
     render(<ChatWidget />);
-    fireEvent.change(screen.getByLabelText("placeholder"), { target: { value: "Hi there" } });
+    fireEvent.change(screen.getByLabelText("composerLabel"), { target: { value: "Hi there" } });
     fireEvent.click(screen.getByText("send"));
 
     expect(await screen.findByText("Provider timed out")).toBeInTheDocument();
@@ -175,7 +175,7 @@ describe("ChatWidget", () => {
     );
 
     render(<ChatWidget />);
-    fireEvent.change(screen.getByLabelText("placeholder"), { target: { value: "Hi there" } });
+    fireEvent.change(screen.getByLabelText("composerLabel"), { target: { value: "Hi there" } });
     fireEvent.click(screen.getByText("send"));
 
     expect(await screen.findByText("disabled")).toBeInTheDocument();
@@ -196,7 +196,7 @@ describe("ChatWidget", () => {
     } as never);
 
     render(<ChatWidget />);
-    fireEvent.change(screen.getByLabelText("placeholder"), { target: { value: "hello" } });
+    fireEvent.change(screen.getByLabelText("composerLabel"), { target: { value: "hello" } });
     fireEvent.click(screen.getByText("send"));
 
     await screen.findByText("errors.unauthorized");
@@ -228,6 +228,9 @@ describe("ChatWidget", () => {
 
     render(<ChatWidget />);
     fireEvent.click(screen.getByText("escalate"));
+    // Story 231 — escalating opens a ticket, so it is confirmed first.
+    expect(mutateAsync).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "escalateConfirm" }));
 
     await vi.waitFor(() => {
       expect(mutateAsync).toHaveBeenCalledOnce();
@@ -249,8 +252,34 @@ describe("ChatWidget", () => {
 
     render(<ChatWidget />);
     fireEvent.click(screen.getByText("escalate"));
+    fireEvent.click(screen.getByRole("button", { name: "escalateConfirm" }));
 
     await screen.findByText("Nothing to escalate yet");
     expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+  it("names the page with an h1 (Story 231)", () => {
+    render(<ChatWidget />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "heading" })).toBeInTheDocument();
+  });
+
+  it("keeps escalation unsent when the confirmation is dismissed (Story 231)", () => {
+    vi.mocked(useChatMessagesQuery).mockReturnValue(
+      queryResult({
+        data: [{ id: "m1", role: "CUSTOMER", body: "Hi", createdAt: "2024-01-01T00:00:00.000Z" }],
+        isSuccess: true,
+      }) as never,
+    );
+    const mutateAsync = vi.fn();
+    vi.mocked(useEscalateChatSessionMutation).mockReturnValue({
+      mutateAsync,
+      isPending: false,
+    } as never);
+
+    render(<ChatWidget />);
+    fireEvent.click(screen.getByText("escalate"));
+    fireEvent.click(screen.getByRole("button", { name: "escalateCancel" }));
+
+    expect(mutateAsync).not.toHaveBeenCalled();
   });
 });

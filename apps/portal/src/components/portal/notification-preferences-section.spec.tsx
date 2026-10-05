@@ -83,10 +83,16 @@ describe("NotificationPreferencesSection", () => {
 
     render(<NotificationPreferencesSection />);
 
-    expect(screen.getByText("eventLabel.ticketUpdated")).toBeInTheDocument();
-    expect(screen.getByText("eventLabel.newReply")).toBeInTheDocument();
-    expect(screen.getByText("preferences.enabled")).toBeInTheDocument();
-    expect(screen.getByText("preferences.disabled")).toBeInTheDocument();
+    // Story 231 — each preference is a switch named by its event label;
+    // its state is the switch's own `aria-checked`.
+    expect(screen.getByRole("switch", { name: "eventLabel.ticketUpdated" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("switch", { name: "eventLabel.newReply" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
   });
 
   it("toggles a preference off", () => {
@@ -100,7 +106,7 @@ describe("NotificationPreferencesSection", () => {
 
     render(<NotificationPreferencesSection />);
 
-    fireEvent.click(screen.getByText("preferences.disable"));
+    fireEvent.click(screen.getByRole("switch", { name: "eventLabel.ticketUpdated" }));
 
     expect(mutate).toHaveBeenCalledWith({ eventType: "ticket.updated", inAppEnabled: false });
   });
@@ -116,7 +122,7 @@ describe("NotificationPreferencesSection", () => {
 
     render(<NotificationPreferencesSection />);
 
-    fireEvent.click(screen.getByText("preferences.enable"));
+    fireEvent.click(screen.getByRole("switch", { name: "eventLabel.newReply" }));
 
     expect(mutate).toHaveBeenCalledWith({ eventType: "channel.message.created", inAppEnabled: true });
   });

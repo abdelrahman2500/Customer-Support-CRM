@@ -33,6 +33,12 @@ export interface MessageThreadProps {
   formatDay: (at: string) => string;
   /** The pill shown when new messages arrive below a reader scrolled up. */
   newMessagesLabel: string;
+  /**
+   * Story 231 — fill the parent's height (a full-height chat page) instead
+   * of the default bounded box. The parent must be a flex column with a
+   * definite height; the log then scrolls inside it.
+   */
+  fill?: boolean;
   className?: string;
 }
 
@@ -49,6 +55,7 @@ export function MessageThread({
   items,
   formatDay,
   newMessagesLabel,
+  fill = false,
   className,
 }: MessageThreadProps) {
   const logRef = React.useRef<HTMLDivElement>(null);
@@ -86,7 +93,7 @@ export function MessageThread({
   }, [items.length]);
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative", fill && "flex min-h-0 flex-1 flex-col", className)}>
       <div
         ref={logRef}
         role="log"
@@ -98,7 +105,10 @@ export function MessageThread({
           atBottomRef.current = atBottom;
           if (atBottom) setUnseen(false);
         }}
-        className="flex max-h-[60vh] min-h-64 flex-col gap-3 overflow-y-auto py-1"
+        className={cn(
+          "flex flex-col gap-3 overflow-y-auto py-1",
+          fill ? "min-h-0 flex-1" : "max-h-[60vh] min-h-64",
+        )}
       >
         {groups.map((group) => (
           <div key={group.key} className="flex flex-col gap-3">

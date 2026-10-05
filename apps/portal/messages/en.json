@@ -222,12 +222,19 @@
       "searchLabel": "Search articles",
       "searchPlaceholder": "Search by title or body...",
       "noResults": "No articles match your search.",
-      "noCategory": "—"
+      "noCategory": "—",
+      "description": "Answers to common questions, written by our support team."
     },
     "detail": {
       "notFound": "This article could not be found.",
       "loadError": "Couldn't load this article.",
       "backToList": "Back to Knowledge Base"
+    },
+    "help": {
+      "heading": "Still need help?",
+      "body": "Ask our assistant, or raise a ticket and our team will get back to you.",
+      "askAssistant": "Ask the assistant",
+      "raiseTicket": "Raise a ticket"
     }
   },
   "chat": {
@@ -245,10 +252,18 @@
     "send": "Send",
     "sending": "Sending...",
     "sendFailed": "Couldn't send the message. Please try again.",
-    "escalate": "Escalate to a human agent",
+    "escalate": "Talk to a person",
     "escalating": "Escalating…",
     "escalateFailed": "Couldn't escalate this conversation. Please try again.",
-    "actionForbidden": "You don't have permission to perform that action."
+    "actionForbidden": "You don't have permission to perform that action.",
+    "description": "Instant answers from our assistant. A person can take over at any time.",
+    "newMessages": "New messages",
+    "composerLabel": "Message to the assistant",
+    "hint": "Enter to send · Shift+Enter for a new line",
+    "escalateConfirmTitle": "Talk to a person?",
+    "escalateConfirmBody": "We'll open a ticket with this conversation so our support team can pick it up.",
+    "escalateConfirm": "Open a ticket",
+    "escalateCancel": "Keep chatting"
   },
   "notifications": {
     "nav": "Notifications",
@@ -273,17 +288,14 @@
         "event": "Event",
         "ticket": "Ticket",
         "loggedAt": "Date"
-      }
+      },
+      "description": "Updates about your tickets."
     },
     "preferences": {
       "heading": "Notification Preferences",
       "description": "Choose which live notifications you want to see while you're signed in.",
       "error": "Couldn't load your preferences.",
       "retry": "Retry",
-      "enabled": "Enabled",
-      "disabled": "Disabled",
-      "enable": "Enable",
-      "disable": "Disable",
       "actionFailed": "Couldn't save that change. Please try again.",
       "actionForbidden": "You don't have permission to perform that action."
     }

@@ -32,6 +32,23 @@ function setGeometry(
 }
 
 describe("MessageThread", () => {
+  it("is bounded by default and fills its parent when asked (Story 231)", () => {
+    const { rerender } = renderThread([item("a", "2026-01-01T10:00:00")]);
+    expect(screen.getByRole("log")).toHaveClass("max-h-[60vh]");
+
+    rerender(
+      <MessageThread
+        fill
+        label="Conversation"
+        items={[item("a", "2026-01-01T10:00:00")]}
+        formatDay={(at) => at.slice(0, 10)}
+        newMessagesLabel="New messages"
+      />,
+    );
+    expect(screen.getByRole("log")).toHaveClass("flex-1", "min-h-0");
+    expect(screen.getByRole("log")).not.toHaveClass("max-h-[60vh]");
+  });
+
   it("is a labelled, polite log", () => {
     renderThread(DAY_ONE);
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { useTranslations } from "next-intl";
 import {
   usePortalNotificationPreferencesQuery,
@@ -7,7 +8,7 @@ import {
 } from "@/hooks/use-portal-notification-preferences";
 import type { PortalNotificationPreferenceSummary } from "@/lib/notification-preferences-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { Alert, Button, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
+import { Alert, Button, Label, LoadingStatus, SectionCard, Skeleton, Switch } from "@crm/ui";
 
 /** The same two event-type strings `PORTAL_NOTIFICATION_EVENT_TYPES` names
  * on the backend (`apps/api/src/modules/notifications/
@@ -55,7 +56,7 @@ export function NotificationPreferencesSection() {
       )}
 
       {preferencesQuery.isSuccess && (
-        <ul className="mt-2 flex flex-col gap-2">
+        <ul className="mt-2 flex flex-col divide-y divide-rule-subtle">
           {preferencesQuery.data.map((preference) => (
             <PreferenceRow key={preference.eventType} preference={preference} />
           ))}
@@ -74,6 +75,7 @@ function PreferenceRow({ preference }: { preference: PortalNotificationPreferenc
   const mutation = useUpdatePortalNotificationPreferenceMutation();
 
   const labelKey = EVENT_LABEL_KEYS[preference.eventType];
+  const switchId = useId();
 
   function toggle() {
     mutation.mutate({
@@ -82,29 +84,21 @@ function PreferenceRow({ preference }: { preference: PortalNotificationPreferenc
     });
   }
 
+  // Story 231 (PR-5.3) — the shared `Switch` (role="switch", named by its
+  // label) replaces the status pill plus "Enable"/"Disable" button pair:
+  // one control that both shows and changes the preference.
   return (
-    <li className="flex items-center justify-between border-b border-rule-subtle pb-2 text-sm">
-      <span className="text-ink-strong">{labelKey ? t(labelKey) : preference.eventType}</span>
-      <div className="flex items-center gap-2">
-        <span
-          className={`rounded-full border px-2 py-0.5 text-xs ${
-            preference.inAppEnabled
-              ? "border-success-border bg-success-subtle text-success-foreground"
-              : "border-rule-strong bg-surface-sunk text-ink-muted"
-          }`}
-        >
-          {preference.inAppEnabled ? t("preferences.enabled") : t("preferences.disabled")}
-        </span>
-        <Button
-          type="button"
+    <li className="flex flex-col gap-1 py-3 text-sm">
+      <div className="flex items-center justify-between gap-4">
+        <Label htmlFor={switchId} className="font-normal text-ink-strong">
+          {labelKey ? t(labelKey) : preference.eventType}
+        </Label>
+        <Switch
+          id={switchId}
+          checked={preference.inAppEnabled}
+          onCheckedChange={toggle}
           disabled={mutation.isPending}
-          onClick={toggle}
-          variant="outline"
-          size="sm"
-          className="text-sm"
-        >
-          {preference.inAppEnabled ? t("preferences.disable") : t("preferences.enable")}
-        </Button>
+        />
       </div>
       {mutation.isError && (
         <p className="mt-1 text-xs text-danger-foreground">

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { useTranslations } from "next-intl";
 import {
   Alert,
@@ -14,8 +13,13 @@ import {
   LoadingStatus,
   PageHeader,
   Pagination,
+  SearchIcon,
   Skeleton,
 } from "@crm/ui";
+import { StillNeedHelp } from "./still-need-help";
+
+/** Story 231 — enough of an article's body to tell articles apart. */
+const EXCERPT_LENGTH = 220;
 import { usePublishedArticlesQuery } from "@/hooks/use-portal-knowledge-base";
 import type { KbLocale } from "@/lib/knowledge-base-api";
 
@@ -35,11 +39,14 @@ import type { KbLocale } from "@/lib/knowledge-base-api";
  * through, so a visitor sees an article's Arabic content whenever an
  * agent has set it — falling back to the base (English) content
  * otherwise, resolved server-side.
+ *
+ * Story 231 (PR-5.3) — a help centre rather than a list: the page header,
+ * one prominent search field, articles as cards with an excerpt (the title
+ * is the card's link, stretched over it), and "Still need help?" below.
  */
 export function ArticleListView() {
   const t = useTranslations("knowledgeBase");
   const tCommon = useTranslations("common");
-  const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
   const [search, setSearch] = useState("");
   /** Story S-8c — 1-based; `undefined` until the reader pages. */
@@ -71,24 +78,28 @@ export function ArticleListView() {
   const articles = articlePage?.items;
 
   return (
-    <Card asChild className="p-surface">
-      <section>
-        <div className="flex items-center justify-between gap-3">
-          <PageHeader title={t("list.title")} />
-          {/* In the heading's own row, so it adds no height and cannot shift
-            the list below it. */}
+    <section className="flex flex-col gap-section">
+      {/* The fetch indicator sits in the header's actions, so it adds no
+          height and cannot shift the list below it. */}
+      <PageHeader
+        title={t("list.title")}
+        description={t("list.description")}
+        actions={
           <FetchingIndicator active={articlesQuery.isPlaceholderData} label={tCommon("updating")} />
-        </div>
+        }
+      />
 
-        <Input
-          type="text"
-          aria-label={t("list.searchLabel")}
-          placeholder={t("list.searchPlaceholder")}
-          value={search}
-          onChange={(event) => updateSearch(event.target.value)}
-          className="mt-3 max-w-sm"
-        />
+      <Input
+        type="search"
+        startIcon={SearchIcon}
+        aria-label={t("list.searchLabel")}
+        placeholder={t("list.searchPlaceholder")}
+        value={search}
+        onChange={(event) => updateSearch(event.target.value)}
+        className="h-11 max-w-xl"
+      />
 
+      <div>
         {articlesQuery.isPending && (
           <LoadingStatus label={tCommon("loading")} className="mt-3 flex flex-col gap-2">
             {[0, 1, 2].map((row) => (
@@ -115,12 +126,11 @@ export function ArticleListView() {
         )}
 
         {articles !== undefined && articles.length > 0 && (
-          <ol className="mt-3 flex flex-col gap-2 text-sm">
+          <ol className="grid gap-3 text-sm sm:grid-cols-2">
             {articles.map((article) => (
               <li
                 key={article.id}
-                className="flex cursor-pointer items-center justify-between gap-2 border-b border-rule-subtle pb-2"
-                onClick={() => router.push(`/${locale}/knowledge-base/${article.id}`)}
+                className="relative flex flex-col gap-2 rounded-surface border border-rule bg-surface p-surface transition-shadow hover:border-rule-strong hover:shadow-raised"
               >
                 {/* `min-w-0 break-words`: an article title is author-written
                   free text, and a flex item's default `min-width: auto`
@@ -132,23 +142,28 @@ export function ArticleListView() {
                   the title is allowed to fill the space — the same shape as
                   `apps/web`'s own knowledge-base row, which already pairs
                   `justify-between` with a gap. */}
+                <span className="shrink-0 text-caption text-ink-subtle">
+                  {article.categoryName ?? t("list.noCategory")}
+                </span>
+                {/* Story 231 — the title is the card's one link, stretched
+                    over the whole card (`after:inset-0`), so the card is
+                    clickable and the link's name stays the title. */}
                 <Link
                   href={`/${locale}/knowledge-base/${article.id}`}
-                  className="focus-ring min-w-0 break-words rounded-sm font-medium text-ink-strong hover:underline"
-                  onClick={(event) => event.stopPropagation()}
+                  className="focus-ring min-w-0 break-words rounded-sm font-semibold text-ink-strong after:absolute after:inset-0 after:rounded-surface hover:underline"
                 >
                   {article.title}
                 </Link>
-                <span className="shrink-0 text-ink-subtle">
-                  {article.categoryName ?? t("list.noCategory")}
-                </span>
+                <p className="line-clamp-2 text-ink-muted">
+                  {article.body.slice(0, EXCERPT_LENGTH)}
+                </p>
               </li>
             ))}
           </ol>
         )}
 
         {articlePage !== undefined && (
-          <div className="mt-3">
+          <div className="mt-4">
             {/* Story S-8c — the shared pager, same primitive the agent
               workspace uses. Renders nothing for a single page, so a small
               published library looks exactly as it did before. */}
@@ -167,7 +182,9 @@ export function ArticleListView() {
             />
           </div>
         )}
-      </section>
-    </Card>
+      </div>
+
+      <StillNeedHelp />
+    </section>
   );
 }
