@@ -130,6 +130,9 @@ export {
 
   // Story 208 (RD-3.8) — attach a file (composer, attachments dropzone).
   Paperclip as AttachIcon,
+
+  // Story 209 (RD-3.9) — an AI-generated result (the pinned summary).
+  Sparkles as AiSummaryIcon,
 } from "lucide-react";
 
 /** The shape every icon above satisfies, for a component that accepts one. */

@@ -23,6 +23,7 @@ import { CustomerContextPanel } from "@/components/tickets/customer-context-pane
 import { TicketChatCard } from "@/components/tickets/ticket-chat-card";
 import type { ReplyInsertion } from "@/components/tickets/ticket-chat-card";
 import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
+import type { PinnedSummary } from "@/components/tickets/ticket-ai-card";
 import { TicketKbReferencesCard } from "@/components/tickets/ticket-kb-references-card";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { useAgentPresence } from "@/hooks/use-agent-presence";
@@ -222,6 +223,8 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const [aiCategoryNoMatch, setAiCategoryNoMatch] = useState<string | null>(null);
   // Story 208 — an AI-suggested reply on its way into the composer's draft.
   const [replyInsertion, setReplyInsertion] = useState<ReplyInsertion | null>(null);
+  // Story 209 — the latest AI summary, pinned in the conversation (client state).
+  const [pinnedSummary, setPinnedSummary] = useState<PinnedSummary | null>(null);
 
   /** Story 203 (RD-3.3) — the inspector sticks just under the sticky ticket
    * header, whose height varies (subject length, wrapped facts, actions).
@@ -401,33 +404,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               timeline: notes, history and SLA escalations now sit in it, in
               time order, instead of three cards of their own. Story 207
               (RD-3.7) — its one composer writes replies and internal notes. */}
-          <TicketChatCard ticketId={ticketId} replyInsertion={replyInsertion} />
-
-          <TicketAiCard
+          <TicketChatCard
             ticketId={ticketId}
-            // Story 208 (RD-3.8, recon TW-06) — into the reply draft, unsent.
-            onInsertReply={(text) => setReplyInsertion({ text, id: Date.now() })}
-            onApplyCategory={(suggested) => {
-              const match = (categoriesQuery.data ?? []).find(
-                (category) => category.name.toLowerCase() === suggested.trim().toLowerCase(),
-              );
-              if (match) {
-                setAiCategoryNoMatch(null);
-                mutation.mutate({ categoryId: match.id });
-              } else {
-                setAiCategoryNoMatch(suggested);
-              }
-            }}
+            replyInsertion={replyInsertion}
+            summary={pinnedSummary}
           />
-
-          {aiCategoryNoMatch && (
-            <Alert>
-              {t("detail.aiCategoryNoMatch", { category: aiCategoryNoMatch })}{" "}
-              <Link className="underline" href={`/${locale}/ticket-categories`}>
-                {t("detail.aiCategoryNoMatchLink")}
-              </Link>
-            </Alert>
-          )}
 
           <AttachmentsCard
             owner={{ type: "ticket", id: ticketId }}
@@ -635,6 +616,36 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               </DescriptionItem>
             </DescriptionList>
           </SectionCard>
+
+          {/* Story 209 (RD-3.9) — AI assist is a tool beside the conversation:
+              an inspector section, with its category no-match notice. */}
+          <TicketAiCard
+            ticketId={ticketId}
+            // Story 208 (RD-3.8, recon TW-06) — into the reply draft, unsent.
+            onInsertReply={(text) => setReplyInsertion({ text, id: Date.now() })}
+            // Story 209 (RD-3.9) — pinned at the top of the conversation.
+            onSummary={setPinnedSummary}
+            onApplyCategory={(suggested) => {
+              const match = (categoriesQuery.data ?? []).find(
+                (category) => category.name.toLowerCase() === suggested.trim().toLowerCase(),
+              );
+              if (match) {
+                setAiCategoryNoMatch(null);
+                mutation.mutate({ categoryId: match.id });
+              } else {
+                setAiCategoryNoMatch(suggested);
+              }
+            }}
+          />
+
+          {aiCategoryNoMatch && (
+            <Alert>
+              {t("detail.aiCategoryNoMatch", { category: aiCategoryNoMatch })}{" "}
+              <Link className="underline" href={`/${locale}/ticket-categories`}>
+                {t("detail.aiCategoryNoMatchLink")}
+              </Link>
+            </Alert>
+          )}
 
           <CustomerContextPanel ticketId={ticketId} customerId={ticket.customerId} collapsible />
 

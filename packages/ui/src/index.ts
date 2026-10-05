@@ -113,6 +113,7 @@ export {
   InternalNoteIcon,
   HistoryEventIcon,
   AttachIcon,
+  AiSummaryIcon,
 } from "./lib/icons";
 export type { LucideIcon } from "./lib/icons";
 

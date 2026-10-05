@@ -63,6 +63,7 @@ const ROLES = [
   "InternalNoteIcon",
   "HistoryEventIcon",
   "AttachIcon",
+  "AiSummaryIcon",
 ] as const;
 
 describe("icon vocabulary", () => {

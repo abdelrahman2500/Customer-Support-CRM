@@ -387,4 +387,172 @@ describe("TicketAiCard", () => {
     expect(await screen.findByText("A short summary.")).toBeInTheDocument();
     expect(screen.queryByText("detail.aiInsertIntoReply")).not.toBeInTheDocument();
   });
+
+  // Story 209 (RD-3.9, recon TW-06) — announced transitions, pinned summary.
+  describe("AI assist panel (Story 209)", () => {
+    function submitting() {
+      vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+        mutateAsync: vi.fn().mockResolvedValue({ id: "log-1", outcome: "PENDING" }),
+        isPending: false,
+      } as never);
+    }
+
+    function liveRegion() {
+      return screen.getByText(
+        (_, element) => element?.getAttribute("aria-live") === "polite" && element.tagName === "P",
+      );
+    }
+
+    it("has an empty polite live region from the start", () => {
+      render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+
+      const region = document.querySelector('p[aria-live="polite"]')!;
+      expect(region).toHaveAttribute("role", "status");
+      expect(region).toBeEmptyDOMElement();
+    });
+
+    it("announces working, then ready, in the same region", async () => {
+      submitting();
+      vi.mocked(useTicketAiResultQuery).mockReturnValue(
+        queryResult({
+          data: {
+            id: "log-1",
+            feature: "SUMMARIZE",
+            outcome: "PENDING",
+            outputText: null,
+            errorMessage: null,
+            createdAt: "2024-01-01T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      const { rerender } = render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+      const region = document.querySelector('p[aria-live="polite"]')!;
+
+      fireEvent.click(screen.getByText("detail.aiSummarize"));
+      await vi.waitFor(() => expect(region).toHaveTextContent("detail.aiStatusPending"));
+
+      vi.mocked(useTicketAiResultQuery).mockReturnValue(
+        queryResult({
+          data: {
+            id: "log-1",
+            feature: "SUMMARIZE",
+            outcome: "SUCCESS",
+            outputText: "Customer cannot log in.",
+            errorMessage: null,
+            createdAt: "2024-01-01T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      rerender(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+      expect(region).toHaveTextContent("detail.aiStatusReady");
+      expect(liveRegion()).toBe(region);
+    });
+
+    it("announces a failure and the turned-off state", async () => {
+      submitting();
+      vi.mocked(useTicketAiResultQuery).mockReturnValue(
+        queryResult({
+          data: {
+            id: "log-1",
+            feature: "SUGGEST_REPLY",
+            outcome: "ERROR",
+            outputText: null,
+            errorMessage: "Model timeout",
+            createdAt: "2024-01-01T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      const { rerender } = render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+      const region = document.querySelector('p[aria-live="polite"]')!;
+
+      fireEvent.click(screen.getByText("detail.aiSuggestReply"));
+      await vi.waitFor(() => expect(region).toHaveTextContent("detail.aiStatusFailed"));
+
+      vi.mocked(useTicketAiResultQuery).mockReturnValue(
+        queryResult({
+          data: {
+            id: "log-1",
+            feature: "SUGGEST_REPLY",
+            outcome: "DISABLED",
+            outputText: null,
+            errorMessage: null,
+            createdAt: "2024-01-01T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      rerender(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+      expect(region).toHaveTextContent("detail.aiStatusDisabled");
+    });
+
+    it("hands a successful summary over once per result, and nothing else", async () => {
+      submitting();
+      vi.mocked(useTicketAiResultQuery).mockReturnValue(
+        queryResult({
+          data: {
+            id: "log-1",
+            feature: "SUMMARIZE",
+            outcome: "SUCCESS",
+            outputText: "Customer cannot log in.",
+            errorMessage: null,
+            createdAt: "2024-01-01T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      const onSummary = vi.fn();
+      const { rerender } = render(
+        <TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} onSummary={onSummary} />,
+      );
+
+      fireEvent.click(screen.getByText("detail.aiSummarize"));
+      await vi.waitFor(() =>
+        expect(onSummary).toHaveBeenCalledWith({
+          id: "log-1",
+          text: "Customer cannot log in.",
+          at: "2024-01-01T00:00:00.000Z",
+        }),
+      );
+      rerender(
+        <TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} onSummary={onSummary} />,
+      );
+      expect(onSummary).toHaveBeenCalledOnce();
+    });
+
+    it("does not pin any other feature's result", async () => {
+      submitting();
+      vi.mocked(useTicketAiResultQuery).mockReturnValue(
+        queryResult({
+          data: {
+            id: "log-1",
+            feature: "SUGGEST_SOLUTIONS",
+            outcome: "SUCCESS",
+            outputText: "Reset it.",
+            errorMessage: null,
+            createdAt: "2024-01-01T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+      const onSummary = vi.fn();
+      render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} onSummary={onSummary} />);
+
+      fireEvent.click(screen.getByText("detail.aiSuggestSolutions"));
+      expect(await screen.findByText("Reset it.")).toBeInTheDocument();
+      expect(onSummary).not.toHaveBeenCalled();
+    });
+
+    it("is a collapsible section, open by default", () => {
+      render(<TicketAiCard ticketId="ticket-1" onApplyCategory={vi.fn()} />);
+
+      const toggle = screen.getByRole("button", { name: "detail.aiHeading" });
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByText("detail.aiSummarize")).not.toBeVisible();
+    });
+  });
 });

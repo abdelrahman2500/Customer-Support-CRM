@@ -2062,9 +2062,10 @@ describe("TicketDetailView", () => {
       return render(<TicketDetailView ticketId="ticket-1" />);
     }
     // Story 206 (RD-3.6) — SLA escalations left the inspector for the
-    // conversation timeline.
+    // conversation timeline. Story 209 (RD-3.9) — AI assist joined it.
     const SECTIONS = [
       "detail.propertiesHeading",
+      "detail.aiHeading",
       "detail.contextPanelHeading",
       "detail.slaHeading",
       "detail.csatHeading",
@@ -2240,6 +2241,55 @@ describe("TicketDetailView", () => {
       expect(reply).toHaveValue("Please try resetting your password.");
       await vi.waitFor(() => expect(reply).toHaveFocus());
       expect(sendMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  // Story 209 (RD-3.9) — AI assist in the inspector, its summary pinned.
+  describe("AI assist panel (Story 209)", () => {
+    it("places AI assist in the inspector, after Properties", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const properties = screen.getByRole("heading", { name: "detail.propertiesHeading" });
+      const ai = screen.getByRole("heading", { name: "detail.aiHeading" });
+      const context = screen.getByRole("heading", { name: "detail.contextPanelHeading" });
+      expect(properties.compareDocumentPosition(ai) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(ai.compareDocumentPosition(context) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // Out of the main column: the conversation no longer sits above it.
+      expect(properties.closest(".lg\\:sticky")).toContainElement(ai);
+    });
+
+    it("pins a successful summary at the top of the conversation", async () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      vi.mocked(useSubmitAiOperationMutation).mockReturnValue({
+        mutateAsync: vi.fn().mockResolvedValue({ id: "log-1", outcome: "PENDING" }),
+        isPending: false,
+      } as never);
+      vi.mocked(useTicketAiResultQuery).mockReturnValue(
+        queryResult({
+          data: {
+            id: "log-1",
+            feature: "SUMMARIZE",
+            outcome: "SUCCESS",
+            outputText: "Customer cannot log in since Monday.",
+            errorMessage: null,
+            createdAt: "2024-01-01T00:00:00.000Z",
+          },
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketDetailView ticketId="ticket-1" />);
+      fireEvent.click(screen.getByText("detail.aiSummarize"));
+
+      const pinned = await screen.findByRole("region", { name: "detail.aiSummaryPinned" });
+      const chat = screen.getByRole("heading", { name: "detail.chatHeading" }).closest(".p-surface")!;
+      expect(chat).toContainElement(pinned);
+      expect(within(pinned).getByText("Customer cannot log in since Monday.")).toBeInTheDocument();
     });
   });
 });

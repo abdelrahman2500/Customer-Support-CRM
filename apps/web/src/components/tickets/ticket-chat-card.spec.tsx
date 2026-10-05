@@ -1249,4 +1249,52 @@ describe("TicketChatCard", () => {
       expect(replyBox()).toHaveValue("Hi Sam,\n\nTry a reset.\n\nThanks!");
     });
   });
+
+  // Story 209 (RD-3.9) — the latest AI summary, pinned above the timeline.
+  describe("pinned AI summary (Story 209)", () => {
+    const summary = { id: "log-1", text: "Customer cannot log in.", at: "2024-01-01T10:00:00.000Z" };
+
+    beforeEach(() => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [customerMessage], isSuccess: true }) as never,
+      );
+    });
+
+    it("shows nothing without a summary", () => {
+      render(<TicketChatCard ticketId="ticket-1" />);
+      expect(screen.queryByRole("region", { name: "detail.aiSummaryPinned" })).not.toBeInTheDocument();
+    });
+
+    it("pins the summary above the timeline, open, with its time", () => {
+      render(<TicketChatCard ticketId="ticket-1" summary={summary} />);
+
+      const pinned = screen.getByRole("region", { name: "detail.aiSummaryPinned" });
+      expect(within(pinned).getByText(summary.text)).toBeVisible();
+      expect(within(pinned).getByTitle(new Date(summary.at).toLocaleString("en"))).toHaveAttribute(
+        "dateTime",
+        summary.at,
+      );
+      const log = screen.getByRole("log");
+      expect(pinned.compareDocumentPosition(log) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("collapses and expands, and a new summary opens again", () => {
+      const { rerender } = render(<TicketChatCard ticketId="ticket-1" summary={summary} />);
+      const toggle = screen.getByRole("button", { name: "detail.aiSummaryPinned" });
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByText(summary.text)).not.toBeVisible();
+
+      rerender(
+        <TicketChatCard ticketId="ticket-1" summary={{ ...summary, id: "log-2", text: "Newer." }} />,
+      );
+      expect(screen.getByRole("button", { name: "detail.aiSummaryPinned" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      expect(screen.getByText("Newer.")).toBeVisible();
+      expect(screen.queryByText(summary.text)).not.toBeInTheDocument();
+    });
+  });
 });

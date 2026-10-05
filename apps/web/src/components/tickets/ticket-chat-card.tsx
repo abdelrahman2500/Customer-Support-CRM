@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -23,6 +23,7 @@ import { useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { historyEventKey } from "@/lib/history-event";
 import { localeDirection } from "@/i18n/direction";
+import type { PinnedSummary } from "@/components/tickets/ticket-ai-card";
 import {
   Alert,
   Checkbox,
@@ -36,7 +37,9 @@ import {
   TabsTrigger,
 } from "@crm/ui";
 import {
+  AiSummaryIcon,
   Avatar,
+  ChevronDownIcon,
   Combobox,
   Composer,
   FileDropzone,
@@ -119,10 +122,13 @@ type TimelineEntry = MessageThreadItem & { kind: TimelineKind };
 export function TicketChatCard({
   ticketId,
   replyInsertion,
+  summary,
 }: {
   ticketId: string;
   /** Story 208 — text to put into the reply draft (e.g. an AI suggestion). */
   replyInsertion?: ReplyInsertion | null;
+  /** Story 209 — the latest AI summary, pinned above the timeline. */
+  summary?: PinnedSummary | null;
 }) {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
@@ -305,6 +311,7 @@ export function TicketChatCard({
 
   return (
     <SectionCard title={t("detail.chatHeading")}>
+      {summary && <PinnedSummaryBlock key={summary.id} summary={summary} locale={locale} />}
       {/* `dir`: Radix reads direction from its prop, not the document, so the
           arrow keys follow the reading direction only when told (Story 206). */}
       <Tabs
@@ -363,6 +370,48 @@ export function TicketChatCard({
 
       <TicketComposer ticketId={ticketId} replyInsertion={replyInsertion} />
     </SectionCard>
+  );
+}
+
+/** Story 209 (RD-3.9) — the latest AI summary, pinned at the top of the
+ * timeline where the agent reads, and collapsible. Client state only: it
+ * goes with a reload, and the next summary replaces it (keyed by id, so a
+ * new one opens again). */
+function PinnedSummaryBlock({ summary, locale }: { summary: PinnedSummary; locale: string }) {
+  const t = useTranslations("tickets");
+  const [open, setOpen] = useState(true);
+  const bodyId = useId();
+
+  return (
+    <section
+      aria-label={t("detail.aiSummaryPinned")}
+      className="mt-2 rounded-inner border border-rule-subtle bg-surface-muted p-3"
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => setOpen((value) => !value)}
+        className="focus-ring flex w-full items-center gap-tight rounded-inner text-start text-label font-medium text-ink-strong"
+      >
+        <AiSummaryIcon aria-hidden="true" className="size-4 shrink-0 text-accent" />
+        <span className="flex-1">{t("detail.aiSummaryPinned")}</span>
+        <ChevronDownIcon
+          aria-hidden="true"
+          className={open ? "size-4" : "size-4 -rotate-90 rtl:rotate-90"}
+        />
+      </button>
+      <div id={bodyId} hidden={!open} className="mt-2">
+        <p className="whitespace-pre-wrap text-sm text-ink-strong">{summary.text}</p>
+        <time
+          dateTime={summary.at}
+          title={formatDateTime(summary.at, locale)}
+          className="mt-1 block text-caption text-ink-subtle"
+        >
+          {formatTime(summary.at, locale)}
+        </time>
+      </div>
+    </section>
   );
 }
 
