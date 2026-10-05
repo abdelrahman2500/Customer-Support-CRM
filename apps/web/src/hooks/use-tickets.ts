@@ -115,7 +115,10 @@ export function useTicketNotesQuery(id: string) {
 export function useTicketCsatQuery(id: string) {
   return useQuery({
     queryKey: ticketCsatQueryKey(id),
-    queryFn: () => getTicketCsat(id),
+    // Story 219 — "no feedback yet" (204 → `undefined`) becomes `null`:
+    // TanStack Query v5 rejects `undefined` data, which turned every ticket
+    // without feedback into the section's load error.
+    queryFn: async () => (await getTicketCsat(id)) ?? null,
   });
 }
 

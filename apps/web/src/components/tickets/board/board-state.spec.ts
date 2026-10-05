@@ -92,7 +92,11 @@ describe("board state", () => {
   });
 
   it("gives every status its own spine, with Closed neutral", () => {
-    expect(statusSpine("OPEN")).toEqual({ border: "border-info-solid", dot: "bg-info-solid" });
+    expect(statusSpine("OPEN")).toEqual({
+      border: "border-info-solid",
+      dot: "bg-info-solid",
+      top: "border-t-info-solid",
+    });
     expect(statusSpine("IN_PROGRESS").border).toBe("border-progress-solid");
     expect(statusSpine("RESOLVED").border).toBe("border-success-solid");
     expect(statusSpine("CLOSED").border).toBe("border-rule-control");

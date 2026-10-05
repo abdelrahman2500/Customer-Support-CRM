@@ -5,7 +5,17 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCustomerQuery, useTicketsQuery } from "@/hooks/use-tickets";
 import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/ticket-badges";
-import { Alert, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
+import type { ContactSummary } from "@/lib/tickets-api";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  DescriptionItem,
+  DescriptionList,
+  LoadingStatus,
+  SectionCard,
+  Skeleton,
+} from "@crm/ui";
 
 /** Story 28's own "still needs work" definition (`dashboard-view.tsx`'s
  * `OPEN_STATUSES`) — reused here rather than re-invented, so "other open
@@ -33,14 +43,24 @@ const OTHER_TICKETS_LIMIT = 5;
  * for its own Related Tickets / Contacts cards, just parameterized to the
  * current ticket's customer instead of the customer detail route's own id.
  * Read-only: no editing capability lives on this panel.
+ *
+ * Story 219 (PR-3.4, RD-3.11, recon VL-11) — an inspector section that
+ * answers "who is this?" first: the customer's identity (avatar, name,
+ * active / inactive / anonymized), then who raised this ticket (when the
+ * ticket's `contactId` is one of the customer's loaded contacts), the other
+ * open tickets, and the primary contacts as a description list. Sentence-case
+ * subheadings (no uppercase). Still only today's two queries.
  */
 export function CustomerContextPanel({
   ticketId,
   customerId,
+  contactId = null,
   collapsible = false,
 }: {
   ticketId: string;
   customerId: string;
+  /** The contact who raised the ticket, when known. */
+  contactId?: string | null;
   /** Story 203 (RD-3.3) — a collapsible inspector section on the ticket page. */
   collapsible?: boolean;
 }) {
@@ -54,30 +74,67 @@ export function CustomerContextPanel({
     pageSize: OTHER_TICKETS_LIMIT,
   });
   const customerQuery = useCustomerQuery(customerId);
+  const customer = customerQuery.data;
 
   // The current ticket itself always matches `customerId` + is usually
   // still open — excluded client-side (the plan's own wording), since the
   // backend has no "every ticket except this one" filter and inventing
   // one for a single capped list isn't worth a new query parameter.
   const otherTickets = (ticketsQuery.data?.items ?? []).filter((ticket) => ticket.id !== ticketId);
-  const primaryContacts = (customerQuery.data?.contacts ?? []).filter(
-    (contact) => contact.isPrimary,
-  );
+  const primaryContacts = (customer?.contacts ?? []).filter((contact) => contact.isPrimary);
+  const raisedBy = contactId
+    ? (customer?.contacts.find((contact) => contact.id === contactId) ?? null)
+    : null;
 
   return (
     <SectionCard title={t("detail.contextPanelHeading")} collapsible={collapsible}>
-      <div className="mt-3 flex flex-col gap-1">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
-            {t("detail.contextPanelTicketsHeading")}
-          </h3>
-          <Link
-            href={`/${locale}/customers/${customerId}`}
-            className="focus-ring rounded-sm text-xs text-ink-subtle hover:underline"
-          >
-            {t("detail.contextPanelViewAll")}
-          </Link>
+      {customerQuery.isLoading && (
+        <LoadingStatus label={tCommon("loading")} asChild>
+          <Skeleton className="mt-3 h-12 w-full" />
+        </LoadingStatus>
+      )}
+      {customer?.displayName && (
+        <div className="mt-3 flex items-center gap-3">
+          <Avatar name={customer.displayName} size="md" decorative />
+          <div className="flex min-w-0 flex-col gap-tight">
+            <Link
+              href={`/${locale}/customers/${customerId}`}
+              className="focus-ring min-w-0 truncate rounded-inner font-medium text-ink-strong hover:underline"
+            >
+              {customer.displayName}
+            </Link>
+            <span className="self-start">
+              {customer.anonymizedAt ? (
+                <Badge variant="secondary" size="sm">
+                  {t("detail.contextCustomerAnonymized")}
+                </Badge>
+              ) : customer.isActive ? (
+                <Badge variant="success" size="sm">
+                  {t("detail.contextCustomerActive")}
+                </Badge>
+              ) : (
+                <Badge variant="secondary" size="sm">
+                  {t("detail.contextCustomerInactive")}
+                </Badge>
+              )}
+            </span>
+          </div>
         </div>
+      )}
+
+      {raisedBy && (
+        <DescriptionList className="mt-3">
+          <DescriptionItem term={t("detail.contextRaisedBy")}>
+            <span className="font-medium text-ink-strong">{raisedBy.fullName}</span>
+            <ContactLines contact={raisedBy} />
+          </DescriptionItem>
+        </DescriptionList>
+      )}
+
+      <div className="mt-3 flex flex-col gap-1 border-t border-rule-subtle pt-3">
+        <h3 className="text-caption font-medium text-ink-muted">
+          {t("detail.contextPanelTicketsHeading")}
+        </h3>
         {ticketsQuery.isLoading && (
           <LoadingStatus label={tCommon("loading")} asChild>
             <Skeleton className="mt-1 h-12 w-full" />
@@ -92,16 +149,16 @@ export function CustomerContextPanel({
           <p className="mt-1 text-sm text-ink-subtle">{t("detail.contextPanelTicketsEmpty")}</p>
         )}
         {ticketsQuery.isSuccess && otherTickets.length > 0 && (
-          <ul className="mt-1 flex flex-col gap-1 text-sm">
+          <ul className="mt-1 flex flex-col gap-2 text-sm">
             {otherTickets.map((ticket) => (
-              <li key={ticket.id} className="flex items-center justify-between gap-2">
+              <li key={ticket.id} className="flex flex-col gap-1">
                 <Link
                   href={`/${locale}/tickets/${ticket.id}`}
-                  className="focus-ring truncate rounded-sm font-medium text-ink-strong hover:underline"
+                  className="focus-ring min-w-0 truncate rounded-inner font-medium text-ink-strong hover:underline"
                 >
                   {ticket.subject}
                 </Link>
-                <span className="flex shrink-0 items-center gap-1">
+                <span className="flex flex-wrap items-center gap-1">
                   <TicketStatusBadge status={ticket.status} />
                   <TicketPriorityBadge priority={ticket.priority} />
                 </span>
@@ -112,14 +169,9 @@ export function CustomerContextPanel({
       </div>
 
       <div className="mt-3 flex flex-col gap-1 border-t border-rule-subtle pt-3">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
+        <h3 className="text-caption font-medium text-ink-muted">
           {t("detail.contextPanelContactsHeading")}
         </h3>
-        {customerQuery.isLoading && (
-          <LoadingStatus label={tCommon("loading")} asChild>
-            <Skeleton className="mt-1 h-8 w-full" />
-          </LoadingStatus>
-        )}
         {customerQuery.isError && (
           <Alert variant="destructive" className="mt-1">
             {t("detail.contextPanelContactsError")}
@@ -129,17 +181,44 @@ export function CustomerContextPanel({
           <p className="mt-1 text-sm text-ink-subtle">{t("detail.contextPanelContactsEmpty")}</p>
         )}
         {customerQuery.isSuccess && primaryContacts.length > 0 && (
-          <ul className="mt-1 flex flex-col gap-1 text-sm">
+          <DescriptionList className="mt-1">
             {primaryContacts.map((contact) => (
-              <li key={contact.id} className="flex flex-wrap items-baseline gap-x-2">
-                <span className="font-medium text-ink-strong">{contact.fullName}</span>
-                {contact.email && <span className="text-ink-subtle">{contact.email}</span>}
-                {contact.phone && <span className="text-ink-subtle">{contact.phone}</span>}
-              </li>
+              <DescriptionItem key={contact.id} term={contact.fullName}>
+                <ContactLines contact={contact} />
+              </DescriptionItem>
             ))}
-          </ul>
+          </DescriptionList>
         )}
       </div>
+
+      <Link
+        href={`/${locale}/customers/${customerId}`}
+        className="focus-ring mt-3 inline-flex self-start rounded-inner text-sm font-medium text-accent hover:underline"
+      >
+        {t("detail.contextPanelViewAll", { customer: customer?.displayName ?? "" })}
+      </Link>
     </SectionCard>
+  );
+}
+
+/** A contact's reachable details, each on its own line (LTR-safe). */
+function ContactLines({ contact }: { contact: ContactSummary }) {
+  return (
+    <span className="flex min-w-0 flex-col text-sm">
+      {contact.email && (
+        <a
+          href={`mailto:${contact.email}`}
+          dir="ltr"
+          className="focus-ring self-start truncate rounded-inner text-ink-muted hover:underline"
+        >
+          {contact.email}
+        </a>
+      )}
+      {contact.phone && (
+        <span dir="ltr" className="self-start text-ink-muted">
+          {contact.phone}
+        </span>
+      )}
+    </span>
   );
 }

@@ -135,17 +135,33 @@ export function isAtRiskTicket(ticket: TicketListItem, now: Date = new Date()): 
   return status.kind === "breached" || (status.kind === "on-track" && status.atRisk);
 }
 
-/** The status spine: one hue per status, used by the column, its dot and the switcher. */
-const SPINE: Record<PresentationTone, { border: string; dot: string }> = {
-  info: { border: "border-info-solid", dot: "bg-info-solid" },
-  progress: { border: "border-progress-solid", dot: "bg-progress-solid" },
-  success: { border: "border-success-solid", dot: "bg-success-solid" },
-  neutral: { border: "border-rule-control", dot: "bg-rule-control" },
-  warning: { border: "border-warning-solid", dot: "bg-warning-solid" },
-  danger: { border: "border-danger-solid", dot: "bg-danger-solid" },
+/**
+ * The status spine: one hue per status, used by the column, its dot and the
+ * switcher — and (Story 219) `top`, the ticket header's top edge. Literal
+ * class names, so Tailwind generates every one.
+ */
+const SPINE: Record<PresentationTone, { border: string; dot: string; top: string }> = {
+  info: { border: "border-info-solid", dot: "bg-info-solid", top: "border-t-info-solid" },
+  progress: {
+    border: "border-progress-solid",
+    dot: "bg-progress-solid",
+    top: "border-t-progress-solid",
+  },
+  success: {
+    border: "border-success-solid",
+    dot: "bg-success-solid",
+    top: "border-t-success-solid",
+  },
+  neutral: { border: "border-rule-control", dot: "bg-rule-control", top: "border-t-rule-control" },
+  warning: {
+    border: "border-warning-solid",
+    dot: "bg-warning-solid",
+    top: "border-t-warning-solid",
+  },
+  danger: { border: "border-danger-solid", dot: "bg-danger-solid", top: "border-t-danger-solid" },
 };
 
-export function statusSpine(status: TicketStatus): { border: string; dot: string } {
+export function statusSpine(status: TicketStatus): { border: string; dot: string; top: string } {
   return SPINE[ticketStatusPresentation(status).tone];
 }
 

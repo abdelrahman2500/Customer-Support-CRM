@@ -138,6 +138,15 @@ describe("board moves", () => {
       expect(columnCoordinates(key("ArrowLeft"), args(1040))).toEqual(centredOn(740));
     });
 
+    it("does nothing before the dragged card is measured", () => {
+      const unmeasured = {
+        currentCoordinates: { x: 0, y: 0 },
+        active: "t1",
+        context: { droppableRects: rects, collisionRect: null },
+      } as never;
+      expect(columnCoordinates(key("ArrowRight"), unmeasured)).toBeUndefined();
+    });
+
     it("ignores other keys (no pixel nudging inside a column)", () => {
       expect(columnCoordinates(key("ArrowDown"), args(140))).toBeUndefined();
     });

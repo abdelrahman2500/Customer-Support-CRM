@@ -100,7 +100,10 @@ export const columnCoordinates: KeyboardCoordinateGetter = (
   if (event.code !== "ArrowLeft" && event.code !== "ArrowRight") return undefined;
   event.preventDefault();
   const rightward = event.code === "ArrowRight";
-  const halfWidth = (context.collisionRect?.width ?? 0) / 2;
+  // Not measured yet (a key pressed in the same frame as the pick-up): no
+  // reliable position to move from, so this key does nothing.
+  if (!context.collisionRect) return undefined;
+  const halfWidth = context.collisionRect.width / 2;
   const current = currentCoordinates.x + halfWidth;
   let best: { center: number; distance: number } | undefined;
   for (const rect of context.droppableRects.values()) {

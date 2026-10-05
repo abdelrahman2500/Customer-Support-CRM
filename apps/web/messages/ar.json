@@ -195,7 +195,7 @@
       "contextPanelContactsHeading": "جهات الاتصال الأساسية",
       "contextPanelContactsEmpty": "لا توجد جهة اتصال أساسية محددة لهذا العميل.",
       "contextPanelContactsError": "تعذّر تحميل جهات اتصال هذا العميل.",
-      "contextPanelViewAll": "عرض العميل",
+      "contextPanelViewAll": "عرض {customer}",
       "subjectLabel": "موضوع التذكرة",
       "status": "الحالة",
       "priority": "الأولوية",
@@ -331,6 +331,18 @@
         "resolve": "حل",
         "close": "إغلاق",
         "reopen": "إعادة فتح"
+      },
+      "kbReferencesRemoveNamed": "إزالة {title}",
+      "kbReferencesAttachNamed": "إرفاق {title}",
+      "contextCustomerActive": "نشط",
+      "contextCustomerInactive": "غير نشط",
+      "contextCustomerAnonymized": "مجهّل الهوية",
+      "contextRaisedBy": "أُنشئت بواسطة",
+      "changeCue": {
+        "status": "تغيّرت الحالة إلى {value}.",
+        "priority": "تغيّرت الأولوية إلى {value}.",
+        "assignee": "أصبحت مسندة إلى {value}.",
+        "unassigned": "أصبحت غير مسندة."
       }
     },
     "sla": {

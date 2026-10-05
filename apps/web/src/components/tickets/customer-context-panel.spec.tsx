@@ -167,4 +167,86 @@ describe("CustomerContextPanel", () => {
       "/en/customers/customer-1",
     );
   });
+
+  /** Story 219 (PR-3.4, RD-3.11, recon VL-11). */
+  describe("inspector section (Story 219)", () => {
+    const customer = {
+      id: "customer-1",
+      displayName: "Desert Rose Hotels",
+      isActive: true,
+      anonymizedAt: null as string | null,
+      createdAt: "2026-01-01T00:00:00Z",
+      contacts: [
+        {
+          id: "contact-1",
+          fullName: "Layla Haddad",
+          email: "layla@example.com",
+          phone: null,
+          isPrimary: false,
+          hasPortalAccess: true,
+        },
+        {
+          id: "contact-2",
+          fullName: "Omar Saleh",
+          email: null,
+          phone: "+966 50 000 0000",
+          isPrimary: true,
+          hasPortalAccess: false,
+        },
+      ],
+    };
+
+    function renderWith(overrides: Partial<typeof customer> = {}, contactId: string | null = null) {
+      vi.mocked(useTicketsQuery).mockReturnValue(
+        queryResult({ data: page([]), isSuccess: true }) as never,
+      );
+      vi.mocked(useCustomerQuery).mockReturnValue(
+        queryResult({ data: { ...customer, ...overrides }, isSuccess: true }) as never,
+      );
+      return render(
+        <CustomerContextPanel ticketId="ticket-1" customerId="customer-1" contactId={contactId} />,
+      );
+    }
+
+    it("leads with the customer's identity and status, linking to the customer", () => {
+      renderWith();
+      expect(screen.getByRole("link", { name: "Desert Rose Hotels" })).toHaveAttribute(
+        "href",
+        "/en/customers/customer-1",
+      );
+      expect(screen.getByText("detail.contextCustomerActive")).toBeInTheDocument();
+    });
+
+    it("marks an inactive or anonymized customer", () => {
+      const { unmount } = renderWith({ isActive: false });
+      expect(screen.getByText("detail.contextCustomerInactive")).toBeInTheDocument();
+      unmount();
+      renderWith({ anonymizedAt: "2026-02-01T00:00:00Z" });
+      expect(screen.getByText("detail.contextCustomerAnonymized")).toBeInTheDocument();
+    });
+
+    it("names who raised the ticket when it is one of the loaded contacts", () => {
+      renderWith({}, "contact-1");
+      const raisedBy = screen.getByText("detail.contextRaisedBy").closest("div")!;
+      expect(raisedBy).toHaveTextContent("Layla Haddad");
+      expect(raisedBy).toHaveTextContent("layla@example.com");
+      expect(screen.getByRole("link", { name: "layla@example.com" })).toHaveAttribute(
+        "href",
+        "mailto:layla@example.com",
+      );
+    });
+
+    it("shows nothing for an unknown raising contact", () => {
+      renderWith({}, "someone-else");
+      expect(screen.queryByText("detail.contextRaisedBy")).not.toBeInTheDocument();
+    });
+
+    it("lists primary contacts as a description list, with sentence-case subheadings", () => {
+      const { container } = renderWith();
+      const term = screen.getByText("Omar Saleh");
+      expect(term.tagName).toBe("DT");
+      expect(term.nextElementSibling).toHaveTextContent("+966 50 000 0000");
+      expect(container.querySelector(".uppercase")).toBeNull();
+    });
+  });
 });

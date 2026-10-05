@@ -7,6 +7,7 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
+  MeasuringStrategy,
   MouseSensor,
   TouchSensor,
   pointerWithin,
@@ -92,6 +93,8 @@ type MoveVia = "pointer" | "keyboard" | "menu";
 
 /** How long a card the agent moved counts as their own change. */
 const OWN_MOVE_MS = 45_000;
+
+const MEASURE_COLUMNS_UP_FRONT = { droppable: { strategy: MeasuringStrategy.Always } };
 
 const SILENT_ANNOUNCEMENTS = {
   onDragStart: () => undefined,
@@ -284,7 +287,13 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
   function onDragStart(event: DragStartEvent) {
     const ticket = (event.active.data.current?.ticket as TicketListItem | undefined) ?? null;
     setDragging(ticket);
-    if (ticket) announce(t("announce.pickedUp", { subject: ticket.subject }));
+    // Announced once the drag is measured (two frames), so "Picked up" also
+    // means the arrow keys are ready to move the card.
+    if (ticket) {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => announce(t("announce.pickedUp", { subject: ticket.subject }))),
+      );
+    }
   }
   function onDragOver(event: DragOverEvent) {
     const over = (event.over?.id as TicketStatus | undefined) ?? null;
@@ -497,6 +506,9 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
         <DndContext
           sensors={sensors}
           collisionDetection={collisionDetection}
+          // The columns are measured before a drag starts, so the first arrow
+          // key of a keyboard drag always finds them (four rects; cheap).
+          measuring={MEASURE_COLUMNS_UP_FRONT}
           onDragStart={onDragStart}
           onDragOver={onDragOver}
           onDragEnd={onDragEnd}

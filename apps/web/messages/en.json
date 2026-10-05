@@ -195,7 +195,7 @@
       "contextPanelContactsHeading": "Primary contacts",
       "contextPanelContactsEmpty": "No primary contact set for this customer.",
       "contextPanelContactsError": "Couldn't load this customer's contacts.",
-      "contextPanelViewAll": "View customer",
+      "contextPanelViewAll": "View {customer}",
       "subjectLabel": "Ticket subject",
       "status": "Status",
       "priority": "Priority",
@@ -331,6 +331,18 @@
         "resolve": "Resolve",
         "close": "Close",
         "reopen": "Reopen"
+      },
+      "kbReferencesRemoveNamed": "Remove {title}",
+      "kbReferencesAttachNamed": "Attach {title}",
+      "contextCustomerActive": "Active",
+      "contextCustomerInactive": "Inactive",
+      "contextCustomerAnonymized": "Anonymized",
+      "contextRaisedBy": "Raised by",
+      "changeCue": {
+        "status": "Status changed to {value}.",
+        "priority": "Priority changed to {value}.",
+        "assignee": "Now assigned to {value}.",
+        "unassigned": "Now unassigned."
       }
     },
     "sla": {

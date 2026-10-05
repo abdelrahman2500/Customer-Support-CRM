@@ -29,7 +29,14 @@ import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus } from "@/lib/sla";
 import { SlaIndicator } from "@/components/tickets/sla-indicator";
-import { TicketHeader, TicketHeaderActions } from "@/components/tickets/ticket-header";
+import {
+  TicketHeader,
+  TicketHeaderActions,
+  type TicketHeaderField,
+} from "@/components/tickets/ticket-header";
+
+/** Story 219 — how long after sending a field its change counts as the agent's own. */
+const OWN_CHANGE_MS = 15_000;
 import { ApiError } from "@/lib/api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
@@ -305,6 +312,16 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   }
   const currentUserId = currentUserQuery.data?.id;
 
+  /** Story 219 (RD-3.13) — a header field's latest change was this agent's
+   * own edit when the page's update mutation sent that field recently. */
+  function isOwnChange(field: TicketHeaderField): boolean {
+    const sent = mutation.variables;
+    if (!sent || Date.now() - mutation.submittedAt > OWN_CHANGE_MS) return false;
+    if (field === "status") return sent.status !== undefined;
+    if (field === "priority") return sent.priority !== undefined;
+    return sent.assignedToUserId !== undefined;
+  }
+
   /** Story 204 (RD-3.4) — the assignee options: avatar (with presence dot),
    * name, presence as text; the current agent first, marked "(you)". */
   const assigneeOptions: ComboboxOption[] = [...(usersQuery.data ?? [])]
@@ -362,6 +379,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             : undefined
         }
         onSubjectCommit={(subject, { onError }) => mutation.mutate({ subject }, { onError })}
+        isOwnChange={isOwnChange}
         actions={
           <TicketHeaderActions
             status={ticket.status}
@@ -424,8 +442,6 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               dropHint: t("detail.attachmentsDropHint"),
             }}
           />
-
-          <TicketKbReferencesCard ticketId={ticketId} />
         </div>
 
         {/* Story 203 (RD-3.3, recon TW-02) — the inspector: from lg it stays
@@ -647,7 +663,17 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             </Alert>
           )}
 
-          <CustomerContextPanel ticketId={ticketId} customerId={ticket.customerId} collapsible />
+          <CustomerContextPanel
+            ticketId={ticketId}
+            customerId={ticket.customerId}
+            contactId={ticket.contactId}
+            collapsible
+          />
+
+          {/* Story 219 (RD-3.10) — knowledge-base references are reference
+              material read beside the conversation: an inspector section,
+              after the customer context. */}
+          <TicketKbReferencesCard ticketId={ticketId} collapsible />
 
           <SectionCard title={t("detail.slaHeading")} collapsible>
             {slaTargetQuery.isLoading && (

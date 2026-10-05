@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { TicketHeader, TicketHeaderActions, type TicketHeaderSla } from "./ticket-header";
+import type { TicketSummary } from "@/lib/tickets-api";
 import enMessages from "../../../messages/en.json";
 import arMessages from "../../../messages/ar.json";
 
@@ -218,6 +219,69 @@ describe("TicketHeader", () => {
       renderActions();
       const group = screen.getByRole("group", { name: "Ticket actions" });
       expect(group.getAttribute("aria-label")).not.toMatch(/status|priority/i);
+    });
+  });
+
+  /** Story 219 (PR-3.4) — the status spine and the realtime change cues (RD-3.13). */
+  describe("status spine and change cues (Story 219)", () => {
+    function view(
+      current: TicketSummary,
+      isOwnChange: (field: "status" | "priority" | "assignee") => boolean = () => false,
+      assigneeName: string | null = "Ada Lovelace",
+    ) {
+      return (
+        <NextIntlClientProvider locale="en" messages={CATALOGS.en} timeZone="UTC">
+          <TicketHeader
+            ticket={current}
+            locale="en"
+            sla={{ status: "ready", target: null }}
+            assigneeName={assigneeName}
+            onSubjectCommit={vi.fn()}
+            isOwnChange={isOwnChange}
+          />
+        </NextIntlClientProvider>
+      );
+    }
+    const live = (container: HTMLElement) => container.querySelector('[aria-live="polite"]')!;
+
+    it("runs the status spine along the header's top edge, in the status hue", () => {
+      locale = "en";
+      const { container, rerender } = render(view(ticket));
+      const header = container.querySelector("header")!;
+      expect(header).toHaveClass("border-t-[3px]", "border-t-progress-solid");
+      rerender(view({ ...ticket, status: "RESOLVED" }));
+      expect(header).toHaveClass("border-t-success-solid");
+    });
+
+    it("cues and announces a status, priority or assignee change made elsewhere", () => {
+      locale = "en";
+      const { container, rerender } = render(view(ticket));
+      expect(container.querySelector("[data-changed]")).toBeNull();
+      expect(live(container)).toBeEmptyDOMElement();
+
+      rerender(view({ ...ticket, status: "RESOLVED", priority: "URGENT" }));
+      expect(container.querySelectorAll("[data-changed]")).toHaveLength(2);
+      expect(live(container)).toHaveTextContent(
+        "Status changed to Resolved. Priority changed to Urgent.",
+      );
+
+      rerender(
+        view(
+          { ...ticket, status: "RESOLVED", priority: "URGENT", assignedToUserId: null },
+          () => false,
+          null,
+        ),
+      );
+      expect(live(container)).toHaveTextContent("Now unassigned.");
+    });
+
+    it("never cues or announces the agent's own change", () => {
+      locale = "en";
+      const own = (field: "status" | "priority" | "assignee") => field === "status";
+      const { container, rerender } = render(view(ticket, own));
+      rerender(view({ ...ticket, status: "RESOLVED" }, own));
+      expect(container.querySelector("[data-changed]")).toBeNull();
+      expect(live(container)).toBeEmptyDOMElement();
     });
   });
 });

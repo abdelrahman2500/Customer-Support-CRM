@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { TicketKbReferencesCard } from "./ticket-kb-references-card";
 import {
   useCreateTicketKbReferenceMutation,
@@ -10,8 +10,11 @@ import { usePublishedArticleSearchQuery } from "@/hooks/use-knowledge-base";
 import { ApiError } from "@/lib/api";
 
 vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
+  // Story 219 — interpolated keys show their values, so unique names are testable.
+  useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
+    vars ? `${key}:${JSON.stringify(vars)}` : key,
 }));
+vi.mock("next/navigation", () => ({ useParams: () => ({ locale: "en" }) }));
 
 vi.mock("@/hooks/use-ticket-kb-references", () => ({
   useTicketKbReferencesQuery: vi.fn(),
@@ -250,5 +253,99 @@ describe("TicketKbReferencesCard", () => {
     fireEvent.click(screen.getByText("detail.kbReferencesAttach"));
 
     expect(await screen.findByText("Article not found")).toBeInTheDocument();
+  });
+
+  /** Story 219 (PR-3.4, RD-3.10, recon A11Y-06 / TW-13). */
+  describe("inspector section (Story 219)", () => {
+    const references = [
+      { id: "reference-1", articleId: "article-1", articleTitle: "Reset a password" },
+      { id: "reference-2", articleId: "article-2", articleTitle: "Change the plan" },
+    ];
+
+    it("links each referenced title to its article and names every remove button uniquely", () => {
+      vi.mocked(useTicketKbReferencesQuery).mockReturnValue(
+        queryResult({ data: references, isSuccess: true }) as never,
+      );
+      render(<TicketKbReferencesCard ticketId="ticket-1" />);
+
+      expect(screen.getByRole("link", { name: "Reset a password" })).toHaveAttribute(
+        "href",
+        "/en/knowledge-base/article-1",
+      );
+      expect(
+        screen.getByRole("button", {
+          name: 'detail.kbReferencesRemoveNamed:{"title":"Reset a password"}',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: 'detail.kbReferencesRemoveNamed:{"title":"Change the plan"}',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("shows pending only on the row being removed; the others stay usable", () => {
+      vi.mocked(useTicketKbReferencesQuery).mockReturnValue(
+        queryResult({ data: references, isSuccess: true }) as never,
+      );
+      vi.mocked(useDeleteTicketKbReferenceMutation).mockReturnValue({
+        mutate: vi.fn(),
+        isPending: true,
+        variables: "reference-1",
+      } as never);
+      render(<TicketKbReferencesCard ticketId="ticket-1" />);
+
+      expect(
+        screen.getByRole("button", { name: /kbReferencesRemoveNamed.*Reset a password/ }),
+      ).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: /kbReferencesRemoveNamed.*Change the plan/ }),
+      ).toBeEnabled();
+    });
+
+    it("names attach buttons uniquely and marks only the one attaching", () => {
+      vi.mocked(useTicketKbReferencesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      vi.mocked(usePublishedArticleSearchQuery).mockReturnValue(
+        queryResult({
+          data: page([
+            { id: "article-1", title: "Reset a password" },
+            { id: "article-3", title: "Refund policy" },
+          ]),
+          isSuccess: true,
+        }) as never,
+      );
+      vi.mocked(useCreateTicketKbReferenceMutation).mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: true,
+        variables: { articleId: "article-3" },
+      } as never);
+      render(<TicketKbReferencesCard ticketId="ticket-1" />);
+
+      const attaching = screen.getByRole("button", { name: /AttachNamed.*Refund policy/ });
+      expect(attaching).toBeDisabled();
+      expect(attaching).toHaveTextContent("detail.kbReferencesAttaching");
+      expect(screen.getByRole("button", { name: /AttachNamed.*Reset a password/ })).toBeEnabled();
+    });
+
+    it("waits for a pause in typing before it searches", () => {
+      vi.useFakeTimers();
+      try {
+        vi.mocked(useTicketKbReferencesQuery).mockReturnValue(
+          queryResult({ data: [], isSuccess: true }) as never,
+        );
+        render(<TicketKbReferencesCard ticketId="ticket-1" />);
+        const field = screen.getByPlaceholderText("detail.kbReferencesSearchPlaceholder");
+        fireEvent.change(field, { target: { value: "pass" } });
+        fireEvent.change(field, { target: { value: "password" } });
+        expect(usePublishedArticleSearchQuery).toHaveBeenLastCalledWith("");
+        act(() => vi.advanceTimersByTime(300));
+        expect(usePublishedArticleSearchQuery).toHaveBeenLastCalledWith("password");
+        expect(usePublishedArticleSearchQuery).not.toHaveBeenCalledWith("pass");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

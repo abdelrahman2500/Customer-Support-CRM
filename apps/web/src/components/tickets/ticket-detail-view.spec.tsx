@@ -2063,10 +2063,12 @@ describe("TicketDetailView", () => {
     }
     // Story 206 (RD-3.6) — SLA escalations left the inspector for the
     // conversation timeline. Story 209 (RD-3.9) — AI assist joined it.
+    // Story 219 (RD-3.10) — knowledge-base references joined the inspector.
     const SECTIONS = [
       "detail.propertiesHeading",
       "detail.aiHeading",
       "detail.contextPanelHeading",
+      "detail.kbReferencesHeading",
       "detail.slaHeading",
       "detail.csatHeading",
     ];
@@ -2290,6 +2292,21 @@ describe("TicketDetailView", () => {
       const chat = screen.getByRole("heading", { name: "detail.chatHeading" }).closest(".p-surface")!;
       expect(chat).toContainElement(pinned);
       expect(within(pinned).getByText("Customer cannot log in since Monday.")).toBeInTheDocument();
+    });
+  });
+
+  // Story 219 (PR-3.4, RD-3.10) — KB references are an inspector section.
+  describe("ticket detail v2 (Story 219)", () => {
+    it("places knowledge-base references in the inspector, after the customer context", () => {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      render(<TicketDetailView ticketId="ticket-1" />);
+
+      const context = screen.getByRole("heading", { name: "detail.contextPanelHeading" });
+      const kb = screen.getByRole("heading", { name: "detail.kbReferencesHeading" });
+      expect(context.compareDocumentPosition(kb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(context.closest(".lg\\:sticky")).toContainElement(kb);
     });
   });
 });

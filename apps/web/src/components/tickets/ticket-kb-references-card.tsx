@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   useCreateTicketKbReferenceMutation,
@@ -10,6 +12,9 @@ import {
 import { usePublishedArticleSearchQuery } from "@/hooks/use-knowledge-base";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import { Alert, Button, Input, LoadingStatus, SectionCard, Skeleton } from "@crm/ui";
+
+/** Story 219 (RD-3.10) — how long typing pauses before the article search runs. */
+const SEARCH_DEBOUNCE_MS = 300;
 
 /**
  * RM-05 — Ticket ↔ Knowledge Base Linkage. Mirrors `TicketDetailView`'s own
@@ -22,10 +27,26 @@ import { Alert, Button, Input, LoadingStatus, SectionCard, Skeleton } from "@crm
  * renders the change. No confirmation dialog on remove — unlike a
  * password reset or portal-access revocation, removing a reference is
  * trivially reversible (re-attach the same article).
+ *
+ * Story 219 (PR-3.4, RD-3.10, recon A11Y-06 / TW-13) — an inspector section:
+ * - each referenced title links to its article;
+ * - every row's button has a unique accessible name ("Remove {title}",
+ *   "Attach {title}") while its visible text stays short;
+ * - the search waits for a pause in typing before it queries;
+ * - only the row being removed or attached shows its pending state (the
+ *   mutation's own `variables`), so the other rows stay usable.
+ * The attach/remove requests are unchanged.
  */
-export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
+export function TicketKbReferencesCard({
+  ticketId,
+  collapsible = false,
+}: {
+  ticketId: string;
+  collapsible?: boolean;
+}) {
   const t = useTranslations("tickets");
   const tCommon = useTranslations("common");
+  const locale = useParams<{ locale: string }>()?.locale ?? "en";
   const errorMessage = useErrorMessage();
   const referencesQuery = useTicketKbReferencesQuery(ticketId);
   const removeMutation = useDeleteTicketKbReferenceMutation(ticketId);
@@ -45,7 +66,7 @@ export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
   }
 
   return (
-    <SectionCard title={t("detail.kbReferencesHeading")}>
+    <SectionCard title={t("detail.kbReferencesHeading")} collapsible={collapsible}>
       {referencesQuery.isLoading && (
         <LoadingStatus label={tCommon("loading")} asChild>
           <Skeleton className="mt-2 h-16 w-full" />
@@ -60,24 +81,37 @@ export function TicketKbReferencesCard({ ticketId }: { ticketId: string }) {
         <p className="mt-2 text-sm text-ink-subtle">{t("detail.kbReferencesEmpty")}</p>
       )}
       {referencesQuery.isSuccess && referencesQuery.data.length > 0 && (
-        <ul className="mt-2 flex flex-col gap-2 text-sm">
-          {referencesQuery.data.map((reference) => (
-            <li
-              key={reference.id}
-              className="flex items-center justify-between gap-2 border-b border-rule-subtle pb-2"
-            >
-              <span className="font-medium text-ink-strong">{reference.articleTitle}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={removeMutation.isPending}
-                onClick={() => handleRemove(reference.id)}
+        <ul className="mt-2 flex flex-col text-sm">
+          {referencesQuery.data.map((reference) => {
+            const removing = removeMutation.isPending && removeMutation.variables === reference.id;
+            return (
+              <li
+                key={reference.id}
+                className="flex items-center justify-between gap-2 border-b border-rule-subtle py-2 last:border-b-0"
               >
-                {t("detail.kbReferencesRemove")}
-              </Button>
-            </li>
-          ))}
+                <Link
+                  href={`/${locale}/knowledge-base/${reference.articleId}`}
+                  className="focus-ring min-w-0 truncate rounded-inner font-medium text-ink-strong hover:underline"
+                >
+                  {reference.articleTitle}
+                </Link>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  isLoading={removing}
+                  disabled={removing}
+                  aria-label={t("detail.kbReferencesRemoveNamed", {
+                    title: reference.articleTitle,
+                  })}
+                  onClick={() => handleRemove(reference.id)}
+                >
+                  {t("detail.kbReferencesRemove")}
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {removeError && (
@@ -95,8 +129,13 @@ function AttachArticleForm({ ticketId }: { ticketId: string }) {
   const tCommon = useTranslations("common");
   const errorMessage = useErrorMessage();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const searchQuery = usePublishedArticleSearchQuery(search);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+  const searchQuery = usePublishedArticleSearchQuery(debouncedSearch);
   const mutation = useCreateTicketKbReferenceMutation(ticketId);
 
   async function handleAttach(articleId: string): Promise<void> {
@@ -104,6 +143,7 @@ function AttachArticleForm({ ticketId }: { ticketId: string }) {
     try {
       await mutation.mutateAsync({ articleId });
       setSearch("");
+      setDebouncedSearch("");
     } catch (attachError) {
       setError(
         errorMessage(attachError, {
@@ -119,6 +159,7 @@ function AttachArticleForm({ ticketId }: { ticketId: string }) {
       <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("detail.kbReferencesSearchLabel")}
         <Input
+          type="search"
           value={search}
           placeholder={t("detail.kbReferencesSearchPlaceholder")}
           onChange={(event) => setSearch(event.target.value)}
@@ -134,21 +175,25 @@ function AttachArticleForm({ ticketId }: { ticketId: string }) {
       )}
       {searchQuery.isSuccess && searchQuery.data.items.length > 0 && (
         <ul className="flex flex-col gap-1 text-sm">
-          {searchQuery.data.items.map((article) => (
-            <li key={article.id} className="flex items-center justify-between gap-2">
-              <span className="truncate text-ink-strong">{article.title}</span>
-              <Button
-                type="button"
-                size="sm"
-                disabled={mutation.isPending}
-                onClick={() => void handleAttach(article.id)}
-              >
-                {mutation.isPending
-                  ? t("detail.kbReferencesAttaching")
-                  : t("detail.kbReferencesAttach")}
-              </Button>
-            </li>
-          ))}
+          {searchQuery.data.items.map((article) => {
+            const attaching = mutation.isPending && mutation.variables?.articleId === article.id;
+            return (
+              <li key={article.id} className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-ink-strong">{article.title}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={attaching}
+                  aria-label={t("detail.kbReferencesAttachNamed", { title: article.title })}
+                  onClick={() => void handleAttach(article.id)}
+                >
+                  {attaching ? t("detail.kbReferencesAttaching") : t("detail.kbReferencesAttach")}
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {error && <Alert variant="destructive">{error}</Alert>}

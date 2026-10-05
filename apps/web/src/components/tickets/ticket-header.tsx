@@ -10,6 +10,7 @@ import {
   DescriptionItem,
   Input,
   Skeleton,
+  cn,
   formatDateTime,
   type AvatarPresence,
 } from "@crm/ui";
@@ -17,6 +18,16 @@ import type { TicketSlaTarget } from "@/lib/sla";
 import type { TicketStatus, TicketSummary } from "@/lib/tickets-api";
 import { SlaIndicator } from "./sla-indicator";
 import { TicketPriorityBadge, TicketStatusBadge } from "./ticket-badges";
+import { statusSpine } from "./board/board-state";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
+
+/** Story 219 (RD-3.13) — the header fields whose change by someone else is cued. */
+export type TicketHeaderField = "status" | "priority" | "assignee";
+
+/** How long a changed field keeps its cue (the board uses the same). */
+const CUE_MS = 2400;
+const CUE_CLASS =
+  "rounded-pill motion-safe:animate-change-cue motion-reduce:ring-2 motion-reduce:ring-accent/50";
 
 /**
  * Story 201 (RD-3.1, recon TW-01) — the ticket's identity and state at a
@@ -34,6 +45,14 @@ import { TicketPriorityBadge, TicketStatusBadge } from "./ticket-badges";
  * Sticky from `lg` on the canvas background, so the state stays in view while
  * the agent works down the conversation. Channel is not shown: tickets carry
  * no channel field (schema or API) — deferred, no backend change.
+ *
+ * Story 219 (PR-3.4) — the status spine (visual-direction.md §3) runs along
+ * the header's top edge in the status hue, as on the board's columns. And
+ * the realtime change cues (RD-3.13, recon TW-15): when a refetch shows the
+ * status, priority or assignee changed by someone else, that field pulses
+ * once (the board's cue; a static ring with reduced motion) and a polite
+ * announcement says what changed. The agent's own edits (`isOwnChange`) are
+ * neither cued nor announced.
  */
 export type TicketHeaderSla =
   { status: "loading" } | { status: "error" } | { status: "ready"; target: TicketSlaTarget | null };
@@ -46,6 +65,7 @@ export function TicketHeader({
   assigneePresence,
   onSubjectCommit,
   actions,
+  isOwnChange = () => false,
 }: {
   ticket: TicketSummary;
   locale: string;
@@ -57,8 +77,53 @@ export function TicketHeader({
   onSubjectCommit: (subject: string, options: { onError: () => void }) => void;
   /** Story 202 (RD-3.2) — the header's actions, at the end of the title row. */
   actions?: ReactNode;
+  /** Story 219 — whether a field's latest change was the agent's own edit. */
+  isOwnChange?: (field: TicketHeaderField) => boolean;
 }) {
   const t = useTranslations("tickets");
+  const labels = useTicketLabels();
+
+  // --- Change cues (Story 219, RD-3.13) -------------------------------------
+  const seen = useRef({
+    status: ticket.status,
+    priority: ticket.priority,
+    assignee: ticket.assignedToUserId,
+  });
+  const [cued, setCued] = useState<ReadonlySet<TicketHeaderField>>(new Set());
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    const previous = seen.current;
+    const next = {
+      status: ticket.status,
+      priority: ticket.priority,
+      assignee: ticket.assignedToUserId,
+    };
+    seen.current = next;
+    const changed = (["status", "priority", "assignee"] as const).filter(
+      (field) => previous[field] !== next[field] && !isOwnChange(field),
+    );
+    if (changed.length === 0) return;
+    setCued(new Set(changed));
+    setAnnouncement(
+      changed
+        .map((field) =>
+          field === "status"
+            ? t("detail.changeCue.status", { value: labels.status(ticket.status) })
+            : field === "priority"
+              ? t("detail.changeCue.priority", { value: labels.priority(ticket.priority) })
+              : assigneeName
+                ? t("detail.changeCue.assignee", { value: assigneeName })
+                : t("detail.changeCue.unassigned"),
+        )
+        .join(" "),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reacts to the three fields only
+  }, [ticket.status, ticket.priority, ticket.assignedToUserId]);
+  useEffect(() => {
+    if (cued.size === 0) return;
+    const timer = window.setTimeout(() => setCued(new Set()), CUE_MS);
+    return () => window.clearTimeout(timer);
+  }, [cued]);
 
   // The subject edit below moved here verbatim from TicketDetailView
   // (Stories 42, 156 and 166) — same states, same keys, same focus restore.
@@ -93,7 +158,12 @@ export function TicketHeader({
   const shortId = ticket.id.slice(0, 8);
 
   return (
-    <header className="flex flex-col gap-stack border-b border-rule-subtle bg-surface-sunk pb-stack lg:sticky lg:top-0 lg:z-20 lg:pt-stack">
+    <header
+      className={cn(
+        "flex flex-col gap-stack border-b border-t-[3px] border-b-rule-subtle bg-surface-sunk pb-stack pt-stack lg:sticky lg:top-0 lg:z-20",
+        statusSpine(ticket.status).top,
+      )}
+    >
       {/* Story 189 — the shared BackLink: chevron flips in RTL, token focus ring. */}
       <BackLink asChild>
         <Link href={`/${locale}/tickets`}>{t("detail.backToList")}</Link>
@@ -175,10 +245,20 @@ export function TicketHeader({
 
       <dl className="flex flex-wrap gap-x-section gap-y-stack">
         <DescriptionItem term={t("list.columns.status")}>
-          <TicketStatusBadge status={ticket.status} />
+          <span
+            data-changed={cued.has("status") || undefined}
+            className={cn("inline-flex", cued.has("status") && CUE_CLASS)}
+          >
+            <TicketStatusBadge status={ticket.status} />
+          </span>
         </DescriptionItem>
         <DescriptionItem term={t("list.columns.priority")}>
-          <TicketPriorityBadge priority={ticket.priority} />
+          <span
+            data-changed={cued.has("priority") || undefined}
+            className={cn("inline-flex", cued.has("priority") && CUE_CLASS)}
+          >
+            <TicketPriorityBadge priority={ticket.priority} />
+          </span>
         </DescriptionItem>
         <DescriptionItem term={t("list.columns.sla")}>
           {sla.status === "loading" && <Skeleton className="h-5 w-24" />}
@@ -189,7 +269,10 @@ export function TicketHeader({
         </DescriptionItem>
         <DescriptionItem term={t("list.columns.assignedAgent")}>
           {assigneeName ? (
-            <span className="flex min-w-0 items-center gap-2">
+            <span
+              data-changed={cued.has("assignee") || undefined}
+              className={cn("flex min-w-0 items-center gap-2", cued.has("assignee") && CUE_CLASS)}
+            >
               <Avatar name={assigneeName} size="sm" presence={assigneePresence} decorative />
               <span className="max-w-48 truncate">{assigneeName}</span>
             </span>
@@ -213,6 +296,10 @@ export function TicketHeader({
           <time dateTime={ticket.updatedAt}>{formatDateTime(ticket.updatedAt, locale)}</time>
         </DescriptionItem>
       </dl>
+      {/* Always mounted, so the first change lands in an existing region. */}
+      <p className="sr-only" aria-live="polite">
+        {announcement}
+      </p>
     </header>
   );
 }
