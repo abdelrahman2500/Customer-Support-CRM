@@ -625,4 +625,44 @@ describe("TicketChatCard", () => {
       expect(textarea).toHaveValue(`Thanks for reaching out.\n\n${quickReply.body}`);
     });
   });
+
+  // Story 205 (RD-3.5, recon TW-03) — the conversation is a MessageThread.
+  describe("conversation thread (Story 205)", () => {
+    it("is a labelled log, so new messages are announced", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [customerMessage, myOwnMessage], isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      const log = screen.getByRole("log", { name: "detail.chatHeading" });
+      expect(log).toHaveAttribute("aria-live", "polite");
+      expect(log).toContainElement(screen.getByText(customerMessage.body));
+    });
+
+    it("dates each day of a multi-day thread, keeping one list item per message", () => {
+      const nextDay = { ...colleagueMessage, id: "message-next-day", createdAt: "2024-01-03T10:00:00.000Z" };
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [customerMessage, nextDay], isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      const log = screen.getByRole("log");
+      expect(log.querySelectorAll("p")).toHaveLength(2);
+      expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    });
+
+    it("marks up each message time with its full date-time", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [customerMessage], isSuccess: true }) as never,
+      );
+
+      const { container } = render(<TicketChatCard ticketId="ticket-1" />);
+
+      const time = container.querySelector("time")!;
+      expect(time).toHaveAttribute("dateTime", customerMessage.createdAt);
+      expect(time.getAttribute("title")).toBeTruthy();
+    });
+  });
 });

@@ -153,6 +153,10 @@ export type { EmptyStateProps } from "./components/empty-state";
 export { ErrorState } from "./components/error-state";
 export { Combobox } from "./components/combobox";
 export type { ComboboxOption, ComboboxProps } from "./components/combobox";
+export { MessageThread } from "./components/message-thread";
+export type { MessageThreadItem, MessageThreadProps } from "./components/message-thread";
+export { MessageBubble } from "./components/message-bubble";
+export type { MessageBubbleProps } from "./components/message-bubble";
 export type { ErrorStateProps } from "./components/error-state";
 
 export { FetchingIndicator } from "./components/fetching-indicator";

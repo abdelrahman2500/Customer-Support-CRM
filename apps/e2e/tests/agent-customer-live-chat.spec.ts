@@ -122,11 +122,21 @@ async function sendChatMessage(page: Page, body: string): Promise<void> {
   await expect(composer).toHaveValue("");
 }
 
-/** The conversation list itself (`<ol aria-label="Live Chat">`), so a
- * delivery assertion is scoped to the rendered message list and cannot be
- * satisfied by the same text sitting in a composer or anywhere else. */
+/** The conversation itself, so a delivery assertion is scoped to the
+ * rendered messages and cannot be satisfied by the same text sitting in a
+ * composer or anywhere else.
+ *
+ * Story 205 (RD-3.5) — selector changed because the markup changed: the
+ * agent workspace's conversation is now a labelled `role="log"` named
+ * "Conversation", grouped by day (each day an `<ol>` of one `<li>` per
+ * message; day labels are not `<li>`s). The portal still renders its
+ * `<ol aria-label="Live Chat">`. Each page has exactly one of the two, so
+ * `.or()` resolves to that one, and every `li` count and order assertion
+ * below is unchanged. */
 function conversation(page: Page) {
-  return page.getByRole("list", { name: "Live Chat" });
+  return page
+    .getByRole("log", { name: "Conversation" })
+    .or(page.getByRole("list", { name: "Live Chat" }));
 }
 
 test("a customer and an agent exchange live messages on the same ticket", async ({

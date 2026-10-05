@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -17,7 +17,6 @@ import {
   Alert,
   Button,
   Checkbox,
-  cn,
   Label,
   LoadingStatus,
   SectionCard,
@@ -25,7 +24,14 @@ import {
   Textarea,
 } from "@crm/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@crm/ui";
-import { formatTime } from "@crm/ui";
+import {
+  Avatar,
+  MessageBubble,
+  MessageThread,
+  formatDate,
+  formatDateTime,
+  formatTime,
+} from "@crm/ui";
 
 /**
  * Story 78 — Live Chat UI (agent side). Reads `GET /tickets/:id/messages`
@@ -66,7 +72,6 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
   const messagesQuery = useTicketMessagesQuery(ticketId);
   const usersQuery = useUsersQuery();
   const currentUserQuery = useCurrentUserQuery();
-  const listRef = useRef<HTMLOListElement>(null);
 
   const userNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -76,15 +81,9 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
     return map;
   }, [usersQuery.data]);
 
-  // Keep the conversation scrolled to the latest message as history loads
-  // and as new messages arrive (initial load, sends, and realtime merges all
-  // flow through the same `messagesQuery.data` array).
-  useEffect(() => {
-    const list = listRef.current;
-    if (list) {
-      list.scrollTop = list.scrollHeight;
-    }
-  }, [messagesQuery.data]);
+  // Story 205 (RD-3.5, recon TW-03) — scrolling now belongs to
+  // MessageThread: it follows new messages only while the agent is at the
+  // bottom, instead of yanking them down on every update.
 
   return (
     <SectionCard title={t("detail.chatHeading")}>
@@ -102,19 +101,16 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
         <p className="mt-2 text-sm text-ink-subtle">{t("detail.chatEmpty")}</p>
       )}
       {messagesQuery.isSuccess && messagesQuery.data.length > 0 && (
-        <ol
-          ref={listRef}
-          aria-label={t("detail.chatHeading")}
-          // Story 156 — was a flat `max-h-80` (320px). The conversation is
-          // the agent's primary work surface on this page, and 320px showed
-          // roughly three messages while the metadata above it took a
-          // full-width four-column grid. `min-h` keeps a short thread from
-          // collapsing into a cramped strip; `max-h` is viewport-relative so
-          // it grows with the screen instead of being pinned to one desktop
-          // guess, and still bounds the scroll region on a phone.
-          className="mt-2 flex max-h-[60vh] min-h-[16rem] flex-col gap-3 overflow-y-auto py-1"
-        >
-          {messagesQuery.data.map((message) => {
+        // Story 205 (RD-3.5, recon TW-03) — a labelled log (new messages are
+        // announced), grouped by day with a date per day; each message names
+        // its sender, avatar, time (full date-time on hover) and delivery
+        // state. The sender rules below are unchanged.
+        <MessageThread
+          label={t("detail.chatHeading")}
+          newMessagesLabel={t("detail.chatNewMessages")}
+          formatDay={(at) => formatDate(at, locale)}
+          className="mt-2"
+          items={messagesQuery.data.map((message) => {
             const isMine =
               message.direction === "OUTBOUND" &&
               message.senderUserId === currentUserQuery.data?.id;
@@ -136,30 +132,20 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
                     : (message.senderUserId && userNameById.get(message.senderUserId)) ||
                       t("detail.chatAgentLabel");
 
-            return (
-              <li
-                key={message.id}
-                className={cn("flex flex-col gap-1", isMine ? "items-end" : "items-start")}
-              >
-                <div
-                  className={cn(
-                    "max-w-[80%] rounded-md px-3 py-2 text-sm whitespace-pre-wrap",
-                    // `text-accent-foreground`, not a bare `text-white`: it is
-                    // the token defined as "text on top of --accent", so the
-                    // pair stays legible if the accent is ever re-pointed
-                    // (Story S-15 plans exactly that).
-                    isMine
-                      ? "bg-accent text-accent-foreground"
-                      : "bg-surface-muted text-ink-strong",
-                  )}
-                >
-                  {message.body}
-                </div>
-                <span className="text-xs text-ink-subtle">
-                  {senderLabel} · {formatTime(message.createdAt, locale)}
-                  {message.direction === "OUTBOUND" && message.deliveryStatus !== "DELIVERED" && (
-                    <>
-                      {" · "}
+            return {
+              key: message.id,
+              at: message.createdAt,
+              node: (
+                <MessageBubble
+                  align={isMine ? "end" : "start"}
+                  tone={isMine ? "mine" : "other"}
+                  sender={senderLabel}
+                  avatar={<Avatar name={senderLabel} size="sm" decorative />}
+                  at={message.createdAt}
+                  timeLabel={formatTime(message.createdAt, locale)}
+                  dateTimeLabel={formatDateTime(message.createdAt, locale)}
+                  status={
+                    message.direction === "OUTBOUND" && message.deliveryStatus !== "DELIVERED" ? (
                       <span
                         className={
                           message.deliveryStatus === "FAILED" ? "text-danger-foreground" : undefined
@@ -167,13 +153,15 @@ export function TicketChatCard({ ticketId }: { ticketId: string }) {
                       >
                         {t(`detail.chatDeliveryStatus.${message.deliveryStatus}`)}
                       </span>
-                    </>
-                  )}
-                </span>
-              </li>
-            );
+                    ) : undefined
+                  }
+                >
+                  {message.body}
+                </MessageBubble>
+              ),
+            };
           })}
-        </ol>
+        />
       )}
 
       <ChatComposer ticketId={ticketId} />
