@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { useTicketStatusCounts } from "@/hooks/use-ticket-status-counts";
+import { useSlaComplianceQuery, useTicketVolumeByCategoryQuery } from "@/hooks/use-reporting";
 import { NextIntlClientProvider } from "next-intl";
 import { DashboardView } from "./dashboard-view";
 import { useCustomersQuery, useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
@@ -29,6 +31,15 @@ vi.mock("@/hooks/use-tickets", () => ({
 // RM-03 — `TasksPanel` (mounted inside `DashboardView`) calls these real
 // hooks; mocked here the same way every other data hook in this spec is,
 // so these tests never depend on a real `QueryClientProvider`/network call.
+// Story 221 — the status distribution and the report:read branch panel.
+vi.mock("@/hooks/use-ticket-status-counts", () => ({
+  COUNTED_STATUSES: ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"],
+  useTicketStatusCounts: vi.fn(() => ({ counts: {}, isLoading: false, isError: false })),
+}));
+vi.mock("@/hooks/use-reporting", () => ({
+  useSlaComplianceQuery: vi.fn(() => ({ isSuccess: false, isError: true })),
+  useTicketVolumeByCategoryQuery: vi.fn(() => ({ isSuccess: false, isError: true })),
+}));
 vi.mock("@/hooks/use-tasks", () => ({
   tasksQueryKey: ["tasks"],
   useTasksQuery: vi.fn(),
@@ -264,8 +275,11 @@ describe("DashboardView", () => {
       // these are the actual labels. The variant still derives from the raw
       // enum, which is what this test asserts.
       // Story 191 (RD-1.14) — OPEN info, IN_PROGRESS progress.
-      expect(screen.getByText("Open")).toHaveClass("bg-info-surface");
-      expect(screen.getByText("In progress")).toHaveClass("bg-progress-surface");
+      // Story 221 — scoped to the section: the status distribution legend
+      // on the same page also names "Open" and "In progress".
+      const queue = screen.getByRole("heading", { name: "My open tickets" }).closest("section, div.p-surface") as HTMLElement;
+      expect(within(queue).getByText("Open")).toHaveClass("bg-info-surface");
+      expect(within(queue).getByText("In progress")).toHaveClass("bg-progress-surface");
     });
 
     it("orders tickets breached-first, then soonest-remaining, then no-target-last", () => {
@@ -523,5 +537,116 @@ describe("DashboardView", () => {
     renderWithLocale();
 
     expect(screen.getByText("My Tasks")).toBeInTheDocument();
+  });
+
+  /** Story 221 (PR-3.6) — "your shift at a glance". */
+  describe("dashboard v2 (Story 221)", () => {
+    const past = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const soon = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+    const later = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    const sla = (responseTargetAt: string) => ({
+      id: "s",
+      slaPolicyId: "p",
+      responseTargetAt,
+      resolutionTargetAt: later,
+      onHoldSince: null,
+    });
+
+    it("links four figures into the board: mine, unclaimed, at risk and breached", () => {
+      mockTicketQueries({
+        mine: {
+          data: [
+            ticket({ id: "a", subject: "Late reply", slaTarget: sla(past), createdAt: past }),
+            ticket({ id: "b", subject: "Nearly due", slaTarget: sla(soon), createdAt: past }),
+            ticket({ id: "c", subject: "Plenty of time", slaTarget: sla(later), createdAt: past }),
+          ],
+        },
+      });
+      renderWithLocale("agent-1");
+
+      const at = (name: RegExp) => screen.getByRole("link", { name });
+      expect(at(/^Assigned to me/)).toHaveAttribute(
+        "href",
+        "/en/tickets?view=board&assignedToUserId=agent-1",
+      );
+      expect(at(/^Unclaimed/)).toHaveAttribute("href", "/en/tickets?view=board&unassigned=true");
+      expect(at(/^At risk/)).toHaveTextContent("1");
+      expect(at(/^At risk/)).toHaveAttribute(
+        "href",
+        "/en/tickets?view=board&assignedToUserId=agent-1&risk=1",
+      );
+      expect(at(/^Breached/)).toHaveTextContent("1");
+    });
+
+    it("says 25+ instead of under-reporting when the whole loaded page is breached", () => {
+      const mine = queryResult({
+        isSuccess: true,
+        data: page(
+          [ticket({ id: "a", slaTarget: sla(past), createdAt: past })],
+          { total: 40 },
+        ),
+      });
+      const all = queryResult({ isSuccess: true, data: page([]) });
+      mockedUseTicketsQuery.mockImplementation((filters) =>
+        (filters && "assignedToUserId" in filters ? mine : all) as never,
+      );
+      renderWithLocale();
+      expect(screen.getByRole("link", { name: /^Breached/ })).toHaveTextContent("1+");
+    });
+
+    it("shows every visible ticket by status, each linking to the filtered list", () => {
+      vi.mocked(useTicketStatusCounts).mockReturnValue({
+        counts: { OPEN: 12, IN_PROGRESS: 7, RESOLVED: 30, CLOSED: 4 },
+        isLoading: false,
+        isError: false,
+      });
+      renderWithLocale();
+      expect(
+        screen.getByRole("img", {
+          name: "Tickets by status: Open 12, In progress 7, Resolved 30, Closed 4",
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Resolved/ })).toHaveAttribute(
+        "href",
+        "/en/tickets?view=list&status=RESOLVED",
+      );
+    });
+
+    it("shows at most six of my tickets, with the rest one link away", () => {
+      mockTicketQueries({
+        mine: {
+          data: Array.from({ length: 8 }, (_, index) =>
+            ticket({ id: `t${index}`, subject: `Ticket ${index}` }),
+          ),
+        },
+      });
+      renderWithLocale();
+      expect(screen.getByText("Ticket 5")).toBeInTheDocument();
+      expect(screen.queryByText("Ticket 6")).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "View all 8 on the board" })).toHaveAttribute(
+        "href",
+        "/en/tickets?view=board&assignedToUserId=agent-1",
+      );
+    });
+
+    it("leaves the branch panel out for agents (403), and shows it with report access", () => {
+      const { unmount } = renderWithLocale();
+      expect(screen.queryByText("Branch, last 30 days")).not.toBeInTheDocument();
+      unmount();
+
+      vi.mocked(useSlaComplianceQuery).mockReturnValue({
+        isSuccess: true,
+        data: { totalWithTarget: 10, breachedCount: 2, compliantCount: 8, complianceRate: 0.8 },
+      } as never);
+      vi.mocked(useTicketVolumeByCategoryQuery).mockReturnValue({
+        isSuccess: true,
+        data: [{ categoryId: "c1", categoryName: "Billing", count: 9 }],
+      } as never);
+      renderWithLocale();
+      expect(screen.getByText("Branch, last 30 days")).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: "SLA compliance 80%" })).toBeInTheDocument();
+      expect(screen.getByText("8 met · 2 breached")).toBeInTheDocument();
+      expect(screen.getByText("Billing")).toBeInTheDocument();
+    });
   });
 });

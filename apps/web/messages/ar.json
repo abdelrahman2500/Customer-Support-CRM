@@ -871,7 +871,24 @@
     },
     "stats": {
       "assignedToMe": "مُسندة إليّ",
-      "unclaimed": "غير مُسندة"
+      "unclaimed": "غير مُسندة",
+      "atRisk": "معرّضة للخطر",
+      "breached": "تم خرقها",
+      "mineHint": "من تذاكري المفتوحة"
+    },
+    "distribution": {
+      "heading": "التذاكر حسب الحالة",
+      "label": "التذاكر حسب الحالة: {summary}",
+      "error": "تعذّر تحميل أعداد الحالات."
+    },
+    "viewAllMine": "عرض جميع التذاكر ({count}) على اللوحة",
+    "branch": {
+      "heading": "الفرع، آخر 30 يومًا",
+      "complianceLabel": "الالتزام باتفاقية مستوى الخدمة {rate}%",
+      "complianceHint": "{met} ملتزمة · {breached} مخروقة",
+      "byCategory": "الحجم حسب الفئة",
+      "uncategorized": "بدون فئة",
+      "compliance": "الالتزام باتفاقية مستوى الخدمة"
     }
   },
   "notifications": {

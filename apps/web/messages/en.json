@@ -871,7 +871,24 @@
     },
     "stats": {
       "assignedToMe": "Assigned to me",
-      "unclaimed": "Unclaimed"
+      "unclaimed": "Unclaimed",
+      "atRisk": "At risk",
+      "breached": "Breached",
+      "mineHint": "Of my open tickets"
+    },
+    "distribution": {
+      "heading": "Tickets by status",
+      "label": "Tickets by status: {summary}",
+      "error": "Couldn't load the status counts."
+    },
+    "viewAllMine": "View all {count} on the board",
+    "branch": {
+      "heading": "Branch, last 30 days",
+      "complianceLabel": "SLA compliance {rate}%",
+      "complianceHint": "{met} met · {breached} breached",
+      "byCategory": "Volume by category",
+      "uncategorized": "Uncategorized",
+      "compliance": "SLA compliance"
     }
   },
   "notifications": {

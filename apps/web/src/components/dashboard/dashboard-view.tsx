@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -12,14 +12,23 @@ import { SlaIndicator } from "@/components/tickets/sla-indicator";
 import { ApiError } from "@/lib/api";
 import {
   Alert,
+  BarChart,
   Button,
-  Card,
+  DistributionBar,
+  DonutGauge,
   EmptyState,
   LoadingStatus,
   PageHeader,
   SectionCard,
   Skeleton,
+  StatCard,
+  recipes,
 } from "@crm/ui";
+import { deriveSlaStatus } from "@/lib/sla";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
+import { COUNTED_STATUSES, useTicketStatusCounts } from "@/hooks/use-ticket-status-counts";
+import { useSlaComplianceQuery, useTicketVolumeByCategoryQuery } from "@/hooks/use-reporting";
+import { statusSpine } from "@/components/tickets/board/board-state";
 import { TasksPanel } from "./tasks-panel";
 
 /** Story 28 — a work queue, not a full history: only tickets still open
@@ -46,36 +55,34 @@ const OPEN_STATUSES: readonly TicketStatus[] = ["OPEN", "IN_PROGRESS"];
  * used below, for the per-row badge and remaining-time text, which do.
  */
 
+/** Story 221 (PR-3.6) — how many of my tickets "Needs you now" shows; the
+ * rest are one link away on the board. */
+const NEEDS_YOU_LIMIT = 6;
+
 /**
- * Story 144 — one figure from the dashboard's summary row.
- *
- * Local to this screen rather than a `packages/ui` primitive: there are
- * exactly two callers and no second screen asks for one, so promoting it
- * would be an abstraction without a user (CLAUDE.md §2). It is a handful of
- * lines to lift out if Reports or the portal ever wants the same tile.
- *
- * `value` is `number | undefined` so the tile can render its own skeleton
- * while the query it summarises is still in flight, instead of the page
- * shifting when three tiles appear at once.
+ * Story 221 (PR-3.6) — one figure of "your shift at a glance", on the shared
+ * `StatCard` (it replaces Story 144's local StatTile). Each figure links to
+ * the board view that lists exactly those tickets.
  */
-function StatTile({
+function ShiftStat({
   label,
   value,
-  isLoading,
+  loading,
+  href,
+  edge,
+  hint,
 }: {
   label: string;
-  value: number | undefined;
-  isLoading: boolean;
+  value: number | string | undefined;
+  loading: boolean;
+  href: string;
+  edge?: string;
+  hint?: string;
 }) {
   return (
-    <Card className="p-surface">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">{label}</p>
-      {isLoading ? (
-        <Skeleton className="mt-2 h-8 w-16" />
-      ) : (
-        <p className="mt-1 text-2xl font-semibold tabular-nums text-ink">{value ?? "—"}</p>
-      )}
-    </Card>
+    <StatCard label={label} value={value} loading={loading} edge={edge} hint={hint} asChild>
+      <Link href={href} className="focus-ring hover:border-rule-strong" />
+    </StatCard>
   );
 }
 
@@ -109,14 +116,14 @@ function UnclaimedTicketRow({
   const mutation = useUpdateTicketMutation(ticket.id);
 
   return (
-    <li className="flex flex-col gap-1 border-b border-rule-subtle pb-2 sm:flex-row sm:items-center sm:justify-between">
+    <li className="flex flex-col gap-2 border-b border-rule-subtle pb-2 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
       <span
-        className="flex cursor-pointer flex-col"
+        className="flex min-w-0 flex-1 cursor-pointer flex-col"
         onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
       >
         <Link
           href={`/${locale}/tickets/${ticket.id}`}
-          className="focus-ring w-fit rounded-sm font-medium text-ink-strong hover:underline"
+          className="focus-ring w-fit max-w-full break-words rounded-sm font-medium text-ink-strong hover:underline"
           onClick={(event) => event.stopPropagation()}
         >
           {ticket.subject}
@@ -136,7 +143,7 @@ function UnclaimedTicketRow({
           </span>
         )}
       </span>
-      <span className="flex flex-wrap items-center gap-2">
+      <span className="flex shrink-0 flex-wrap items-center gap-2">
         <TicketStatusBadge status={ticket.status} />
         <TicketPriorityBadge priority={ticket.priority} />
         <SlaIndicator target={ticket.slaTarget} createdAt={ticket.createdAt} now={now} />
@@ -190,6 +197,14 @@ function UnclaimedTicketRow({
 export function DashboardView({ userId }: { userId: string }) {
   const t = useTranslations("dashboard");
   const tCommon = useTranslations("common");
+  const labels = useTicketLabels();
+  const statusCounts = useTicketStatusCounts();
+  // Story 221 — branch figures for `report:read` users; a 403 hides them.
+  const [since] = useState(() =>
+    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  );
+  const slaComplianceQuery = useSlaComplianceQuery({ from: since });
+  const volumeByCategoryQuery = useTicketVolumeByCategoryQuery({ from: since });
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 
@@ -256,30 +271,116 @@ export function DashboardView({ userId }: { userId: string }) {
     return { unclaimedTickets: unclaimedTicketsQuery.data?.items ?? [], now };
   }, [unclaimedTicketsQuery.data]);
 
+  /**
+   * Story 221 (PR-3.6) — at risk and breached, among my open tickets. There
+   * is no SLA-state filter on the API, so these are counted on the loaded
+   * page — which is honest because the page is ranked by SLA urgency:
+   * breached tickets come first, then at-risk ones. A count is exact unless
+   * the whole page is that urgent and more pages exist; then it reads "25+"
+   * instead of quietly under-reporting (Story 144's concern).
+   */
+  const urgency = useMemo(() => {
+    const kinds = openTickets.map((ticket) => {
+      const sla = deriveSlaStatus(ticket.slaTarget, now, { createdAt: ticket.createdAt });
+      return sla.kind === "breached"
+        ? "breached"
+        : sla.kind === "on-track" && sla.atRisk
+          ? "atRisk"
+          : "calm";
+    });
+    const more = (myTicketsQuery.data?.total ?? 0) > openTickets.length;
+    const last = kinds[kinds.length - 1];
+    const breached = kinds.filter((kind) => kind === "breached").length;
+    const atRisk = kinds.filter((kind) => kind === "atRisk").length;
+    return {
+      breached: more && last === "breached" ? `${breached}+` : breached,
+      atRisk: more && last !== "calm" && last !== undefined ? `${atRisk}+` : atRisk,
+      breachedCount: breached,
+      atRiskCount: atRisk,
+    };
+  }, [openTickets, now, myTicketsQuery.data]);
+
+  const board = (query: string) => `/${locale}/tickets?view=board&${query}`;
+  const mineQuery = `assignedToUserId=${encodeURIComponent(userId)}`;
+  const categoryRows = (volumeByCategoryQuery.data ?? [])
+    .filter((row) => row.count > 0)
+    .sort((x, y) => y.count - x.count)
+    .slice(0, 5)
+    .map((row) => ({
+      id: row.categoryId ?? "none",
+      label: row.categoryName ?? t("branch.uncategorized"),
+      segments: [{ label: "", value: row.count, color: "rgb(var(--viz-1))" }],
+    }));
+  const compliance = slaComplianceQuery.data?.complianceRate;
+  const showBranch = slaComplianceQuery.isSuccess || volumeByCategoryQuery.isSuccess;
+
   return (
     <section className="flex flex-col gap-4">
       <PageHeader title={t("title")} />
 
-      {/* Story 144 — the summary row. Both figures come from the paginated
-          envelope's own `total`, which counts every matching ticket
-          regardless of page, so they stay correct past the first page.
-          Deliberately only these two: a "breaching SLA" tile would have to
-          be counted from the loaded rows, which is page 1 only, and would
-          quietly under-report exactly the number an agent would most rely
-          on. Same reasoning Story 136 used to refuse a portal status
-          breakdown. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <StatTile
+      {/* Story 221 (PR-3.6) — "your shift at a glance": four figures, each a
+          link into the board filtered to exactly those tickets. Mine and
+          unclaimed are the list envelopes' `total`; at risk and breached
+          are counted on the urgency-ranked page (see `urgency`). */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <ShiftStat
           label={t("stats.assignedToMe")}
           value={myTicketsQuery.data?.total}
-          isLoading={myTicketsQuery.isLoading}
+          loading={myTicketsQuery.isLoading}
+          href={board(mineQuery)}
         />
-        <StatTile
+        <ShiftStat
           label={t("stats.unclaimed")}
           value={unclaimedTicketsQuery.data?.total}
-          isLoading={unclaimedTicketsQuery.isLoading}
+          loading={unclaimedTicketsQuery.isLoading}
+          href={board("unassigned=true")}
+        />
+        <ShiftStat
+          label={t("stats.atRisk")}
+          value={myTicketsQuery.isSuccess ? urgency.atRisk : undefined}
+          loading={myTicketsQuery.isLoading}
+          href={board(`${mineQuery}&risk=1`)}
+          edge={urgency.atRiskCount > 0 ? "border-warning-solid" : undefined}
+          hint={t("stats.mineHint")}
+        />
+        <ShiftStat
+          label={t("stats.breached")}
+          value={myTicketsQuery.isSuccess ? urgency.breached : undefined}
+          loading={myTicketsQuery.isLoading}
+          href={board(`${mineQuery}&risk=1`)}
+          edge={urgency.breachedCount > 0 ? "border-danger-solid" : undefined}
+          hint={t("stats.mineHint")}
         />
       </div>
+
+      {/* Story 221 — every ticket the agent can see, by status (the status
+          spine colours); each legend entry opens the list filtered to it. */}
+      <SectionCard title={t("distribution.heading")}>
+        {statusCounts.isLoading ? (
+          <LoadingStatus label={tCommon("loading")} asChild>
+            <Skeleton className="mt-3 h-10 w-full" />
+          </LoadingStatus>
+        ) : statusCounts.isError ? (
+          <p className="mt-2 text-sm text-ink-subtle">{t("distribution.error")}</p>
+        ) : (
+          <DistributionBar
+            className="mt-3"
+            linkAs={Link}
+            ariaLabel={t("distribution.label", {
+              summary: COUNTED_STATUSES.map(
+                (status) => `${labels.status(status)} ${statusCounts.counts[status] ?? 0}`,
+              ).join(", "),
+            })}
+            segments={COUNTED_STATUSES.map((status) => ({
+              key: status,
+              label: labels.status(status),
+              value: statusCounts.counts[status] ?? 0,
+              tone: statusSpine(status).dot,
+              href: `/${locale}/tickets?view=list&status=${status}`,
+            }))}
+          />
+        )}
+      </SectionCard>
 
       {/* The primary operational queue. `raised` is the one place on this
           page that takes elevation — `Card`'s own doc comment reserves it
@@ -321,15 +422,17 @@ export function DashboardView({ userId }: { userId: string }) {
           />
         )}
 
+        {/* Story 221 — the most urgent of my tickets as mini cards (the same
+            links, badges and SLA as before); the rest are on the board. */}
         {myTicketsQuery.isSuccess && openTickets.length > 0 && (
-          <ul className="mt-2 flex flex-col gap-2 text-sm">
-            {openTickets.map((ticket) => (
+          <ul className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+            {openTickets.slice(0, NEEDS_YOU_LIMIT).map((ticket) => (
               <li
                 key={ticket.id}
-                className="flex cursor-pointer items-center justify-between border-b border-rule-subtle pb-2"
+                className={`${recipes.card} ${recipes.liftable} flex cursor-pointer flex-col gap-3 p-3`}
                 onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
               >
-                <span className="flex flex-col">
+                <span className="flex min-w-0 flex-col">
                   <Link
                     href={`/${locale}/tickets/${ticket.id}`}
                     className="focus-ring w-fit rounded-sm font-medium text-ink-strong hover:underline"
@@ -354,6 +457,14 @@ export function DashboardView({ userId }: { userId: string }) {
               </li>
             ))}
           </ul>
+        )}
+        {myTicketsQuery.isSuccess && (myTicketsQuery.data?.total ?? 0) > NEEDS_YOU_LIMIT && (
+          <Link
+            href={board(mineQuery)}
+            className="focus-ring mt-3 inline-flex rounded-inner text-sm font-medium text-accent hover:underline"
+          >
+            {t("viewAllMine", { count: myTicketsQuery.data?.total ?? 0 })}
+          </Link>
         )}
       </SectionCard>
 
@@ -400,6 +511,48 @@ export function DashboardView({ userId }: { userId: string }) {
           )}
         </SectionCard>
       </div>
+
+      {/* Story 221 — branch figures for users with `report:read`, over the
+          last 30 days. The UI has no permission model: an agent's 403 simply
+          leaves this panel out. */}
+      {showBranch && (
+        <SectionCard title={t("branch.heading")}>
+          <div className="mt-3 grid grid-cols-1 gap-section md:grid-cols-2">
+            {slaComplianceQuery.isSuccess && (
+              <div className="flex items-center gap-4">
+                <DonutGauge
+                  percent={compliance === null || compliance === undefined ? 0 : compliance * 100}
+                  color="rgb(var(--success-solid))"
+                  ariaLabel={t("branch.complianceLabel", {
+                    rate:
+                      compliance === null || compliance === undefined
+                        ? "—"
+                        : Math.round(compliance * 100),
+                  })}
+                />
+                <div className="flex flex-col gap-tight">
+                  {/* The gauge shows the rate; the text names it. */}
+                  <span className="text-subhead text-ink-strong">{t("branch.compliance")}</span>
+                  <span className="text-caption text-ink-muted">
+                    {t("branch.complianceHint", {
+                      met: slaComplianceQuery.data.compliantCount,
+                      breached: slaComplianceQuery.data.breachedCount,
+                    })}
+                  </span>
+                </div>
+              </div>
+            )}
+            {volumeByCategoryQuery.isSuccess && categoryRows.length > 0 && (
+              <div className="flex flex-col gap-stack">
+                <h3 className="text-caption font-medium text-ink-muted">
+                  {t("branch.byCategory")}
+                </h3>
+                <BarChart rows={categoryRows} ariaLabel={t("branch.byCategory")} />
+              </div>
+            )}
+          </div>
+        </SectionCard>
+      )}
     </section>
   );
 }
