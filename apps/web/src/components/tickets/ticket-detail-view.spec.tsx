@@ -52,9 +52,17 @@ vi.mock("@crm/ui", async (importOriginal) => ({
 
 const mockedShowSuccessToast = vi.mocked(showSuccessToast);
 
+let searchParamsString = "";
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
   useRouter: () => ({ push: vi.fn() }),
+  // Story 220 — the board/list context a ticket was opened from.
+  useSearchParams: () => new URLSearchParams(searchParamsString),
+}));
+
+// Story 220 — the prev/next column query (none in these tests' context).
+vi.mock("@/hooks/use-ticket-board", () => ({
+  useTicketBoardColumnQuery: () => ({ data: undefined }),
 }));
 
 vi.mock("next-intl", () => ({
@@ -2307,6 +2315,42 @@ describe("TicketDetailView", () => {
       const kb = screen.getByRole("heading", { name: "detail.kbReferencesHeading" });
       expect(context.compareDocumentPosition(kb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(context.closest(".lg\\:sticky")).toContainElement(kb);
+    });
+  });
+
+  // Story 220 (PR-3.5, RD-3.12 / RD-3.14) — mobile panels and the way back.
+  describe("ticket detail mobile and navigation (Story 220)", () => {
+    function renderLoaded() {
+      vi.mocked(useTicketQuery).mockReturnValue(
+        queryResult({ data: baseTicket, isSuccess: true }) as never,
+      );
+      return render(<TicketDetailView ticketId="ticket-1" />);
+    }
+
+    it("switches between the conversation and the details below lg", () => {
+      searchParamsString = "";
+      renderLoaded();
+      const switcher = screen.getByRole("radiogroup", { name: "detail.panelSwitcher" });
+      const conversation = screen.getByRole("heading", { name: "detail.chatHeading" });
+      const properties = screen.getByRole("heading", { name: "detail.propertiesHeading" });
+      const mainColumn = conversation.closest(".lg\\:col-span-2")!;
+      const inspector = properties.closest(".lg\\:sticky")!;
+      expect(mainColumn).not.toHaveClass("max-lg:hidden");
+      expect(inspector).toHaveClass("max-lg:hidden");
+
+      fireEvent.click(within(switcher).getByRole("radio", { name: "detail.panel.details" }));
+      expect(mainColumn).toHaveClass("max-lg:hidden");
+      expect(inspector).not.toHaveClass("max-lg:hidden");
+    });
+
+    it("goes back to the board or list view, with its filters, it was opened from", () => {
+      searchParamsString = "from=board&search=vat";
+      renderLoaded();
+      expect(screen.getByRole("link", { name: "detail.backToList" })).toHaveAttribute(
+        "href",
+        "/en/tickets?view=board&search=vat",
+      );
+      searchParamsString = "";
     });
   });
 });

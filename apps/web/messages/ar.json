@@ -343,6 +343,19 @@
         "priority": "تغيّرت الأولوية إلى {value}.",
         "assignee": "أصبحت مسندة إلى {value}.",
         "unassigned": "أصبحت غير مسندة."
+      },
+      "panelSwitcher": "لوحة التذكرة",
+      "panel": {
+        "conversation": "المحادثة",
+        "details": "التفاصيل"
+      },
+      "neighbours": {
+        "label": "التنقل بين التذاكر",
+        "previous": "التذكرة السابقة: {subject}",
+        "next": "التذكرة التالية: {subject}",
+        "previousNone": "لا توجد تذكرة سابقة",
+        "nextNone": "لا توجد تذكرة تالية",
+        "position": "{index} من {total}"
       }
     },
     "sla": {

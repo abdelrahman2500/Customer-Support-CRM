@@ -27,6 +27,7 @@ export function TicketCard({
   ticket,
   locale,
   assigneeName,
+  href,
   actions,
   now,
   className,
@@ -35,6 +36,8 @@ export function TicketCard({
   locale: string;
   /** Resolved from the loaded users; `null` when unassigned. */
   assigneeName: string | null;
+  /** Story 220 — the link, with the board's context for prev/next. */
+  href?: string;
   actions?: ReactNode;
   now?: Date;
   className?: string;
@@ -80,7 +83,7 @@ export function TicketCard({
       </div>
 
       <Link
-        href={`/${locale}/tickets/${ticket.id}`}
+        href={href ?? `/${locale}/tickets/${ticket.id}`}
         aria-describedby={descriptionId}
         title={ticket.subject}
         className="focus-ring line-clamp-2 rounded-inner font-medium text-ink-strong after:absolute after:inset-0 after:rounded-surface after:content-[''] hover:text-ink"

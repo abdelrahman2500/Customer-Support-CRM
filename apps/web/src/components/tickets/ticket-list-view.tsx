@@ -12,6 +12,7 @@ import { TicketPriorityBadge, TicketStatusBadge } from "@/components/tickets/tic
 import { SlaIndicator } from "@/components/tickets/sla-indicator";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useUrlFilters } from "@/lib/url-filters";
+import { parseListFilters, ticketHref } from "@/components/tickets/ticket-neighbours";
 import {
   Button,
   FetchingIndicator,
@@ -44,25 +45,8 @@ const ALL_VALUE = "__all__";
  * pre-existing default (`createdAt`/`desc`) both when parsing an absent
  * param and when serializing that default back out, so the common,
  * unsorted-from-the-user's-perspective case never grows a query string. */
-function parseTicketFilters(params: URLSearchParams): ListTicketsFilters {
-  const page = params.get("page");
-  return {
-    sortBy: (params.get("sortBy") as ListTicketsFilters["sortBy"]) ?? "createdAt",
-    sortDir: (params.get("sortDir") as ListTicketsFilters["sortDir"]) ?? "desc",
-    ...(params.get("status")
-      ? { status: params.get("status") as ListTicketsFilters["status"] }
-      : {}),
-    ...(params.get("priority")
-      ? { priority: params.get("priority") as ListTicketsFilters["priority"] }
-      : {}),
-    ...(params.get("categoryId") ? { categoryId: params.get("categoryId")! } : {}),
-    ...(params.get("assignedToUserId")
-      ? { assignedToUserId: params.get("assignedToUserId")! }
-      : {}),
-    ...(params.get("search") ? { search: params.get("search")! } : {}),
-    ...(page ? { page: Number(page) } : {}),
-  };
-}
+// Story 220 — shared with the ticket page (prev/next reads the same names).
+const parseTicketFilters = parseListFilters;
 
 function serializeTicketFilters(filters: ListTicketsFilters): URLSearchParams {
   const params = new URLSearchParams();
@@ -127,6 +111,8 @@ function TicketListViewContent({ viewSwitcher }: { viewSwitcher?: ReactNode }) {
   const { locale } = useParams<{ locale: string }>();
 
   const [filters, setFilters] = useUrlFilters(parseTicketFilters, serializeTicketFilters);
+  // Story 220 — ticket links carry this view's filters for prev/next.
+  const listContext = { from: "list" as const, query: serializeTicketFilters(filters) };
 
   const ticketsQuery = useTicketsQuery(filters);
   /** Story S-7 — whoever they came from: a completed fetch, the previous
@@ -318,7 +304,7 @@ function TicketListViewContent({ viewSwitcher }: { viewSwitcher?: ReactNode }) {
               <TableRow
                 key={ticket.id}
                 className="cursor-pointer"
-                onClick={() => router.push(`/${locale}/tickets/${ticket.id}`)}
+                onClick={() => router.push(ticketHref(locale, ticket.id, listContext))}
               >
                 {/* Story 158 — the id and category live here rather than in
                     columns of their own. Ten columns overflowed on a desktop
@@ -329,7 +315,7 @@ function TicketListViewContent({ viewSwitcher }: { viewSwitcher?: ReactNode }) {
                     stay labelled — they moved, they were not dropped. */}
                 <TableCell label={t("list.columns.subject")} className="font-medium text-ink">
                   <Link
-                    href={`/${locale}/tickets/${ticket.id}`}
+                    href={ticketHref(locale, ticket.id, listContext)}
                     className="focus-ring rounded-sm hover:underline"
                     onClick={(event) => event.stopPropagation()}
                   >

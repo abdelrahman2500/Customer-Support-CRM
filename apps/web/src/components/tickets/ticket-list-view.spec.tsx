@@ -281,7 +281,8 @@ describe("TicketListView", () => {
     render(<TicketListView />);
 
     const subject = screen.getByRole("link", { name: "Cannot log in" });
-    expect(subject).toHaveAttribute("href", "/en/tickets/ticket-1");
+    // Story 220 — the link carries the list as its context (prev/next, back).
+    expect(subject).toHaveAttribute("href", "/en/tickets/ticket-1?from=list");
     expect(subject).not.toHaveAttribute("tabIndex");
     subject.focus();
     expect(subject).toHaveFocus();

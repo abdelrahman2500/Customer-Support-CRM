@@ -66,6 +66,8 @@ export function TicketHeader({
   onSubjectCommit,
   actions,
   isOwnChange = () => false,
+  backHref,
+  navigation,
 }: {
   ticket: TicketSummary;
   locale: string;
@@ -79,6 +81,10 @@ export function TicketHeader({
   actions?: ReactNode;
   /** Story 219 — whether a field's latest change was the agent's own edit. */
   isOwnChange?: (field: TicketHeaderField) => boolean;
+  /** Story 220 — back to the board/list view (and filters) it was opened from. */
+  backHref?: string;
+  /** Story 220 — previous/next ticket in that view's order. */
+  navigation?: ReactNode;
 }) {
   const t = useTranslations("tickets");
   const labels = useTicketLabels();
@@ -165,9 +171,12 @@ export function TicketHeader({
       )}
     >
       {/* Story 189 — the shared BackLink: chevron flips in RTL, token focus ring. */}
-      <BackLink asChild>
-        <Link href={`/${locale}/tickets`}>{t("detail.backToList")}</Link>
-      </BackLink>
+      <div className="flex items-center justify-between gap-inline">
+        <BackLink asChild>
+          <Link href={backHref ?? `/${locale}/tickets`}>{t("detail.backToList")}</Link>
+        </BackLink>
+        {navigation}
+      </div>
 
       {/* Story 202 — the title block and the actions share a row that wraps:
           on narrow screens the actions move under the title. */}
@@ -289,10 +298,10 @@ export function TicketHeader({
             {ticket.customerName ?? ticket.customerId}
           </Link>
         </DescriptionItem>
-        <DescriptionItem term={t("list.columns.createdAt")}>
+        <DescriptionItem term={t("list.columns.createdAt")} className="hidden lg:flex">
           <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt, locale)}</time>
         </DescriptionItem>
-        <DescriptionItem term={t("list.columns.updatedAt")}>
+        <DescriptionItem term={t("list.columns.updatedAt")} className="hidden lg:flex">
           <time dateTime={ticket.updatedAt}>{formatDateTime(ticket.updatedAt, locale)}</time>
         </DescriptionItem>
       </dl>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import {
@@ -25,6 +25,8 @@ import type { ReplyInsertion } from "@/components/tickets/ticket-chat-card";
 import { TicketAiCard } from "@/components/tickets/ticket-ai-card";
 import type { PinnedSummary } from "@/components/tickets/ticket-ai-card";
 import { TicketKbReferencesCard } from "@/components/tickets/ticket-kb-references-card";
+import { TicketNeighbours, ticketsBackHref } from "@/components/tickets/ticket-neighbours";
+import { localeDirection } from "@/i18n/direction";
 import { useTicketRealtime } from "@/hooks/use-ticket-realtime";
 import { useAgentPresence } from "@/hooks/use-agent-presence";
 import { deriveSlaStatus } from "@/lib/sla";
@@ -50,6 +52,8 @@ import {
   DescriptionList,
   LoadingStatus,
   SectionCard,
+  SegmentedControl,
+  formatDateTime,
   showSuccessToast,
   Skeleton,
 } from "@crm/ui";
@@ -171,34 +175,48 @@ const PRIORITY_OPTIONS: TicketPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 export function TicketDetailSkeleton() {
   return (
     <section className="flex flex-col gap-6" aria-hidden="true">
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-7 w-1/2" />
-        <Skeleton className="h-4 w-40" />
+      {/* Header: back link, id, subject, facts (Story 220 — the v2 layout). */}
+      <div className="flex flex-col gap-stack border-b border-t-[3px] border-rule-subtle pb-stack pt-stack">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-7 w-2/3" />
+        <div className="flex flex-wrap gap-x-section gap-y-stack">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="flex flex-col gap-tight">
+              <Skeleton className="h-3 w-14" />
+              <Skeleton className="h-5 w-24" />
+            </div>
+          ))}
+        </div>
       </div>
-
-      {/* RM-04 — the customer context panel. */}
-      <Card className="p-surface">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="mt-2 h-16 w-full" />
-      </Card>
-
-      <Card className="grid grid-cols-1 gap-4 p-surface sm:grid-cols-2 lg:grid-cols-1">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="flex flex-col gap-1">
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-9 w-full" />
-          </div>
-        ))}
-      </Card>
-
-      <Skeleton className="h-40 w-full rounded-md" />
-
-      {Array.from({ length: 7 }).map((_, index) => (
-        <Card key={index} className="p-surface">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="mt-2 h-16 w-full" />
+      <Skeleton className="h-9 w-full lg:hidden" />
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        {/* The conversation: messages and the composer. */}
+        <Card className="flex flex-col gap-3 p-surface lg:col-span-2">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-12 w-3/4" />
+          <Skeleton className="ms-auto h-12 w-2/3" />
+          <Skeleton className="h-12 w-1/2" />
+          <Skeleton className="mt-6 h-20 w-full" />
         </Card>
-      ))}
+        {/* The inspector: properties, then the other sections. */}
+        <div className="hidden flex-col gap-6 lg:flex">
+          <Card className="flex flex-col gap-4 p-surface">
+            <Skeleton className="h-5 w-24" />
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="flex flex-col gap-1">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            ))}
+          </Card>
+          <Card className="p-surface">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="mt-3 h-16 w-full" />
+          </Card>
+        </div>
+      </div>
     </section>
   );
 }
@@ -208,6 +226,11 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
   const tCommon = useTranslations("common");
   const ticketLabels = useTicketLabels();
   const { locale } = useParams<{ locale: string }>();
+  // Story 220 — the board/list context the ticket was opened from, if any.
+  const searchParams = useSearchParams();
+  const contextParams = new URLSearchParams(searchParams?.toString() ?? "");
+  /** Story 220 (RD-3.12) — below lg one panel at a time: the conversation or the details. */
+  const [panel, setPanel] = useState<"conversation" | "details">("conversation");
 
   useTicketRealtime(ticketId);
 
@@ -380,6 +403,10 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
         }
         onSubjectCommit={(subject, { onError }) => mutation.mutate({ subject }, { onError })}
         isOwnChange={isOwnChange}
+        backHref={ticketsBackHref(locale, contextParams)}
+        navigation={
+          <TicketNeighbours ticketId={ticket.id} status={ticket.status} locale={locale} />
+        }
         actions={
           <TicketHeaderActions
             status={ticket.status}
@@ -416,8 +443,27 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
           `items-start` so the columns size independently instead of the
           shorter one stretching. Below `lg` the grid is one column and the
           main column renders first, so a phone opens on the conversation. */}
+      {/* Story 220 (RD-3.12, recon RS-02) — below lg, Conversation | Details:
+          the composer stays with the conversation and the inspector is one
+          tap away, instead of a long single column. From lg both show. */}
+      <SegmentedControl
+        aria-label={t("detail.panelSwitcher")}
+        dir={localeDirection(locale)}
+        size="sm"
+        fill
+        className="sticky top-0 z-20 lg:hidden"
+        options={[
+          { value: "conversation", label: t("detail.panel.conversation") },
+          { value: "details", label: t("detail.panel.details") },
+        ]}
+        value={panel}
+        onValueChange={(value) => setPanel(value as "conversation" | "details")}
+      />
+
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+        <div
+          className={`flex min-w-0 flex-col gap-6 lg:col-span-2${panel === "details" ? " max-lg:hidden" : ""}`}
+        >
           {/* Story 206 (RD-3.6, recon TW-04) — the conversation is the ticket's
               timeline: notes, history and SLA escalations now sit in it, in
               time order, instead of three cards of their own. Story 207
@@ -451,7 +497,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             where sticky lets go at the grid's edge — it never slides under
             the header. `-mx-1 px-1` keeps focus rings at the card edges from
             being clipped by the scroll container. */}
-        <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-[var(--ticket-header-h,0px)] lg:-mx-1 lg:max-h-[calc(100vh_-_var(--ticket-header-h,0px)_-_var(--space-page-y))] lg:overflow-y-auto lg:px-1 lg:pb-stack">
+        <div
+          className={`${panel === "conversation" ? "max-lg:hidden " : ""}flex min-w-0 flex-col gap-6 lg:sticky lg:top-[var(--ticket-header-h,0px)] lg:-mx-1 lg:max-h-[calc(100vh_-_var(--ticket-header-h,0px)_-_var(--space-page-y))] lg:overflow-y-auto lg:px-1 lg:pb-stack`}
+        >
           {/* Story 203 (RD-3.3, recon TW-07) — the properties card has a
               heading now (it was the one untitled card, breaking the
               outline); the five controls inside are unchanged. */}
@@ -625,6 +673,12 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               </Field>
             </div>
             <DescriptionList className="mt-4">
+              <DescriptionItem term={t("list.columns.createdAt")} className="lg:hidden">
+                <time dateTime={ticket.createdAt}>{formatDateTime(ticket.createdAt, locale)}</time>
+              </DescriptionItem>
+              <DescriptionItem term={t("list.columns.updatedAt")} className="lg:hidden">
+                <time dateTime={ticket.updatedAt}>{formatDateTime(ticket.updatedAt, locale)}</time>
+              </DescriptionItem>
               <DescriptionItem term={t("detail.ticketIdFull")}>
                 <span className="break-all font-mono text-caption" dir="ltr">
                   {ticket.id}

@@ -343,6 +343,19 @@
         "priority": "Priority changed to {value}.",
         "assignee": "Now assigned to {value}.",
         "unassigned": "Now unassigned."
+      },
+      "panelSwitcher": "Ticket panel",
+      "panel": {
+        "conversation": "Conversation",
+        "details": "Details"
+      },
+      "neighbours": {
+        "label": "Ticket navigation",
+        "previous": "Previous ticket: {subject}",
+        "next": "Next ticket: {subject}",
+        "previousNone": "No previous ticket",
+        "nextNone": "No next ticket",
+        "position": "{index} of {total}"
       }
     },
     "sla": {

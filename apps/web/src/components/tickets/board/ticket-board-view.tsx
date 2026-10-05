@@ -66,6 +66,7 @@ import {
 import { TicketBoardColumn, type ColumnReport } from "./ticket-board-column";
 import { TicketCard } from "./ticket-card";
 import { BoardCard } from "./board-card";
+import { ticketHref } from "@/components/tickets/ticket-neighbours";
 import { columnCoordinates, needsConfirmation } from "./board-moves";
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
@@ -330,9 +331,12 @@ export function TicketBoardView({ viewSwitcher }: { viewSwitcher?: ReactNode }) 
     announce(t("announce.cancelled"));
   }
 
+  // Story 220 — cards open the ticket with this board's filters, for prev/next.
+  const boardQuery = serializeBoardFilters(filters);
   const renderCard = (ticket: TicketListItem, changed: boolean) => (
     <BoardCard
       changed={changed}
+      href={ticketHref(locale, ticket.id, { from: "board", query: boardQuery })}
       ticket={ticket}
       locale={locale}
       assigneeName={assigneeNameOf(ticket)}

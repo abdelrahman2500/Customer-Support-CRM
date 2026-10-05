@@ -130,6 +130,15 @@ describe("TicketBoardView", () => {
     expect(screen.getByRole("link", { name: "Invoice shows the old price" })).toBeInTheDocument();
   });
 
+  it("opens a ticket with the board as its context, for prev/next (Story 220)", () => {
+    searchParamsString = "search=invoice";
+    render(<TicketBoardView />);
+    expect(screen.getByRole("link", { name: "Invoice shows the old price" })).toHaveAttribute(
+      "href",
+      "/en/tickets/t1?from=board&search=invoice",
+    );
+  });
+
   it("sums the column totals into a polite summary", () => {
     render(<TicketBoardView />);
     // Story 217: dnd-kit adds its own (empty) role=status region, so the

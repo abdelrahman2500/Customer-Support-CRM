@@ -26,6 +26,8 @@ export interface BoardCardProps {
   ticket: TicketListItem;
   locale: string;
   assigneeName: string | null;
+  /** Story 220 — the ticket link, carrying the board's filters. */
+  href?: string;
   /** Pointer and keyboard drag (≥ md); phones move with the menu only. */
   draggable: boolean;
   /** The status this card waits to be confirmed into (Resolved/Closed), if any. */
@@ -59,6 +61,7 @@ export const BoardCard = memo(function BoardCard({
   ticket,
   locale,
   assigneeName,
+  href,
   draggable,
   confirming,
   focusRequested,
@@ -167,6 +170,7 @@ export const BoardCard = memo(function BoardCard({
             ticket={ticket}
             locale={locale}
             assigneeName={assigneeName}
+            href={href}
             actions={actions}
             className={cn(
               isDragging &&
