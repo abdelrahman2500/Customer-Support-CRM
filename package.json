@@ -13,7 +13,10 @@
     "test": "turbo run test --filter=!@crm/e2e",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "demo:reset": "node scripts/demo.mjs reset",
+    "demo:api": "node scripts/demo.mjs api",
+    "demo:worker": "node scripts/demo.mjs worker"
   },
   "devDependencies": {
     "turbo": "^2.10.11",
