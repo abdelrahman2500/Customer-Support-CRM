@@ -12,9 +12,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
   MoreActionsIcon,
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
   cn,
 } from "@crm/ui";
 import type { TicketListItem, TicketStatus } from "@/lib/tickets-api";
@@ -53,9 +50,14 @@ export interface BoardCardProps {
  * - the "⋯" menu's "Move to" items, at every width (the only path on
  *   phones, and the screen-reader-friendly one).
  *
- * A move into Resolved or Closed waits on an inline popover anchored to the
- * card (PD-5: the customer is notified); focus starts on its confirm
- * button, and Escape / Cancel / clicking away leaves the card where it was.
+ * A move into Resolved or Closed waits on a confirmation (PD-5: the customer
+ * is notified); focus starts on its confirm button, and Escape / Cancel
+ * leaves the card where it was.
+ *
+ * Demo hardening — the confirmation opens inside the card, under its
+ * content, instead of a popover: below the card it covered the next card in
+ * the column, beside it the first card of the next column. Inline, it covers
+ * nothing and is unmistakably about this card.
  */
 export const BoardCard = memo(function BoardCard({
   ticket,
@@ -90,6 +92,20 @@ export const BoardCard = memo(function BoardCard({
   const onHandleKeyDown = onKeyDown as KeyboardEventHandler<HTMLButtonElement> | undefined;
 
   const focusTarget = () => (draggable ? handleRef.current : null) ?? menuRef.current;
+
+  // The confirmation takes focus when it opens and hands it back to the card
+  // when it closes (what the popover's own focus management used to do).
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (confirming) {
+      confirmRef.current?.focus();
+    } else if (wasConfirming.current) {
+      focusTarget()?.focus();
+    }
+    wasConfirming.current = confirming !== null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- focusTarget reads refs only
+  }, [confirming]);
 
   useEffect(() => {
     if (!focusRequested) return;
@@ -153,60 +169,55 @@ export const BoardCard = memo(function BoardCard({
   );
 
   return (
-    <Popover
-      open={confirming !== null}
-      onOpenChange={(open) => {
-        if (!open) onCancel();
-      }}
+    <div
+      ref={setNodeRef}
+      {...(draggable ? pointerListeners : {})}
+      data-changed={changed || undefined}
+      className="touch-manipulation"
     >
-      <PopoverAnchor asChild>
-        <div
-          ref={setNodeRef}
-          {...(draggable ? pointerListeners : {})}
-          data-changed={changed || undefined}
-          className="touch-manipulation"
-        >
-          <TicketCard
-            ticket={ticket}
-            locale={locale}
-            assigneeName={assigneeName}
-            href={href}
-            actions={actions}
-            className={cn(
-              isDragging &&
-                "border-dashed border-rule-strong bg-surface-muted opacity-50 shadow-none",
-              // With reduced motion only the colour remains (§6).
-              changed &&
-                "motion-safe:animate-change-cue motion-reduce:ring-2 motion-reduce:ring-accent/50",
-            )}
-          />
-        </div>
-      </PopoverAnchor>
-      <PopoverContent
-        aria-labelledby={questionId}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault();
-          focusTarget()?.focus();
-        }}
-        className="flex flex-col gap-stack"
-      >
-        {confirming && (
-          <>
-            <p id={questionId} className="text-body-sm text-ink">
-              <span className="font-medium">{t(`confirm.${confirming}.question`)}</span>{" "}
-              <span className="text-ink-muted">{t("confirm.notified")}</span>
-            </p>
-            <div className="flex justify-end gap-tight">
-              <Button type="button" size="sm" onClick={onConfirm}>
-                {t(`confirm.${confirming}.action`)}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-                {t("confirm.cancel")}
-              </Button>
-            </div>
-          </>
+      <TicketCard
+        ticket={ticket}
+        locale={locale}
+        assigneeName={assigneeName}
+        href={href}
+        actions={actions}
+        className={cn(
+          isDragging && "border-dashed border-rule-strong bg-surface-muted opacity-50 shadow-none",
+          // With reduced motion only the colour remains (§6).
+          changed &&
+            "motion-safe:animate-change-cue motion-reduce:ring-2 motion-reduce:ring-accent/50",
+          confirming && "rounded-b-none",
         )}
-      </PopoverContent>
-    </Popover>
+      />
+      {confirming && (
+        // A non-modal dialog: named by its question, closed by Escape.
+        <div
+          role="dialog"
+          aria-labelledby={questionId}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              onCancel();
+            }
+          }}
+          // Not a drag start: the buttons are inside the draggable card.
+          onPointerDown={(event) => event.stopPropagation()}
+          className="flex flex-col gap-stack rounded-b-surface border border-t-0 border-rule bg-surface-raised p-3 shadow-sm"
+        >
+          <p id={questionId} className="text-body-sm text-ink">
+            <span className="font-medium">{t(`confirm.${confirming}.question`)}</span>{" "}
+            <span className="text-ink-muted">{t("confirm.notified")}</span>
+          </p>
+          <div className="flex justify-end gap-tight">
+            <Button ref={confirmRef} type="button" size="sm" onClick={onConfirm}>
+              {t(`confirm.${confirming}.action`)}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+              {t("confirm.cancel")}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 });

@@ -99,12 +99,12 @@ export function TicketCard({
         {urgent ? (
           <TicketPriorityBadge priority={ticket.priority} className="text-caption" />
         ) : (
-          <span
-            className="inline-flex items-center text-ink-subtle"
-            title={labels.priority(ticket.priority)}
-          >
+          // Demo hardening — low and medium priority read as a quiet label
+          // (icon and word), not a lone glyph that looked like a rendering
+          // glitch; only high and urgent get a coloured badge.
+          <span className="inline-flex items-center gap-1 text-caption text-ink-subtle">
             <PriorityIcon aria-hidden="true" className="h-3.5 w-3.5" />
-            <span className="sr-only">{labels.priority(ticket.priority)}</span>
+            {labels.priority(ticket.priority)}
           </span>
         )}
         {showSla && (

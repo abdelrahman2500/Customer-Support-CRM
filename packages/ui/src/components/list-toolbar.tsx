@@ -96,7 +96,10 @@ function SearchField({
           </button>
         ) : undefined
       }
-      className="[&::-webkit-search-cancel-button]:hidden"
+      // Demo hardening — with a start icon, Input puts `className` on its
+      // wrapper, so the native clear button is hidden on the input inside it;
+      // the clear button above is the only one.
+      className="[&_input::-webkit-search-cancel-button]:hidden"
     />
   );
 }

@@ -54,10 +54,13 @@ describe("TicketCard", () => {
     expect(screen.getByText("Billing")).toBeInTheDocument();
   });
 
-  it("keeps urgency rare: HIGH/URGENT get an edge and a badge, MEDIUM only a labelled icon", () => {
+  it("keeps urgency rare: HIGH/URGENT get an edge and a badge, MEDIUM a quiet label", () => {
     const { container, unmount } = renderCard();
     expect(container.firstElementChild).not.toHaveClass("border-s-[3px]");
-    expect(screen.getByText("ticketPriority.MEDIUM")).toHaveClass("sr-only");
+    // Demo hardening — a visible, muted word beside the icon (a lone glyph
+    // read as a rendering glitch), never a badge.
+    expect(screen.getByText("ticketPriority.MEDIUM")).toHaveClass("text-ink-subtle");
+    expect(screen.getByText("ticketPriority.MEDIUM")).not.toHaveClass("sr-only");
     unmount();
 
     const urgent = renderCard({ ticket: ticket({ priority: "URGENT" }) });
