@@ -11,6 +11,10 @@ export interface SlaTargetSummary {
   /** RM-25 — `null` means not on hold. See `SlaHoldListener`'s own doc
    * comment for the full pause/resume mechanics. */
   onHoldSince: Date | null;
+  /** Demo hardening — when an agent first replied (the first outbound
+   * message sent by a user), or `null`. A reply satisfies the response
+   * target; the UI then governs by the resolution target. */
+  firstResponseAt: Date | null;
 }
 
 /**
@@ -19,6 +23,16 @@ export interface SlaTargetSummary {
  * `Ticket` (mirroring `TicketsService.getTicketHistory`'s scope-through-
  * parent shape) since `SlaTicketTarget` carries no `branchId` of its own.
  */
+/** The first outbound message a person (not the AI) sent on a ticket. */
+async function firstAgentReplyAt(prisma: PrismaService, ticketId: string): Promise<Date | null> {
+  const reply = await prisma.channelMessage.findFirst({
+    where: { ticketId, direction: "OUTBOUND", senderUserId: { not: null } },
+    orderBy: { createdAt: "asc" },
+    select: { createdAt: true },
+  });
+  return reply?.createdAt ?? null;
+}
+
 @Injectable()
 export class SlaTargetsService {
   constructor(
@@ -46,6 +60,7 @@ export class SlaTargetsService {
       responseTargetAt: target.responseTargetAt,
       resolutionTargetAt: target.resolutionTargetAt,
       onHoldSince: target.onHoldSince,
+      firstResponseAt: (await firstAgentReplyAt(this.prisma, ticketId)) ?? null,
     };
   }
 }

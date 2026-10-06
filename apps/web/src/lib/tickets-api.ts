@@ -11,6 +11,8 @@ export interface TicketSlaTarget {
   resolutionTargetAt: string;
   /** RM-25 — SLA Pause/Resume. `null` means not on hold. */
   onHoldSince: string | null;
+  /** Demo hardening — when an agent first replied, or `null`. */
+  firstResponseAt?: string | null;
 }
 
 /** Mirrors `apps/api/src/modules/tickets/tickets.service.ts`'s `TicketSummary`. */

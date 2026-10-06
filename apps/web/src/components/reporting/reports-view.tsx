@@ -230,7 +230,7 @@ function failureKind(query: QueryLike): FailureKind | null {
  * carry five different metrics (calls, successes, errors, tokens, cost),
  * and charting only the call count would quietly drop the other four.
  *
- * Every existing textual detail line (`slaCompliance.detail`/`csat.detail`) is
+ * Every existing textual detail line (`slaCompliance.responseDetail`/`resolutionDetail`/`csat.detail`) is
  * kept alongside its new chart, not replaced by it — the chart adds a
  * visual, it doesn't remove the precise number. `ReportCard`'s own
  * loading/forbidden/error states are untouched: a chart is just a new
@@ -406,24 +406,53 @@ export function ReportsView() {
             exportPath="sla-compliance"
             range={range}
           >
-            {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget === 0 && (
-              <p className="text-sm text-ink-subtle">{t("slaCompliance.empty")}</p>
-            )}
-            {slaComplianceQuery.isSuccess && slaComplianceQuery.data.totalWithTarget > 0 && (
-              <div className="flex flex-col items-center gap-1 text-sm">
-                <DonutGauge
-                  percent={(slaComplianceQuery.data.complianceRate ?? 0) * 100}
-                  color="rgb(var(--success-solid))"
-                  ariaLabel={`${Math.round((slaComplianceQuery.data.complianceRate ?? 0) * 100)}%`}
-                />
-                <span className="text-ink-subtle">
-                  {t("slaCompliance.detail", {
-                    compliant: slaComplianceQuery.data.compliantCount,
-                    total: slaComplianceQuery.data.totalWithTarget,
-                  })}
-                </span>
-              </div>
-            )}
+            {/* Demo hardening — response and resolution are reported
+                separately, counted the way the board's SLA badges show them:
+                a reply (or resolution) by the target time meets it. */}
+            {slaComplianceQuery.isSuccess &&
+              slaComplianceQuery.data.response.dueCount === 0 &&
+              slaComplianceQuery.data.resolution.dueCount === 0 && (
+                <p className="text-sm text-ink-subtle">{t("slaCompliance.empty")}</p>
+              )}
+            {slaComplianceQuery.isSuccess &&
+              (slaComplianceQuery.data.response.dueCount > 0 ||
+                slaComplianceQuery.data.resolution.dueCount > 0) && (
+                <div className="flex flex-col gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["response", "resolution"] as const).map((kind) => {
+                      const target = slaComplianceQuery.data[kind];
+                      const percent = Math.round((target.rate ?? 0) * 100);
+                      return (
+                        <div key={kind} className="flex flex-col items-center gap-1 text-center">
+                          <span className="text-label text-ink-muted">
+                            {t(`slaCompliance.${kind}`)}
+                          </span>
+                          {target.dueCount > 0 ? (
+                            <DonutGauge
+                              percent={percent}
+                              color={
+                                percent >= 80
+                                  ? "rgb(var(--success-solid))"
+                                  : "rgb(var(--warning-solid))"
+                              }
+                              ariaLabel={`${t(`slaCompliance.${kind}`)}: ${percent}%`}
+                            />
+                          ) : (
+                            <span className="py-6 text-ink-subtle">—</span>
+                          )}
+                          <span className="text-ink-subtle">
+                            {t(`slaCompliance.${kind}Detail`, {
+                              met: target.metCount,
+                              due: target.dueCount,
+                            })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-caption text-ink-subtle">{t("slaCompliance.note")}</p>
+                </div>
+              )}
           </ReportCard>
         );
 
@@ -577,7 +606,7 @@ export function ReportsView() {
         // when no successful call in range has a priced cost; a nonzero
         // `unpricedCallCount` is surfaced as an explicit caveat, mirroring
         // this screen's existing "never hide a caveat" convention (e.g.
-        // `slaCompliance.detail`, `resolutionTime.detail`).
+        // `slaCompliance.responseDetail`/`resolutionDetail`, `resolutionTime.detail`).
         return (
           <ReportCard
             heading={t("aiUsage.heading")}
@@ -692,11 +721,14 @@ export function ReportsView() {
   const ticketTotal = ticketVolumeQuery.isSuccess
     ? ticketVolumeQuery.data.reduce((sum, row) => sum + row.count, 0)
     : undefined;
+  const percentFormat = new Intl.NumberFormat(latinDigits(locale), { style: "percent" });
   const complianceRate =
-    slaComplianceQuery.isSuccess && slaComplianceQuery.data.complianceRate !== null
-      ? new Intl.NumberFormat(latinDigits(locale), { style: "percent" }).format(
-          slaComplianceQuery.data.complianceRate,
-        )
+    slaComplianceQuery.isSuccess && slaComplianceQuery.data.resolution.rate !== null
+      ? percentFormat.format(slaComplianceQuery.data.resolution.rate)
+      : undefined;
+  const responseRate =
+    slaComplianceQuery.isSuccess && slaComplianceQuery.data.response.rate !== null
+      ? percentFormat.format(slaComplianceQuery.data.response.rate)
       : undefined;
   const averageRating =
     csatQuery.isSuccess && csatQuery.data.averageRating !== null
@@ -946,6 +978,11 @@ export function ReportsView() {
             <StatCard
               label={t("kpi.slaCompliance")}
               value={complianceRate}
+              hint={
+                responseRate === undefined
+                  ? undefined
+                  : t("kpi.slaResponseHint", { rate: responseRate })
+              }
               loading={slaComplianceQuery.isLoading}
             />
             <StatCard

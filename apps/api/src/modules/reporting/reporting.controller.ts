@@ -47,11 +47,34 @@ const TICKET_VOLUME_COLUMNS: Array<CsvColumn<TicketVolumeByStatus>> = [
   { key: "count", header: "Count" },
 ];
 
-const SLA_COMPLIANCE_COLUMNS: Array<CsvColumn<SlaComplianceSummary>> = [
+/** Demo hardening — the summary flattened for its one-row CSV. */
+type SlaComplianceCsvRow = Omit<SlaComplianceSummary, "response" | "resolution"> & {
+  responseDue: number;
+  responseMet: number;
+  responseBreached: number;
+  responseRate: number | null;
+};
+
+function toSlaComplianceCsvRow(summary: SlaComplianceSummary): SlaComplianceCsvRow {
+  const { response, resolution: _resolution, ...rest } = summary;
+  return {
+    ...rest,
+    responseDue: response.dueCount,
+    responseMet: response.metCount,
+    responseBreached: response.breachedCount,
+    responseRate: response.rate,
+  };
+}
+
+const SLA_COMPLIANCE_COLUMNS: Array<CsvColumn<SlaComplianceCsvRow>> = [
   { key: "totalWithTarget", header: "Total With Target" },
   { key: "breachedCount", header: "Breached Count" },
   { key: "compliantCount", header: "Compliant Count" },
   { key: "complianceRate", header: "Compliance Rate" },
+  { key: "responseDue", header: "Response Due" },
+  { key: "responseMet", header: "Response Met" },
+  { key: "responseBreached", header: "Response Breached" },
+  { key: "responseRate", header: "Response Compliance Rate" },
 ];
 
 const CSAT_COLUMNS: Array<CsvColumn<CsatSummary>> = [
@@ -184,7 +207,7 @@ export class ReportingController {
     @Res() response: Response,
   ): Promise<void> {
     const summary = await this.reportingService.getSlaCompliance(toFilters(query));
-    sendCsv(response, "sla-compliance", query.from, query.to, toCsv([summary], SLA_COMPLIANCE_COLUMNS));
+    sendCsv(response, "sla-compliance", query.from, query.to, toCsv([toSlaComplianceCsvRow(summary)], SLA_COMPLIANCE_COLUMNS));
   }
 
   @Get("csat")

@@ -13,6 +13,9 @@ export interface TicketSlaTarget {
   resolutionTargetAt: string | Date;
   /** RM-25 — SLA Pause/Resume. `null`/absent means not on hold. */
   onHoldSince?: string | Date | null;
+  /** Demo hardening — when an agent first replied; a reply satisfies the
+   * response target, so the resolution target governs from then on. */
+  firstResponseAt?: string | Date | null;
 }
 
 /** Story 192 (RD-1.15) — which of the two targets governs. */
@@ -62,8 +65,13 @@ export function deriveSlaStatus(
   }
   const responseAt = new Date(target.responseTargetAt);
   const resolutionAt = new Date(target.resolutionTargetAt);
+  // Demo hardening — once an agent has replied, the response target is
+  // satisfied and the resolution target is what is left to meet (Reports
+  // counts responses the same way).
   const governing: SlaTargetKind =
-    responseAt.getTime() <= resolutionAt.getTime() ? "response" : "resolution";
+    !target.firstResponseAt && responseAt.getTime() <= resolutionAt.getTime()
+      ? "response"
+      : "resolution";
   const earliest = governing === "response" ? responseAt : resolutionAt;
 
   if (now.getTime() > earliest.getTime()) {

@@ -2,12 +2,11 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import { EventEmitter2 } from "@nestjs/event-emitter";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
-import { SLA_BREACHED_EVENT } from "../src/modules/sla-policies/sla-detection.events";
 import { PrismaService } from "../src/prisma/prisma.service";
+import type { SlaComplianceSummary } from "../src/modules/reporting/reporting.service";
 
 /**
  * Integration suite for Story 56 — `GET /reports/ticket-volume`,
@@ -18,9 +17,9 @@ import { PrismaService } from "../src/prisma/prisma.service";
  * suite combines: a fresh, randomly-categorized `SlaPolicy` fixture (so it
  * cannot collide with another suite's leftover policy in this shared
  * database — `sla-targets.e2e-spec.ts`'s own precedent) to produce a real
- * `SlaTicketTarget`, then `SLA_BREACHED_EVENT` emitted directly on the real,
- * compiled `EventEmitter2` (`sla-escalations.e2e-spec.ts`'s own precedent)
- * to produce a real `SlaEscalation`.
+ * `SlaTicketTarget`, whose target times are then moved into the past (or the
+ * ticket resolved) to make it breached or met — demo hardening: compliance is
+ * computed from the targets themselves, not from recorded escalations.
  *
  * Because the seeded admin's branch is shared with every other e2e suite in
  * this run, every assertion here is a *delta* (before vs. after a known
@@ -36,7 +35,6 @@ import { PrismaService } from "../src/prisma/prisma.service";
  */
 describe("Reporting & Analytics (e2e)", () => {
   let app: INestApplication;
-  let eventEmitter: EventEmitter2;
   let prisma: PrismaService;
   let adminAccessToken: string;
   let adminBranchId: string;
@@ -44,7 +42,6 @@ describe("Reporting & Analytics (e2e)", () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
-    eventEmitter = moduleRef.get(EventEmitter2);
     prisma = moduleRef.get(PrismaService);
 
     app.use(cookieParser());
@@ -154,12 +151,7 @@ describe("Reporting & Analytics (e2e)", () => {
     return response.body;
   }
 
-  async function getSlaCompliance(range?: DateRange): Promise<{
-    totalWithTarget: number;
-    breachedCount: number;
-    compliantCount: number;
-    complianceRate: number | null;
-  }> {
+  async function getSlaCompliance(range?: DateRange): Promise<SlaComplianceSummary> {
     const response = await request(app.getHttpServer())
       .get(`/api/v1/reports/sla-compliance${toQueryString(range)}`)
       .set("Authorization", `Bearer ${adminAccessToken}`)
@@ -460,7 +452,12 @@ describe("Reporting & Analytics (e2e)", () => {
         .expect(200);
 
       const lines = (response.text as string).trim().split("\r\n");
-      expect(lines[0]).toBe("Total With Target,Breached Count,Compliant Count,Compliance Rate");
+      // Demo hardening — the response target's columns follow the
+      // (resolution) summary columns.
+      expect(lines[0]).toBe(
+        "Total With Target,Breached Count,Compliant Count,Compliance Rate," +
+          "Response Due,Response Met,Response Breached,Response Compliance Rate",
+      );
       expect(lines).toHaveLength(2);
       const [totalWithTarget, breachedCount, compliantCount] = lines[1]!.split(",");
       expect(Number(totalWithTarget)).toBe(summary.totalWithTarget);
@@ -528,9 +525,13 @@ describe("Reporting & Analytics (e2e)", () => {
     expect(afterOpen).toBe(beforeOpen + 1);
   });
 
-  it("reflects a real SlaTicketTarget in totalWithTarget, then a real sla.breached escalation in breachedCount/complianceRate", async () => {
-    const before = await getSlaCompliance();
-
+  /**
+   * Demo hardening — a ticket with a real SlaTicketTarget (the policy is
+   * category-scoped so it matches only this ticket). SlaTargetListener runs
+   * fire-and-forget after POST /tickets responds (sla-targets.e2e-spec.ts's
+   * own documented gap), so this polls until the target is visible.
+   */
+  async function createTicketWithSlaTarget(): Promise<string> {
     const matchingCategoryId = await createTicketCategory();
     await request(app.getHttpServer())
       .post("/api/v1/sla-policies")
@@ -538,10 +539,6 @@ describe("Reporting & Analytics (e2e)", () => {
       .send({ categoryId: matchingCategoryId, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
       .expect(201);
     const ticketId = await createTicket(matchingCategoryId);
-
-    // SlaTargetListener runs fire-and-forget after POST /tickets responds
-    // (sla-targets.e2e-spec.ts's own documented gap) — poll briefly until
-    // the real SlaTicketTarget is visible via the existing endpoint.
     const deadline = Date.now() + 5000;
     let targetSeen = false;
     while (Date.now() < deadline && !targetSeen) {
@@ -554,33 +551,57 @@ describe("Reporting & Analytics (e2e)", () => {
       }
     }
     expect(targetSeen).toBe(true);
+    return ticketId;
+  }
 
-    const afterTarget = await getSlaCompliance();
-    expect(afterTarget.totalWithTarget).toBe(before.totalWithTarget + 1);
-    expect(afterTarget.breachedCount).toBe(before.breachedCount);
-
-    eventEmitter.emit(SLA_BREACHED_EVENT, {
-      ticketId,
-      branchId: adminBranchId,
-      targetType: "resolution",
-      targetAt: new Date("2026-01-01T00:00:00.000Z"),
+  /** Moves a ticket's targets into the past, as if its windows had elapsed. */
+  async function elapseTargets(ticketId: string): Promise<void> {
+    await prisma.slaTicketTarget.update({
+      where: { ticketId },
+      data: {
+        responseTargetAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        resolutionTargetAt: new Date(Date.now() - 60 * 60 * 1000),
+      },
     });
+  }
 
-    const escalationDeadline = Date.now() + 5000;
-    let afterBreach = afterTarget;
-    while (Date.now() < escalationDeadline && afterBreach.breachedCount === before.breachedCount) {
-      afterBreach = await getSlaCompliance();
-      if (afterBreach.breachedCount === before.breachedCount) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
+  // Demo hardening — compliance is computed from the targets themselves
+  // (resolvedAt / first agent reply against the target time), no longer
+  // from worker-recorded escalations; these replace the escalation-driven
+  // versions of the same scenarios.
+  it("counts a target only once it is due: a fresh target is not yet due, an elapsed unresolved one is breached", async () => {
+    const before = await getSlaCompliance();
 
-    expect(afterBreach.breachedCount).toBe(before.breachedCount + 1);
-    expect(afterBreach.totalWithTarget).toBe(before.totalWithTarget + 1);
-    expect(afterBreach.compliantCount).toBe(afterBreach.totalWithTarget - afterBreach.breachedCount);
-    expect(afterBreach.complianceRate).toBeCloseTo(
-      afterBreach.compliantCount / afterBreach.totalWithTarget,
+    const ticketId = await createTicketWithSlaTarget();
+    const afterTarget = await getSlaCompliance();
+    expect(afterTarget.totalWithTarget).toBe(before.totalWithTarget);
+    expect(afterTarget.response.dueCount).toBe(before.response.dueCount);
+
+    await elapseTargets(ticketId);
+    const afterElapsed = await getSlaCompliance();
+    expect(afterElapsed.totalWithTarget).toBe(before.totalWithTarget + 1);
+    expect(afterElapsed.breachedCount).toBe(before.breachedCount + 1);
+    expect(afterElapsed.response.breachedCount).toBe(before.response.breachedCount + 1);
+    expect(afterElapsed.compliantCount).toBe(afterElapsed.totalWithTarget - afterElapsed.breachedCount);
+    expect(afterElapsed.complianceRate).toBeCloseTo(
+      afterElapsed.compliantCount / afterElapsed.totalWithTarget,
     );
+  });
+
+  it("counts a ticket resolved before its targets as meeting both", async () => {
+    const before = await getSlaCompliance();
+
+    const ticketId = await createTicketWithSlaTarget();
+    await request(app.getHttpServer())
+      .patch(`/api/v1/tickets/${ticketId}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ status: "RESOLVED" })
+      .expect(200);
+
+    const after = await getSlaCompliance();
+    expect(after.compliantCount).toBe(before.compliantCount + 1);
+    expect(after.response.metCount).toBe(before.response.metCount + 1);
+    expect(after.breachedCount).toBe(before.breachedCount);
   });
 
   it("reflects real portal-submitted feedback in responseCount/averageRating", async () => {
@@ -921,58 +942,21 @@ describe("Reporting & Analytics (e2e)", () => {
     expect(afterYesterday.responseCount).toBe(beforeYesterday.responseCount);
   });
 
-  it("sla-compliance: filters the cohort by SlaTicketTarget.createdAt — a [today, today] range includes a fresh target+breach; [yesterday, yesterday] excludes it", async () => {
+  it("sla-compliance: filters the cohort by SlaTicketTarget.createdAt — a [today, today] range includes a fresh breached target; [yesterday, yesterday] excludes it", async () => {
     const beforeToday = await getSlaCompliance({ from: today(), to: today() });
     const beforeYesterday = await getSlaCompliance({ from: yesterday(), to: yesterday() });
 
-    const matchingCategoryId = await createTicketCategory();
-    await request(app.getHttpServer())
-      .post("/api/v1/sla-policies")
-      .set("Authorization", `Bearer ${adminAccessToken}`)
-      .send({ categoryId: matchingCategoryId, responseTargetMinutes: 30, resolutionTargetMinutes: 240 })
-      .expect(201);
-    const ticketId = await createTicket(matchingCategoryId);
+    const ticketId = await createTicketWithSlaTarget();
+    await elapseTargets(ticketId);
 
-    const deadline = Date.now() + 5000;
-    let targetSeen = false;
-    while (Date.now() < deadline && !targetSeen) {
-      const targetResponse = await request(app.getHttpServer())
-        .get(`/api/v1/tickets/${ticketId}/sla-target`)
-        .set("Authorization", `Bearer ${adminAccessToken}`);
-      targetSeen = targetResponse.status === 200;
-      if (!targetSeen) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
-    expect(targetSeen).toBe(true);
-
-    eventEmitter.emit(SLA_BREACHED_EVENT, {
-      ticketId,
-      branchId: adminBranchId,
-      targetType: "resolution",
-      targetAt: new Date("2026-01-01T00:00:00.000Z"),
-    });
-
-    const escalationDeadline = Date.now() + 5000;
-    let afterToday = beforeToday;
-    while (
-      Date.now() < escalationDeadline &&
-      afterToday.breachedCount === beforeToday.breachedCount
-    ) {
-      afterToday = await getSlaCompliance({ from: today(), to: today() });
-      if (afterToday.breachedCount === beforeToday.breachedCount) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
-
+    const afterToday = await getSlaCompliance({ from: today(), to: today() });
     expect(afterToday.totalWithTarget).toBe(beforeToday.totalWithTarget + 1);
     expect(afterToday.breachedCount).toBe(beforeToday.breachedCount + 1);
     expect(afterToday.compliantCount).toBe(afterToday.totalWithTarget - afterToday.breachedCount);
 
     // The target (and therefore the whole cohort) was created today, not
     // yesterday — that range's own count (captured before this fixture
-    // existed) must be unchanged, not equal to `beforeToday`'s unrelated
-    // count.
+    // existed) must be unchanged.
     const afterYesterday = await getSlaCompliance({ from: yesterday(), to: yesterday() });
     expect(afterYesterday.totalWithTarget).toBe(beforeYesterday.totalWithTarget);
     expect(afterYesterday.breachedCount).toBe(beforeYesterday.breachedCount);

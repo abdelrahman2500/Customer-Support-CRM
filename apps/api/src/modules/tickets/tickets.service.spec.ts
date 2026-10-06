@@ -19,6 +19,14 @@ import type { KnowledgeBaseService } from "../knowledge-base/knowledge-base.serv
 import type { IdentityService } from "../identity/identity.service";
 import { assertValidTicketStatusTransition } from "./ticket-status-transitions";
 
+/** Demo hardening — the first-agent-reply lookup `listTickets` includes. */
+const FIRST_REPLY_INCLUDE = {
+  where: { direction: "OUTBOUND", senderUserId: { not: null } },
+  orderBy: { createdAt: "asc" },
+  take: 1,
+  select: { createdAt: true },
+};
+
 // RM-01 — spied, not stubbed: `vi.fn(actual...)` wraps the real
 // implementation as the default for every test in this file (so every
 // existing `updateTicket` call below still exercises the real, permissive
@@ -401,6 +409,8 @@ describe("TicketsService", () => {
           slaTarget: true,
           category: { select: { name: true } },
           customer: { select: { displayName: true } },
+          // Demo hardening — the first agent reply, for the SLA badge.
+          channelMessages: FIRST_REPLY_INCLUDE,
         },
         skip: 0,
         take: 25,
@@ -558,11 +568,32 @@ describe("TicketsService", () => {
         responseTargetAt: new Date("2024-01-03T00:00:00.000Z"),
         resolutionTargetAt: new Date("2024-01-04T00:00:00.000Z"),
       };
-      prisma.ticket.findMany.mockResolvedValue([{ ...baseTicketRow, slaTarget }]);
+      prisma.ticket.findMany.mockResolvedValue([{ ...baseTicketRow, slaTarget, channelMessages: [] }]);
 
       const result = await service.listTickets();
 
-      expect(result.items[0]?.slaTarget).toEqual(slaTarget);
+      expect(result.items[0]?.slaTarget).toEqual({ ...slaTarget, firstResponseAt: null });
+    });
+
+    it("adds the first agent reply to the slaTarget (demo hardening)", async () => {
+      const repliedAt = new Date("2024-01-02T10:00:00.000Z");
+      prisma.ticket.findMany.mockResolvedValue([
+        {
+          ...baseTicketRow,
+          slaTarget: {
+            id: "target-1",
+            slaPolicyId: "policy-1",
+            responseTargetAt: new Date("2024-01-03T00:00:00.000Z"),
+            resolutionTargetAt: new Date("2024-01-04T00:00:00.000Z"),
+            onHoldSince: null,
+          },
+          channelMessages: [{ createdAt: repliedAt }],
+        },
+      ]);
+
+      const result = await service.listTickets();
+
+      expect(result.items[0]?.slaTarget?.firstResponseAt).toBe(repliedAt);
     });
 
     // Story 70 — Ticket Search Foundation.
@@ -935,6 +966,7 @@ describe("TicketsService", () => {
             slaTarget: true,
             category: { select: { name: true } },
             customer: { select: { displayName: true } },
+            channelMessages: FIRST_REPLY_INCLUDE,
           },
         }),
       );

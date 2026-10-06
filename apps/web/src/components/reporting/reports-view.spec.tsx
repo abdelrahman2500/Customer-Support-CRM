@@ -100,6 +100,16 @@ function queryResult(overrides: Record<string, unknown>) {
   };
 }
 
+/** Demo hardening — the SLA summary breaks response and resolution out. */
+const SLA_SUMMARY = {
+  totalWithTarget: 10,
+  breachedCount: 2,
+  compliantCount: 8,
+  complianceRate: 0.8,
+  response: { dueCount: 10, metCount: 7, breachedCount: 3, rate: 0.7 },
+  resolution: { dueCount: 10, metCount: 8, breachedCount: 2, rate: 0.8 },
+};
+
 describe("ReportsView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -107,7 +117,14 @@ describe("ReportsView", () => {
     mockedUseTicketVolumeQuery.mockReturnValue(queryResult({ data: [], isSuccess: true }) as never);
     mockedUseSlaComplianceQuery.mockReturnValue(
       queryResult({
-        data: { totalWithTarget: 0, breachedCount: 0, compliantCount: 0, complianceRate: null },
+        data: {
+          totalWithTarget: 0,
+          breachedCount: 0,
+          compliantCount: 0,
+          complianceRate: null,
+          response: { dueCount: 0, metCount: 0, breachedCount: 0, rate: null },
+          resolution: { dueCount: 0, metCount: 0, breachedCount: 0, rate: null },
+        },
         isSuccess: true,
       }) as never,
     );
@@ -285,7 +302,7 @@ describe("ReportsView", () => {
   it("renders the SLA compliance card's populated rate", () => {
     mockedUseSlaComplianceQuery.mockReturnValue(
       queryResult({
-        data: { totalWithTarget: 10, breachedCount: 2, compliantCount: 8, complianceRate: 0.8 },
+        data: SLA_SUMMARY,
         isSuccess: true,
       }) as never,
     );
@@ -348,16 +365,23 @@ describe("ReportsView", () => {
     it("renders the sla-compliance widget as a chart (role=img), alongside its own existing detail text", () => {
       mockedUseSlaComplianceQuery.mockReturnValue(
         queryResult({
-          data: { totalWithTarget: 10, breachedCount: 2, compliantCount: 8, complianceRate: 0.8 },
+          data: SLA_SUMMARY,
           isSuccess: true,
         }) as never,
       );
 
       render(<ReportsView />);
 
-      expect(screen.getByRole("img", { name: "80%" })).toBeInTheDocument();
+      // Demo hardening — one chart per target, each with its own detail.
+      expect(screen.getByRole("img", { name: "slaCompliance.response: 70%" })).toBeInTheDocument();
       expect(
-        screen.getByText(`slaCompliance.detail:${JSON.stringify({ compliant: 8, total: 10 })}`),
+        screen.getByRole("img", { name: "slaCompliance.resolution: 80%" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(`slaCompliance.responseDetail:${JSON.stringify({ met: 7, due: 10 })}`),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(`slaCompliance.resolutionDetail:${JSON.stringify({ met: 8, due: 10 })}`),
       ).toBeInTheDocument();
     });
 

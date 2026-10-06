@@ -46,11 +46,59 @@ export interface TicketVolumeByStatus {
  * `totalWithTarget` is `0` — no SLA-targeted ticket exists yet for this
  * branch.
  */
+/** Demo hardening — one SLA target across the report's cohort. `dueCount`
+ * counts the tickets whose target has been decided (met or breached);
+ * tickets still inside their window are not yet due and count for neither. */
+export interface SlaTargetCompliance {
+  dueCount: number;
+  metCount: number;
+  breachedCount: number;
+  rate: number | null;
+}
+
+/**
+ * The top-level fields describe the resolution target (their long-standing
+ * meaning in the UI and the CSV: "met their resolution target"); `response`
+ * and `resolution` break both targets out.
+ */
 export interface SlaComplianceSummary {
   totalWithTarget: number;
   breachedCount: number;
   compliantCount: number;
   complianceRate: number | null;
+  response: SlaTargetCompliance;
+  resolution: SlaTargetCompliance;
+}
+
+export type SlaTargetOutcome = "met" | "breached" | "pending";
+
+/**
+ * Demo hardening — whether one target was met, using the same facts the
+ * board shows: a target is met when it was satisfied by its deadline,
+ * breached when it was satisfied late or is still unsatisfied after it, and
+ * not yet due otherwise. A clock paused (on hold) before the deadline is not
+ * yet due either — the hold moves the deadline when it ends.
+ */
+export function evaluateSlaTarget(
+  targetAt: Date,
+  satisfiedAt: Date | null,
+  now: Date,
+  onHoldSince: Date | null = null,
+): SlaTargetOutcome {
+  if (satisfiedAt) {
+    return satisfiedAt.getTime() <= targetAt.getTime() ? "met" : "breached";
+  }
+  if (onHoldSince && onHoldSince.getTime() <= targetAt.getTime()) {
+    return "pending";
+  }
+  return now.getTime() > targetAt.getTime() ? "breached" : "pending";
+}
+
+function summarizeTarget(outcomes: SlaTargetOutcome[]): SlaTargetCompliance {
+  const metCount = outcomes.filter((outcome) => outcome === "met").length;
+  const breachedCount = outcomes.filter((outcome) => outcome === "breached").length;
+  const dueCount = metCount + breachedCount;
+  return { dueCount, metCount, breachedCount, rate: dueCount > 0 ? metCount / dueCount : null };
 }
 
 /** `averageRating` is `null` (never `0`) when `responseCount` is `0` — no
@@ -270,36 +318,24 @@ export class ReportingService {
   }
 
   /**
-   * "Compliant" means an `SlaTicketTarget` existed for the ticket and no
-   * `resolution`-type `SlaEscalation` was ever recorded for it — deliberately
-   * a target-vs-breach measure, not a duration; Story 99's
-   * `getResolutionTime` is the actual time-to-resolution measure, kept
-   * separate since "met the SLA target" and "how long resolution took" are
-   * two different questions with two different cohorts (SLA-targeted
-   * tickets vs. every resolved ticket).
+   * Demo hardening — compliance is computed from the targets themselves, per
+   * target, with the same meaning the board's SLA badges have:
    *
-   * Story 93 — the reporting cohort is defined by `SlaTicketTarget.createdAt`
-   * (when the ticket entered SLA tracking), not `SlaEscalation.escalatedAt`
-   * (when a breach was recorded): the two can differ (a ticket targeted
-   * last month can breach this month), and mixing them would let
-   * `breachedCount` describe a different set of tickets than
-   * `totalWithTarget`, breaking the `compliantCount = totalWithTarget -
-   * breachedCount` arithmetic's own meaning. Selecting `ticketId` (not
-   * `count()`) is what makes the escalation lookup below
-   * cohort-constrained: `SlaTicketTarget.ticketId` is `@unique` (one row
-   * per ticket, ever — Story 16's recategorization updates it in place
-   * rather than creating a new row), so `ticketIds` is exactly the set of
-   * tickets in this report's cohort, and `breachedCount` can never exceed
-   * `totalWithTarget` by construction, not merely by the defensive
-   * `Math.max` below (kept as cheap, harmless defense-in-depth).
+   * - **Response** is met by the first agent reply (an outbound message sent
+   *   by a user — an AI chat replay is not a person replying), or by the
+   *   ticket being resolved, whichever came first.
+   * - **Resolution** is met by `Ticket.resolvedAt`.
    *
-   * `distinct: ["ticketId"]` on the escalation lookup, not a raw row count:
-   * `SlaEscalation` is unique on `(ticketId, targetType, targetAt)`, so a
-   * ticket recategorized after already breaching could in principle carry
-   * more than one `resolution`-type row across different target windows —
-   * counting distinct tickets avoids double-counting a single ticket twice.
+   * See `evaluateSlaTarget` for met / breached / not-yet-due. This replaced
+   * counting `resolution` escalations, which only exist for breaches the
+   * worker happened to observe live — so tickets resolved late, and every
+   * response breach, were reported as compliant ("100%" beside a board full
+   * of "Response breached").
+   *
+   * Story 93 — the cohort is still the tickets whose `SlaTicketTarget` was
+   * created in the range (when they entered SLA tracking).
    */
-  async getSlaCompliance(filters: ReportFilters = {}): Promise<SlaComplianceSummary> {
+  async getSlaCompliance(filters: ReportFilters = {}, now: Date = new Date()): Promise<SlaComplianceSummary> {
     const branchFilter = await this.resolveBranchFilter(filters.crossBranch);
     const range = resolveReportDateRange(filters.from, filters.to);
 
@@ -313,22 +349,55 @@ export class ReportingService {
         },
         ...(hasDateRange(range) ? { createdAt: range } : {}),
       },
-      select: { ticketId: true },
+      select: {
+        ticketId: true,
+        responseTargetAt: true,
+        resolutionTargetAt: true,
+        onHoldSince: true,
+        ticket: { select: { resolvedAt: true } },
+      },
     });
-    const totalWithTarget = targets.length;
-    const ticketIds = targets.map((target) => target.ticketId);
 
-    const breachedTickets = ticketIds.length
-      ? await this.prisma.slaEscalation.findMany({
-          where: { ...branchFilter, targetType: "resolution", ticketId: { in: ticketIds } },
-          select: { ticketId: true },
-          distinct: ["ticketId"],
+    const firstReplies = targets.length
+      ? await this.prisma.channelMessage.groupBy({
+          by: ["ticketId"],
+          where: {
+            ticketId: { in: targets.map((target) => target.ticketId) },
+            direction: "OUTBOUND",
+            senderUserId: { not: null },
+          },
+          _min: { createdAt: true },
         })
       : [];
-    const breachedCount = breachedTickets.length;
-    const compliantCount = Math.max(totalWithTarget - breachedCount, 0);
-    const complianceRate = totalWithTarget > 0 ? compliantCount / totalWithTarget : null;
-    return { totalWithTarget, breachedCount, compliantCount, complianceRate };
+    const firstReplyAt = new Map(
+      firstReplies.map((row) => [row.ticketId, row._min.createdAt ?? null] as const),
+    );
+
+    const response: SlaTargetOutcome[] = [];
+    const resolution: SlaTargetOutcome[] = [];
+    for (const target of targets) {
+      const resolvedAt = target.ticket.resolvedAt;
+      const repliedAt = firstReplyAt.get(target.ticketId) ?? null;
+      const respondedAt =
+        repliedAt && resolvedAt
+          ? new Date(Math.min(repliedAt.getTime(), resolvedAt.getTime()))
+          : (repliedAt ?? resolvedAt);
+      response.push(evaluateSlaTarget(target.responseTargetAt, respondedAt, now, target.onHoldSince));
+      resolution.push(
+        evaluateSlaTarget(target.resolutionTargetAt, resolvedAt, now, target.onHoldSince),
+      );
+    }
+
+    const responseSummary = summarizeTarget(response);
+    const resolutionSummary = summarizeTarget(resolution);
+    return {
+      totalWithTarget: resolutionSummary.dueCount,
+      breachedCount: resolutionSummary.breachedCount,
+      compliantCount: resolutionSummary.metCount,
+      complianceRate: resolutionSummary.rate,
+      response: responseSummary,
+      resolution: resolutionSummary,
+    };
   }
 
   /** Scoped through the `Ticket` relation, not a denormalized `branchId`

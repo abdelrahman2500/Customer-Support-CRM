@@ -44,6 +44,19 @@ describe("deriveSlaStatus", () => {
     expect(result.kind).toBe("breached");
   });
 
+  // Demo hardening — an agent reply satisfies the response target.
+  it("governs by the resolution target once an agent has replied", () => {
+    const result = deriveSlaStatus(
+      {
+        responseTargetAt: "2024-01-01T00:00:00.000Z",
+        resolutionTargetAt: "2024-01-05T00:00:00.000Z",
+        firstResponseAt: "2023-12-31T23:30:00.000Z",
+      },
+      now,
+    );
+    expect(result).toMatchObject({ kind: "on-track", governing: "resolution" });
+  });
+
   // RM-25 — SLA Pause/Resume.
   it("returns 'on-hold' when onHoldSince is set, regardless of where the targets sit", () => {
     const result = deriveSlaStatus(

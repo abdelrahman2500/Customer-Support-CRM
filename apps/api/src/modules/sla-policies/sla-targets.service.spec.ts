@@ -12,6 +12,10 @@ function buildPrismaMock() {
     slaTicketTarget: {
       findUnique: vi.fn(),
     },
+    // Demo hardening — the first agent reply.
+    channelMessage: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
   };
 }
 
@@ -83,7 +87,31 @@ describe("SlaTargetsService", () => {
 
       const result = await service.getSlaTargetForTicket("ticket-1");
 
-      expect(result).toEqual(target);
+      // Demo hardening — plus when an agent first replied (none here).
+      expect(result).toEqual({ ...target, firstResponseAt: null });
+    });
+
+    it("adds the first agent reply, looked up as the earliest outbound message a person sent", async () => {
+      prisma.ticket.findFirst.mockResolvedValue({ id: "ticket-1" });
+      prisma.slaTicketTarget.findUnique.mockResolvedValue({
+        id: "target-1",
+        ticketId: "ticket-1",
+        slaPolicyId: "policy-1",
+        responseTargetAt: new Date("2026-01-01T00:30:00.000Z"),
+        resolutionTargetAt: new Date("2026-01-01T04:00:00.000Z"),
+        onHoldSince: null,
+      });
+      const repliedAt = new Date("2026-01-01T00:10:00.000Z");
+      prisma.channelMessage.findFirst.mockResolvedValue({ createdAt: repliedAt });
+
+      const result = await service.getSlaTargetForTicket("ticket-1");
+
+      expect(result.firstResponseAt).toBe(repliedAt);
+      expect(prisma.channelMessage.findFirst).toHaveBeenCalledWith({
+        where: { ticketId: "ticket-1", direction: "OUTBOUND", senderUserId: { not: null } },
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      });
     });
 
     // RM-25 — SLA Pause/Resume.

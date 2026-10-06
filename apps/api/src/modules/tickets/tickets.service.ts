@@ -106,6 +106,8 @@ export interface TicketSlaTargetSummary {
   resolutionTargetAt: Date;
   /** RM-25 — `null` means not on hold. */
   onHoldSince: Date | null;
+  /** Demo hardening — the first agent reply (see `SlaTargetsService`). */
+  firstResponseAt: Date | null;
 }
 
 export interface TicketListItem extends TicketSummary {
@@ -318,7 +320,17 @@ export class TicketsService {
         }) =>
           this.prisma.ticket.findMany({
             ...args,
-            include: { slaTarget: true, ...CATEGORY_NAME_INCLUDE },
+            include: {
+              slaTarget: true,
+              ...CATEGORY_NAME_INCLUDE,
+              // Demo hardening — the first agent reply, for the SLA badge.
+              channelMessages: {
+                where: { direction: "OUTBOUND", senderUserId: { not: null } },
+                orderBy: { createdAt: "asc" },
+                take: 1,
+                select: { createdAt: true },
+              },
+            },
           }),
       },
       {
@@ -357,6 +369,7 @@ export class TicketsService {
             responseTargetAt: ticket.slaTarget.responseTargetAt,
             resolutionTargetAt: ticket.slaTarget.resolutionTargetAt,
             onHoldSince: ticket.slaTarget.onHoldSince,
+            firstResponseAt: ticket.channelMessages[0]?.createdAt ?? null,
           }
         : null,
     }));

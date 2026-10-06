@@ -644,7 +644,7 @@ describe("DashboardView", () => {
       } as never);
       renderWithLocale();
       expect(screen.getByText("Branch, last 30 days")).toBeInTheDocument();
-      expect(screen.getByRole("img", { name: "SLA compliance 80%" })).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: "Resolution SLA met 80%" })).toBeInTheDocument();
       expect(screen.getByText("8 met · 2 breached")).toBeInTheDocument();
       expect(screen.getByText("Billing")).toBeInTheDocument();
     });

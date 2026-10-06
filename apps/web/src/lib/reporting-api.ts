@@ -47,11 +47,24 @@ export interface TicketVolumeByStatus {
   count: number;
 }
 
+/** Demo hardening — one SLA target across the cohort; `dueCount` counts
+ * the tickets whose target has been decided (met or breached). */
+export interface SlaTargetCompliance {
+  dueCount: number;
+  metCount: number;
+  breachedCount: number;
+  rate: number | null;
+}
+
+/** The top-level fields describe the resolution target; `response` and
+ * `resolution` break both targets out. */
 export interface SlaComplianceSummary {
   totalWithTarget: number;
   breachedCount: number;
   compliantCount: number;
   complianceRate: number | null;
+  response: SlaTargetCompliance;
+  resolution: SlaTargetCompliance;
 }
 
 export interface CsatSummary {

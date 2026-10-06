@@ -962,11 +962,11 @@
     "viewAllMine": "عرض جميع التذاكر ({count}) على اللوحة",
     "branch": {
       "heading": "الفرع، آخر 30 يومًا",
-      "complianceLabel": "الالتزام باتفاقية مستوى الخدمة {rate}%",
+      "complianceLabel": "الالتزام بهدف الحل {rate}%",
       "complianceHint": "{met} ملتزمة · {breached} مخروقة",
       "byCategory": "الحجم حسب الفئة",
       "uncategorized": "بدون فئة",
-      "compliance": "الالتزام باتفاقية مستوى الخدمة"
+      "compliance": "الالتزام بهدف الحل"
     }
   },
   "notifications": {
@@ -1162,7 +1162,11 @@
     "slaCompliance": {
       "heading": "الالتزام باتفاقية مستوى الخدمة",
       "empty": "لا توجد تذاكر مرتبطة باتفاقية مستوى خدمة حتى الآن.",
-      "detail": "{compliant} من أصل {total} تذكرة حققت هدف الحل"
+      "response": "الاستجابة",
+      "resolution": "الحل",
+      "responseDetail": "{met} من {due} ردود أولى في الوقت",
+      "resolutionDetail": "{met} من {due} حُلت في الوقت",
+      "note": "تُحتسب التذاكر التي انقضى موعد هدفها أو تحقق؛ والتذاكر التي ما زالت ضمن المهلة لا تُحتسب بعد."
     },
     "csat": {
       "heading": "رضا العميل",
@@ -1215,10 +1219,11 @@
     "description": "أداء الفريق خلال الفترة والمرشحات التي تختارها.",
     "kpi": {
       "tickets": "التذاكر",
-      "slaCompliance": "الالتزام باتفاقية مستوى الخدمة",
+      "slaCompliance": "الالتزام بهدف الحل",
       "csat": "متوسط رضا العملاء",
       "csatScale": "من 5",
-      "resolutionTime": "متوسط وقت الحل"
+      "resolutionTime": "متوسط وقت الحل",
+      "slaResponseHint": "الالتزام بهدف الاستجابة: {rate}"
     },
     "units": {
       "hoursMinutes": "{hours} س {minutes} د",

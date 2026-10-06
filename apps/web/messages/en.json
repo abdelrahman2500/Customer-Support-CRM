@@ -962,11 +962,11 @@
     "viewAllMine": "View all {count} on the board",
     "branch": {
       "heading": "Branch, last 30 days",
-      "complianceLabel": "SLA compliance {rate}%",
+      "complianceLabel": "Resolution SLA met {rate}%",
       "complianceHint": "{met} met · {breached} breached",
       "byCategory": "Volume by category",
       "uncategorized": "Uncategorized",
-      "compliance": "SLA compliance"
+      "compliance": "Resolution SLA met"
     }
   },
   "notifications": {
@@ -1162,7 +1162,11 @@
     "slaCompliance": {
       "heading": "SLA Compliance",
       "empty": "No SLA-targeted tickets yet.",
-      "detail": "{compliant} of {total} tickets met their resolution target"
+      "response": "Response",
+      "resolution": "Resolution",
+      "responseDetail": "{met} of {due} first replies on time",
+      "resolutionDetail": "{met} of {due} resolved on time",
+      "note": "Counts tickets whose target time has passed or was met; tickets still inside their window are not counted yet."
     },
     "csat": {
       "heading": "Customer Satisfaction",
@@ -1215,10 +1219,11 @@
     "description": "How the team is doing over the period and filters you choose.",
     "kpi": {
       "tickets": "Tickets",
-      "slaCompliance": "SLA compliance",
+      "slaCompliance": "Resolution SLA met",
       "csat": "Average CSAT",
       "csatScale": "out of 5",
-      "resolutionTime": "Average resolution time"
+      "resolutionTime": "Average resolution time",
+      "slaResponseHint": "Response SLA met: {rate}"
     },
     "units": {
       "hoursMinutes": "{hours}h {minutes}m",

@@ -15,6 +15,9 @@ function buildPrismaMock() {
     slaEscalation: {
       findMany: vi.fn(),
     },
+    channelMessage: {
+      groupBy: vi.fn(),
+    },
     ticketCsatResponse: {
       aggregate: vi.fn(),
     },
@@ -187,139 +190,140 @@ describe("ReportingService", () => {
     });
   });
 
+  /**
+   * Demo hardening — compliance is computed per target from the targets
+   * themselves (first agent reply / resolvedAt against the target time),
+   * replacing the count of worker-recorded `resolution` escalations, which
+   * reported late resolutions and every response breach as compliant. The
+   * tests of the old definition were replaced by these, which pin the new
+   * one: met, breached and not-yet-due for each target, the cohort and its
+   * filters, and the first-reply lookup.
+   */
   describe("getSlaCompliance", () => {
-    it("returns a null complianceRate when no ticket has an SLA target yet", async () => {
-      prisma.slaTicketTarget.findMany.mockResolvedValue([]);
-      prisma.slaEscalation.findMany.mockResolvedValue([]);
+    const NOW = new Date("2026-03-10T12:00:00.000Z");
+    const at = (iso: string) => new Date(iso);
+    function target(
+      ticketId: string,
+      responseTargetAt: string,
+      resolutionTargetAt: string,
+      resolvedAt: string | null = null,
+      onHoldSince: string | null = null,
+    ) {
+      return {
+        ticketId,
+        responseTargetAt: at(responseTargetAt),
+        resolutionTargetAt: at(resolutionTargetAt),
+        onHoldSince: onHoldSince ? at(onHoldSince) : null,
+        ticket: { resolvedAt: resolvedAt ? at(resolvedAt) : null },
+      };
+    }
+    const TARGET_SELECT = {
+      ticketId: true,
+      responseTargetAt: true,
+      resolutionTargetAt: true,
+      onHoldSince: true,
+      ticket: { select: { resolvedAt: true } },
+    };
 
-      const result = await service.getSlaCompliance();
+    it("returns null rates when no ticket has an SLA target yet, without looking up replies", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([]);
+
+      const result = await service.getSlaCompliance({}, NOW);
 
       expect(result).toEqual({
         totalWithTarget: 0,
         breachedCount: 0,
         compliantCount: 0,
         complianceRate: null,
+        response: { dueCount: 0, metCount: 0, breachedCount: 0, rate: null },
+        resolution: { dueCount: 0, metCount: 0, breachedCount: 0, rate: null },
       });
+      expect(prisma.channelMessage.groupBy).not.toHaveBeenCalled();
     });
 
-    it("computes compliantCount/complianceRate from targeted vs. breached tickets", async () => {
+    it("meets a target satisfied by its deadline and breaches one satisfied late or still open after it", async () => {
       prisma.slaTicketTarget.findMany.mockResolvedValue([
-        { ticketId: "ticket-1" },
-        { ticketId: "ticket-2" },
-        { ticketId: "ticket-3" },
-        { ticketId: "ticket-4" },
-        { ticketId: "ticket-5" },
-        { ticketId: "ticket-6" },
-        { ticketId: "ticket-7" },
-        { ticketId: "ticket-8" },
-        { ticketId: "ticket-9" },
-        { ticketId: "ticket-10" },
+        // Replied and resolved in time.
+        target("t1", "2026-03-10T09:00:00Z", "2026-03-10T11:00:00Z", "2026-03-10T10:00:00Z"),
+        // Replied late; resolved late.
+        target("t2", "2026-03-10T09:00:00Z", "2026-03-10T10:00:00Z", "2026-03-10T11:00:00Z"),
+        // No reply, open, both targets passed.
+        target("t3", "2026-03-10T09:00:00Z", "2026-03-10T11:00:00Z"),
+        // No reply yet, open, nothing due.
+        target("t4", "2026-03-10T13:00:00Z", "2026-03-11T12:00:00Z"),
       ]);
-      prisma.slaEscalation.findMany.mockResolvedValue([
-        { ticketId: "ticket-1" },
-        { ticketId: "ticket-2" },
+      prisma.channelMessage.groupBy.mockResolvedValue([
+        { ticketId: "t1", _min: { createdAt: at("2026-03-10T08:30:00Z") } },
+        { ticketId: "t2", _min: { createdAt: at("2026-03-10T09:30:00Z") } },
       ]);
 
-      const result = await service.getSlaCompliance();
+      const result = await service.getSlaCompliance({}, NOW);
 
-      expect(result).toEqual({
-        totalWithTarget: 10,
-        breachedCount: 2,
-        compliantCount: 8,
-        complianceRate: 0.8,
-      });
+      expect(result.response).toEqual({ dueCount: 3, metCount: 1, breachedCount: 2, rate: 1 / 3 });
+      expect(result.resolution).toEqual({ dueCount: 3, metCount: 1, breachedCount: 2, rate: 1 / 3 });
+      // The top-level fields keep describing the resolution target.
+      expect(result).toMatchObject({ totalWithTarget: 3, compliantCount: 1, breachedCount: 2 });
     });
 
-    // Story 93 — regression: proves the cohort-query rewrite below produces
-    // the exact same logical result, for the exact same no-range scenario,
-    // as the pre-Story-93 `count()`/independent-`findMany()` implementation
-    // (see the "computes compliantCount/complianceRate..." test above —
-    // this is the identical 10-targeted/2-breached scenario, asserted the
-    // same way).
-    it("REGRESSION: with no from/to, returns the same logical result as the pre-Story-93 implementation", async () => {
-      prisma.slaTicketTarget.findMany.mockResolvedValue(
-        Array.from({ length: 10 }, (_, i) => ({ ticketId: `ticket-${i + 1}` })),
-      );
-      prisma.slaEscalation.findMany.mockResolvedValue([
-        { ticketId: "ticket-1" },
-        { ticketId: "ticket-2" },
-      ]);
-
-      const result = await service.getSlaCompliance();
-
-      expect(result).toEqual({
-        totalWithTarget: 10,
-        breachedCount: 2,
-        compliantCount: 8,
-        complianceRate: 0.8,
-      });
-    });
-
-    it("scopes the target lookup by branch, then scopes the escalation lookup to that exact cohort's ticket ids plus branch/resolution", async () => {
+    it("counts resolving before the response target as a response, even without a reply", async () => {
       prisma.slaTicketTarget.findMany.mockResolvedValue([
-        { ticketId: "ticket-1" },
-        { ticketId: "ticket-2" },
+        target("t1", "2026-03-10T09:00:00Z", "2026-03-10T11:00:00Z", "2026-03-10T08:45:00Z"),
       ]);
-      prisma.slaEscalation.findMany.mockResolvedValue([]);
+      prisma.channelMessage.groupBy.mockResolvedValue([]);
 
-      await service.getSlaCompliance();
+      const result = await service.getSlaCompliance({}, NOW);
+
+      expect(result.response.metCount).toBe(1);
+    });
+
+    it("leaves a target paused before its deadline not yet due", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([
+        target("t1", "2026-03-10T09:00:00Z", "2026-03-10T11:00:00Z", null, "2026-03-10T08:00:00Z"),
+      ]);
+      prisma.channelMessage.groupBy.mockResolvedValue([]);
+
+      const result = await service.getSlaCompliance({}, NOW);
+
+      expect(result.response.dueCount).toBe(0);
+      expect(result.resolution.dueCount).toBe(0);
+    });
+
+    it("scopes the target lookup by branch and looks up only that cohort's first agent replies", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([
+        target("ticket-1", "2026-03-10T09:00:00Z", "2026-03-10T11:00:00Z"),
+        target("ticket-2", "2026-03-10T09:00:00Z", "2026-03-10T11:00:00Z"),
+      ]);
+      prisma.channelMessage.groupBy.mockResolvedValue([]);
+
+      await service.getSlaCompliance({}, NOW);
 
       expect(prisma.slaTicketTarget.findMany).toHaveBeenCalledWith({
         where: { ticket: { branchId: "branch-1" } },
-        select: { ticketId: true },
+        select: TARGET_SELECT,
       });
-      expect(prisma.slaEscalation.findMany).toHaveBeenCalledWith({
+      expect(prisma.channelMessage.groupBy).toHaveBeenCalledWith({
+        by: ["ticketId"],
         where: {
-          branchId: "branch-1",
-          targetType: "resolution",
           ticketId: { in: ["ticket-1", "ticket-2"] },
+          direction: "OUTBOUND",
+          senderUserId: { not: null },
         },
-        select: { ticketId: true },
-        distinct: ["ticketId"],
+        _min: { createdAt: true },
       });
-    });
-
-    it("never queries slaEscalation at all when the cohort has no targeted tickets", async () => {
-      prisma.slaTicketTarget.findMany.mockResolvedValue([]);
-
-      await service.getSlaCompliance();
-
-      expect(prisma.slaEscalation.findMany).not.toHaveBeenCalled();
-    });
-
-    it("never returns a negative compliantCount even if breachedCount somehow exceeds totalWithTarget (defense-in-depth — the cohort's own ticketId: {in: ...} filter already makes this unreachable in production, since prisma.slaEscalation.findMany is mocked here rather than truly filtered)", async () => {
-      prisma.slaTicketTarget.findMany.mockResolvedValue([{ ticketId: "ticket-1" }]);
-      prisma.slaEscalation.findMany.mockResolvedValue([
-        { ticketId: "ticket-1" },
-        { ticketId: "ticket-2" },
-      ]);
-
-      const result = await service.getSlaCompliance();
-
-      expect(result.compliantCount).toBe(0);
     });
 
     // Story 93 — date-range filtering.
-    it("filters the target cohort by SlaTicketTarget.createdAt, not SlaEscalation.escalatedAt, when a range is supplied", async () => {
-      prisma.slaTicketTarget.findMany.mockResolvedValue([{ ticketId: "ticket-1" }]);
-      prisma.slaEscalation.findMany.mockResolvedValue([]);
+    it("filters the cohort by SlaTicketTarget.createdAt when a range is supplied", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([]);
 
-      await service.getSlaCompliance({ from: "2026-01-01", to: "2026-01-31" });
+      await service.getSlaCompliance({ from: "2026-01-01", to: "2026-01-31" }, NOW);
 
       expect(prisma.slaTicketTarget.findMany).toHaveBeenCalledWith({
         where: {
           ticket: { branchId: "branch-1" },
           createdAt: { gte: new Date("2026-01-01T00:00:00.000Z"), lt: new Date("2026-02-01T00:00:00.000Z") },
         },
-        select: { ticketId: true },
-      });
-      // The escalation lookup is never itself date-filtered — it stays
-      // constrained to the cohort's ticketIds regardless of when the
-      // breach was recorded (see this method's own doc comment).
-      expect(prisma.slaEscalation.findMany).toHaveBeenCalledWith({
-        where: { branchId: "branch-1", targetType: "resolution", ticketId: { in: ["ticket-1"] } },
-        select: { ticketId: true },
-        distinct: ["ticketId"],
+        select: TARGET_SELECT,
       });
     });
 
@@ -330,18 +334,14 @@ describe("ReportingService", () => {
       expect(prisma.slaTicketTarget.findMany).not.toHaveBeenCalled();
     });
 
-    // RM-07 — cross-dimension filters, applied via the `ticket` relation
-    // (SlaTicketTarget carries no departmentId/assignedToUserId/categoryId
-    // column of its own).
-    it("applies departmentId/assignedToUserId/categoryId via the ticket relation on the target lookup only, never on the escalation lookup", async () => {
-      prisma.slaTicketTarget.findMany.mockResolvedValue([{ ticketId: "ticket-1" }]);
-      prisma.slaEscalation.findMany.mockResolvedValue([]);
+    // RM-07 — cross-dimension filters, applied via the `ticket` relation.
+    it("applies departmentId/assignedToUserId/categoryId via the ticket relation on the target lookup", async () => {
+      prisma.slaTicketTarget.findMany.mockResolvedValue([]);
 
-      await service.getSlaCompliance({
-        departmentId: "department-1",
-        assignedToUserId: "user-1",
-        categoryId: "category-1",
-      });
+      await service.getSlaCompliance(
+        { departmentId: "department-1", assignedToUserId: "user-1", categoryId: "category-1" },
+        NOW,
+      );
 
       expect(prisma.slaTicketTarget.findMany).toHaveBeenCalledWith({
         where: {
@@ -352,12 +352,7 @@ describe("ReportingService", () => {
             categoryId: "category-1",
           },
         },
-        select: { ticketId: true },
-      });
-      expect(prisma.slaEscalation.findMany).toHaveBeenCalledWith({
-        where: { branchId: "branch-1", targetType: "resolution", ticketId: { in: ["ticket-1"] } },
-        select: { ticketId: true },
-        distinct: ["ticketId"],
+        select: TARGET_SELECT,
       });
     });
   });
