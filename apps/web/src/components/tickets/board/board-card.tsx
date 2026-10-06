@@ -98,14 +98,38 @@ export const BoardCard = memo(function BoardCard({
   const confirmRef = useRef<HTMLButtonElement | null>(null);
   const wasConfirming = useRef(false);
   useEffect(() => {
-    if (confirming) {
-      confirmRef.current?.focus();
-    } else if (wasConfirming.current) {
-      focusTarget()?.focus();
-    }
-    wasConfirming.current = confirming !== null;
+    wasConfirming.current = wasConfirming.current || confirming !== null;
+    if (!confirming && !wasConfirming.current) return;
+    // Two frames: after a keyboard drop, dnd-kit hands focus back to the
+    // drag handle in its own animation frame, which would otherwise win.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => {
+        if (confirming) {
+          confirmRef.current?.focus();
+        } else {
+          focusTarget()?.focus();
+          wasConfirming.current = false;
+        }
+      });
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- focusTarget reads refs only
   }, [confirming]);
+
+  // Escape cancels from anywhere while the confirmation is open, as the
+  // popover's dismissable layer did (focus may still be on the menu).
+  useEffect(() => {
+    if (!confirming) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [confirming, onCancel]);
 
   useEffect(() => {
     if (!focusRequested) return;
@@ -190,16 +214,10 @@ export const BoardCard = memo(function BoardCard({
         )}
       />
       {confirming && (
-        // A non-modal dialog: named by its question, closed by Escape.
+        // A non-modal dialog, named by its question (Escape: see above).
         <div
           role="dialog"
           aria-labelledby={questionId}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.stopPropagation();
-              onCancel();
-            }
-          }}
           // Not a drag start: the buttons are inside the draggable card.
           onPointerDown={(event) => event.stopPropagation()}
           className="flex flex-col gap-stack rounded-b-surface border border-t-0 border-rule bg-surface-raised p-3 shadow-sm"
