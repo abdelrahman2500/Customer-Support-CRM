@@ -246,8 +246,8 @@
     "youLabel": "You",
     "assistantLabel": "Assistant",
     "typing": "Thinking...",
-    "replyFailed": "Couldn't get a reply. Please try again.",
-    "disabled": "AI chat isn't available right now.",
+    "replyFailed": "Something went wrong while getting a reply. Send your message again, or talk to a person.",
+    "disabled": "Our team can still help — talk to a person and we'll open a ticket with this conversation.",
     "placeholder": "Type a message...",
     "send": "Send",
     "sending": "Sending...",
@@ -263,7 +263,9 @@
     "escalateConfirmTitle": "Talk to a person?",
     "escalateConfirmBody": "We'll open a ticket with this conversation so our support team can pick it up.",
     "escalateConfirm": "Open a ticket",
-    "escalateCancel": "Keep chatting"
+    "escalateCancel": "Keep chatting",
+    "disabledTitle": "The assistant isn't available right now",
+    "replyFailedTitle": "The assistant couldn't answer"
   },
   "notifications": {
     "nav": "Notifications",

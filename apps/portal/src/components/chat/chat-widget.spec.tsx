@@ -282,4 +282,72 @@ describe("ChatWidget", () => {
 
     expect(mutateAsync).not.toHaveBeenCalled();
   });
+  describe("turn outcomes (demo hardening)", () => {
+    /** Like the real hook: the result is only fetched while a turn is
+     * pending (`logId` set); once the widget clears it, the query is idle. */
+    function resultFor(outcome: string, errorMessage: string | null = null) {
+      vi.mocked(useChatAiResultQuery).mockImplementation(
+        (_session, logId) =>
+          (logId
+            ? queryResult({
+                data: { id: logId, outcome, outputText: null, errorMessage },
+                isSuccess: true,
+              })
+            : queryResult({})) as never,
+      );
+    }
+
+    async function sendMessage() {
+      vi.mocked(useChatMessagesQuery).mockReturnValue(
+        queryResult({
+          data: [{ id: "m1", role: "CUSTOMER", body: "Hi", createdAt: "2024-01-01T00:00:00.000Z" }],
+          isSuccess: true,
+        }) as never,
+      );
+      render(<ChatWidget />);
+      fireEvent.change(screen.getByLabelText("composerLabel"), { target: { value: "Hi" } });
+      fireEvent.click(screen.getByText("send"));
+    }
+
+    it("keeps the unavailable notice after polling stops, with a way to a person", async () => {
+      resultFor("DISABLED");
+      await sendMessage();
+
+      expect(await screen.findByText("disabledTitle")).toBeInTheDocument();
+      expect(screen.getByText("disabled")).toBeInTheDocument();
+      // The page header and the notice both offer the handover.
+      expect(screen.getAllByRole("button", { name: "escalate" }).length).toBeGreaterThan(1);
+      expect(screen.queryByText("typing")).not.toBeInTheDocument();
+    });
+
+    it("keeps an error notice after polling stops", async () => {
+      resultFor("ERROR", "Model overloaded");
+      await sendMessage();
+
+      expect(await screen.findByText("replyFailedTitle")).toBeInTheDocument();
+      expect(screen.getByText("Model overloaded")).toBeInTheDocument();
+    });
+
+    it("shows a failed result lookup as an error, not a hang", async () => {
+      vi.mocked(useChatAiResultQuery).mockImplementation(
+        (_session, logId) =>
+          (logId
+            ? queryResult({ isError: true, error: new Error("network") })
+            : queryResult({})) as never,
+      );
+      await sendMessage();
+
+      expect(await screen.findByText("replyFailedTitle")).toBeInTheDocument();
+      expect(screen.getByText("replyFailed")).toBeInTheDocument();
+    });
+
+    it("shows Thinking while the first result has not arrived yet", async () => {
+      vi.mocked(useChatAiResultQuery).mockImplementation(
+        () => queryResult({ isLoading: true }) as never,
+      );
+      await sendMessage();
+
+      expect(await screen.findByText("typing")).toBeInTheDocument();
+    });
+  });
 });

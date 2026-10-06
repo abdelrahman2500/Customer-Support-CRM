@@ -60,6 +60,13 @@ export function ChatWidget() {
   const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [pendingLogId, setPendingLogId] = useState<string | null>(null);
+  /** Demo hardening — how the last turn ended when it did not end in a
+   * reply. Kept apart from `pendingLogId`, which is cleared as soon as the
+   * outcome arrives (that is what stopped the "disabled" and error notices
+   * from ever rendering). */
+  const [turnOutcome, setTurnOutcome] = useState<
+    { kind: "disabled" } | { kind: "error"; message: string } | null
+  >(null);
   const [escalateError, setEscalateError] = useState<string | null>(null);
   const [confirmEscalate, setConfirmEscalate] = useState(false);
   const startSession = useStartChatSessionMutation();
@@ -101,18 +108,39 @@ export function ChatWidget() {
 
   // Once a pending turn resolves (no longer PENDING), it has either
   // become a real ChatMessage (SUCCESS, now in messagesQuery.data) or
-  // failed (ERROR/DISABLED, rendered inline below) — either way there is
-  // nothing left to poll for.
+  // failed (ERROR/DISABLED) — either way there is nothing left to poll for.
+  // The failure is recorded first, so it stays on screen after polling stops.
   useEffect(() => {
-    if (resultQuery.isSuccess && resultQuery.data.outcome !== "PENDING") {
+    if (!pendingLogId) return;
+    if (resultQuery.isError) {
+      setTurnOutcome({ kind: "error", message: t("replyFailed") });
       setPendingLogId(null);
+      return;
     }
-  }, [resultQuery.isSuccess, resultQuery.data?.outcome]);
+    if (!resultQuery.isSuccess || resultQuery.data.outcome === "PENDING") return;
+    if (resultQuery.data.outcome === "DISABLED") {
+      setTurnOutcome({ kind: "disabled" });
+    } else if (resultQuery.data.outcome === "ERROR") {
+      setTurnOutcome({
+        kind: "error",
+        message: resultQuery.data.errorMessage ?? t("replyFailed"),
+      });
+    } else {
+      setTurnOutcome(null);
+    }
+    setPendingLogId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingLogId, resultQuery.isSuccess, resultQuery.isError, resultQuery.data?.outcome]);
+
+  function handleSent(logId: string) {
+    setTurnOutcome(null);
+    setPendingLogId(logId);
+  }
 
   const messages = messagesQuery.data ?? [];
-  const thinking = Boolean(
-    pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "PENDING",
-  );
+  // Waiting from the moment a message is sent until its outcome arrives —
+  // including the first poll, before any result exists.
+  const thinking = Boolean(pendingLogId);
   const items = messages.map((message) => {
     const isMine = message.role === "CUSTOMER";
     const sender = isMine ? t("youLabel") : t("assistantLabel");
@@ -213,16 +241,31 @@ export function ChatWidget() {
         <p role="status" className="mt-2 text-sm text-ink-subtle empty:hidden">
           {thinking ? t("typing") : ""}
         </p>
-        {pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "ERROR" && (
-          <Alert variant="destructive" className="mt-2">
-            {resultQuery.data.errorMessage ?? t("replyFailed")}
+        {/* Demo hardening — a turn that ends without a reply says so, and
+            offers the way on: a person (which opens a ticket with this
+            conversation), or sending the message again. */}
+        {turnOutcome && (
+          <Alert
+            variant={turnOutcome.kind === "error" ? "destructive" : "info"}
+            icon
+            title={turnOutcome.kind === "error" ? t("replyFailedTitle") : t("disabledTitle")}
+            className="mt-2"
+          >
+            <p>{turnOutcome.kind === "error" ? turnOutcome.message : t("disabled")}</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2 w-fit self-start"
+              onClick={() => setConfirmEscalate(true)}
+              disabled={escalate.isPending}
+            >
+              {t("escalate")}
+            </Button>
           </Alert>
         )}
-        {pendingLogId && resultQuery.isSuccess && resultQuery.data.outcome === "DISABLED" && (
-          <Alert className="mt-2">{t("disabled")}</Alert>
-        )}
 
-        <ChatComposer sessionId={sessionId} onSent={setPendingLogId} />
+        <ChatComposer sessionId={sessionId} onSent={handleSent} />
       </Card>
     </section>
   );
