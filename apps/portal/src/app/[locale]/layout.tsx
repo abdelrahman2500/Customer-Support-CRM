@@ -8,7 +8,7 @@ import { localeDirection } from "@/i18n/direction";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { fontVariables } from "@/lib/fonts";
 import "../globals.css";
-import { ThemeScript } from "@crm/ui";
+import { ThemeScript, ThemeSync } from "@crm/ui";
 
 /**
  * Story 232 (PR-6.1) — the document title: a page's own name (its
@@ -61,6 +61,9 @@ export default async function LocaleLayout({
       </head>
       <body className="font-sans antialiased">
         <NextIntlClientProvider>
+          {/* Demo hardening — re-applies the saved theme when a locale switch
+              replaces <html> (ThemeScript only runs on a full load). */}
+          <ThemeSync />
           <QueryProvider>{children}</QueryProvider>
         </NextIntlClientProvider>
       </body>

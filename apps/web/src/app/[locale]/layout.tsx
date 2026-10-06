@@ -8,7 +8,7 @@ import { localeDirection } from "@/i18n/direction";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { fontVariables } from "@/lib/fonts";
 import "../globals.css";
-import { ThemeScript } from "@crm/ui";
+import { ThemeScript, ThemeSync } from "@crm/ui";
 
 // This is the app's root layout (there is no sibling `app/layout.tsx`):
 // `dir` depends on the active locale, so it must be set on the <html> tag
@@ -67,6 +67,9 @@ export default async function LocaleLayout({
       </head>
       <body className="font-sans antialiased" suppressHydrationWarning>
         <NextIntlClientProvider>
+          {/* Demo hardening — re-applies the saved theme when a locale switch
+              replaces <html> (ThemeScript only runs on a full load). */}
+          <ThemeSync />
           <QueryProvider>{children}</QueryProvider>
         </NextIntlClientProvider>
       </body>

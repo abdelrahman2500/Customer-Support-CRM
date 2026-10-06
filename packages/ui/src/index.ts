@@ -47,6 +47,7 @@ export {
 } from "./lib/theme";
 export type { ThemePreference } from "./lib/theme";
 export { ThemeScript } from "./components/theme-script";
+export { ThemeSync } from "./components/theme-sync";
 export { ThemeSwitcher } from "./components/theme-switcher";
 export { BrandScope } from "./components/brand-scope";
 export {
