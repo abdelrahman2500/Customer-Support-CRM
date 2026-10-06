@@ -3,7 +3,13 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
 
-import { NAV_GROUPS, NavItemLabel, isNavItemActive, resolveNavigationLayout } from "./nav-items";
+import {
+  NAV_GROUPS,
+  NavItemLabel,
+  isNavItemActive,
+  resolveNavigationLayout,
+  visibleNavGroups,
+} from "./nav-items";
 
 /** Relative to `apps/web`, which is this package's own vitest root. */
 const NAV_ITEMS_SOURCE_PATH = "src/components/workspace/nav-items.tsx";
@@ -153,5 +159,37 @@ describe("NavItemLabel is data-fetching free (regression guard)", () => {
     const icon = inRail.container.querySelector("svg");
     expect(icon).not.toHaveClass("-ms-4");
     expect(icon).not.toHaveClass("me-4");
+  });
+});
+
+// Demo hardening — navigation leaves out what the user may not open.
+describe("visibleNavGroups", () => {
+  const hrefs = (groups: ReturnType<typeof visibleNavGroups>) =>
+    groups.flatMap((group) => group.items.map((item) => item.href));
+
+  it("shows every destination while permissions are unknown", () => {
+    expect(hrefs(visibleNavGroups(undefined))).toEqual(
+      NAV_GROUPS.flatMap((group) => group.items.map((item) => item.href)),
+    );
+  });
+
+  it("hides the destinations an agent lacks permission for, and the groups left empty", () => {
+    const groups = visibleNavGroups(["ticket:read", "customer:read", "kb:read", "sla:read"]);
+
+    expect(hrefs(groups)).toEqual([
+      "dashboard",
+      "tickets",
+      "customers",
+      "knowledge-base",
+      "notifications",
+      "sla-policies",
+      "my-sessions",
+    ]);
+    expect(groups.map((group) => group.groupKey)).toEqual(["work", "configure", "account"]);
+  });
+
+  it("shows settings for either administrator permission", () => {
+    expect(hrefs(visibleNavGroups(["ai:read"]))).toContain("settings");
+    expect(hrefs(visibleNavGroups(["branding:read"]))).toContain("settings");
   });
 });

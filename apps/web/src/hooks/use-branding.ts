@@ -21,8 +21,18 @@ export const brandingQueryKey = ["branding"] as const;
  * that branches on `isLoading`, and it never passes `initialData`, so its
  * loading skeleton is unchanged.
  */
-export function useBrandingQuery(initialData?: BrandingSummary) {
-  return useQuery({ queryKey: brandingQueryKey, queryFn: getBranding, initialData });
+export function useBrandingQuery(
+  initialData?: BrandingSummary,
+  options: { enabled?: boolean } = {},
+) {
+  return useQuery({
+    queryKey: brandingQueryKey,
+    queryFn: getBranding,
+    initialData,
+    // Demo hardening — `WorkspaceShell` turns this off for a user without
+    // `branding:read`, whose request would only 403 on every page.
+    enabled: options.enabled ?? true,
+  });
 }
 
 export function useUpdateBrandingMutation() {

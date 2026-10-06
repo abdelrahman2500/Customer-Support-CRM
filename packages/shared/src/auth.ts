@@ -9,6 +9,12 @@ export interface AuthenticatedUser {
   branchId: string | null;
   departmentId: string | null;
   roles: string[];
+  /** Demo hardening — the permission keys the caller's active roles grant,
+   * resolved exactly as `PermissionsGuard` resolves them. The UI uses them
+   * only to leave out what would be refused anyway (navigation, requests);
+   * the API still enforces every permission itself. Optional so a consumer
+   * that predates it keeps working: absent means "unknown", not "none". */
+  permissions?: string[];
   /** Story 119 — `null` means no explicit choice has been made yet
    * (the frontend falls back to the URL's own `[locale]` segment). */
   preferredLocale: string | null;

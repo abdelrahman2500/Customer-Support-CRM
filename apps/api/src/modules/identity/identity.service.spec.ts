@@ -682,6 +682,10 @@ describe("IdentityService", () => {
   });
 
   describe("getAuthenticatedUser", () => {
+    beforeEach(() => {
+      prisma.permission.findMany.mockResolvedValue([]);
+    });
+
     it("resolves branchId/departmentId/roles from the user's activeBranchId/activeDepartmentId, not always branchRoles[0]", async () => {
       const otherBranchRole = {
         branchId: "branch-2",
@@ -706,6 +710,30 @@ describe("IdentityService", () => {
         branchId: "branch-2",
         departmentId: null,
         roles: ["Agent"],
+        permissions: [],
+      });
+    });
+
+    // Demo hardening — the active roles' permissions, looked up the way
+    // PermissionsGuard looks them up.
+    it("returns the permissions the active roles grant", async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        email: "admin@example.com",
+        fullName: "Admin User",
+        activeBranchId: null,
+        activeDepartmentId: null,
+        branchRoles: [activeBranchRole],
+      });
+      prisma.permission.findMany.mockResolvedValue([{ key: "ticket:read" }, { key: "user:read" }]);
+
+      const result = await service.getAuthenticatedUser("user-1");
+
+      expect(result.permissions).toEqual(["ticket:read", "user:read"]);
+      expect(prisma.permission.findMany).toHaveBeenCalledWith({
+        where: { roles: { some: { role: { name: { in: [activeBranchRole.role.name] } } } } },
+        select: { key: true },
+        orderBy: { key: "asc" },
       });
     });
 

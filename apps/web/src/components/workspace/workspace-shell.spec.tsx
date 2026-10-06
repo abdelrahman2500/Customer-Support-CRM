@@ -4,6 +4,7 @@ import { WorkspaceShell } from "./workspace-shell";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import type { BrandingSummary } from "@/lib/branding-api";
+import type { AuthenticatedUser } from "@crm/shared";
 
 /**
  * Story 129 — the shell's own responsibility is exactly one decision:
@@ -34,7 +35,7 @@ vi.mock("./workspace-sidebar", () => ({
 const mockedUseBrandingQuery = vi.mocked(useBrandingQuery);
 const mockedUseUnreadNotificationCountQuery = vi.mocked(useUnreadNotificationCountQuery);
 
-const user = {
+const user: AuthenticatedUser = {
   id: "user-1",
   email: "agent@example.com",
   fullName: "Ada Lovelace",
@@ -55,9 +56,9 @@ function branding(overrides: Partial<BrandingSummary> = {}): BrandingSummary {
   };
 }
 
-function renderShell(initialBranding: BrandingSummary | null = null) {
+function renderShell(initialBranding: BrandingSummary | null = null, shellUser = user) {
   return render(
-    <WorkspaceShell user={user} initialBranding={initialBranding}>
+    <WorkspaceShell user={shellUser} initialBranding={initialBranding}>
       <p>page content</p>
     </WorkspaceShell>,
   );
@@ -169,13 +170,26 @@ describe("WorkspaceShell", () => {
 
       renderShell(initial);
 
-      expect(mockedUseBrandingQuery).toHaveBeenCalledWith(initial);
+      expect(mockedUseBrandingQuery).toHaveBeenCalledWith(initial, { enabled: true });
     });
 
     it("passes undefined rather than null when the server fetch failed", () => {
       renderShell(null);
 
-      expect(mockedUseBrandingQuery).toHaveBeenCalledWith(undefined);
+      expect(mockedUseBrandingQuery).toHaveBeenCalledWith(undefined, { enabled: true });
+    });
+
+    // Demo hardening — an agent's GET /branding would only 403.
+    it("does not request branding for a user without branding:read", () => {
+      renderShell(null, { ...user, permissions: ["ticket:read"] });
+
+      expect(mockedUseBrandingQuery).toHaveBeenCalledWith(undefined, { enabled: false });
+    });
+
+    it("requests branding for a user with branding:read", () => {
+      renderShell(null, { ...user, permissions: ["branding:read"] });
+
+      expect(mockedUseBrandingQuery).toHaveBeenCalledWith(undefined, { enabled: true });
     });
 
     it("renders the sidebar on the very first render, with no intermediate navbar frame", () => {

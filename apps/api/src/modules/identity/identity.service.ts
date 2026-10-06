@@ -530,18 +530,25 @@ export class IdentityService {
       branchId: user.activeBranchId,
       departmentId: user.activeDepartmentId,
     });
+    const roles = user.branchRoles
+      .filter((br) => br.branchId === active?.branchId && br.departmentId === active?.departmentId)
+      .map((br) => br.role.name);
+    // Demo hardening — the same lookup `PermissionsGuard` makes for these
+    // roles, so the UI can leave out what the API would refuse.
+    const granted = await this.prisma.permission.findMany({
+      where: { roles: { some: { role: { name: { in: roles } } } } },
+      select: { key: true },
+      orderBy: { key: "asc" },
+    });
     return {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
       branchId: active?.branchId ?? null,
       departmentId: active?.departmentId ?? null,
-      roles: user.branchRoles
-        .filter(
-          (br) => br.branchId === active?.branchId && br.departmentId === active?.departmentId,
-        )
-        .map((br) => br.role.name),
+      roles,
       preferredLocale: user.preferredLocale,
+      permissions: granted.map((permission) => permission.key),
     };
   }
 

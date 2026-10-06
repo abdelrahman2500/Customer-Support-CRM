@@ -13,6 +13,7 @@ import {
   useUserListQuery,
 } from "@/hooks/use-tickets";
 import { useRolesQuery } from "@/hooks/use-roles";
+import { useCan } from "@/lib/permissions";
 import { useAgentPresence, type PresenceStatus } from "@/hooks/use-agent-presence";
 import type { ListUsersFilters, UserSummary } from "@/lib/tickets-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
@@ -268,7 +269,9 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
   const assignmentMutation = useUpdateUserAssignmentMutation(user.id);
   const resetPasswordMutation = useResetPasswordMutation(user.id);
   const unlockMutation = useUnlockUserMutation(user.id);
-  const rolesQuery = useRolesQuery();
+  // Demo hardening — without `role:read` (an agent) the request would
+  // only 403, once per row.
+  const rolesQuery = useRolesQuery({ enabled: useCan("role:read") });
   const departmentsQuery = useDepartmentsQuery();
   const [fullNameDraft, setFullNameDraft] = useState(user.fullName);
   const [emailDraft, setEmailDraft] = useState(user.email);

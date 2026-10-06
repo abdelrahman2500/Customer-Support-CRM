@@ -14,7 +14,7 @@ import {
   recipes,
 } from "@crm/ui";
 import { localeDirection } from "@/i18n/direction";
-import { NAV_GROUPS, NavItemLabel, isNavItemActive } from "./nav-items";
+import { NavItemLabel, isNavItemActive, useVisibleNavGroups } from "./nav-items";
 
 /** Story 129 — the collapsed/expanded flag is a PER-USER, per-browser view
  * convenience, deliberately kept separate from the admin's branch-level
@@ -57,10 +57,11 @@ export function RailNav({
   const t = useTranslations("workspace");
   const pathname = usePathname();
   const { locale } = useParams<{ locale: string }>();
+  const navGroups = useVisibleNavGroups();
 
   return (
     <nav aria-label={t("nav.label")} className="flex flex-col gap-section px-2">
-      {NAV_GROUPS.map((group) => (
+      {navGroups.map((group) => (
         <div key={group.groupKey} className="flex flex-col gap-0.5">
           <p
             className={`px-3 py-1.5 text-label text-chrome-muted ${

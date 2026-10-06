@@ -41,10 +41,14 @@ export function useTicketVolumeQuery(range: ReportDateRange = {}) {
   });
 }
 
-export function useSlaComplianceQuery(range: ReportDateRange = {}) {
+export function useSlaComplianceQuery(
+  range: ReportDateRange = {},
+  options: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: ["reports", "sla-compliance", range],
     queryFn: () => getSlaCompliance(range),
+    enabled: options.enabled ?? true,
   });
 }
 
@@ -83,10 +87,14 @@ export function useAiUsageQuery(range: ReportDateRange = {}) {
 }
 
 /** Story 126 — same parameterized-query-key pattern as every other hook here. */
-export function useTicketVolumeByCategoryQuery(range: ReportDateRange = {}) {
+export function useTicketVolumeByCategoryQuery(
+  range: ReportDateRange = {},
+  options: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: ["reports", "ticket-volume-by-category", range],
     queryFn: () => getTicketVolumeByCategory(range),
+    enabled: options.enabled ?? true,
   });
 }
 

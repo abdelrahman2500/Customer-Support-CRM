@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import type { BrandingSummary } from "@/lib/branding-api";
+import { PermissionsProvider, hasAnyPermission } from "@/lib/permissions";
 import { resolveNavigationLayout } from "./nav-items";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceNavbar } from "./workspace-navbar";
@@ -52,7 +53,12 @@ export function WorkspaceShell({
   initialBranding: BrandingSummary | null;
   children: ReactNode;
 }) {
-  const brandingQuery = useBrandingQuery(initialBranding ?? undefined);
+  // Demo hardening — a user without `branding:read` (an agent) is never
+  // sent the branding, so the request is not made at all: they keep the
+  // default presentation they already got from the 403.
+  const brandingQuery = useBrandingQuery(initialBranding ?? undefined, {
+    enabled: hasAnyPermission(user.permissions, ["branding:read"]),
+  });
   // Story 183 (RD-1.6) — the controlled branding model. `initialBranding`
   // arrives server-side, so BrandScope paints the shell branded on first
   // render; it also mirrors the variables onto <html> for portalled menus.
@@ -97,27 +103,31 @@ export function WorkspaceShell({
 
   if (layout === "SIDEBAR") {
     return (
-      <BrandScope tokens={brandTokens}>
-        {header}
-        {/* `min-h-0` — without it the flex row refuses to shrink below its
+      <PermissionsProvider permissions={user.permissions}>
+        <BrandScope tokens={brandTokens}>
+          {header}
+          {/* `min-h-0` — without it the flex row refuses to shrink below its
             content's height, and the rail's own `overflow-y-auto` never
             engages. */}
-        <div className="flex min-h-0 flex-1">
-          <WorkspaceSidebar
-            unreadCount={unreadCount}
-            unreadCountKnown={unreadCountQuery.isSuccess}
-          />
-          {main}
-        </div>
-      </BrandScope>
+          <div className="flex min-h-0 flex-1">
+            <WorkspaceSidebar
+              unreadCount={unreadCount}
+              unreadCountKnown={unreadCountQuery.isSuccess}
+            />
+            {main}
+          </div>
+        </BrandScope>
+      </PermissionsProvider>
     );
   }
 
   return (
-    <BrandScope tokens={brandTokens}>
-      {header}
-      <WorkspaceNavbar unreadCount={unreadCount} unreadCountKnown={unreadCountQuery.isSuccess} />
-      {main}
-    </BrandScope>
+    <PermissionsProvider permissions={user.permissions}>
+      <BrandScope tokens={brandTokens}>
+        {header}
+        <WorkspaceNavbar unreadCount={unreadCount} unreadCountKnown={unreadCountQuery.isSuccess} />
+        {main}
+      </BrandScope>
+    </PermissionsProvider>
   );
 }

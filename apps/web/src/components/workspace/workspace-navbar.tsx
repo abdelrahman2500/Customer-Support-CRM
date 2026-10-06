@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
   recipes,
 } from "@crm/ui";
-import { NAV_GROUPS, NavItemLabel, isNavItemActive } from "./nav-items";
+import { NavItemLabel, isNavItemActive, useVisibleNavGroups } from "./nav-items";
 import { chromeNavItemClassName } from "./workspace-sidebar";
 
 /**
@@ -45,6 +45,7 @@ export function WorkspaceNavbar({
   const t = useTranslations("workspace");
   const pathname = usePathname();
   const { locale } = useParams<{ locale: string }>();
+  const navGroups = useVisibleNavGroups();
 
   return (
     <nav
@@ -53,7 +54,7 @@ export function WorkspaceNavbar({
       // band; its menus still open on the light raised surface.
       className={`${recipes.chrome} hidden items-center gap-1 border-b border-chrome-rule px-6 py-2 sm:flex`}
     >
-      {NAV_GROUPS.map((group) => {
+      {navGroups.map((group) => {
         const groupName = t(`nav.groups.${group.groupKey}`);
         // The section the user is currently in has to stay identifiable
         // with every menu closed, so the trigger takes the exact same

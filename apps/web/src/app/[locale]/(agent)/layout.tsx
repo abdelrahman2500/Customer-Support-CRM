@@ -42,7 +42,12 @@ export default async function AgentWorkspaceLayout({
   if (!user) {
     redirect(`/${locale}/login`);
   }
-  const branding = await fetchBranding();
+  // Demo hardening — only fetched for a user who may read it (an agent
+  // would get a 403 on every page load); unknown permissions still fetch.
+  const branding =
+    user.permissions === undefined || user.permissions.includes("branding:read")
+      ? await fetchBranding()
+      : null;
   const t = await getTranslations("common");
 
   return (

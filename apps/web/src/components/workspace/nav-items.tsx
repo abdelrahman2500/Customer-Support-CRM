@@ -24,6 +24,7 @@ import {
 } from "@crm/ui";
 import type { LucideIcon } from "@crm/ui";
 import type { NavigationLayout } from "@/lib/branding-api";
+import { hasAnyPermission, usePermissions } from "@/lib/permissions";
 
 /**
  * Story 129 — this module is the ONE source of truth for the Agent
@@ -204,6 +205,13 @@ export interface NavLinkItem {
   readonly href: string;
   readonly labelKey: string;
   readonly icon: LucideIcon;
+  /** Demo hardening — the permission(s), any of which the destination's
+   * own data needs (its list endpoint's `@RequirePermissions`). Without
+   * one the item is hidden — the page would only render its 403 state.
+   * This supersedes Story 44's "no client-side permission gating": `/auth/me`
+   * now reports the caller's permissions, so there is a real signal to key
+   * visibility off. The API still enforces every permission itself. */
+  readonly requires?: readonly string[];
 }
 
 export interface NavGroup {
@@ -224,55 +232,122 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { href: "dashboard", labelKey: "nav.dashboard", icon: DashboardIcon },
       { href: "tickets", labelKey: "nav.tickets", icon: TicketsIcon },
-      { href: "customers", labelKey: "nav.customers", icon: CustomersIcon },
-      { href: "knowledge-base", labelKey: "nav.knowledgeBase", icon: KnowledgeBaseIcon },
+      {
+        href: "customers",
+        labelKey: "nav.customers",
+        icon: CustomersIcon,
+        requires: ["customer:read"],
+      },
+      {
+        href: "knowledge-base",
+        labelKey: "nav.knowledgeBase",
+        icon: KnowledgeBaseIcon,
+        requires: ["kb:read"],
+      },
       { href: "notifications", labelKey: "nav.notifications", icon: NotificationsIcon },
     ],
   },
   {
     groupKey: "insights",
     items: [
-      { href: "reports", labelKey: "nav.reports", icon: ReportsIcon },
-      { href: "audit-logs", labelKey: "nav.auditLogs", icon: AuditLogsIcon },
+      { href: "reports", labelKey: "nav.reports", icon: ReportsIcon, requires: ["report:read"] },
+      {
+        href: "audit-logs",
+        labelKey: "nav.auditLogs",
+        icon: AuditLogsIcon,
+        requires: ["audit:read"],
+      },
     ],
   },
   {
     groupKey: "configure",
     items: [
-      { href: "sla-policies", labelKey: "nav.slaPolicies", icon: SlaPoliciesIcon },
-      { href: "ticket-categories", labelKey: "nav.ticketCategories", icon: TicketCategoriesIcon },
-      { href: "kb-categories", labelKey: "nav.kbCategories", icon: KbCategoriesIcon },
-      { href: "automation-rules", labelKey: "nav.automationRules", icon: AutomationRulesIcon },
-      { href: "quick-replies", labelKey: "nav.quickReplies", icon: QuickRepliesIcon },
+      {
+        href: "sla-policies",
+        labelKey: "nav.slaPolicies",
+        icon: SlaPoliciesIcon,
+        requires: ["sla:read"],
+      },
+      {
+        href: "ticket-categories",
+        labelKey: "nav.ticketCategories",
+        icon: TicketCategoriesIcon,
+        requires: ["ticket-category:read"],
+      },
+      {
+        href: "kb-categories",
+        labelKey: "nav.kbCategories",
+        icon: KbCategoriesIcon,
+        requires: ["kb-category:read"],
+      },
+      {
+        href: "automation-rules",
+        labelKey: "nav.automationRules",
+        icon: AutomationRulesIcon,
+        requires: ["automation:read"],
+      },
+      {
+        href: "quick-replies",
+        labelKey: "nav.quickReplies",
+        icon: QuickRepliesIcon,
+        requires: ["quick-reply:read"],
+      },
       {
         href: "notification-templates",
         labelKey: "nav.notificationTemplates",
         icon: NotificationTemplatesIcon,
+        requires: ["notification:read"],
       },
     ],
   },
   {
     groupKey: "admin",
     items: [
-      { href: "branches", labelKey: "nav.branches", icon: BranchesIcon },
-      { href: "users", labelKey: "nav.users", icon: UsersIcon },
-      { href: "roles", labelKey: "nav.roles", icon: RolesIcon },
+      { href: "branches", labelKey: "nav.branches", icon: BranchesIcon, requires: ["branch:read"] },
+      { href: "users", labelKey: "nav.users", icon: UsersIcon, requires: ["user:read"] },
+      { href: "roles", labelKey: "nav.roles", icon: RolesIcon, requires: ["role:read"] },
       {
         href: "webhook-subscriptions",
         labelKey: "nav.webhookSubscriptions",
         icon: WebhookSubscriptionsIcon,
+        requires: ["integration:manage"],
       },
-      { href: "api-keys", labelKey: "nav.apiKeys", icon: ApiKeysIcon },
+      {
+        href: "api-keys",
+        labelKey: "nav.apiKeys",
+        icon: ApiKeysIcon,
+        requires: ["integration:manage"],
+      },
     ],
   },
   {
     groupKey: "account",
     items: [
-      { href: "settings", labelKey: "nav.settings", icon: SettingsIcon },
+      {
+        href: "settings",
+        labelKey: "nav.settings",
+        icon: SettingsIcon,
+        // Branding and AI are the tabs only an administrator can read.
+        requires: ["branding:read", "ai:read"],
+      },
       { href: "my-sessions", labelKey: "nav.mySessions", icon: MySessionsIcon },
     ],
   },
 ];
+
+/** Demo hardening — `NAV_GROUPS` without the items the signed-in user
+ * lacks permission for, and without groups left empty. Both presentations
+ * render this, never `NAV_GROUPS` directly. */
+export function visibleNavGroups(permissions: readonly string[] | undefined): readonly NavGroup[] {
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => hasAnyPermission(permissions, item.requires)),
+  })).filter((group) => group.items.length > 0);
+}
+
+export function useVisibleNavGroups(): readonly NavGroup[] {
+  return visibleNavGroups(usePermissions());
+}
 
 /** RM-11 — the one shared render path for a nav item's visible label plus
  * its Story 92 unread-count badge, so the desktop `<nav>` and the mobile

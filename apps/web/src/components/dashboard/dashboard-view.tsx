@@ -28,6 +28,7 @@ import { deriveSlaStatus } from "@/lib/sla";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { COUNTED_STATUSES, useTicketStatusCounts } from "@/hooks/use-ticket-status-counts";
 import { useSlaComplianceQuery, useTicketVolumeByCategoryQuery } from "@/hooks/use-reporting";
+import { useCan } from "@/lib/permissions";
 import { statusSpine } from "@/components/tickets/board/board-state";
 import { TasksPanel } from "./tasks-panel";
 
@@ -203,8 +204,14 @@ export function DashboardView({ userId }: { userId: string }) {
   const [since] = useState(() =>
     new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
   );
-  const slaComplianceQuery = useSlaComplianceQuery({ from: since });
-  const volumeByCategoryQuery = useTicketVolumeByCategoryQuery({ from: since });
+  // Demo hardening — not requested at all without `report:read` (an
+  // agent's request would only 403); the panel stays out either way.
+  const canReadReports = useCan("report:read");
+  const slaComplianceQuery = useSlaComplianceQuery({ from: since }, { enabled: canReadReports });
+  const volumeByCategoryQuery = useTicketVolumeByCategoryQuery(
+    { from: since },
+    { enabled: canReadReports },
+  );
   const router = useRouter();
   const { locale } = useParams<{ locale: string }>();
 

@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { useTicketStatusCounts } from "@/hooks/use-ticket-status-counts";
 import { useSlaComplianceQuery, useTicketVolumeByCategoryQuery } from "@/hooks/use-reporting";
+import { PermissionsProvider } from "@/lib/permissions";
 import { NextIntlClientProvider } from "next-intl";
 import { DashboardView } from "./dashboard-view";
 import { useCustomersQuery, useTicketsQuery, useUpdateTicketMutation } from "@/hooks/use-tickets";
@@ -647,6 +648,22 @@ describe("DashboardView", () => {
       expect(screen.getByRole("img", { name: "Resolution SLA met 80%" })).toBeInTheDocument();
       expect(screen.getByText("8 met · 2 breached")).toBeInTheDocument();
       expect(screen.getByText("Billing")).toBeInTheDocument();
+    });
+
+    // Demo hardening — an agent's report requests would only 403.
+    it("does not request the branch figures without report:read", () => {
+      render(
+        <NextIntlClientProvider locale="en" messages={enMessages}>
+          <PermissionsProvider permissions={["ticket:read"]}>
+            <DashboardView userId="agent-1" />
+          </PermissionsProvider>
+        </NextIntlClientProvider>,
+      );
+
+      expect(useSlaComplianceQuery).toHaveBeenCalledWith(expect.anything(), { enabled: false });
+      expect(useTicketVolumeByCategoryQuery).toHaveBeenCalledWith(expect.anything(), {
+        enabled: false,
+      });
     });
   });
 });

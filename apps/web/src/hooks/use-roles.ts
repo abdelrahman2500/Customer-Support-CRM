@@ -25,8 +25,13 @@ export const managedRolesQueryKey = ["managed-roles"] as const;
 
 /** UNCHANGED — key `["roles"]`, active-only. `CreateUserView`'s role picker
  * depends on this exact hook/key; do not alter. */
-export function useRolesQuery() {
-  return useQuery({ queryKey: ["roles"], queryFn: listRoles, staleTime: 5 * 60_000 });
+export function useRolesQuery(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: ["roles"],
+    queryFn: listRoles,
+    staleTime: 5 * 60_000,
+    enabled: options.enabled ?? true,
+  });
 }
 
 /** Every role, active or not — backs the `/roles` management screen. */
