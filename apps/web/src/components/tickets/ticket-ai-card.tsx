@@ -208,8 +208,13 @@ export function TicketAiCard({
             <Alert variant="destructive">{resultQuery.data.errorMessage}</Alert>
           )}
 
+          {/* Demo hardening — an environment without an AI provider says so
+              plainly (a titled notice, not a bare sentence); nothing is
+              invented in its place. */}
           {resultQuery.isSuccess && resultQuery.data.outcome === "DISABLED" && (
-            <Alert>{t("detail.aiDisabled")}</Alert>
+            <Alert variant="info" icon title={t("detail.aiDisabledTitle")}>
+              {t("detail.aiDisabled")}
+            </Alert>
           )}
         </div>
       )}

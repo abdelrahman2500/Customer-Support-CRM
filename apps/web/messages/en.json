@@ -263,7 +263,7 @@
       "aiStatusFailed": "{feature} failed.",
       "aiStatusDisabled": "AI assist is turned off in this environment.",
       "aiSummaryPinned": "AI summary",
-      "aiDisabled": "AI features are not enabled in this environment.",
+      "aiDisabled": "No AI provider is configured for this workspace, so summaries and suggestions aren't available. Everything else on the ticket works as usual — an administrator can connect a provider.",
       "aiUseAsCategory": "Use as category",
       "slaHeading": "SLA",
       "escalationsHeading": "SLA Escalations",
@@ -361,7 +361,8 @@
         "previousNone": "No previous ticket",
         "nextNone": "No next ticket",
         "position": "{index} of {total}"
-      }
+      },
+      "aiDisabledTitle": "AI assist isn't connected here"
     },
     "sla": {
       "none": "No SLA target",
