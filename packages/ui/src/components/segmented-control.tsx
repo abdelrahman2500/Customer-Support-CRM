@@ -82,7 +82,9 @@ export function SegmentedControl({
       dir={dir}
       onKeyDown={onKeyDown}
       className={cn(
-        "inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-control border border-rule bg-surface-muted p-0.5",
+        // Final UX pass — a tinted track with no outline; the chosen option
+        // is a raised pill, not a ringed box.
+        "inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-control bg-ink/[0.05] p-0.5",
         fill && "flex w-full",
         className,
       )}
@@ -105,8 +107,8 @@ export function SegmentedControl({
               size === "sm" ? "h-7 px-2.5 text-xs" : "h-8 px-3 text-sm",
               fill && "flex-1",
               checked
-                ? "bg-surface text-ink ring-1 ring-rule"
-                : "text-ink-muted hover:bg-surface hover:text-ink",
+                ? "bg-surface-raised text-ink shadow-raised"
+                : "text-ink-muted hover:bg-ink/[0.05] hover:text-ink",
             )}
           >
             {option.dot && (

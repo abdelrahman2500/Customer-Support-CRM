@@ -3,7 +3,7 @@
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { cn } from "../lib/cn";
-import { controlClassName } from "../lib/control";
+import { choiceControlClassName } from "../lib/control";
 import {
   CheckIcon as Check,
   ChevronDownIcon as ChevronDown,
@@ -22,10 +22,10 @@ export const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      // Story 186 (RD-1.9) — the shared control look (40px, control radius,
-      // 3:1 border, invalid state), identical to Input.
+      // Story 186 (RD-1.9) — 40px, control radius, invalid state. Final UX
+      // pass — the filled choice surface, not the outlined field.
       "focus-ring-always flex h-10 items-center justify-between gap-2 px-3 text-start",
-      controlClassName,
+      choiceControlClassName,
       className,
     )}
     {...props}

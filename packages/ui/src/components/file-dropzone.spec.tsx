@@ -54,13 +54,15 @@ describe("FileDropzone", () => {
     expect(onFile).not.toHaveBeenCalled();
   });
 
-  it("looks like a small outline button in the button variant, without the hint", () => {
+  it("looks like a small secondary button in the button variant, without the hint", () => {
     render(
       <FileDropzone variant="button" label="Attach file" hint="or drop it here" onFile={vi.fn()} />,
     );
 
     const zone = screen.getByLabelText("Attach file").closest("label")!;
-    expect(zone).toHaveClass("border", "h-8");
+    // Final UX pass — the secondary button is a tonal fill, not an outline.
+    expect(zone).toHaveClass("bg-ink/[0.06]", "h-8");
+    expect(zone).not.toHaveClass("border");
     expect(screen.queryByText("or drop it here")).not.toBeInTheDocument();
     expect(zone.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });

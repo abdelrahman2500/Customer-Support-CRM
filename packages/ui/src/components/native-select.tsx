@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { choiceControlClassName } from "../lib/control";
 import { cn } from "../lib/cn";
 
 /**
@@ -33,8 +34,10 @@ export const NativeSelect = React.forwardRef<HTMLSelectElement, NativeSelectProp
     <select
       ref={ref}
       className={cn(
-        "focus-ring rounded-control border border-rule-control bg-surface text-sm text-ink",
-        "transition-colors duration-fast hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50",
+        // Final UX pass — the filled choice surface (see control.ts).
+        "focus-ring",
+        choiceControlClassName,
+        "w-auto",
         size === "sm" ? "h-8 px-2" : "h-10 px-3",
         className,
       )}

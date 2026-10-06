@@ -141,8 +141,11 @@ describe("Select", () => {
     renderSelect(["Low"]);
 
     const trigger = screen.getByRole("combobox", { name: "Assigned agent" });
-    expect(trigger).toHaveClass("border-rule-control");
-    expect(trigger).toHaveClass("bg-surface");
+    // Final UX pass — the filled choice surface, with no outline; an invalid
+    // choice still shows the danger edge.
+    expect(trigger).toHaveClass("bg-ink/[0.05]", "border-transparent");
+    expect(trigger).not.toHaveClass("border-rule-control");
+    expect(trigger).toHaveClass("aria-[invalid=true]:border-danger-solid");
     expect(trigger).toHaveClass("focus-ring-always");
     expect(trigger.className).not.toMatch(/slate-\d/);
   });

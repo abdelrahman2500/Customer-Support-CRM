@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "../lib/cn";
-import { controlClassName } from "../lib/control";
+import { choiceControlClassName, controlClassName } from "../lib/control";
 import { CheckIcon, ChevronDownIcon } from "../lib/icons";
 import { menuItemClassName } from "../lib/menu";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
@@ -153,9 +153,10 @@ export function Combobox({
             }
           }}
           className={cn(
-            // Story 186 (RD-1.9) — the shared control look, identical to SelectTrigger.
+            // Story 186 (RD-1.9) — identical to SelectTrigger (Final UX pass:
+            // the filled choice surface).
             "focus-ring-always flex h-10 items-center justify-between gap-2 px-3 text-start",
-            controlClassName,
+            choiceControlClassName,
             className,
           )}
         >

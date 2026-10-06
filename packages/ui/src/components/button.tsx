@@ -34,8 +34,11 @@ export const buttonVariants = cva(
         default: "bg-accent text-accent-foreground hover:bg-accent-hover active:bg-accent-active",
         secondary:
           "bg-accent-surface text-accent-hover hover:bg-surface-muted active:bg-surface-muted",
-        outline:
-          "border border-rule-strong bg-surface text-ink hover:bg-surface-muted active:bg-surface-sunk",
+        // Final UX pass — the secondary action is a quiet tonal fill, not an
+        // outlined box: the same ink tint as the choice controls, so a row of
+        // actions and filters reads as one family under the solid primary.
+        // The name stays (79 call sites mean "secondary", not "has a border").
+        outline: "bg-ink/[0.06] text-ink-strong hover:bg-ink/[0.1] active:bg-ink/[0.14]",
         ghost: "text-ink-strong hover:bg-surface-muted active:bg-surface-sunk",
         // Story 212 (PR-1.3) — a quiet action on the ink chrome (rail, header
         // band); the chrome's `.on-chrome` scope supplies a visible focus ring.

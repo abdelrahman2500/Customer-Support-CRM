@@ -16,6 +16,20 @@
 export const controlClassName =
   "w-full rounded-control border border-rule-control bg-surface text-sm text-ink transition-colors duration-fast ease-standard placeholder:text-ink-subtle hover:border-ink-subtle disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-danger-solid";
 
+/**
+ * Final UX pass — the surface of a control you *choose* with rather than
+ * type into: Select and Combobox triggers, NativeSelect. A quiet ink tint
+ * (it reads on a white card and on the warm canvas alike, and inverts with
+ * the theme) instead of the outlined box — an outline around every filter
+ * and dropdown made the screens read as a form. Identified by its value and
+ * chevron (WCAG 1.4.11 does not ask a boundary of a labelled control);
+ * hover and press deepen the tint, focus keeps the ring, and an invalid
+ * choice still shows the danger edge. Text fields keep `controlClassName`:
+ * an empty one has nothing else to show where it is.
+ */
+export const choiceControlClassName =
+  "w-full rounded-control border border-transparent bg-ink/[0.05] text-sm text-ink transition-colors duration-fast ease-standard placeholder:text-ink-subtle hover:bg-ink/[0.08] data-[state=open]:bg-ink/[0.08] disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-danger-solid";
+
 /** Heights for single-line controls: comfortable 40px, compact 32px. */
 export const controlHeightClassName = {
   md: "h-10 px-3",
