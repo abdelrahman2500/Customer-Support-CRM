@@ -36,14 +36,14 @@ An audit of every route with axe and the keyboard, fixing what it finds, and a s
 | A11Y-03 missing h1 | Closed — error states (199); portal assistant (231). |
 | A11Y-04 heading order | Closed — portal tickets page header before the create card (230); settings one h1 (224). |
 | A11Y-05 mention combobox | Closed — `Composer` suggestions (207). |
-| A11Y-06 repeated names | Closed — unique KB row actions (219); "View all" removed with the customer panel redesign (219). |
+| A11Y-06 repeated names | Closed — unique KB row actions (219); the customer panel link names its customer (`detail.contextPanelViewAll`). |
 | A11Y-07 unannounced errors | Closed here (34 sites + guard). |
 | A11Y-08 focus rings | Closed — `NativeSelect`/`focus-ring` (182, 189); verified by the keyboard walk. |
 | A11Y-09 placeholder names, focus loss | Closed — `Composer` labels and never-disabled field (207, 230, 231). |
 | A11Y-10 toast region | Closed — regions always mounted (193). |
 | A11Y-11 unread count masking | Closed (200). |
 | A11Y-12 contrast | Closed — tokens (180); axe colour-contrast clean in all four variants. |
-| A11Y-13 colour-only status | Closed — status/priority badges carry icons; SLA indicator has text + icon. |
+| A11Y-13 colour-only status | Closed — status/priority badges carry icons; SLA at-risk/breached are icon badges, on-track is plain text (no colour coding to miss). |
 | A11Y-14 reduced motion | Closed — global `prefers-reduced-motion` rule in `tailwind-tokens.css` (179). |
 | A11Y-15 mouse-only rows | Closed — rows keep an inner link; portal rows became full-card links (230/231). |
 
