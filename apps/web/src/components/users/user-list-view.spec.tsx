@@ -786,7 +786,14 @@ describe("UserListView", () => {
       renderView();
       openEditor(); // Story 226 — the controls live in the user's editor Sheet
 
-      expect(screen.getByRole("button", { name: "Reset password" })).toHaveClass("bg-danger-solid");
+      // Demo hardening — a quiet destructive trigger (danger text, no solid
+      // fill); its confirmation dialog keeps the solid destructive action.
+      expect(screen.getByRole("button", { name: "Reset password" })).toHaveClass(
+        "text-danger-foreground",
+      );
+      expect(screen.getByRole("button", { name: "Reset password" })).not.toHaveClass(
+        "bg-danger-solid",
+      );
     });
 
     it("keeps the reset-password button disabled until the draft is at least 8 characters", () => {

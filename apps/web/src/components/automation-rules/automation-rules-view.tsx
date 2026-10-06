@@ -235,7 +235,7 @@ function AutomationRuleRow({
             inactiveLabel={t("inactive")}
           />
           <Button
-            variant={rule.isActive ? "destructive" : "outline"}
+            variant={rule.isActive ? "destructive-quiet" : "outline"}
             size="sm"
             disabled={mutation.isPending}
             onClick={handleToggleActiveClick}

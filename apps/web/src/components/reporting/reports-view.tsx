@@ -253,6 +253,15 @@ function failureKind(query: QueryLike): FailureKind | null {
  * Clear button, and a KPI row and a page-level failure state frame the
  * cards.
  */
+/** Demo hardening — the AI features with a localized name in the AI usage card. */
+const AI_FEATURES: readonly string[] = [
+  "CHAT",
+  "SUMMARIZE",
+  "SUGGEST_REPLY",
+  "CATEGORIZE",
+  "SUGGEST_SOLUTIONS",
+];
+
 export function ReportsView() {
   const t = useTranslations("reporting");
   const ticketLabels = useTicketLabels();
@@ -638,7 +647,12 @@ export function ReportsView() {
                 <ul className="flex flex-col gap-1 border-t border-rule-subtle pt-2">
                   {aiUsageQuery.data.byFeature.map((row) => (
                     <li key={row.feature} className="flex items-center justify-between">
-                      <span className="text-ink-muted">{row.feature}</span>
+                      {/* Demo hardening — the feature's name, never its enum. */}
+                      <span className="text-ink-muted">
+                        {AI_FEATURES.includes(row.feature)
+                          ? t(`aiUsage.feature.${row.feature}`)
+                          : row.feature}
+                      </span>
                       <span className="font-medium text-ink">
                         {row.totalCostUsd !== null
                           ? formatUsd(row.totalCostUsd, locale)

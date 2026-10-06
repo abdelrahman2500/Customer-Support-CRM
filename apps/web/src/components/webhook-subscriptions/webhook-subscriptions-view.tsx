@@ -260,7 +260,7 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
         <TableCell>
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              variant={subscription.isActive ? "destructive" : "outline"}
+              variant={subscription.isActive ? "destructive-quiet" : "outline"}
               size="sm"
               disabled={updateMutation.isPending}
               onClick={handleToggleActiveClick}
@@ -274,7 +274,7 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
             >
               {deliveriesExpanded ? t("hideDeliveries") : t("viewDeliveries")}
             </Button>
-            <Button variant="destructive" size="sm" onClick={() => setConfirmDeleteOpen(true)}>
+            <Button variant="destructive-quiet" size="sm" onClick={() => setConfirmDeleteOpen(true)}>
               {t("delete")}
             </Button>
             <ConfirmDialog

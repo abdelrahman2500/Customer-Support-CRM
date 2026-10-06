@@ -164,7 +164,7 @@ function RoleRow({
                 </Badge>
                 <Button
                   type="button"
-                  variant={role.isActive ? "destructive" : "outline"}
+                  variant={role.isActive ? "destructive-quiet" : "outline"}
                   size="sm"
                   disabled={updateMutation.isPending}
                   onClick={handleToggleActiveClick}

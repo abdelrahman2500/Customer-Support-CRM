@@ -560,8 +560,11 @@
       "contactFullNameLabel": "Name",
       "contactEmailLabel": "Email",
       "contactPhoneLabel": "Phone",
-      "setPrimary": "Set as primary",
-      "unsetPrimary": "Unset primary",
+      "setPrimary": "Make primary",
+      "unsetPrimary": "Remove as primary",
+      "editContact": "Edit",
+      "editContactFor": "Edit {name}",
+      "doneEditing": "Done",
       "addContactSubmit": "Add contact",
       "addContactSubmitting": "Adding...",
       "addContactFailed": "Couldn't add the contact. Please try again.",
@@ -1203,7 +1206,14 @@
       "empty": "No AI usage yet.",
       "detail": "{calls} calls · {inputTokens} input / {outputTokens} output tokens",
       "costUnknown": "Cost unknown",
-      "unpricedWarning": "{count} successful call(s) used a model not in the price table and are excluded from the cost total."
+      "unpricedWarning": "{count} successful call(s) used a model not in the price table and are excluded from the cost total.",
+      "feature": {
+        "CHAT": "Portal assistant",
+        "SUMMARIZE": "Ticket summary",
+        "SUGGEST_REPLY": "Suggested reply",
+        "CATEGORIZE": "Category suggestion",
+        "SUGGEST_SOLUTIONS": "Suggested solutions"
+      }
     },
     "ticketVolumeByCategory": {
       "heading": "Ticket Volume by Category",

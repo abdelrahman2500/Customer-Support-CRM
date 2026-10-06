@@ -272,7 +272,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
             {article.status === "PUBLISHED" ? t("list.published") : t("list.draft")}
           </Badge>
           <Button
-            variant={article.status === "PUBLISHED" ? "destructive" : "outline"}
+            variant={article.status === "PUBLISHED" ? "destructive-quiet" : "outline"}
             size="sm"
             disabled={mutation.isPending}
             onClick={handleTogglePublishedClick}

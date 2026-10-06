@@ -146,9 +146,10 @@ describe("TasksPanel", () => {
     render(<TasksPanel userId="user-1" />);
 
     expect(screen.getByText("Follow up with Acme Corp")).toBeInTheDocument();
-    // "MEDIUM" also appears as the create-form's own default priority
-    // selection — at least one instance is this row's own priority badge.
-    expect(screen.getAllByText("MEDIUM").length).toBeGreaterThan(0);
+    // Demo hardening — the localized label (here the mocked key), never the
+    // raw enum; it also appears as the create-form's default selection.
+    expect(screen.getAllByText("ticketPriority.MEDIUM").length).toBeGreaterThan(0);
+    expect(screen.queryByText("MEDIUM")).not.toBeInTheDocument();
   });
 
   it("shows an overdue badge for a past-due, incomplete task", () => {

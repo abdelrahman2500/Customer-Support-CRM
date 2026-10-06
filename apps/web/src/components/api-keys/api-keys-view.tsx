@@ -154,7 +154,7 @@ function ApiKeyRow({ apiKey }: { apiKey: ApiKeySummary }) {
       </TableCell>
       <TableCell>
         <Button
-          variant="destructive"
+          variant="destructive-quiet"
           size="sm"
           disabled={status === "revoked" || mutation.isPending}
           onClick={() => setConfirmRevokeOpen(true)}

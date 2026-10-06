@@ -74,6 +74,9 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
   const [fullNameDraft, setFullNameDraft] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState<string | null>(null);
   const [phoneDraft, setPhoneDraft] = useState<string | null>(null);
+  // Demo hardening — a contact reads as text until "Edit": three always-open
+  // inputs per row made every contact look like an unsaved form.
+  const [editing, setEditing] = useState(false);
   const mutation = useUpdateContactMutation(customerId, contact.id);
   const portalPasswordMutation = useSetContactPortalPasswordMutation(customerId, contact.id);
   const [portalPasswordDraft, setPortalPasswordDraft] = useState("");
@@ -118,55 +121,97 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
 
   return (
     <li className="flex flex-col gap-1 border-b border-rule-subtle pb-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-      <div className="flex flex-1 flex-wrap items-center gap-2">
-        <Input
-          className="min-w-0 flex-1 basis-36"
-          defaultValue={contact.fullName}
-          aria-label={t("detail.contactFullNameLabel")}
-          onChange={(event) => setFullNameDraft(event.target.value)}
-          onBlur={() => {
-            const value = fullNameDraft?.trim();
-            if (value && fullNameDraft !== contact.fullName) {
-              mutation.mutate({ fullName: value });
-            }
-          }}
-        />
-        <Input
-          className="min-w-0 flex-[2] basis-48"
-          defaultValue={contact.email ?? ""}
-          placeholder={t("detail.contactEmailLabel")}
-          aria-label={t("detail.contactEmailLabel")}
-          onChange={(event) => setEmailDraft(event.target.value)}
-          onBlur={() => {
-            const value = emailDraft?.trim();
-            if (value && emailDraft !== (contact.email ?? "")) {
-              mutation.mutate({ email: value });
-            }
-          }}
-        />
-        <Input
-          className="min-w-0 flex-1 basis-36"
-          defaultValue={contact.phone ?? ""}
-          placeholder={t("detail.contactPhoneLabel")}
-          aria-label={t("detail.contactPhoneLabel")}
-          onChange={(event) => setPhoneDraft(event.target.value)}
-          onBlur={() => {
-            if (phoneDraft !== null && phoneDraft !== (contact.phone ?? "")) {
-              mutation.mutate({ phone: phoneDraft });
-            }
-          }}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={mutation.isPending}
-          onClick={() => mutation.mutate({ isPrimary: !contact.isPrimary })}
-        >
-          {contact.isPrimary ? t("detail.unsetPrimary") : t("detail.setPrimary")}
-        </Button>
-        {contact.isPrimary && <Badge variant="outline">{t("detail.primaryContact")}</Badge>}
-      </div>
+      {!editing && (
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+          <div className="flex min-w-0 flex-1 basis-48 flex-col">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-ink-strong">{contact.fullName}</span>
+              {contact.isPrimary && <Badge variant="outline">{t("detail.primaryContact")}</Badge>}
+            </span>
+            <span className="truncate text-caption text-ink-muted">
+              {[contact.email, contact.phone].filter(Boolean).join(" · ") ||
+                t("detail.noContactInfo")}
+            </span>
+          </div>
+          <div className="flex items-center gap-tight">
+            {!contact.isPrimary && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={mutation.isPending}
+                onClick={() => mutation.mutate({ isPrimary: true })}
+              >
+                {t("detail.setPrimary")}
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={t("detail.editContactFor", { name: contact.fullName })}
+              onClick={() => setEditing(true)}
+            >
+              {t("detail.editContact")}
+            </Button>
+          </div>
+        </div>
+      )}
+      {editing && (
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <Input
+            className="min-w-0 flex-1 basis-36"
+            defaultValue={contact.fullName}
+            aria-label={t("detail.contactFullNameLabel")}
+            onChange={(event) => setFullNameDraft(event.target.value)}
+            onBlur={() => {
+              const value = fullNameDraft?.trim();
+              if (value && fullNameDraft !== contact.fullName) {
+                mutation.mutate({ fullName: value });
+              }
+            }}
+          />
+          <Input
+            className="min-w-0 flex-[2] basis-48"
+            defaultValue={contact.email ?? ""}
+            placeholder={t("detail.contactEmailLabel")}
+            aria-label={t("detail.contactEmailLabel")}
+            onChange={(event) => setEmailDraft(event.target.value)}
+            onBlur={() => {
+              const value = emailDraft?.trim();
+              if (value && emailDraft !== (contact.email ?? "")) {
+                mutation.mutate({ email: value });
+              }
+            }}
+          />
+          <Input
+            className="min-w-0 flex-1 basis-36"
+            defaultValue={contact.phone ?? ""}
+            placeholder={t("detail.contactPhoneLabel")}
+            aria-label={t("detail.contactPhoneLabel")}
+            onChange={(event) => setPhoneDraft(event.target.value)}
+            onBlur={() => {
+              if (phoneDraft !== null && phoneDraft !== (contact.phone ?? "")) {
+                mutation.mutate({ phone: phoneDraft });
+              }
+            }}
+          />
+          {contact.isPrimary && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ isPrimary: false })}
+            >
+              {t("detail.unsetPrimary")}
+            </Button>
+          )}
+          <Button type="button" size="sm" onClick={() => setEditing(false)}>
+            {t("detail.doneEditing")}
+          </Button>
+        </div>
+      )}
       {mutation.isError && (
         <span role="alert" className="text-xs text-danger-foreground">
           {errorMessage(mutation.error, {
@@ -263,7 +308,7 @@ function ContactRow({ customerId, contact }: { customerId: string; contact: Cont
             <Badge variant="success">{t("detail.portalAccessGranted")}</Badge>
             <Button
               type="button"
-              variant="destructive"
+              variant="destructive-quiet"
               size="sm"
               disabled={revokeMutation.isPending}
               onClick={() => setConfirmRevokeOpen(true)}
@@ -965,7 +1010,7 @@ function AnonymizeCustomerCard({
       <p className="mt-2 text-sm text-ink-subtle">{t("detail.anonymizeDescription")}</p>
       <div className="mt-3">
         <Button
-          variant="destructive"
+          variant="destructive-quiet"
           size="sm"
           disabled={mutation.isPending}
           onClick={() => setConfirmOpen(true)}

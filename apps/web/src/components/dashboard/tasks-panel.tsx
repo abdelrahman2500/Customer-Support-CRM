@@ -11,6 +11,7 @@ import {
 import { useTaskReminders } from "@/hooks/use-task-reminders";
 import type { TaskPriority, TaskSummary } from "@/lib/tasks-api";
 import { TicketPriorityBadge } from "@/components/tickets/ticket-badges";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
   Alert,
@@ -111,6 +112,7 @@ function isOverdue(task: TaskSummary, now: Date): boolean {
  * `UnclaimedTicketRow`'s own Rules-of-Hooks convention. */
 function TaskRow({ task }: { task: TaskSummary }) {
   const t = useTranslations("dashboard");
+  const labels = useTicketLabels();
   // Story 194 (RD-1.17, recon RTL-02) — dates follow the UI locale, not the
   // browser's. Null-safe: outside a route (specs) the runtime default applies.
   const locale = useParams<{ locale?: string }>()?.locale;
@@ -143,7 +145,13 @@ function TaskRow({ task }: { task: TaskSummary }) {
         )}
       </span>
       <span className="flex items-center gap-2">
-        <TicketPriorityBadge priority={task.priority} />
+        {/* Demo hardening — like the board: a badge only for high and
+            urgent, a quiet label otherwise. */}
+        {task.priority === "HIGH" || task.priority === "URGENT" ? (
+          <TicketPriorityBadge priority={task.priority} />
+        ) : (
+          <span className="text-caption text-ink-subtle">{labels.priority(task.priority)}</span>
+        )}
         {isOverdue(task, now) && <Badge variant="destructive">{t("tasks.overdue")}</Badge>}
         <Button
           size="sm"
@@ -155,7 +163,7 @@ function TaskRow({ task }: { task: TaskSummary }) {
         </Button>
         <Button
           size="sm"
-          variant="destructive"
+          variant="destructive-quiet"
           disabled={deleteMutation.isPending}
           onClick={() => setConfirmDeleteOpen(true)}
         >
@@ -187,6 +195,7 @@ function TaskRow({ task }: { task: TaskSummary }) {
  * has no primitive at all.) */
 function AddTaskForm() {
   const t = useTranslations("dashboard");
+  const labels = useTicketLabels();
   const errorMessage = useErrorMessage();
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
@@ -232,11 +241,11 @@ function AddTaskForm() {
       </label>
       <label className="flex flex-col gap-1 text-xs text-ink-muted">
         {t("tasks.dueLabel")}
-        <input
+        {/* Demo hardening — the shared field, matching the title beside it. */}
+        <Input
           type="datetime-local"
           value={dueAt}
           onChange={(event) => setDueAt(event.target.value)}
-          className="flex h-9 rounded-md border border-rule-strong bg-surface px-3 py-1 text-sm shadow-sm transition-colors focus-ring"
         />
       </label>
       <label className="flex flex-col gap-1 text-xs text-ink-muted">
@@ -248,7 +257,8 @@ function AddTaskForm() {
           <SelectContent>
             {PRIORITIES.map((option) => (
               <SelectItem key={option} value={option}>
-                {option}
+                {/* Demo hardening — the localized label, never the raw enum. */}
+                {labels.priority(option)}
               </SelectItem>
             ))}
           </SelectContent>

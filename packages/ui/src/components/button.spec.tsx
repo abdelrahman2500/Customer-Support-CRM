@@ -24,6 +24,15 @@ describe("Button", () => {
     }
   });
 
+  // Demo hardening — a quiet destructive action: danger text, no solid fill.
+  it("renders destructive-quiet as danger text without the solid fill", () => {
+    render(<Button variant="destructive-quiet">Deactivate</Button>);
+
+    const button = screen.getByRole("button", { name: "Deactivate" });
+    expect(button).toHaveClass("text-danger-foreground");
+    expect(button).not.toHaveClass("bg-danger-solid");
+  });
+
   describe("loading state", () => {
     it("marks the button busy and disabled", () => {
       render(<Button isLoading>Save</Button>);

@@ -560,8 +560,11 @@
       "contactFullNameLabel": "الاسم",
       "contactEmailLabel": "البريد الإلكتروني",
       "contactPhoneLabel": "الهاتف",
-      "setPrimary": "تعيين كجهة اتصال أساسية",
-      "unsetPrimary": "إلغاء التعيين كأساسي",
+      "setPrimary": "تعيين جهة اتصال رئيسية",
+      "unsetPrimary": "إلغاء التعيين كرئيسية",
+      "editContact": "تعديل",
+      "editContactFor": "تعديل {name}",
+      "doneEditing": "تم",
       "addContactSubmit": "إضافة جهة اتصال",
       "addContactSubmitting": "جارٍ الإضافة...",
       "addContactFailed": "تعذّر إضافة جهة الاتصال. حاول مرة أخرى.",
@@ -1203,7 +1206,14 @@
       "empty": "لا يوجد استخدام للذكاء الاصطناعي حتى الآن.",
       "detail": "{calls} طلبات · {inputTokens} رمز إدخال / {outputTokens} رمز إخراج",
       "costUnknown": "التكلفة غير معروفة",
-      "unpricedWarning": "{count} طلب (طلبات) ناجحة استخدمت نموذجًا غير مدرج في جدول الأسعار واستُبعدت من إجمالي التكلفة."
+      "unpricedWarning": "{count} طلب (طلبات) ناجحة استخدمت نموذجًا غير مدرج في جدول الأسعار واستُبعدت من إجمالي التكلفة.",
+      "feature": {
+        "CHAT": "مساعد البوابة",
+        "SUMMARIZE": "ملخص التذكرة",
+        "SUGGEST_REPLY": "رد مقترح",
+        "CATEGORIZE": "اقتراح الفئة",
+        "SUGGEST_SOLUTIONS": "حلول مقترحة"
+      }
     },
     "ticketVolumeByCategory": {
       "heading": "حجم التذاكر حسب الفئة",

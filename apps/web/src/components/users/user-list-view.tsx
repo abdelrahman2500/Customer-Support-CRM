@@ -491,7 +491,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Story 98 — destructive, like its own confirmation. */}
                   <Button
-                    variant="destructive"
+                    variant="destructive-quiet"
                     size="sm"
                     disabled={newPasswordDraft.length < 8 || resetPasswordMutation.isPending}
                     onClick={() => setConfirmResetOpen(true)}
@@ -531,7 +531,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
                     {user.isActive ? t("list.active") : t("list.inactive")}
                   </Badge>
                   <Button
-                    variant={user.isActive ? "destructive" : "outline"}
+                    variant={user.isActive ? "destructive-quiet" : "outline"}
                     size="sm"
                     disabled={mutation.isPending}
                     onClick={handleToggleActiveClick}

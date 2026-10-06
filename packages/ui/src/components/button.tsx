@@ -44,6 +44,12 @@ export const buttonVariants = cva(
         link: "text-accent underline-offset-4 hover:underline",
         destructive:
           "bg-danger-solid text-danger-solid-foreground hover:bg-danger-solid-hover active:bg-danger-solid-hover",
+        // Demo hardening — a destructive action that is not the decision
+        // itself (it opens a confirmation): danger-coloured text that tints on
+        // hover, so a list of rows is not a column of solid red buttons. The
+        // confirmation keeps the solid `destructive` fill.
+        "destructive-quiet":
+          "text-danger-foreground hover:bg-danger-subtle active:bg-danger-subtle",
       },
       size: {
         // Story 185 (RD-1.8) — comfortable density: 40px default, 32px sm,

@@ -125,7 +125,7 @@ function QuickReplyRow({ quickReply }: { quickReply: QuickReplySummary }) {
         <div className="flex items-center gap-2">
           <ActiveBadge active={quickReply.isActive} activeLabel={t("active")} inactiveLabel={t("inactive")} />
           <Button
-            variant={quickReply.isActive ? "destructive" : "outline"}
+            variant={quickReply.isActive ? "destructive-quiet" : "outline"}
             size="sm"
             disabled={mutation.isPending}
             onClick={handleToggleActiveClick}

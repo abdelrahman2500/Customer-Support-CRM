@@ -233,7 +233,7 @@ function TemplateLifecycleToggle({ template }: { template: NotificationTemplateS
       <div className="flex items-center gap-2">
         <ActiveBadge active={template.isActive} activeLabel={t("active")} inactiveLabel={t("inactive")} />
         <Button
-          variant={template.isActive ? "destructive" : "outline"}
+          variant={template.isActive ? "destructive-quiet" : "outline"}
           size="sm"
           disabled={mutation.isPending}
           onClick={handleToggleActiveClick}

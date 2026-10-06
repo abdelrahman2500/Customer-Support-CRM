@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { SlaPolicyListView } from "./sla-policy-list-view";
 import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla-policies";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
+import { useDepartmentsQuery } from "@/hooks/use-tickets";
 import { ApiError } from "@/lib/api";
 
 const push = vi.fn();
@@ -24,6 +25,11 @@ vi.mock("@/hooks/use-sla-policies", () => ({
 
 vi.mock("@/hooks/use-ticket-categories", () => ({
   useTicketCategoriesQuery: vi.fn(),
+}));
+
+// Demo hardening — department names for the scope column.
+vi.mock("@/hooks/use-tickets", () => ({
+  useDepartmentsQuery: vi.fn(() => ({ data: [] })),
 }));
 
 const mockedUseSlaPoliciesQuery = vi.mocked(useSlaPoliciesQuery);
@@ -65,6 +71,7 @@ const basePolicy = {
 describe("SlaPolicyListView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useDepartmentsQuery).mockReturnValue({ data: [] } as never);
     mockedUseUpdateSlaPolicyMutation.mockReturnValue(mutationResult() as never);
     mockedUseTicketCategoriesQuery.mockReturnValue(
       queryResult({
@@ -127,6 +134,24 @@ describe("SlaPolicyListView", () => {
     expect(screen.getByDisplayValue("30")).toBeInTheDocument();
     expect(screen.getByDisplayValue("240")).toBeInTheDocument();
     expect(screen.getByText("list.active")).toBeInTheDocument();
+  });
+
+  // Demo hardening — names, not ids; long targets read as hours.
+  it("names the department and shows long targets in hours and minutes", () => {
+    vi.mocked(useDepartmentsQuery).mockReturnValue({
+      data: [{ id: "dept-1", branchId: "branch-1", name: "Support" }],
+    } as never);
+    mockedUseSlaPoliciesQuery.mockReturnValue(
+      queryResult({ isSuccess: true, data: [basePolicy] }) as never,
+    );
+
+    render(<SlaPolicyListView />);
+
+    expect(screen.getByText("Support")).toBeInTheDocument();
+    expect(screen.queryByText("dept-1")).not.toBeInTheDocument();
+    // 240 minutes reads as 4h 0m; 30 minutes needs no translation.
+    expect(screen.getByText('hoursMinutes:{"hours":4,"minutes":0}')).toBeInTheDocument();
+    expect(screen.queryByText(/hoursMinutes:{"hours":0/)).not.toBeInTheDocument();
   });
 
   it("falls back to the placeholder labels for unscoped fields", () => {

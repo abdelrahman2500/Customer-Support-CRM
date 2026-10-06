@@ -156,7 +156,7 @@ function KbCategoryRow({ category }: { category: KbCategory }) {
         <div className="flex items-center gap-2">
           <ActiveBadge active={category.isActive} activeLabel={t("active")} inactiveLabel={t("inactive")} />
           <Button
-            variant={category.isActive ? "destructive" : "outline"}
+            variant={category.isActive ? "destructive-quiet" : "outline"}
             size="sm"
             disabled={mutation.isPending}
             onClick={handleToggleActiveClick}

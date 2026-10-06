@@ -219,8 +219,10 @@ describe("CustomerDetailView", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Acme Inc." })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "detail.displayNameEdit" })).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Acme Inc.")).not.toBeInTheDocument();
-    expect(screen.getByDisplayValue("Jane Doe")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("jane@acme.test")).toBeInTheDocument();
+    // Demo hardening — contacts read as text too, edited behind Edit.
+    expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    expect(screen.getByText(/jane@acme.test/)).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Jane Doe")).not.toBeInTheDocument();
     // "detail.primaryContact" also labels the add-contact form's checkbox —
     // scope to the contacts list to assert the row's own primary badge.
     expect(within(screen.getByRole("list")).getByText("detail.primaryContact")).toBeInTheDocument();
@@ -664,12 +666,61 @@ describe("CustomerDetailView", () => {
       mockedUseUpdateContactMutation.mockReturnValue(idleMutation({ mutate }) as never);
 
       render(<CustomerDetailView customerId="customer-1" />);
+      // Demo hardening — contacts are edited after "Edit".
+      fireEvent.click(screen.getByRole("button", { name: /detail.editContactFor/ }));
       const input = screen.getByDisplayValue("Jane Doe");
       fireEvent.change(input, { target: { value: "Jane Smith" } });
       fireEvent.blur(input);
 
       expect(mockedUseUpdateContactMutation).toHaveBeenCalledWith("customer-1", "contact-1");
       expect(mutate).toHaveBeenCalledWith({ fullName: "Jane Smith" });
+    });
+
+    // Demo hardening — read-only until "Edit"; primary is one clear action.
+    it("shows a contact as text, with Edit opening its fields and Done closing them", () => {
+      render(<CustomerDetailView customerId="customer-1" />);
+
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+      expect(screen.getByText("jane@acme.test")).toBeInTheDocument();
+      expect(screen.queryByDisplayValue("Jane Doe")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /detail.editContactFor/ }));
+      expect(screen.getByDisplayValue("Jane Doe")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "detail.doneEditing" }));
+      expect(screen.queryByDisplayValue("Jane Doe")).not.toBeInTheDocument();
+    });
+
+    it("offers only Remove as primary, while editing, on the primary contact", () => {
+      const mutate = vi.fn();
+      mockedUseUpdateContactMutation.mockReturnValue(idleMutation({ mutate }) as never);
+      mockedUseCustomerQuery.mockReturnValue(
+        queryResult({
+          isSuccess: true,
+          data: {
+            id: "customer-1",
+            displayName: "Acme Inc.",
+            isActive: true,
+            contacts: [
+              {
+                id: "contact-1",
+                fullName: "Jane Doe",
+                email: "jane@acme.test",
+                phone: null,
+                isPrimary: true,
+              },
+            ],
+          },
+        }) as never,
+      );
+
+      render(<CustomerDetailView customerId="customer-1" />);
+      expect(screen.queryByText("detail.setPrimary")).not.toBeInTheDocument();
+      expect(screen.queryByText("detail.unsetPrimary")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /detail.editContactFor/ }));
+      fireEvent.click(screen.getByText("detail.unsetPrimary"));
+
+      expect(mutate).toHaveBeenCalledWith({ isPrimary: false });
     });
 
     it("toggles a contact's primary flag via the real PATCH contact mutation", () => {
@@ -921,7 +972,14 @@ describe("CustomerDetailView", () => {
       render(<CustomerDetailView customerId="customer-1" />);
 
       expect(screen.getByText("detail.portalAccessGranted")).toBeInTheDocument();
-      expect(screen.getByText("detail.revokePortalAccessSubmit")).toHaveClass("bg-danger-solid");
+      // Demo hardening — a quiet destructive trigger (danger text, no solid
+      // fill); its confirmation dialog keeps the solid destructive action.
+      expect(screen.getByText("detail.revokePortalAccessSubmit")).toHaveClass(
+        "text-danger-foreground",
+      );
+      expect(screen.getByText("detail.revokePortalAccessSubmit")).not.toHaveClass(
+        "bg-danger-solid",
+      );
     });
 
     it("clicking revoke opens a confirmation dialog rather than committing immediately", () => {
@@ -1254,8 +1312,13 @@ describe("CustomerDetailView", () => {
 
       render(<CustomerDetailView customerId="customer-1" />);
 
-      expect(screen.getByRole("button", { name: "detail.anonymizeSubmit" })).toHaveClass(
+      // Demo hardening — a quiet destructive trigger (danger text, no solid
+      // fill); its confirmation dialog keeps the solid destructive action.
+      expect(screen.getByRole("button", { name: "detail.anonymizeSubmit" })).not.toHaveClass(
         "bg-danger-solid",
+      );
+      expect(screen.getByRole("button", { name: "detail.anonymizeSubmit" })).toHaveClass(
+        "text-danger-foreground",
       );
     });
 

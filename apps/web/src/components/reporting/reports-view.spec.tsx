@@ -783,7 +783,9 @@ describe("ReportsView", () => {
       expect(
         screen.getByText('aiUsage.detail:{"calls":5,"inputTokens":1000,"outputTokens":500}'),
       ).toBeInTheDocument();
-      expect(screen.getByText("SUMMARIZE")).toBeInTheDocument();
+      // Demo hardening — the feature's localized name, never the enum.
+      expect(screen.getByText("aiUsage.feature.SUMMARIZE")).toBeInTheDocument();
+      expect(screen.queryByText("SUMMARIZE")).not.toBeInTheDocument();
       expect(screen.queryByText('aiUsage.unpricedWarning:{"count":0}')).not.toBeInTheDocument();
     });
 

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useSlaPoliciesQuery, useUpdateSlaPolicyMutation } from "@/hooks/use-sla-policies";
 import { useTicketCategoriesQuery } from "@/hooks/use-ticket-categories";
+import { useDepartmentsQuery } from "@/hooks/use-tickets";
 import type { SlaPolicySummary } from "@/lib/sla-policies-api";
 import { useErrorMessage } from "@/hooks/use-error-message";
 import {
@@ -48,6 +49,13 @@ export function SlaPolicyListView() {
     }
     return map;
   }, [categoriesQuery.data]);
+  // Demo hardening — a department's name, not its id.
+  const departmentsQuery = useDepartmentsQuery();
+  const departmentNameById = useMemo(
+    () =>
+      new Map((departmentsQuery.data ?? []).map((department) => [department.id, department.name])),
+    [departmentsQuery.data],
+  );
 
   return (
     <section className="flex flex-col gap-4">
@@ -103,7 +111,12 @@ export function SlaPolicyListView() {
           </TableHeader>
           <TableBody>
             {(policiesQuery.data ?? []).map((policy) => (
-              <SlaPolicyRow key={policy.id} policy={policy} categoryNameById={categoryNameById} />
+              <SlaPolicyRow
+                key={policy.id}
+                policy={policy}
+                categoryNameById={categoryNameById}
+                departmentNameById={departmentNameById}
+              />
             ))}
           </TableBody>
         </Table>
@@ -122,11 +135,14 @@ export function SlaPolicyListView() {
 function SlaPolicyRow({
   policy,
   categoryNameById,
+  departmentNameById,
 }: {
   policy: SlaPolicySummary;
   categoryNameById: Map<string, string>;
+  departmentNameById: Map<string, string>;
 }) {
   const t = useTranslations("slaPolicies");
+  const readableMinutes = useReadableMinutes();
   const errorMessage = useErrorMessage();
   const mutation = useUpdateSlaPolicyMutation(policy.id);
 
@@ -180,7 +196,9 @@ function SlaPolicyRow({
     <TableRow>
       {/* Story 150 — labels reuse each column's own header key. */}
       <TableCell label={t("list.columns.department")} className="text-ink-subtle">
-        {policy.departmentId ?? t("list.noDepartment")}
+        {policy.departmentId
+          ? (departmentNameById.get(policy.departmentId) ?? policy.departmentId)
+          : t("list.noDepartment")}
       </TableCell>
       <TableCell label={t("list.columns.category")} className="text-ink-subtle">
         {policy.categoryId
@@ -195,26 +213,32 @@ function SlaPolicyRow({
         )}
       </TableCell>
       <TableCell label={t("list.columns.responseTarget")}>
-        <Input
-          type="number"
-          min={1}
-          className="w-24"
-          value={responseDraft}
-          aria-label={t("list.columns.responseTarget")}
-          onChange={(event) => setResponseDraft(event.target.value)}
-          onBlur={commitResponseTarget}
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={1}
+            className="w-24"
+            value={responseDraft}
+            aria-label={t("list.columns.responseTarget")}
+            onChange={(event) => setResponseDraft(event.target.value)}
+            onBlur={commitResponseTarget}
+          />
+          <span className="text-caption text-ink-subtle">{readableMinutes(responseDraft)}</span>
+        </div>
       </TableCell>
       <TableCell label={t("list.columns.resolutionTarget")}>
-        <Input
-          type="number"
-          min={1}
-          className="w-24"
-          value={resolutionDraft}
-          aria-label={t("list.columns.resolutionTarget")}
-          onChange={(event) => setResolutionDraft(event.target.value)}
-          onBlur={commitResolutionTarget}
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={1}
+            className="w-24"
+            value={resolutionDraft}
+            aria-label={t("list.columns.resolutionTarget")}
+            onChange={(event) => setResolutionDraft(event.target.value)}
+            onBlur={commitResolutionTarget}
+          />
+          <span className="text-caption text-ink-subtle">{readableMinutes(resolutionDraft)}</span>
+        </div>
       </TableCell>
       <TableCell label={t("list.columns.status")}>
         <div className="flex items-center gap-2">
@@ -224,7 +248,7 @@ function SlaPolicyRow({
             inactiveLabel={t("list.inactive")}
           />
           <Button
-            variant={policy.isActive ? "destructive" : "outline"}
+            variant={policy.isActive ? "destructive-quiet" : "outline"}
             size="sm"
             disabled={mutation.isPending}
             onClick={handleToggleActiveClick}
@@ -252,4 +276,16 @@ function SlaPolicyRow({
       </TableCell>
     </TableRow>
   );
+}
+
+/** Demo hardening — a minute count an hour or longer, read as hours and
+ * minutes ("1440" → "24h 0m") beside the field that holds it; empty below an
+ * hour, where the number already reads plainly. */
+function useReadableMinutes() {
+  const t = useTranslations("common.duration");
+  return (draft: string): string => {
+    const minutes = Number(draft);
+    if (!Number.isInteger(minutes) || minutes < 60) return "";
+    return t("hoursMinutes", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
+  };
 }

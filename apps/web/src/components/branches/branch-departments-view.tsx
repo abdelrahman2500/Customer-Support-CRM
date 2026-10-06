@@ -141,7 +141,7 @@ function MyBranchFields({ branch }: { branch: ManagedBranch }) {
       <div className="flex items-center gap-2">
         <ActiveBadge active={branch.isActive} activeLabel={t("myBranch.active")} inactiveLabel={t("myBranch.inactive")} />
         <Button
-          variant={branch.isActive ? "destructive" : "outline"}
+          variant={branch.isActive ? "destructive-quiet" : "outline"}
           size="sm"
           disabled={mutation.isPending}
           onClick={handleToggleActiveClick}
@@ -278,7 +278,7 @@ function DepartmentRow({ department }: { department: ManagedDepartment }) {
         <div className="flex items-center gap-2">
           <ActiveBadge active={department.isActive} activeLabel={t("departments.active")} inactiveLabel={t("departments.inactive")} />
           <Button
-            variant={department.isActive ? "destructive" : "outline"}
+            variant={department.isActive ? "destructive-quiet" : "outline"}
             size="sm"
             disabled={mutation.isPending}
             onClick={handleToggleActiveClick}
