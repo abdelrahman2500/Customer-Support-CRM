@@ -176,11 +176,12 @@ describe("WorkspaceSidebar", () => {
 
   // Story 196 (RD-2.2) — the design language's navigation sizes and labels.
   describe("rail presentation (Story 196)", () => {
-    it("draws rail icons at 20px and styles group headings as labels", () => {
+    // Final UX pass — 18px, to weigh what the 14px label does.
+    it("draws rail icons at 18px and styles group headings as labels", () => {
       renderSidebar();
 
       const link = screen.getByRole("link", { name: "nav.tickets" });
-      expect(link.querySelector("svg")).toHaveClass("h-5", "w-5");
+      expect(link.querySelector("svg")).toHaveClass("h-[18px]", "w-[18px]");
       const heading = screen.getByText("nav.groups.work");
       expect(heading).toHaveClass("text-label");
       expect(heading).not.toHaveClass("uppercase");

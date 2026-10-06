@@ -420,9 +420,14 @@ export function NavItemLabel({
   return (
     <>
       <Icon
-        // Story 196 (RD-2.2) — the design language's icon sizes: 20px on a
-        // navigation surface (the rail), 16px in an inline menu row.
-        className={inMenu ? "h-4 w-4 shrink-0 -ms-4 me-4" : "h-5 w-5 shrink-0"}
+        // Story 196 (RD-2.2) — 16px in an inline menu row, a step larger on
+        // the rail. Final UX pass — 18px (not 20) on the rail so the glyph
+        // weighs what the 14px label beside it does, one lighter stroke for
+        // every nav icon, and no negative margins: the row's own gap places
+        // the icon (`-ms-4 me-4` pushed it onto the menu's edge with a 24px
+        // gap after it, in both directions).
+        strokeWidth={1.75}
+        className={inMenu ? "h-4 w-4 shrink-0 text-ink-subtle" : "h-[18px] w-[18px] shrink-0"}
         aria-hidden
       />
       <span className={labelClassName}>{t(item.labelKey)}</span>

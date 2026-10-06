@@ -112,7 +112,13 @@ export function WorkspaceNavbar({
                 const href = `/${locale}/${item.href}`;
                 const isActive = isNavItemActive(pathname, href);
                 return (
-                  <DropdownMenuItem key={item.href} asChild>
+                  <DropdownMenuItem
+                    key={item.href}
+                    asChild
+                    // Final UX pass — the page you are on is marked in its menu
+                    // too: the accent tint and an accent icon.
+                    className="aria-[current=page]:bg-accent-surface aria-[current=page]:font-medium aria-[current=page]:text-accent-hover [&[aria-current=page]_svg]:text-accent"
+                  >
                     <Link href={href} aria-current={isActive ? "page" : undefined}>
                       <NavItemLabel
                         item={item}

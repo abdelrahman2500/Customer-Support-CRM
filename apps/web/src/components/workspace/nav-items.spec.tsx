@@ -144,21 +144,27 @@ describe("NavItemLabel is data-fetching free (regression guard)", () => {
     ).not.toThrow();
   });
 
-  it("applies the pulled-in icon spacing only inside a menu", () => {
+  // Final UX pass — no negative margins anywhere (they pushed the icon onto
+  // the menu edge); the row's gap places it. One stroke weight for all.
+  it("sizes the icon for its surface, with no pulled-in margins", () => {
     const t = ((key: string) => key) as never;
 
     const inMenu = render(
       <NavItemLabel item={item} t={t} unreadCount={0} unreadCountKnown={false} inMenu />,
     );
-    expect(inMenu.container.querySelector("svg")).toHaveClass("-ms-4", "me-4");
+    const menuIcon = inMenu.container.querySelector("svg");
+    expect(menuIcon).toHaveClass("h-4", "w-4", "text-ink-subtle");
+    expect(menuIcon).not.toHaveClass("-ms-4");
+    expect(menuIcon).toHaveAttribute("stroke-width", "1.75");
     inMenu.unmount();
 
     const inRail = render(
       <NavItemLabel item={item} t={t} unreadCount={0} unreadCountKnown={false} />,
     );
     const icon = inRail.container.querySelector("svg");
+    expect(icon).toHaveClass("h-[18px]", "w-[18px]");
     expect(icon).not.toHaveClass("-ms-4");
-    expect(icon).not.toHaveClass("me-4");
+    expect(icon).toHaveAttribute("stroke-width", "1.75");
   });
 });
 

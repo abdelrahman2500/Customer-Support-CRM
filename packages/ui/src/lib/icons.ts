@@ -82,9 +82,12 @@ export {
   // `rtl:` flip — a plain pictogram reads the same in both directions.
   LayoutDashboard as DashboardIcon,
   Ticket as TicketsIcon,
-  Contact as CustomersIcon,
+  // Final UX pass — customers are organisations (a briefcase, not a
+  // contact card); KB categories are folders of articles (not a second tag
+  // beside Ticket Categories); "My Account" is the person, not a monitor.
+  BriefcaseBusiness as CustomersIcon,
   BookOpen as KnowledgeBaseIcon,
-  Tags as KbCategoriesIcon,
+  FolderOpen as KbCategoriesIcon,
   Bell as NotificationsIcon,
   Timer as SlaPoliciesIcon,
   Tag as TicketCategoriesIcon,
@@ -99,7 +102,7 @@ export {
   Webhook as WebhookSubscriptionsIcon,
   KeyRound as ApiKeysIcon,
   Settings as SettingsIcon,
-  Monitor as MySessionsIcon,
+  CircleUserRound as MySessionsIcon,
 
   // Story 129 — the Agent Workspace sidebar's collapse-to-icons toggle.
   // Named by its role (collapsing the rail) rather than by the glyph, per
