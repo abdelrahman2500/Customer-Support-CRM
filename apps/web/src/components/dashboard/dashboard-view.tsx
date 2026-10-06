@@ -126,7 +126,7 @@ function UnclaimedTicketRow({
           className="focus-ring w-fit max-w-full break-words rounded-sm font-medium text-ink-strong hover:underline"
           onClick={(event) => event.stopPropagation()}
         >
-          {ticket.subject}
+          <bdi>{ticket.subject}</bdi>
         </Link>
         <Link
           href={`/${locale}/customers/${ticket.customerId}`}
@@ -438,7 +438,7 @@ export function DashboardView({ userId }: { userId: string }) {
                     className="focus-ring w-fit rounded-sm font-medium text-ink-strong hover:underline"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    {ticket.subject}
+                    <bdi>{ticket.subject}</bdi>
                   </Link>
                   <Link
                     href={`/${locale}/customers/${ticket.customerId}`}

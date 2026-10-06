@@ -101,7 +101,7 @@ export function CustomerContextPanel({
               href={`/${locale}/customers/${customerId}`}
               className="focus-ring min-w-0 truncate rounded-inner font-medium text-ink-strong hover:underline"
             >
-              {customer.displayName}
+              <bdi>{customer.displayName}</bdi>
             </Link>
             <span className="self-start">
               {customer.anonymizedAt ? (
@@ -156,7 +156,7 @@ export function CustomerContextPanel({
                   href={`/${locale}/tickets/${ticket.id}`}
                   className="focus-ring min-w-0 truncate rounded-inner font-medium text-ink-strong hover:underline"
                 >
-                  {ticket.subject}
+                  <bdi>{ticket.subject}</bdi>
                 </Link>
                 <span className="flex flex-wrap items-center gap-1">
                   <TicketStatusBadge status={ticket.status} />

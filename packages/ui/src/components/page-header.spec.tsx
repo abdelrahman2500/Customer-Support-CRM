@@ -24,6 +24,13 @@ describe("PageHeader", () => {
     expect(heading).not.toHaveClass("text-lg");
   });
 
+  it("isolates the title, which is often user text in the other direction (Story 233)", () => {
+    render(<PageHeader title="Invoice for March?" />);
+
+    const heading = screen.getByRole("heading", { level: 1, name: "Invoice for March?" });
+    expect(heading.firstElementChild?.tagName).toBe("BDI");
+  });
+
   it("renders inside a header landmark", () => {
     render(<PageHeader title="Tickets" />);
 

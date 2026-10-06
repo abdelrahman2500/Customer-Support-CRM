@@ -93,9 +93,16 @@ export function PageHeader({
     <>
       <div className="min-w-0">
         {headingLevel === 1 ? (
-          <h1 className="text-title text-ink">{title}</h1>
+          <h1 className="text-title text-ink">
+            {/* Story 233 — a title is often user text (a ticket subject, an
+                article or customer name): isolated, so its punctuation
+                stays put in the other direction. */}
+            <bdi>{title}</bdi>
+          </h1>
         ) : (
-          <h2 className="text-heading text-ink">{title}</h2>
+          <h2 className="text-heading text-ink">
+            <bdi>{title}</bdi>
+          </h2>
         )}
         {description && <p className="mt-1 text-sm text-ink-subtle">{description}</p>}
         {meta && (

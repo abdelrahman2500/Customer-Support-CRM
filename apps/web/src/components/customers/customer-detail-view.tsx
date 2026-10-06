@@ -649,7 +649,9 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
           <Avatar name={customer.displayName} size="lg" decorative />
           {editingName ? (
             <>
-              <h1 className="sr-only">{customer.displayName}</h1>
+              <h1 className="sr-only">
+                <bdi>{customer.displayName}</bdi>
+              </h1>
               <Input
                 autoFocus
                 className="w-full sm:w-56 text-title"
@@ -684,7 +686,9 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
             </>
           ) : (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="text-title text-ink">{customer.displayName}</h1>
+              <h1 className="text-title text-ink">
+                <bdi>{customer.displayName}</bdi>
+              </h1>
               <Button
                 type="button"
                 variant="ghost"
@@ -803,7 +807,7 @@ export function CustomerDetailView({ customerId }: { customerId: string }) {
                       className="focus-ring min-w-0 break-words rounded-sm font-medium text-ink-strong hover:underline"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      {ticket.subject}
+                      <bdi>{ticket.subject}</bdi>
                     </Link>
                     <span className="flex flex-wrap items-center gap-2">
                       <TicketStatusBadge status={ticket.status} />

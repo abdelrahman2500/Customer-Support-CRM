@@ -152,7 +152,7 @@ export function ArticleListView() {
                   href={`/${locale}/knowledge-base/${article.id}`}
                   className="focus-ring min-w-0 break-words rounded-sm font-semibold text-ink-strong after:absolute after:inset-0 after:rounded-surface hover:underline"
                 >
-                  {article.title}
+                  <bdi>{article.title}</bdi>
                 </Link>
                 <p className="line-clamp-2 text-ink-muted">
                   {article.body.slice(0, EXCERPT_LENGTH)}

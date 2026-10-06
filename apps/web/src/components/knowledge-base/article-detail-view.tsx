@@ -207,7 +207,9 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         {editingTitle ? (
           <>
-            <h1 className="sr-only">{article.title}</h1>
+            <h1 className="sr-only">
+              <bdi>{article.title}</bdi>
+            </h1>
             <Input
               autoFocus
               className="w-full max-w-md text-title"
@@ -242,7 +244,9 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
           </>
         ) : (
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-title text-ink">{article.title}</h1>
+            <h1 className="text-title text-ink">
+              <bdi>{article.title}</bdi>
+            </h1>
             <Button
               type="button"
               variant="ghost"
@@ -478,7 +482,9 @@ function ArticleReadView({
           <p className="whitespace-pre-wrap text-body-lg text-ink">{arabic.body}</p>
         </div>
       ) : (
-        <p className="max-w-prose whitespace-pre-wrap text-body-lg text-ink">{body}</p>
+        <p dir="auto" className="max-w-prose whitespace-pre-wrap text-body-lg text-ink">
+          {body}
+        </p>
       )}
     </article>
   );

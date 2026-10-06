@@ -202,7 +202,9 @@ export function TicketHeader({
             on which mode is active. */}
           {editingSubject ? (
             <>
-              <h1 className="sr-only">{ticket.subject}</h1>
+              <h1 className="sr-only">
+                <bdi>{ticket.subject}</bdi>
+              </h1>
               <Input
                 autoFocus
                 className="w-full max-w-xl text-title"
@@ -236,7 +238,9 @@ export function TicketHeader({
             </>
           ) : (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="min-w-0 break-words text-title text-ink">{ticket.subject}</h1>
+              <h1 className="min-w-0 break-words text-title text-ink">
+                <bdi>{ticket.subject}</bdi>
+              </h1>
               <Button
                 type="button"
                 variant="ghost"

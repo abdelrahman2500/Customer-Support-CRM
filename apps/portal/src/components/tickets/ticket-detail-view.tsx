@@ -277,7 +277,11 @@ function CsatSection({ ticketId }: { ticketId: string }) {
           <span className="font-medium text-ink-strong">
             {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
           </span>
-          {csatQuery.data.comment && <p className="text-ink-muted">{csatQuery.data.comment}</p>}
+          {csatQuery.data.comment && (
+            <p dir="auto" className="text-ink-muted">
+              {csatQuery.data.comment}
+            </p>
+          )}
           <p className="text-ink-subtle">{t("detail.csatSubmitted")}</p>
         </div>
       )}

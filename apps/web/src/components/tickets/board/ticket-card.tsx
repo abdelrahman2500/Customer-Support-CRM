@@ -88,7 +88,7 @@ export function TicketCard({
         title={ticket.subject}
         className="focus-ring line-clamp-2 rounded-inner font-medium text-ink-strong after:absolute after:inset-0 after:rounded-surface after:content-[''] hover:text-ink"
       >
-        {ticket.subject}
+        <bdi>{ticket.subject}</bdi>
       </Link>
 
       <p className="min-w-0 truncate text-caption text-ink-muted">

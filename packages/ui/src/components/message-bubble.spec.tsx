@@ -64,8 +64,15 @@ describe("MessageBubble", () => {
     expect(screen.getByText("09:00").parentElement).toHaveTextContent(
       "Internal note · Jane Agent · 09:00",
     );
-    // The sender is its own element, so it can be found on its own.
-    expect(screen.getByText("Jane Agent").tagName).toBe("SPAN");
+    // The sender is its own element, so it can be found on its own —
+    // Story 233: a `<bdi>`, isolating a name written in the other direction.
+    expect(screen.getByText("Jane Agent").tagName).toBe("BDI");
+  });
+
+  it("lets a message take its direction from its own text (Story 233)", () => {
+    renderBubble({});
+
+    expect(screen.getByText("Hello there")).toHaveAttribute("dir", "auto");
   });
 
   it("keeps the avatar decorative and uses logical classes only", () => {

@@ -68,7 +68,11 @@ export function MessageBubble({
           align === "end" ? "items-end" : "items-start",
         )}
       >
+        {/* Story 233 — `dir="auto"`: a message takes its direction from
+            its own text, so an English reply in the Arabic UI (and the
+            reverse) keeps its punctuation at the right end. */}
         <div
+          dir="auto"
           className={cn(
             "rounded-surface px-3 py-2 text-sm whitespace-pre-wrap break-words",
             // `text-accent-foreground`: the token defined as "text on top of
@@ -84,7 +88,7 @@ export function MessageBubble({
         </div>
         <span className="text-xs text-ink-subtle">
           {label && <>{label} · </>}
-          <span>{sender}</span> ·{" "}
+          <bdi>{sender}</bdi> ·{" "}
           <time dateTime={at} title={dateTimeLabel}>
             {timeLabel}
           </time>

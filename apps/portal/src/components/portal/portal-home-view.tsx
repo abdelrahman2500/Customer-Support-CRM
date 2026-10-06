@@ -244,7 +244,7 @@ export function PortalHomeView() {
                       />
                       <span className="flex min-w-0 flex-col">
                         <span className="break-words font-medium text-ink-strong group-hover:underline">
-                          {article.title}
+                          <bdi>{article.title}</bdi>
                         </span>
                         <span className="text-caption text-ink-subtle">
                           {article.categoryName ?? tKnowledgeBase("list.noCategory")}

@@ -809,7 +809,9 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                   {t("detail.csatRatingLabel", { rating: csatQuery.data.rating })}
                 </span>
                 {csatQuery.data.comment && (
-                  <p className="text-ink-strong">{csatQuery.data.comment}</p>
+                  <p dir="auto" className="text-ink-strong">
+                    {csatQuery.data.comment}
+                  </p>
                 )}
               </div>
             )}

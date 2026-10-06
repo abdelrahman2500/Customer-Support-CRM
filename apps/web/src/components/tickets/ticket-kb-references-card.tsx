@@ -179,7 +179,9 @@ function AttachArticleForm({ ticketId }: { ticketId: string }) {
             const attaching = mutation.isPending && mutation.variables?.articleId === article.id;
             return (
               <li key={article.id} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate text-ink-strong">{article.title}</span>
+                <span className="min-w-0 truncate text-ink-strong">
+                  <bdi>{article.title}</bdi>
+                </span>
                 <Button
                   type="button"
                   variant="outline"

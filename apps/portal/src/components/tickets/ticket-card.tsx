@@ -24,7 +24,9 @@ export function TicketCard({ ticket, locale }: { ticket: PortalTicketSummary; lo
     >
       {/* `break-words`: a subject is free text the customer typed, and one
           long unbreakable word must wrap rather than widen the card. */}
-      <span className="min-w-0 break-words font-medium text-ink-strong">{ticket.subject}</span>
+      <span className="min-w-0 break-words font-medium text-ink-strong">
+        <bdi>{ticket.subject}</bdi>
+      </span>
       <span className="flex flex-wrap items-center gap-2 text-caption text-ink-subtle">
         <TicketStatusBadge status={ticket.status} />
         <span>{formatDate(ticket.createdAt, locale)}</span>

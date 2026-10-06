@@ -90,7 +90,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
             <p className="mb-2 text-caption font-medium text-accent">{article.categoryName}</p>
           )}
           <PageHeader title={article.title} />
-          <div className="mt-4 whitespace-pre-wrap text-body-lg text-ink-strong">
+          <div dir="auto" className="mt-4 whitespace-pre-wrap text-body-lg text-ink-strong">
             {article.body}
           </div>
         </article>

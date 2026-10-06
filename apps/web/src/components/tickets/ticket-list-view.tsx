@@ -319,7 +319,7 @@ function TicketListViewContent({ viewSwitcher }: { viewSwitcher?: ReactNode }) {
                     className="focus-ring rounded-sm hover:underline"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    {ticket.subject}
+                    <bdi>{ticket.subject}</bdi>
                   </Link>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs font-normal text-ink-subtle">
                     <span className="font-mono">{ticket.id.slice(0, 8)}</span>

@@ -288,7 +288,7 @@ function ArticleRow({ article }: { article: ArticleListItem }) {
           href={`/${locale}/knowledge-base/${article.id}`}
           className="focus-ring rounded-sm text-start font-medium text-ink-strong hover:underline"
         >
-          {article.title}
+          <bdi>{article.title}</bdi>
         </Link>
       </TableCell>
       <TableCell label={t("list.columns.category")} className="text-ink-subtle">

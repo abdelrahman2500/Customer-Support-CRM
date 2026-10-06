@@ -235,7 +235,7 @@ function CustomerListViewContent() {
                       className="focus-ring min-w-0 break-words rounded-sm hover:underline"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      {customer.displayName}
+                      <bdi>{customer.displayName}</bdi>
                     </Link>
                   </span>
                 </TableCell>
