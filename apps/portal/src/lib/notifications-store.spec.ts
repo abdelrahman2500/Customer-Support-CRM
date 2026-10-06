@@ -4,7 +4,7 @@ import { usePortalNotificationsStore } from "./notifications-store";
 describe("usePortalNotificationsStore", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    usePortalNotificationsStore.setState({ notifications: [] });
+    usePortalNotificationsStore.setState({ notifications: [], recentKeys: {} });
   });
 
   afterEach(() => {
@@ -61,5 +61,62 @@ describe("usePortalNotificationsStore", () => {
     expect(
       notifications.some((n) => "ticketId" in n.payload && n.payload.ticketId === "ticket-0"),
     ).toBe(false);
+  });
+});
+
+// Demo hardening — one toast per event, and only for an agent's reply.
+describe("usePortalNotificationsStore — deduplication", () => {
+  const reply = {
+    ticketId: "ticket-1",
+    message: { id: "message-1", body: "We're on it", senderUserId: "user-1" },
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    usePortalNotificationsStore.setState({ notifications: [], recentKeys: {} });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows a reply once when it arrives through both rooms and again for each delivery status", () => {
+    const { add } = usePortalNotificationsStore.getState();
+    add("channel.message.created", reply);
+    add("channel.message.created", reply);
+    vi.advanceTimersByTime(3_000);
+    add("channel.message.created", reply);
+
+    expect(usePortalNotificationsStore.getState().notifications).toHaveLength(1);
+  });
+
+  it("still shows a different reply", () => {
+    const { add } = usePortalNotificationsStore.getState();
+    add("channel.message.created", reply);
+    add("channel.message.created", { ...reply, message: { ...reply.message, id: "message-2" } });
+
+    expect(usePortalNotificationsStore.getState().notifications).toHaveLength(2);
+  });
+
+  it("does not show the customer's own message as a reply", () => {
+    usePortalNotificationsStore.getState().add("channel.message.created", {
+      ...reply,
+      message: { ...reply.message, senderUserId: null },
+    });
+
+    expect(usePortalNotificationsStore.getState().notifications).toHaveLength(0);
+  });
+
+  it("shows a ticket update once when it arrives twice, and a later change again", () => {
+    const { add } = usePortalNotificationsStore.getState();
+    const update = {
+      ticket: { id: "ticket-1", subject: "Cannot log in", status: "IN_PROGRESS" },
+      actorUserId: "user-1",
+    };
+    add("ticket.updated", update);
+    add("ticket.updated", update);
+    add("ticket.updated", { ...update, ticket: { ...update.ticket, status: "RESOLVED" } });
+
+    expect(usePortalNotificationsStore.getState().notifications).toHaveLength(2);
   });
 });

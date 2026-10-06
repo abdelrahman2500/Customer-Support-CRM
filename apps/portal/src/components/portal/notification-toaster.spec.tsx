@@ -39,8 +39,9 @@ describe("NotificationToaster", () => {
     expect(list).toHaveAttribute("aria-live", "polite");
     expect(within(list).queryAllByRole("listitem")).toHaveLength(0);
     // 320px-safe position (recon RS-01): a gutter on both edges on phones,
-    // a 24rem column at the end edge from sm.
-    expect(region).toHaveClass("inset-x-4", "sm:end-4", "sm:w-96", "top-4");
+    // a 24rem column at the end edge from sm. Demo hardening — at the bottom,
+    // clear of the header and the open ticket's heading.
+    expect(region).toHaveClass("inset-x-4", "sm:end-4", "sm:w-96", "bottom-4");
     expect(region).not.toHaveClass("w-full");
   });
 

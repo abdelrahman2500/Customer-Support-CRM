@@ -137,7 +137,8 @@ describe("PortalNotifications", () => {
     act(() => {
       socket._trigger("channel.message.created", {
         ticketId: "ticket-1",
-        message: { id: "msg-1", body: "We're looking into this." },
+        // An agent's reply — the relay only sends those (senderUserId set).
+        message: { id: "msg-1", body: "We're looking into this.", senderUserId: "user-1" },
       });
     });
 

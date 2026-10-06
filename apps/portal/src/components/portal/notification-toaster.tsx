@@ -47,7 +47,7 @@ function ticketIdFor(notification: PortalNotification): string {
  * Story 86 — renders the Customer Portal's transient notification stack,
  * mirroring `apps/web`'s `NotificationToaster` shape exactly: mounted
  * once alongside `usePortalNotifications` (see `PortalNotifications`),
- * fixed to a corner using logical (RTL-safe) positioning (`top-*`/`end-*`,
+ * fixed to a corner using logical (RTL-safe) positioning (`bottom-*`/`end-*`,
  * not `right-*`), purely presentational — no persistence, no read/unread
  * state, no notification-template substitution (Non-Goal, unlike
  * `apps/web`'s own later Story 63 enhancement).
@@ -66,7 +66,13 @@ export function NotificationToaster() {
   const dismiss = usePortalNotificationsStore((state) => state.dismiss);
 
   return (
-    <div role="region" aria-label={t("regionLabel")} className={cn(toastRegionClassName, "top-4")}>
+    // Demo hardening — bottom corner: at the top the stack covered the
+    // header and the open ticket's own heading.
+    <div
+      role="region"
+      aria-label={t("regionLabel")}
+      className={cn(toastRegionClassName, "bottom-4")}
+    >
       <ol aria-live="polite" className={toastListClassName}>
         {notifications.map((notification) => {
           const ticketId = ticketIdFor(notification);
