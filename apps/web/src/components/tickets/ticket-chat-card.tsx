@@ -21,7 +21,8 @@ import {
 import { useQuickRepliesQuery } from "@/hooks/use-quick-replies";
 import { useUploadAttachmentMutation } from "@/hooks/use-attachments";
 import { useErrorMessage } from "@/hooks/use-error-message";
-import { historyEventKey } from "@/lib/history-event";
+import { describeHistoryChange, historyEventKey, type HistoryChange } from "@/lib/history-event";
+import { useTicketLabels } from "@/hooks/use-ticket-labels";
 import { localeDirection } from "@/i18n/direction";
 import type { PinnedSummary } from "@/components/tickets/ticket-ai-card";
 import {
@@ -74,7 +75,9 @@ const FILTER_KINDS: Record<TimelineFilter, TimelineKind[]> = {
   events: ["history", "escalation"],
 };
 
-type TimelineEntry = MessageThreadItem & { kind: TimelineKind };
+/** `first` — Demo hardening: sorts ahead of anything at the same instant
+ * (a ticket's "created" event before the message it was opened with). */
+type TimelineEntry = MessageThreadItem & { kind: TimelineKind; first?: boolean };
 
 /**
  * Story 78 — Live Chat UI (agent side). Reads `GET /tickets/:id/messages`
@@ -131,6 +134,7 @@ export function TicketChatCard({
   summary?: PinnedSummary | null;
 }) {
   const t = useTranslations("tickets");
+  const ticketLabels = useTicketLabels();
   const tCommon = useTranslations("common");
   const { locale } = useParams<{ locale: string }>();
   const messagesQuery = useTicketMessagesQuery(ticketId);
@@ -236,15 +240,51 @@ export function TicketChatCard({
     });
   }
 
-  for (const entry of historyQuery.data ?? []) {
+  const changeLabel = (change: HistoryChange): string => {
+    switch (change.field) {
+      case "status":
+        return t("detail.historyChange.status", { status: ticketLabels.status(change.value) });
+      case "priority":
+        return t("detail.historyChange.priority", {
+          priority: ticketLabels.priority(change.value),
+        });
+      case "assignee":
+        return change.value
+          ? t("detail.historyChange.assigned", {
+              name: userNameById.get(change.value) ?? t("detail.historyChange.someone"),
+            })
+          : t("detail.historyChange.unassigned");
+      case "category":
+        return t("detail.historyEvent.recategorized");
+      case "subject":
+        return t("detail.historyChange.subject");
+    }
+  };
+
+  // Demo hardening — each update is named by what it changed, comparing its
+  // snapshot with the previous entry's (oldest first).
+  const history = [...(historyQuery.data ?? [])].sort(
+    (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
+  );
+  history.forEach((entry, index) => {
+    const eventKey = historyEventKey(entry.eventType);
+    const changes =
+      eventKey === "updated"
+        ? describeHistoryChange(history[index - 1]?.snapshot, entry.snapshot)
+        : [];
     entries.push({
       kind: "history",
       key: `history:${entry.id}`,
       at: entry.createdAt,
+      first: eventKey === "created",
       node: (
         <TimelineEvent
           icon={<HistoryEventIcon aria-hidden="true" className="size-3.5" />}
-          label={t(`detail.historyEvent.${historyEventKey(entry.eventType)}`)}
+          label={
+            changes.length > 0
+              ? changes.map(changeLabel).join(" · ")
+              : t(`detail.historyEvent.${eventKey}`)
+          }
           // Only a name the loaded users resolve; a system event (no actor)
           // or an unknown id shows none rather than a raw id.
           actor={entry.actorUserId ? userNameById.get(entry.actorUserId) : undefined}
@@ -253,7 +293,7 @@ export function TicketChatCard({
         />
       ),
     });
-  }
+  });
 
   for (const escalation of escalationsQuery.data ?? []) {
     const targetTypeLabelKey = TARGET_TYPE_LABEL_KEYS[escalation.targetType];
@@ -274,7 +314,9 @@ export function TicketChatCard({
   }
 
   // `sort` is stable: entries at the same instant keep their source order.
-  entries.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  entries.sort(
+    (a, b) => Date.parse(a.at) - Date.parse(b.at) || Number(b.first ?? 0) - Number(a.first ?? 0),
+  );
 
   const loading =
     messagesQuery.isLoading ||

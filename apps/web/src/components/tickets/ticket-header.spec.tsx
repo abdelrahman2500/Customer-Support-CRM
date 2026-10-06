@@ -192,13 +192,31 @@ describe("TicketHeader", () => {
       fireEvent.click(screen.getByRole("button", { name: "Assign to me" }));
       fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
       expect(onAssignToMe).toHaveBeenCalledOnce();
+      // Demo hardening — resolving asks first, like the board.
+      expect(onSetStatus).not.toHaveBeenCalled();
+      const dialog = screen.getByRole("alertdialog");
+      expect(dialog).toHaveTextContent("Resolve this ticket?");
+      expect(dialog).toHaveTextContent("The customer is notified.");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Resolve" }));
       expect(onSetStatus).toHaveBeenCalledWith("RESOLVED");
+    });
+
+    it("sends nothing when the resolve confirmation is cancelled", () => {
+      const { onSetStatus } = renderActions({ status: "OPEN" });
+      fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
+      fireEvent.click(
+        within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
+      );
+      expect(onSetStatus).not.toHaveBeenCalled();
     });
 
     it("offers Close and Reopen on a resolved ticket, Reopen on a closed one", () => {
       const { onSetStatus } = renderActions({ status: "RESOLVED", canAssignToMe: false });
       expect(names()).toEqual(["Close", "Reopen"]);
       fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      fireEvent.click(
+        within(screen.getByRole("alertdialog")).getByRole("button", { name: "Close ticket" }),
+      );
       fireEvent.click(screen.getByRole("button", { name: "Reopen" }));
       expect(onSetStatus.mock.calls).toEqual([["CLOSED"], ["OPEN"]]);
     });

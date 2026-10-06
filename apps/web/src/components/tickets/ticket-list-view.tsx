@@ -351,7 +351,11 @@ function TicketListViewContent({ viewSwitcher }: { viewSwitcher?: ReactNode }) {
                     : t("list.unassigned")}
                 </TableCell>
                 <TableCell label={t("list.columns.sla")}>
-                  <SlaIndicator target={ticket.slaTarget} createdAt={ticket.createdAt} />
+                  <SlaIndicator
+                    target={ticket.slaTarget}
+                    createdAt={ticket.createdAt}
+                    ticketStatus={ticket.status}
+                  />
                 </TableCell>
                 <TableCell label={t("list.columns.createdAt")} className="text-ink-subtle">
                   {formatDateTime(ticket.createdAt, locale)}

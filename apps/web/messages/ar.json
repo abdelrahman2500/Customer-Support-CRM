@@ -279,6 +279,14 @@
         "escalated": "تم تصعيد التذكرة",
         "other": "تم تغيير التذكرة"
       },
+      "historyChange": {
+        "status": "تغيّرت الحالة إلى {status}",
+        "priority": "عُيّنت الأولوية {priority}",
+        "assigned": "أُسندت إلى {name}",
+        "someone": "أحد الزملاء",
+        "unassigned": "أُلغي الإسناد",
+        "subject": "عُدّل العنوان"
+      },
       "notesHeading": "الملاحظات",
       "notesError": "تعذّر تحميل ملاحظات هذه التذكرة.",
       "notesEmpty": "لا توجد ملاحظات حتى الآن.",
@@ -369,6 +377,7 @@
       "breached": "تم الخرق",
       "onHold": "معلّق",
       "onHoldSince": "معلّق منذ {time}",
+      "stopped": "توقف العدّاد",
       "target": {
         "response": "الاستجابة",
         "resolution": "الحل"

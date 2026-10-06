@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Badge, ErrorIcon, WarningIcon, cn } from "@crm/ui";
 import { deriveSlaStatus, splitDuration, type TicketSlaTarget } from "@/lib/sla";
+import type { TicketStatus } from "@/lib/tickets-api";
 import { formatDateTime } from "@crm/ui";
 
 /**
@@ -28,8 +29,12 @@ export function SlaIndicator({
   now,
   variant = "compact",
   className,
+  ticketStatus,
 }: {
   target: TicketSlaTarget | null;
+  /** Demo hardening — a resolved or closed ticket's clock has stopped: it
+   * shows no countdown and no breach to act on. */
+  ticketStatus?: TicketStatus;
   /** The ticket's creation time — the start of the D3 at-risk window. */
   createdAt?: string | Date;
   now?: Date;
@@ -47,6 +52,15 @@ export function SlaIndicator({
     return (
       <Tag className={cn("text-ink-subtle", detail && "mt-1 text-sm", className)}>
         {t("sla.none")}
+      </Tag>
+    );
+  }
+
+  if (ticketStatus === "RESOLVED" || ticketStatus === "CLOSED") {
+    const Tag = detail ? "p" : "span";
+    return (
+      <Tag className={cn("text-ink-subtle", detail && "mt-1 text-sm", className)}>
+        {t("sla.stopped")}
       </Tag>
     );
   }

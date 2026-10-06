@@ -687,6 +687,85 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
             </DescriptionList>
           </SectionCard>
 
+          {/* Demo hardening — ordered by how often an agent needs it: who the
+              customer is and the SLA clock first, then reference material,
+              then AI assist (an optional tool), then feedback. */}
+          <CustomerContextPanel
+            ticketId={ticketId}
+            customerId={ticket.customerId}
+            contactId={ticket.contactId}
+            collapsible
+          />
+
+          <SectionCard title={t("detail.slaHeading")} collapsible>
+            {slaTargetQuery.isLoading && (
+              <LoadingStatus label={tCommon("loading")} asChild>
+                <Skeleton className="mt-2 h-5 w-40" />
+              </LoadingStatus>
+            )}
+            {/* Story 192 (RD-1.15) — SlaIndicator: governing target, the
+                at-risk tier and a localized duration. RM-25: while held it
+                shows "on hold since", never a countdown for a paused clock. */}
+            {slaTargetQuery.isSuccess && (
+              <SlaIndicator
+                variant="detail"
+                target={slaTargetQuery.data ?? null}
+                createdAt={ticket.createdAt}
+                ticketStatus={ticket.status}
+              />
+            )}
+            {/* Demo hardening — nothing to pause once the ticket is resolved. */}
+            {slaTargetQuery.isSuccess &&
+              slaStatus.kind !== "none" &&
+              (ticket.status === "OPEN" || ticket.status === "IN_PROGRESS") && (
+                <div className="mt-2">
+                  {slaStatus.kind === "on-hold" ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={resumeMutation.isPending}
+                      onClick={() => resumeMutation.mutate()}
+                    >
+                      {t("sla.resume")}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={holdMutation.isPending}
+                      onClick={() => setConfirmHoldOpen(true)}
+                    >
+                      {t("sla.placeOnHold")}
+                    </Button>
+                  )}
+                  <ConfirmDialog
+                    open={confirmHoldOpen}
+                    onOpenChange={setConfirmHoldOpen}
+                    title={t("sla.holdConfirmTitle")}
+                    description={t("sla.holdConfirmDescription")}
+                    confirmLabel={t("sla.placeOnHold")}
+                    onConfirm={() =>
+                      holdMutation.mutate(undefined, { onSuccess: () => setConfirmHoldOpen(false) })
+                    }
+                    isPending={holdMutation.isPending}
+                  />
+                  {(holdMutation.isError || resumeMutation.isError) && (
+                    <p role="alert" className="mt-1 text-xs text-danger-foreground">
+                      {errorMessage(holdMutation.error ?? resumeMutation.error, {
+                        forbidden: t("sla.actionForbidden"),
+                        generic: t("sla.actionFailed"),
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
+          </SectionCard>
+
+          {/* Story 219 (RD-3.10) — knowledge-base references are reference
+              material read beside the conversation: an inspector section,
+              after the customer context. */}
+          <TicketKbReferencesCard ticketId={ticketId} collapsible />
+
           {/* Story 209 (RD-3.9) — AI assist is a tool beside the conversation:
               an inspector section, with its category no-match notice. */}
           <TicketAiCard
@@ -716,78 +795,6 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
               </Link>
             </Alert>
           )}
-
-          <CustomerContextPanel
-            ticketId={ticketId}
-            customerId={ticket.customerId}
-            contactId={ticket.contactId}
-            collapsible
-          />
-
-          {/* Story 219 (RD-3.10) — knowledge-base references are reference
-              material read beside the conversation: an inspector section,
-              after the customer context. */}
-          <TicketKbReferencesCard ticketId={ticketId} collapsible />
-
-          <SectionCard title={t("detail.slaHeading")} collapsible>
-            {slaTargetQuery.isLoading && (
-              <LoadingStatus label={tCommon("loading")} asChild>
-                <Skeleton className="mt-2 h-5 w-40" />
-              </LoadingStatus>
-            )}
-            {/* Story 192 (RD-1.15) — SlaIndicator: governing target, the
-                at-risk tier and a localized duration. RM-25: while held it
-                shows "on hold since", never a countdown for a paused clock. */}
-            {slaTargetQuery.isSuccess && (
-              <SlaIndicator
-                variant="detail"
-                target={slaTargetQuery.data ?? null}
-                createdAt={ticket.createdAt}
-              />
-            )}
-            {slaTargetQuery.isSuccess && slaStatus.kind !== "none" && (
-              <div className="mt-2">
-                {slaStatus.kind === "on-hold" ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={resumeMutation.isPending}
-                    onClick={() => resumeMutation.mutate()}
-                  >
-                    {t("sla.resume")}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={holdMutation.isPending}
-                    onClick={() => setConfirmHoldOpen(true)}
-                  >
-                    {t("sla.placeOnHold")}
-                  </Button>
-                )}
-                <ConfirmDialog
-                  open={confirmHoldOpen}
-                  onOpenChange={setConfirmHoldOpen}
-                  title={t("sla.holdConfirmTitle")}
-                  description={t("sla.holdConfirmDescription")}
-                  confirmLabel={t("sla.placeOnHold")}
-                  onConfirm={() =>
-                    holdMutation.mutate(undefined, { onSuccess: () => setConfirmHoldOpen(false) })
-                  }
-                  isPending={holdMutation.isPending}
-                />
-                {(holdMutation.isError || resumeMutation.isError) && (
-                  <p role="alert" className="mt-1 text-xs text-danger-foreground">
-                    {errorMessage(holdMutation.error ?? resumeMutation.error, {
-                      forbidden: t("sla.actionForbidden"),
-                      generic: t("sla.actionFailed"),
-                    })}
-                  </p>
-                )}
-              </div>
-            )}
-          </SectionCard>
 
           <SectionCard title={t("detail.csatHeading")} collapsible>
             {csatQuery.isLoading && (

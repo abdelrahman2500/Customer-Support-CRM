@@ -807,6 +807,65 @@ describe("TicketChatCard", () => {
       expect(within(item).getByText("Sam Colleague")).toBeInTheDocument();
     });
 
+    // Demo hardening — an update says what it changed, and a ticket's
+    // "created" event leads the message it was opened with.
+    it("names what each update changed, from the snapshots", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({ data: [], isSuccess: true }) as never,
+      );
+      const base = { status: "OPEN", priority: "MEDIUM", assignedToUserId: null };
+      vi.mocked(useTicketHistoryQuery).mockReturnValue(
+        queryResult({
+          data: [
+            { ...created, snapshot: base },
+            {
+              ...created,
+              id: "history-2",
+              eventType: "ticket.updated",
+              snapshot: { ...base, status: "IN_PROGRESS", assignedToUserId: "agent-2" },
+              createdAt: "2024-01-01T08:05:00.000Z",
+            },
+            {
+              ...created,
+              id: "history-3",
+              eventType: "ticket.updated",
+              snapshot: { ...base, status: "RESOLVED", assignedToUserId: "agent-2" },
+              createdAt: "2024-01-01T08:10:00.000Z",
+            },
+          ],
+          isSuccess: true,
+        }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      const [, second, third] = within(screen.getByRole("log")).getAllByRole("listitem");
+      // This file's next-intl mock returns bare keys (values are covered by
+      // describeHistoryChange's own tests).
+      expect(second).toHaveTextContent("detail.historyChange.status · detail.historyChange.assigned");
+      expect(third).toHaveTextContent("detail.historyChange.status");
+      expect(third).not.toHaveTextContent("detail.historyChange.assigned");
+      expect(third).not.toHaveTextContent("detail.historyEvent.updated");
+    });
+
+    it("puts the created event before a message at the same instant", () => {
+      vi.mocked(useTicketMessagesQuery).mockReturnValue(
+        queryResult({
+          data: [{ ...customerMessage, createdAt: created.createdAt }],
+          isSuccess: true,
+        }) as never,
+      );
+      vi.mocked(useTicketHistoryQuery).mockReturnValue(
+        queryResult({ data: [created], isSuccess: true }) as never,
+      );
+
+      render(<TicketChatCard ticketId="ticket-1" />);
+
+      const [first, second] = within(screen.getByRole("log")).getAllByRole("listitem");
+      expect(first).toHaveTextContent("detail.historyEvent.created");
+      expect(second).toHaveTextContent(customerMessage.body);
+    });
+
     it("names a history event's actor when the loaded users resolve it, and no one otherwise", () => {
       vi.mocked(useTicketMessagesQuery).mockReturnValue(
         queryResult({ data: [], isSuccess: true }) as never,

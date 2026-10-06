@@ -279,6 +279,14 @@
         "escalated": "Ticket escalated",
         "other": "Ticket changed"
       },
+      "historyChange": {
+        "status": "Status changed to {status}",
+        "priority": "Priority set to {priority}",
+        "assigned": "Assigned to {name}",
+        "someone": "a teammate",
+        "unassigned": "Unassigned",
+        "subject": "Subject edited"
+      },
       "notesHeading": "Notes",
       "notesError": "Couldn't load this ticket's notes.",
       "notesEmpty": "No notes yet.",
@@ -369,6 +377,7 @@
       "breached": "Breached",
       "onHold": "On hold",
       "onHoldSince": "On hold since {time}",
+      "stopped": "Clock stopped",
       "target": {
         "response": "Response",
         "resolution": "Resolution"

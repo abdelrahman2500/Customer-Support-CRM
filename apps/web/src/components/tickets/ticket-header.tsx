@@ -17,6 +17,7 @@ import {
 import type { TicketSlaTarget } from "@/lib/sla";
 import type { TicketStatus, TicketSummary } from "@/lib/tickets-api";
 import { SlaIndicator } from "./sla-indicator";
+import { ConfirmDialog } from "../confirm-dialog";
 import { TicketPriorityBadge, TicketStatusBadge } from "./ticket-badges";
 import { statusSpine } from "./board/board-state";
 import { useTicketLabels } from "@/hooks/use-ticket-labels";
@@ -277,7 +278,11 @@ export function TicketHeader({
           {sla.status === "loading" && <Skeleton className="h-5 w-24" />}
           {sla.status === "error" && <span className="text-ink-subtle">—</span>}
           {sla.status === "ready" && (
-            <SlaIndicator target={sla.target} createdAt={ticket.createdAt} />
+            <SlaIndicator
+              target={sla.target}
+              createdAt={ticket.createdAt}
+              ticketStatus={ticket.status}
+            />
           )}
         </DescriptionItem>
         <DescriptionItem term={t("list.columns.assignedAgent")}>
@@ -343,19 +348,43 @@ export function TicketHeaderActions({
 }) {
   const t = useTranslations("tickets");
   const open = status === "OPEN" || status === "IN_PROGRESS";
+  // Demo hardening — resolving or closing notifies the customer, so the
+  // header asks first, with the board's own confirmation copy (PD-5).
+  // Reopening does not notify and stays one click.
+  const [confirming, setConfirming] = useState<"RESOLVED" | "CLOSED" | null>(null);
   return (
     <div
       role="group"
       aria-label={t("detail.actions.label")}
       className="flex shrink-0 flex-wrap items-center gap-inline"
     >
+      <ConfirmDialog
+        open={confirming !== null}
+        onOpenChange={(next) => {
+          if (!next) setConfirming(null);
+        }}
+        title={confirming ? t(`board.confirm.${confirming}.question`) : ""}
+        description={t("board.confirm.notified")}
+        confirmLabel={confirming ? t(`board.confirm.${confirming}.action`) : ""}
+        destructive={false}
+        isPending={pending}
+        onConfirm={() => {
+          if (confirming) onSetStatus(confirming);
+          setConfirming(null);
+        }}
+      />
       {canAssignToMe && (
         <Button type="button" variant="outline" size="sm" disabled={pending} onClick={onAssignToMe}>
           {t("detail.actions.assignToMe")}
         </Button>
       )}
       {open && (
-        <Button type="button" size="sm" disabled={pending} onClick={() => onSetStatus("RESOLVED")}>
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending}
+          onClick={() => setConfirming("RESOLVED")}
+        >
           {t("detail.actions.resolve")}
         </Button>
       )}
@@ -365,7 +394,7 @@ export function TicketHeaderActions({
           variant="outline"
           size="sm"
           disabled={pending}
-          onClick={() => onSetStatus("CLOSED")}
+          onClick={() => setConfirming("CLOSED")}
         >
           {t("detail.actions.close")}
         </Button>

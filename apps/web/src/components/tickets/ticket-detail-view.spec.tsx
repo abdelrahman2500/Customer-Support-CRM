@@ -2008,6 +2008,12 @@ describe("TicketDetailView", () => {
       const mutate = renderWith({ status: "OPEN" });
 
       fireEvent.click(within(actions()).getByRole("button", { name: "detail.actions.resolve" }));
+      // Demo hardening — the header asks first, like the board.
+      fireEvent.click(
+        within(screen.getByRole("alertdialog")).getByRole("button", {
+          name: "board.confirm.RESOLVED.action",
+        }),
+      );
 
       expect(mutate).toHaveBeenCalledWith({ status: "RESOLVED" }, expect.any(Object));
       expect(mockedShowSuccessToast).toHaveBeenCalledWith(
@@ -2256,7 +2262,9 @@ describe("TicketDetailView", () => {
 
   // Story 209 (RD-3.9) — AI assist in the inspector, its summary pinned.
   describe("AI assist panel (Story 209)", () => {
-    it("places AI assist in the inspector, after Properties", () => {
+    // Demo hardening — the inspector leads with the customer context; AI
+    // assist, an optional tool, follows it.
+    it("places AI assist in the inspector, after Properties and the customer context", () => {
       vi.mocked(useTicketQuery).mockReturnValue(
         queryResult({ data: baseTicket, isSuccess: true }) as never,
       );
@@ -2265,8 +2273,10 @@ describe("TicketDetailView", () => {
       const properties = screen.getByRole("heading", { name: "detail.propertiesHeading" });
       const ai = screen.getByRole("heading", { name: "detail.aiHeading" });
       const context = screen.getByRole("heading", { name: "detail.contextPanelHeading" });
-      expect(properties.compareDocumentPosition(ai) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(ai.compareDocumentPosition(context) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(
+        properties.compareDocumentPosition(context) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(context.compareDocumentPosition(ai) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       // Out of the main column: the conversation no longer sits above it.
       expect(properties.closest(".lg\\:sticky")).toContainElement(ai);
     });
