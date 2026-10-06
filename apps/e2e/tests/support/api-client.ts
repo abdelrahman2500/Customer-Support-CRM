@@ -184,3 +184,32 @@ export async function setTicketStatusAsAdmin(
     body: JSON.stringify({ status }),
   });
 }
+
+/**
+ * Final UX pass — an Agent-role user in the admin's own active branch, for
+ * `session-switch.spec.ts` (signing in as different people in one tab).
+ * The branch comes from the admin's `GET /auth/me`, the role id from
+ * `GET /identity/roles`, so nothing about the seeded data is assumed.
+ */
+export async function createAgentAsAdmin(
+  adminToken: string,
+  input: { email: string; password: string; fullName: string },
+): Promise<{ id: string }> {
+  const me = await apiFetch<{ branchId: string }>("/auth/me", { token: adminToken });
+  const roles = await apiFetch<{ id: string; name: string }[]>("/identity/roles", {
+    token: adminToken,
+  });
+  const agentRole = roles.find((role) => role.name === "Agent");
+  if (!agentRole) throw new Error("The seeded Agent role was not found");
+  return apiFetch<{ id: string }>("/identity/users", {
+    method: "POST",
+    token: adminToken,
+    body: JSON.stringify({ ...input, branchId: me.branchId, roleId: agentRole.id }),
+  });
+}
+
+/** Final UX pass — the full name `GET /auth/me` reports for a token. */
+export async function getMyFullName(token: string): Promise<string> {
+  const me = await apiFetch<{ fullName: string }>("/auth/me", { token });
+  return me.fullName;
+}

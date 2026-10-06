@@ -6,6 +6,7 @@ import { fetchBranding } from "@/lib/branding-server";
 import { PortalHeader } from "@/components/portal/portal-header";
 import { PortalNotifications } from "@/components/portal/portal-notifications";
 import { SuccessToaster } from "@/components/portal/success-toaster";
+import { SessionGuard } from "@/components/providers/session-guard";
 
 /**
  * Story 52 — the real auth guard for the Customer Portal, mirroring
@@ -40,17 +41,20 @@ export default async function CustomerLayout({
       <a href="#main-content" className="skip-link">
         {t("skipToMainContent")}
       </a>
-      <PortalHeader contact={contact} initialBranding={branding} />
-      <PortalNotifications customerId={contact.customerId} />
-      {/* Story 229 — one reading-width column, shared with the header's
+      {/* Final UX pass — see apps/web's (agent)/layout.tsx. */}
+      <SessionGuard subject={contact.id}>
+        <PortalHeader contact={contact} initialBranding={branding} />
+        <PortalNotifications customerId={contact.customerId} />
+        {/* Story 229 — one reading-width column, shared with the header's
           own inner row so the brand, the nav and the content line up. */}
-      <main id="main-content" className="flex-1 px-page-x py-page-y">
-        <div className="mx-auto w-full max-w-5xl">{children}</div>
-      </main>
-      {/* Story 94 — one generic success-feedback renderer for the whole
+        <main id="main-content" className="flex-1 px-page-x py-page-y">
+          <div className="mx-auto w-full max-w-5xl">{children}</div>
+        </main>
+        {/* Story 94 — one generic success-feedback renderer for the whole
           authenticated session; deliberately separate from
           PortalNotifications' real-time domain-event stack. */}
-      <SuccessToaster />
+        <SuccessToaster />
+      </SessionGuard>
     </div>
   );
 }

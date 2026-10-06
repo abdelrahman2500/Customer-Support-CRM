@@ -6,6 +6,7 @@ import { fetchBranding } from "@/lib/branding-server";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { BranchNotifications } from "@/components/notifications/branch-notifications";
 import { SuccessToaster } from "@/components/ui/success-toaster";
+import { SessionGuard } from "@/components/providers/session-guard";
 
 /**
  * Story 23 — the real auth guard for the agent workspace, replacing the
@@ -69,17 +70,21 @@ export default async function AgentWorkspaceLayout({
           `overflow-x-auto` box (`packages/ui/src/components/table.tsx`),
           so a wide table scrolls inside that box rather than depending on
           that `<main>` being edge-to-edge. */}
-      <WorkspaceShell user={user} initialBranding={branding}>
-        {children}
-      </WorkspaceShell>
-      {/* Story 24 — one branch-wide notification consumer for the whole
+      {/* Final UX pass — nothing of this user renders in a tab whose token
+          belongs to someone else (a stale cached copy of this layout). */}
+      <SessionGuard subject={user.id}>
+        <WorkspaceShell user={user} initialBranding={branding}>
+          {children}
+        </WorkspaceShell>
+        {/* Story 24 — one branch-wide notification consumer for the whole
           authenticated session, not per-page (see BranchNotifications). */}
-      <BranchNotifications branchId={user.branchId} />
-      {/* Story 94 — one generic success-feedback renderer for the whole
+        <BranchNotifications branchId={user.branchId} />
+        {/* Story 94 — one generic success-feedback renderer for the whole
           authenticated session; deliberately separate from
           BranchNotifications' domain-event stack (see SuccessToaster's own
           doc comment). */}
-      <SuccessToaster />
+        <SuccessToaster />
+      </SessionGuard>
     </div>
   );
 }

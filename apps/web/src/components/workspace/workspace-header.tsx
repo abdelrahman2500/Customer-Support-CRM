@@ -33,6 +33,7 @@ import {
 } from "@crm/ui";
 import { clearAccessToken, logout, switchBranch, updatePreferredLocale } from "@/lib/api";
 import { clearQueryCache } from "@/lib/query-client-registry";
+import { resetClientSession } from "@/lib/session";
 import type { BrandingSummary } from "@/lib/branding-api";
 import { RailNav } from "./workspace-sidebar";
 
@@ -141,7 +142,8 @@ export function WorkspaceHeader({
       // Best-effort — local sign-out below always proceeds regardless.
     }
     clearAccessToken();
-    clearQueryCache();
+    // Final UX pass — also the per-user stores and the Router Cache.
+    resetClientSession(router);
     router.push(`/${locale}/login`);
   }
 

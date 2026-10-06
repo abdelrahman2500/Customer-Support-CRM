@@ -10,7 +10,7 @@ import { useBrandingQuery } from "@/hooks/use-branding";
 import type { BrandingSummary } from "@/lib/branding-api";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-portal-notification-history";
 import { clearAccessToken, logout, updatePreferredLocale } from "@/lib/api";
-import { clearQueryCache } from "@/lib/query-client-registry";
+import { resetClientSession } from "@/lib/session";
 import { useRealtimeConnectionIssue } from "@/lib/realtime-connection";
 import {
   Alert,
@@ -128,7 +128,8 @@ export function PortalHeader({
       // Best-effort — local sign-out below always proceeds regardless.
     }
     clearAccessToken();
-    clearQueryCache();
+    // Final UX pass — also the per-user stores and the Router Cache.
+    resetClientSession(router);
     router.push(`/${locale}/login`);
   }
 

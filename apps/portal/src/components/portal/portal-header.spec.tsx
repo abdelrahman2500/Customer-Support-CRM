@@ -9,6 +9,8 @@ import { clearQueryCache } from "@/lib/query-client-registry";
 import { useRealtimeConnectionIssue } from "@/lib/realtime-connection";
 
 const push = vi.fn();
+// Final UX pass — sign-in/out resets the client session, Router Cache included.
+const refresh = vi.fn();
 let pathname = "/en/home";
 // Story S-6 — mutable so a test can render under `/ar`, mirroring how
 // `pathname` above is already varied per test.
@@ -16,7 +18,7 @@ let locale = "en";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale }),
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, refresh }),
   usePathname: () => pathname,
 }));
 
@@ -158,6 +160,7 @@ describe("PortalHeader", () => {
     // session's cached data flash before their own queries refetch.
     expect(mockedClearQueryCache).toHaveBeenCalledOnce();
     expect(push).toHaveBeenCalledWith("/en/login");
+    expect(refresh).toHaveBeenCalled();
   });
 
   it("still clears the local token and redirects even when the logout call rejects", async () => {

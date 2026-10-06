@@ -19,6 +19,7 @@ import {
   ThemeSwitcher,
 } from "@crm/ui";
 import { getApiBaseUrl, setAccessToken } from "@/lib/api";
+import { resetClientSession } from "@/lib/session";
 
 /**
  * Story 52 — the Customer Portal's real sign-in screen, mirroring
@@ -127,6 +128,8 @@ export default function LoginPage() {
 
       const { accessToken } = (await response.json()) as { accessToken: string };
       setAccessToken(accessToken);
+      // Final UX pass — see apps/web's login page.
+      resetClientSession(router);
       router.push(`/${locale}/home`);
       // UX audit — deliberately no `setSubmitting(false)` here. Mirrors
       // apps/web's own login page fix: the destination route's layout does

@@ -4,11 +4,13 @@ import LoginPage from "./page";
 import { setAccessToken } from "@/lib/api";
 
 const push = vi.fn();
+// Final UX pass — sign-in/out resets the client session, Router Cache included.
+const refresh = vi.fn();
 let searchParams = new URLSearchParams();
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, refresh }),
   useSearchParams: () => searchParams,
 }));
 
@@ -112,6 +114,7 @@ describe("LoginPage (portal)", () => {
       }),
     );
     expect(push).toHaveBeenCalledWith("/en/home");
+    expect(refresh).toHaveBeenCalled();
   });
 
   // UX audit — mirrors apps/web's own login page: the destination route's

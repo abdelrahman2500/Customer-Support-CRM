@@ -18,6 +18,7 @@ import {
   ThemeSwitcher,
 } from "@crm/ui";
 import { getApiBaseUrl, setAccessToken } from "@/lib/api";
+import { resetClientSession } from "@/lib/session";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 
 /**
@@ -128,6 +129,9 @@ export default function LoginPage() {
 
       const { accessToken } = (await response.json()) as { accessToken: string };
       setAccessToken(accessToken);
+      // Final UX pass — whatever an earlier session left in this tab (its
+      // cached signed-in layout above all) is dropped before the new one.
+      resetClientSession(router);
       router.push(`/${locale}/tickets`);
       // UX audit — deliberately no `setSubmitting(false)` here. The
       // destination route's own layout does a server-side auth-init round

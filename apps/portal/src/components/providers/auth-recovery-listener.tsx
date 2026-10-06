@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useNavigatingRouter as useRouter } from "@/hooks/use-navigating-router";
 import { onAuthExpired } from "@/lib/auth-events";
-import { clearQueryCache } from "@/lib/query-client-registry";
+import { resetClientSession } from "@/lib/session";
 
 /**
  * Story 95 — Authentication Recovery. Mirrors
@@ -19,7 +19,7 @@ export function AuthRecoveryListener() {
 
   useEffect(() => {
     return onAuthExpired(() => {
-      clearQueryCache();
+      resetClientSession(router);
       router.replace(`/${locale}/login?reason=session-expired`);
     });
   }, [router, locale]);

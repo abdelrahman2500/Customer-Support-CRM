@@ -6,10 +6,12 @@ import { emitAuthExpired } from "@/lib/auth-events";
 import { clearQueryCache } from "@/lib/query-client-registry";
 
 const replace = vi.fn();
+// Final UX pass — an expired session resets the client session, Router Cache included.
+const refresh = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ locale: "en" }),
-  useRouter: () => ({ replace }),
+  useRouter: () => ({ replace, refresh }),
 }));
 
 vi.mock("@/lib/query-client-registry", () => ({
@@ -38,6 +40,7 @@ describe("AuthRecoveryListener (portal)", () => {
 
     expect(mockedClearQueryCache).toHaveBeenCalledOnce();
     expect(replace).toHaveBeenCalledWith("/en/login?reason=session-expired");
+    expect(refresh).toHaveBeenCalled();
   });
 
   it("stops reacting to the event once unmounted", () => {
