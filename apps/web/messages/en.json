@@ -159,6 +159,11 @@
       "groupMenuLabelUnread": "{group} menu, {count} unread",
       "collapseSidebar": "Collapse the navigation sidebar",
       "expandSidebar": "Expand the navigation sidebar"
+    },
+    "noAccess": {
+      "title": "This page isn't part of your role",
+      "description": "It's for administrators. Ask one if you need something changed here.",
+      "back": "Go to tickets"
     }
   },
   "tickets": {
@@ -1532,7 +1537,8 @@
       "alarm": "Your brand color appears on the header edge only. Red buttons would look like destructive actions, so buttons keep the default indigo.",
       "recognisability": "Your brand color appears on the header edge only. It is too light to carry readable button text without changing it beyond recognition.",
       "contrast": "Your brand color appears on the header edge only. It cannot be made readable on buttons in both themes."
-    }
+    },
+    "forbidden": "Branding is managed by administrators."
   },
   "aiSettings": {
     "title": "AI Settings",
@@ -1545,7 +1551,8 @@
     "chatLabel": "Portal AI Chatbot",
     "suggestSolutionsLabel": "Suggest Solutions",
     "saveFailed": "Couldn't save this setting. Please try again.",
-    "saveForbidden": "You don't have permission to change these settings."
+    "saveForbidden": "You don't have permission to change these settings.",
+    "forbidden": "AI features are managed by administrators."
   },
   "mySessions": {
     "title": "My Sessions",

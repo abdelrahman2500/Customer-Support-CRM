@@ -349,6 +349,30 @@ export function useVisibleNavGroups(): readonly NavGroup[] {
   return visibleNavGroups(usePermissions());
 }
 
+/**
+ * Final UX pass — the permission(s), any of which each workspace route needs,
+ * keyed by its first path segment: every navigation destination's own
+ * `requires`, plus the settings screens that are reached from Settings
+ * rather than the navigation. A route not listed needs nothing beyond being
+ * signed in (dashboard, tickets, notifications, my account).
+ */
+export const ROUTE_REQUIREMENTS: Readonly<Record<string, readonly string[]>> = {
+  ...Object.fromEntries(
+    NAV_GROUPS.flatMap((group) => group.items)
+      .filter((item) => item.requires)
+      .map((item) => [item.href, item.requires!]),
+  ),
+  branding: ["branding:read"],
+  "ai-settings": ["ai:read"],
+  "business-hours": ["sla:read"],
+};
+
+/** The permissions `pathname` (`/{locale}/{route}/…`) needs, if any. */
+export function routeRequirements(pathname: string | null): readonly string[] | undefined {
+  const segment = pathname?.split("/")[2];
+  return segment ? ROUTE_REQUIREMENTS[segment] : undefined;
+}
+
 /** RM-11 — the one shared render path for a nav item's visible label plus
  * its Story 92 unread-count badge, so the desktop `<nav>` and the mobile
  * `DropdownMenu` can never render different content for the same item.

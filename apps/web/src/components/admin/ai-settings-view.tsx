@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ApiError } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useAiSettingsQuery, useUpdateAiSettingsMutation } from "@/hooks/use-ai-settings";
 import type { AiSettingsSummary } from "@/lib/ai-settings-api";
@@ -47,7 +48,12 @@ export function AiSettingsView({ hosted = false }: { hosted?: boolean } = {}) {
         </LoadingStatus>
       )}
 
-      {settingsQuery.isError && (
+      {/* Final UX pass — a role without access is told so, without a
+          retry that could never succeed. */}
+      {settingsQuery.isError && isForbidden(settingsQuery.error) && (
+        <Alert variant="info">{t("forbidden")}</Alert>
+      )}
+      {settingsQuery.isError && !isForbidden(settingsQuery.error) && (
         <Alert variant="destructive" className="flex items-center justify-between">
           <span>{t("error")}</span>
           <Button variant="outline" size="sm" onClick={() => settingsQuery.refetch()}>
@@ -112,4 +118,8 @@ function AiSettingsForm({ initial }: { initial: AiSettingsSummary }) {
       {error && <Alert variant="destructive">{error}</Alert>}
     </Card>
   );
+}
+
+function isForbidden(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403;
 }

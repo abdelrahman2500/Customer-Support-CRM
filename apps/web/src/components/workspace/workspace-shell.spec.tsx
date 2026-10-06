@@ -22,6 +22,11 @@ vi.mock("@/hooks/use-notifications", () => ({
   useUnreadNotificationCountQuery: vi.fn(),
 }));
 
+// Final UX pass — the route decides whether the page renders at all.
+let pathname = "/en/tickets";
+vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+vi.mock("./no-access-state", () => ({ NoAccessState: () => <div>no access state</div> }));
+
 vi.mock("./workspace-header", () => ({
   WorkspaceHeader: () => <div>header content</div>,
 }));
@@ -256,5 +261,56 @@ describe("WorkspaceShell branding", () => {
     const scope = container.firstElementChild as HTMLElement;
     expect(scope.style.getPropertyValue("--brand")).toBe("220 38 38");
     expect(scope).not.toHaveAttribute("data-brand-accent");
+  });
+});
+
+// Final UX pass — a page the role cannot read is never mounted.
+describe("WorkspaceShell — route permissions", () => {
+  beforeEach(() => {
+    vi.mocked(useBrandingQuery).mockReturnValue({ data: undefined } as never);
+    vi.mocked(useUnreadNotificationCountQuery).mockReturnValue({
+      data: undefined,
+      isSuccess: false,
+    } as never);
+  });
+  afterEach(() => {
+    pathname = "/en/tickets";
+  });
+  const agent: AuthenticatedUser = {
+    id: "user-1",
+    email: "agent@example.com",
+    fullName: "Ada Lovelace",
+    branchId: "branch-1",
+    departmentId: null,
+    roles: ["Agent"],
+    preferredLocale: null,
+    permissions: ["ticket:read", "sla:read"],
+  };
+  const renderAt = (path: string, user: AuthenticatedUser) => {
+    pathname = path;
+    return render(
+      <WorkspaceShell user={user} initialBranding={null}>
+        <p>page content</p>
+      </WorkspaceShell>,
+    );
+  };
+
+  it("shows the no-access state instead of an admin-only page", () => {
+    renderAt("/en/ai-settings", agent);
+    expect(screen.queryByText("page content")).not.toBeInTheDocument();
+    expect(screen.getByText("no access state")).toBeInTheDocument();
+  });
+
+  it("renders a page the role can read, and every page while permissions are unknown", () => {
+    const { unmount } = renderAt("/en/sla-policies/new", agent);
+    expect(screen.getByText("page content")).toBeInTheDocument();
+    unmount();
+    renderAt("/en/branding", { ...agent, permissions: undefined });
+    expect(screen.getByText("page content")).toBeInTheDocument();
+  });
+
+  it("renders the admin's settings pages for an admin", () => {
+    renderAt("/en/branding", { ...agent, permissions: ["branding:read"] });
+    expect(screen.getByText("page content")).toBeInTheDocument();
   });
 });

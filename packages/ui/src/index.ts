@@ -117,6 +117,7 @@ export {
   PriorityHighIcon,
   PriorityUrgentIcon,
   InternalNoteIcon,
+  NoAccessIcon,
   HistoryEventIcon,
   AttachIcon,
   AiSummaryIcon,

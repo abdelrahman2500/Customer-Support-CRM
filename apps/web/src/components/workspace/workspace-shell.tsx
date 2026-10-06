@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { BrandScope, deriveBrandTokens } from "@crm/ui";
 import type { AuthenticatedUser } from "@crm/shared";
 import { useBrandingQuery } from "@/hooks/use-branding";
 import { useUnreadNotificationCountQuery } from "@/hooks/use-notifications";
 import type { BrandingSummary } from "@/lib/branding-api";
 import { PermissionsProvider, hasAnyPermission } from "@/lib/permissions";
-import { resolveNavigationLayout } from "./nav-items";
+import { resolveNavigationLayout, routeRequirements } from "./nav-items";
+import { NoAccessState } from "./no-access-state";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceNavbar } from "./workspace-navbar";
 import { WorkspaceSidebar } from "./workspace-sidebar";
@@ -95,9 +97,17 @@ export function WorkspaceShell({
      `overflow-x-auto` box, which is exactly what NAV-2 assumed. Harmless
      in the navbar branch, where `<main>` is a flex *column* child and the
      cross-axis was never the constrained one. */
+  // Final UX pass — a page this role cannot read is not mounted at all
+  // (reached by a link, a bookmark or history): it would only request what
+  // the API refuses and show its 403 as a load error ("Couldn't load your
+  // AI settings"). The API still enforces every permission itself.
+  const pathname = usePathname();
+  const allowed = hasAnyPermission(user.permissions, routeRequirements(pathname));
   const main = (
     <main id="main-content" className="min-w-0 flex-1 px-page-x py-page-y">
-      <div className="mx-auto w-full max-w-screen-2xl">{children}</div>
+      <div className="mx-auto w-full max-w-screen-2xl">
+        {allowed ? children : <NoAccessState />}
+      </div>
     </main>
   );
 

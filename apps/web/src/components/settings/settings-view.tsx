@@ -8,6 +8,7 @@ import { BrandingView } from "@/components/admin/branding-view";
 import { AiSettingsView } from "@/components/admin/ai-settings-view";
 import { BusinessHoursView } from "@/components/business-hours/business-hours-view";
 import { localeDirection } from "@/i18n/direction";
+import { hasAnyPermission, usePermissions } from "@/lib/permissions";
 
 /**
  * RM-23 — Consolidated System Settings Screen. Core 10 (Security &
@@ -38,6 +39,13 @@ import { localeDirection } from "@/i18n/direction";
 const SETTINGS_TABS = ["branding", "ai", "businessHours"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
+/** Final UX pass — what each tab's screen reads (its GET's permission). */
+const TAB_REQUIREMENTS: Record<SettingsTab, string> = {
+  branding: "branding:read",
+  ai: "ai:read",
+  businessHours: "sla:read",
+};
+
 export function SettingsView() {
   const t = useTranslations("settings");
   const locale = useLocale();
@@ -46,16 +54,22 @@ export function SettingsView() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // Final UX pass — only the tabs this role can read; a tab it cannot
+  // would only show its 403 as "Couldn't load your … settings".
+  const permissions = usePermissions();
+  const tabs = SETTINGS_TABS.filter((tab) =>
+    hasAnyPermission(permissions, [TAB_REQUIREMENTS[tab]]),
+  );
+  const defaultTab = tabs[0] ?? "branding";
   const requested = searchParams?.get("tab");
-  const fromUrl =
-    requested && SETTINGS_TABS.includes(requested as SettingsTab) ? requested : "branding";
+  const fromUrl = requested && tabs.includes(requested as SettingsTab) ? requested : defaultTab;
   const [tab, setTab] = useState(fromUrl);
   // Back/Forward (or a link) changing ?tab= moves the tab too.
   useEffect(() => setTab(fromUrl), [fromUrl]);
   function selectTab(next: string) {
     setTab(next);
     const params = new URLSearchParams(searchParams?.toString() ?? "");
-    if (next === "branding") params.delete("tab");
+    if (next === defaultTab) params.delete("tab");
     else params.set("tab", next);
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
@@ -67,19 +81,27 @@ export function SettingsView() {
 
       <Tabs value={tab} onValueChange={selectTab} dir={localeDirection(locale)}>
         <TabsList>
-          <TabsTrigger value="branding">{t("tabs.branding")}</TabsTrigger>
-          <TabsTrigger value="ai">{t("tabs.ai")}</TabsTrigger>
-          <TabsTrigger value="businessHours">{t("tabs.businessHours")}</TabsTrigger>
+          {tabs.map((tab) => (
+            <TabsTrigger key={tab} value={tab}>
+              {t(`tabs.${tab}`)}
+            </TabsTrigger>
+          ))}
         </TabsList>
-        <TabsContent value="branding">
-          <BrandingView hosted />
-        </TabsContent>
-        <TabsContent value="ai">
-          <AiSettingsView hosted />
-        </TabsContent>
-        <TabsContent value="businessHours">
-          <BusinessHoursView hosted />
-        </TabsContent>
+        {tabs.includes("branding") && (
+          <TabsContent value="branding">
+            <BrandingView hosted />
+          </TabsContent>
+        )}
+        {tabs.includes("ai") && (
+          <TabsContent value="ai">
+            <AiSettingsView hosted />
+          </TabsContent>
+        )}
+        {tabs.includes("businessHours") && (
+          <TabsContent value="businessHours">
+            <BusinessHoursView hosted />
+          </TabsContent>
+        )}
       </Tabs>
     </section>
   );

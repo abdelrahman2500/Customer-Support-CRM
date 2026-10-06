@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { ApiError } from "@/lib/api";
 import { useTranslations } from "next-intl";
 import { useBrandingQuery, useUpdateBrandingMutation } from "@/hooks/use-branding";
 import { useErrorMessage } from "@/hooks/use-error-message";
@@ -60,7 +61,12 @@ export function BrandingView({ hosted = false }: { hosted?: boolean } = {}) {
         </LoadingStatus>
       )}
 
-      {brandingQuery.isError && (
+      {/* Final UX pass — a role without access is told so, without a
+          retry that could never succeed. */}
+      {brandingQuery.isError && isForbidden(brandingQuery.error) && (
+        <Alert variant="info">{t("forbidden")}</Alert>
+      )}
+      {brandingQuery.isError && !isForbidden(brandingQuery.error) && (
         <Alert variant="destructive" className="flex items-center justify-between">
           <span>{t("error")}</span>
           <Button variant="outline" size="sm" onClick={() => brandingQuery.refetch()}>
@@ -334,4 +340,8 @@ function NavigationLayoutThumbnail({ layout }: { layout: NavigationLayout }) {
       )}
     </span>
   );
+}
+
+function isForbidden(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403;
 }

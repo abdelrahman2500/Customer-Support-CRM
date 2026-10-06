@@ -126,6 +126,8 @@ export {
   // Story 206 (RD-3.6) — the ticket timeline: an internal note (always
   // paired with its "Internal note" text) and a history event row.
   Lock as InternalNoteIcon,
+  // Final UX pass — a page the signed-in role cannot open.
+  ShieldOff as NoAccessIcon,
   GitCommitHorizontal as HistoryEventIcon,
 
   // Story 208 (RD-3.8) — attach a file (composer, attachments dropzone).

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsView } from "./settings-view";
+import { PermissionsProvider } from "@/lib/permissions";
 
 // Story 224 (RD-6.5) — the open tab is mirrored in ?tab=.
 const replace = vi.fn();
@@ -97,5 +98,21 @@ describe("SettingsView", () => {
     await userEvent.setup().click(screen.getByRole("tab", { name: "tabs.ai" }));
     expect(replace).toHaveBeenLastCalledWith("/en/settings?tab=ai", { scroll: false });
     searchParamsString = "";
+  });
+});
+
+// Final UX pass — only the tabs the role can read.
+describe("SettingsView — permissions", () => {
+  it("shows only the tabs the role can read, opening the first of them", () => {
+    searchParamsString = "";
+    render(
+      <PermissionsProvider permissions={["sla:read"]}>
+        <SettingsView />
+      </PermissionsProvider>,
+    );
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["tabs.businessHours"]);
+    expect(screen.getByText("business hours panel content")).toBeInTheDocument();
+    expect(screen.queryByText("branding panel content")).not.toBeInTheDocument();
+    expect(screen.queryByText("ai panel content")).not.toBeInTheDocument();
   });
 });
