@@ -401,7 +401,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
                   />
                 </FormField>
                 {mutation.isError && (
-                  <p className="text-xs text-danger-foreground">
+                  <p role="alert" className="text-xs text-danger-foreground">
                     {errorMessage(mutation.error, {
                       forbidden: t("list.actionForbidden"),
                       generic: t("list.actionFailed"),
@@ -463,7 +463,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
                   </Select>
                 </FormField>
                 {assignmentMutation.isError && (
-                  <p className="text-xs text-danger-foreground">
+                  <p role="alert" className="text-xs text-danger-foreground">
                     {errorMessage(assignmentMutation.error, {
                       forbidden: t("list.actionForbidden"),
                       generic: t("list.actionFailed"),
@@ -513,7 +513,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
                   </p>
                 )}
                 {resetPasswordMutation.isError && (
-                  <p className="text-xs text-danger-foreground">
+                  <p role="alert" className="text-xs text-danger-foreground">
                     {errorMessage(resetPasswordMutation.error, {
                       forbidden: t("list.actionForbidden"),
                       generic: t("list.actionFailed"),
@@ -559,7 +559,7 @@ function UserRow({ user, presence }: { user: UserSummary; presence: PresenceStat
                   </div>
                 )}
                 {unlockMutation.isError && (
-                  <p className="text-xs text-danger-foreground">
+                  <p role="alert" className="text-xs text-danger-foreground">
                     {errorMessage(unlockMutation.error, {
                       forbidden: t("list.actionForbidden"),
                       generic: t("list.actionFailed"),

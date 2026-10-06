@@ -362,6 +362,10 @@ describe("WebhookSubscriptionsView", () => {
 
       expect(screen.getByText("stripe")).toBeInTheDocument();
       expect(screen.getByText("Signature mismatch")).toBeInTheDocument();
+      // Story 232 — the badge carries the status word; the free-text reason
+      // sits beside it, outside the nowrap badge, so it can wrap on a phone.
+      expect(screen.getByText("inboundRejected")).toBeInTheDocument();
+      expect(screen.getByText("Signature mismatch").closest("[class*='rounded-pill']")).toBeNull();
     });
 
     it("shows a generic error state with a retry action", () => {

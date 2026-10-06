@@ -86,7 +86,10 @@ export function MySessionsView({ hosted = false }: { hosted?: boolean } = {}) {
               <TableHead>{t("columns.ipAddress")}</TableHead>
               <TableHead>{t("columns.lastActive")}</TableHead>
               <TableHead>{t("columns.signedInSince")}</TableHead>
-              <TableHead />
+              <TableHead>
+                {/* Story 232 — the revoke column is named for screen readers. */}
+                <span className="sr-only">{t("columns.actions")}</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -156,7 +159,7 @@ function SessionRow({ session }: { session: SessionSummary }) {
           </>
         )}
         {mutation.isError && (
-          <p className="text-xs text-danger-foreground">
+          <p role="alert" className="text-xs text-danger-foreground">
             {errorMessage(mutation.error, {
               forbidden: t("actionForbidden"),
               generic: t("actionFailed"),

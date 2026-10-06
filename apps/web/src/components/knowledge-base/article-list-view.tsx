@@ -356,7 +356,7 @@ function ArticleRow({ article }: { article: ArticleListItem }) {
           />
         </div>
         {mutation.isError && (
-          <p className="mt-1 text-xs text-danger-foreground">
+          <p role="alert" className="mt-1 text-xs text-danger-foreground">
             {errorMessage(mutation.error, {
               forbidden: t("list.actionForbidden"),
               generic: t("list.actionFailed"),

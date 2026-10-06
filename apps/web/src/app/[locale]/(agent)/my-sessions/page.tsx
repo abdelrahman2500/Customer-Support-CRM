@@ -1,4 +1,7 @@
 import { AccountView } from "@/components/settings/account-view";
+import { pageTitle } from "@/lib/page-title";
+
+export const generateMetadata = pageTitle("workspace.nav", "mySessions");
 
 /** Story 147 — the second component on this page. `/my-sessions` is the
  * `account` nav group's personal account-security screen, and a password

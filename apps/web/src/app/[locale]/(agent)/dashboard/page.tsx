@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { fetchCurrentUser } from "@/lib/auth-server";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
+import { pageTitle } from "@/lib/page-title";
+
+export const generateMetadata = pageTitle("workspace.nav", "dashboard");
 
 /**
  * Story 28 — replaces the Story 23 redirect stub (which itself replaced the

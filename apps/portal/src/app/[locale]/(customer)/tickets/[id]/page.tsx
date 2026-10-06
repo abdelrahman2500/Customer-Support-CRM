@@ -1,4 +1,7 @@
 import { TicketDetailView } from "@/components/tickets/ticket-detail-view";
+import { pageTitle } from "@/lib/page-title";
+
+export const generateMetadata = pageTitle("tickets", "nav");
 
 export default async function TicketDetailPage({
   params,

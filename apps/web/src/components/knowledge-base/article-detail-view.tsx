@@ -348,7 +348,7 @@ export function ArticleDetailView({ articleId }: { articleId: string }) {
                 </SelectContent>
               </Select>
               {categoriesQuery.isError && (
-                <span className="text-xs text-danger-foreground">
+                <span role="alert" className="text-xs text-danger-foreground">
                   {t("detail.categoryLoadError")}
                 </span>
               )}

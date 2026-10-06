@@ -1534,7 +1534,8 @@
       "device": "الجهاز",
       "ipAddress": "عنوان IP",
       "lastActive": "آخر نشاط",
-      "signedInSince": "تاريخ تسجيل الدخول"
+      "signedInSince": "تاريخ تسجيل الدخول",
+      "actions": "الإجراءات"
     },
     "unknownDevice": "جهاز غير معروف",
     "thisDevice": "هذا الجهاز",

@@ -134,7 +134,7 @@ function TaskRow({ task }: { task: TaskSummary }) {
           </span>
         )}
         {completeMutation.isError && (
-          <span className="text-xs text-danger-foreground">
+          <span role="alert" className="text-xs text-danger-foreground">
             {errorMessage(completeMutation.error, {
               forbidden: t("tasks.actionForbidden"),
               generic: t("tasks.actionFailed"),

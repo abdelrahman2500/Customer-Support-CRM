@@ -1,4 +1,7 @@
 import { PortalHomeView } from "@/components/portal/portal-home-view";
+import { pageTitle } from "@/lib/page-title";
+
+export const generateMetadata = pageTitle("home", "nav.home");
 
 /**
  * Story 52 — the Customer Portal's first authenticated page, reached only

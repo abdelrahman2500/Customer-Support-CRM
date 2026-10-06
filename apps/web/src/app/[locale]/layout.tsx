@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { localeDirection } from "@/i18n/direction";
@@ -12,6 +14,22 @@ import { ThemeScript } from "@crm/ui";
 // `dir` depends on the active locale, so it must be set on the <html> tag
 // inside the [locale] segment, which is where the locale param is available.
 // See docs/architecture/10-i18n-and-rtl.md.
+
+/**
+ * Story 232 (PR-6.1) — the document title: a page's own name (its
+ * `generateMetadata`, see `lib/page-title.ts`) followed by the product
+ * name, or the product name alone for a page without one.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "common" });
+  const appName = t("appName");
+  return { title: { template: `%s · ${appName}`, default: appName } };
+}
 
 export function generateStaticParams(): Array<{ locale: string }> {
   return routing.locales.map((locale) => ({ locale }));

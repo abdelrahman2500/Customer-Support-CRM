@@ -200,7 +200,11 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
                 onChange={(event) => setPrimaryColor(event.target.value)}
               />
             </span>
-            {invalidPrimary && <span className="text-danger-foreground">{t("invalidColor")}</span>}
+            {invalidPrimary && (
+              <span role="status" className="text-danger-foreground">
+                {t("invalidColor")}
+              </span>
+            )}
           </label>
           <label className="flex flex-col gap-1 text-xs text-ink-muted">
             {t("secondaryColorLabel")}
@@ -220,7 +224,9 @@ function BrandingForm({ initial }: { initial: BrandingSummary }) {
               />
             </span>
             {invalidSecondary && (
-              <span className="text-danger-foreground">{t("invalidColor")}</span>
+              <span role="status" className="text-danger-foreground">
+                {t("invalidColor")}
+              </span>
             )}
           </label>
           {/* Story 129 — native `<input type="radio">`s in a `<fieldset>`

@@ -226,7 +226,7 @@ function RoleRow({
                     ))
                   )}
                   {permissionsMutation.isError && (
-                    <p className="text-xs text-danger-foreground">
+                    <p role="alert" className="text-xs text-danger-foreground">
                       {errorMessage(permissionsMutation.error, {
                         forbidden: t("list.actionForbidden"),
                         generic: t("list.actionFailed"),
@@ -245,7 +245,7 @@ function RoleRow({
             </Sheet>
           </div>
           {hasError && (
-            <p className="mt-1 text-xs text-danger-foreground">
+            <p role="alert" className="mt-1 text-xs text-danger-foreground">
               {errorMessage(activeError, {
                 forbidden: t("list.actionForbidden"),
                 generic: t("list.actionFailed"),

@@ -147,7 +147,7 @@ function TicketCategoryRow({ category }: { category: TicketCategory }) {
           onBlur={commitName}
         />
         {mutation.isError && (
-          <p className="mt-1 text-xs text-danger-foreground">
+          <p role="alert" className="mt-1 text-xs text-danger-foreground">
             {errorMessage(mutation.error, {
               forbidden: t("actionForbidden"),
               generic: t("actionFailed"),

@@ -1102,7 +1102,11 @@ function ReportCard({
           </Button>
         )}
       </header>
-      {exportError && <p className="mt-1 text-xs text-danger-foreground">{t("export.error")}</p>}
+      {exportError && (
+        <p role="alert" className="mt-1 text-xs text-danger-foreground">
+          {t("export.error")}
+        </p>
+      )}
       {query.isLoading && <ReportCardSkeleton variant={skeleton} label={tCommon("loading")} />}
       {query.isError && forbidden && (
         <Alert variant="destructive" className="mt-2">

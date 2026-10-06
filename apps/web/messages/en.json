@@ -1534,7 +1534,8 @@
       "device": "Device",
       "ipAddress": "IP address",
       "lastActive": "Last active",
-      "signedInSince": "Signed in since"
+      "signedInSince": "Signed in since",
+      "actions": "Actions"
     },
     "unknownDevice": "Unknown device",
     "thisDevice": "This device",

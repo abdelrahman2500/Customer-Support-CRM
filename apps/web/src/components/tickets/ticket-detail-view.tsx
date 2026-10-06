@@ -600,7 +600,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                   </SelectContent>
                 </Select>
                 {categoriesQuery.isError && (
-                  <span className="text-xs text-danger-foreground">
+                  <span role="alert" className="text-xs text-danger-foreground">
                     {t("detail.categoryLoadError")}
                   </span>
                 )}
@@ -666,7 +666,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                   </SelectContent>
                 </Select>
                 {departmentsQuery.isError && (
-                  <span className="text-xs text-danger-foreground">
+                  <span role="alert" className="text-xs text-danger-foreground">
                     {t("detail.departmentLoadError")}
                   </span>
                 )}
@@ -778,7 +778,7 @@ export function TicketDetailView({ ticketId }: { ticketId: string }) {
                   isPending={holdMutation.isPending}
                 />
                 {(holdMutation.isError || resumeMutation.isError) && (
-                  <p className="mt-1 text-xs text-danger-foreground">
+                  <p role="alert" className="mt-1 text-xs text-danger-foreground">
                     {errorMessage(holdMutation.error ?? resumeMutation.error, {
                       forbidden: t("sla.actionForbidden"),
                       generic: t("sla.actionFailed"),

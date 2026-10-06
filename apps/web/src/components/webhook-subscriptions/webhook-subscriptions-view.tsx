@@ -159,11 +159,19 @@ function InboundWebhookLog() {
                     {log.providerKey}
                   </TableCell>
                   <TableCell label={t("inboundColumns.result")}>
-                    <Badge variant={log.verified ? "success" : "destructive"}>
-                      {log.verified
-                        ? t("inboundVerified")
-                        : (log.rejectReason ?? t("inboundRejected"))}
-                    </Badge>
+                    {/* Story 232 — the badge is the status; a free-text reason
+                        sits under it, where it can wrap (inside a nowrap
+                        badge it overflowed the phone layout). */}
+                    <span className="flex flex-col items-start gap-tight">
+                      <Badge variant={log.verified ? "success" : "destructive"}>
+                        {log.verified ? t("inboundVerified") : t("inboundRejected")}
+                      </Badge>
+                      {!log.verified && log.rejectReason && (
+                        <span className="break-words text-caption text-ink-subtle">
+                          {log.rejectReason}
+                        </span>
+                      )}
+                    </span>
                   </TableCell>
                   <TableCell label={t("inboundColumns.receivedAt")} className="text-ink-subtle">
                     {formatDateTime(log.receivedAt, locale)}
@@ -289,7 +297,7 @@ function SubscriptionRows({ subscription }: { subscription: WebhookSubscriptionS
             />
           </div>
           {(updateMutation.isError || deleteMutation.isError) && (
-            <p className="mt-1 text-xs text-danger-foreground">
+            <p role="alert" className="mt-1 text-xs text-danger-foreground">
               {errorMessage(updateMutation.error ?? deleteMutation.error, {
                 forbidden: t("actionForbidden"),
                 generic: t("actionFailed"),
@@ -331,7 +339,11 @@ function DeliveryAttemptsLog({ subscriptionId }: { subscriptionId: string }) {
   }
 
   if (attemptsQuery.isError) {
-    return <p className="text-xs text-danger-foreground">{t("deliveriesError")}</p>;
+    return (
+      <p role="alert" className="text-xs text-danger-foreground">
+        {t("deliveriesError")}
+      </p>
+    );
   }
 
   if (!attemptsQuery.data || attemptsQuery.data.items.length === 0) {
@@ -353,11 +365,19 @@ function DeliveryAttemptsLog({ subscriptionId }: { subscriptionId: string }) {
             <TableRow key={attempt.id}>
               <TableCell label={t("deliveryColumns.eventType")}>{attempt.eventType}</TableCell>
               <TableCell label={t("deliveryColumns.result")}>
-                <Badge variant={attempt.succeeded ? "success" : "destructive"}>
-                  {attempt.succeeded
-                    ? t("deliverySucceeded", { status: attempt.responseStatus ?? "" })
-                    : (attempt.errorMessage ?? t("deliveryFailed"))}
-                </Badge>
+                {/* Story 232 — status badge, free-text reason beneath it. */}
+                <span className="flex flex-col items-start gap-tight">
+                  <Badge variant={attempt.succeeded ? "success" : "destructive"}>
+                    {attempt.succeeded
+                      ? t("deliverySucceeded", { status: attempt.responseStatus ?? "" })
+                      : t("deliveryFailed")}
+                  </Badge>
+                  {!attempt.succeeded && attempt.errorMessage && (
+                    <span className="break-words text-caption text-ink-subtle">
+                      {attempt.errorMessage}
+                    </span>
+                  )}
+                </span>
               </TableCell>
               <TableCell label={t("deliveryColumns.attemptedAt")} className="text-ink-subtle">
                 {formatDateTime(attempt.attemptedAt, locale)}
