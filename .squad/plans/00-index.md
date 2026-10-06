@@ -195,3 +195,29 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | composer-tools | [composer-tools/00-overview.md](./composer-tools/00-overview.md) | Story 208 — "Composer tools" (CRM UI/UX redesign RD-3.8): `FileDropzone` (named file inputs everywhere), attach from the Reply composer, searchable quick replies, AI "Insert into reply"; Insert KB link deferred (no portal origin). | 208 |
 | ai-assist-panel | [ai-assist-panel/00-overview.md](./ai-assist-panel/00-overview.md) | Story 209 — "AI assist panel" (CRM UI/UX redesign RD-3.9): AI assist as a collapsible inspector section, results announced through a persistent polite live region, the latest summary pinned at the top of the timeline. | 209 |
 | crm-product-redesign | [crm-product-redesign/00-overview.md](./crm-product-redesign/00-overview.md) | **Active roadmap (approved 2026-10-05)** — the product redesign track: visual language v2, agent shell v2, a Kanban-first Tickets page, Ticket detail and Dashboard v2, supporting screens, portal, then hardening and QA; supersedes the unstarted RD-3.10 … RD-7.8 items of `crm-ui-ux-redesign`. 26 Stories (PR-1.1 … PR-7.2); direction in `visual-direction.md`, board spec in `tickets-kanban-ux.md`, status in `progress.md`. | 210– |
+| visual-language-v2 | [visual-language-v2/00-overview.md](./visual-language-v2/00-overview.md) | Story 210 — "Visual language v2: tokens and recipes" (CRM product redesign PR-1.1) |
+| primitive-kit-v2 | [primitive-kit-v2/00-overview.md](./primitive-kit-v2/00-overview.md) | Story 211 — "Primitive kit v2" (CRM product redesign PR-1.2) |
+| primitive-restyle-v2 | [primitive-restyle-v2/00-overview.md](./primitive-restyle-v2/00-overview.md) | Story 212 — "Primitive restyle to v2" (CRM product redesign PR-1.3) |
+| agent-shell-v2 | [agent-shell-v2/00-overview.md](./agent-shell-v2/00-overview.md) | Story 213 — "Agent shell v2" (CRM product redesign PR-2.1) |
+| authentication-v2 | [authentication-v2/00-overview.md](./authentication-v2/00-overview.md) | Story 214 — "Authentication v2 (web + portal)" (CRM product redesign PR-2.2) |
+| demo-dataset | [demo-dataset/00-overview.md](./demo-dataset/00-overview.md) | Story 215 — "Demo dataset" (CRM product redesign PR-3.0) |
+| tickets-board-views | [tickets-board-views/00-overview.md](./tickets-board-views/00-overview.md) | Story 216 — "Tickets board: views, columns, cards and toolbar" (CRM product redesign PR-3.1) |
+| tickets-board-moves | [tickets-board-moves/00-overview.md](./tickets-board-moves/00-overview.md) | Story 217 — "Tickets board: moving cards" (CRM product redesign PR-3.2) |
+| tickets-board-freshness | [tickets-board-freshness/00-overview.md](./tickets-board-freshness/00-overview.md) | Story 218 — "Tickets board: freshness and verification" (CRM product redesign PR-3.3) |
+| ticket-detail-v2 | [ticket-detail-v2/00-overview.md](./ticket-detail-v2/00-overview.md) | Story 219 — "Ticket detail v2: inspector completion and polish" (CRM product redesign PR-3.4) |
+| ticket-detail-mobile-nav | [ticket-detail-mobile-nav/00-overview.md](./ticket-detail-mobile-nav/00-overview.md) | Story 220 — "Ticket detail: mobile/tablet, skeleton, prev/next" (CRM product redesign PR-3.5) |
+| dashboard-v2 | [dashboard-v2/00-overview.md](./dashboard-v2/00-overview.md) | Story 221 — "Dashboard v2" (CRM product redesign PR-3.6) |
+| customers-v2 | [customers-v2/00-overview.md](./customers-v2/00-overview.md) | Story 222 — "Customers v2" (CRM product redesign PR-4.1) |
+| knowledge-base-v2 | [knowledge-base-v2/00-overview.md](./knowledge-base-v2/00-overview.md) | Story 223 — "Knowledge base (agent) v2" (CRM product redesign PR-4.2) |
+| account-and-settings | [account-and-settings/00-overview.md](./account-and-settings/00-overview.md) | Story 224 — "Notifications, account and settings" (CRM product redesign PR-4.3) |
+| create-forms-v2 | [create-forms-v2/00-overview.md](./create-forms-v2/00-overview.md) | Story 225 — "Forms and create flows" (CRM product redesign PR-4.4) |
+| admin-people-access | [admin-people-access/00-overview.md](./admin-people-access/00-overview.md) | Story 226 — "Admin I: people and access" (CRM product redesign PR-4.5) |
+| admin-configuration | [admin-configuration/00-overview.md](./admin-configuration/00-overview.md) | Story 227 — "Admin II: configuration" (CRM product redesign PR-4.6) |
+| insights-reports-audit | [insights-reports-audit/00-overview.md](./insights-reports-audit/00-overview.md) | Story 228 — "Insights: reports and audit log" (CRM product redesign PR-4.7) |
+| portal-frame-home | [portal-frame-home/00-overview.md](./portal-frame-home/00-overview.md) | Story 229 — "Portal frame and home" (CRM product redesign PR-5.1) |
+| portal-tickets | [portal-tickets/00-overview.md](./portal-tickets/00-overview.md) | Story 230 — "Portal tickets" (CRM product redesign PR-5.2) |
+| portal-help-account | [portal-help-account/00-overview.md](./portal-help-account/00-overview.md) | Story 231 — "Portal help and account" (CRM product redesign PR-5.3) |
+| accessibility-hardening | [accessibility-hardening/00-overview.md](./accessibility-hardening/00-overview.md) | Story 232 — "Accessibility hardening" (CRM product redesign PR-6.1) |
+| responsive-rtl-theme-parity | [responsive-rtl-theme-parity/00-overview.md](./responsive-rtl-theme-parity/00-overview.md) | Story 233 — "Responsive, RTL and theme parity" (CRM product redesign PR-6.2) |
+| visual-regression-baseline | [visual-regression-baseline/00-overview.md](./visual-regression-baseline/00-overview.md) | Story 234 — "Visual regression baseline" (CRM product redesign PR-7.1) |
+| closeout | [closeout/00-overview.md](./closeout/00-overview.md) | Story 235 — "Closeout" (CRM product redesign PR-7.2) |

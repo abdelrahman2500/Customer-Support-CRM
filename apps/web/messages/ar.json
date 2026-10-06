@@ -366,8 +366,6 @@
     "sla": {
       "none": "لا يوجد هدف اتفاقية مستوى خدمة",
       "breached": "تم الخرق",
-      "breachedAt": "تم الخرق في {time}",
-      "remaining": "الوقت المتبقي: {time}",
       "onHold": "معلّق",
       "onHoldSince": "معلّق منذ {time}",
       "target": {

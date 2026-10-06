@@ -7,7 +7,6 @@ import { useTranslations } from "next-intl";
 import {
   Alert,
   Button,
-  Card,
   FetchingIndicator,
   Input,
   LoadingStatus,

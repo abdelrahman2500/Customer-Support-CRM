@@ -366,8 +366,6 @@
     "sla": {
       "none": "No SLA target",
       "breached": "Breached",
-      "breachedAt": "Breached at {time}",
-      "remaining": "{time} remaining",
       "onHold": "On hold",
       "onHoldSince": "On hold since {time}",
       "target": {

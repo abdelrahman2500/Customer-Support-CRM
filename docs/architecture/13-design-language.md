@@ -35,7 +35,7 @@ Status is always **icon + localized label + tone**; colour is never the only sig
 | Ticket priority | LOW / MEDIUM → neutral · HIGH → `warning` · URGENT → `danger` |
 | SLA | on-track → neutral · at-risk → `warning` · breached → `danger` · on-hold → neutral |
 
-Statuses never use `warning`/`danger`; priorities never use `info`/`progress`. **Status spine (v2):** each status's `solid` tone (CLOSED: `rule-control`) is also its 3px spine — the top edge of its board column, its dot and its distribution-bar segment. HIGH/URGENT tickets add a 3px inline-start **urgency edge** in `warning-solid`/`danger-solid`; other priorities stay neutral. **At-risk** is a presentation tier only: the governing target has ≤ 25% of its window (measured from ticket creation) or ≤ 60 minutes remaining, whichever comes first. It changes no business rule.
+Statuses never use `warning`/`danger`; priorities never use `info`/`progress`. **Status spine (v2):** each status's `solid` tone (CLOSED: `rule-control`) is also its 3px spine — the top edge of its board column and of the ticket header (both apps), its dot, its distribution-bar segment, and the inline-start edge of a portal ticket card. One source: `toneSpine(tone)` in `@crm/ui` (`border` / `dot` / `top` / `start`), fed by `@crm/shared`'s `ticketStatusPresentation`, so customers and agents see the same hue. HIGH/URGENT tickets add a 3px inline-start **urgency edge** in `warning-solid`/`danger-solid`; other priorities stay neutral. **At-risk** is a presentation tier only: the governing target has ≤ 25% of its window (measured from ticket creation) or ≤ 60 minutes remaining, whichever comes first. It changes no business rule.
 
 ## Theme
 
@@ -43,6 +43,7 @@ Statuses never use `warning`/`danger`; priorities never use `info`/`progress`. *
 - Preference: the `crm-theme` cookie (`light` | `dark` | `system`). An explicit light/dark is put on `<html>` before first paint by a blocking inline `ThemeScript` (`@crm/ui`) in each root `<head>`; "system" needs no script. The cookie is deliberately not read on the server, which would make the statically generated `[locale]` layouts dynamic. No per-user database preference.
 - Depth in dark mode comes from lighter surfaces (`sunk` < `surface` < `raised`), not shadows.
 - Uploaded branch logos sit on a light logo plate in dark mode.
+- **Portal chrome (v2):** lighter than the agent's ink chrome — a white (`surface`) header with the 3px brand stripe along its top and a hairline shadow, its row on the content's reading width (`max-w-5xl`). Branding is read server-side and seeded into the query, so the first paint already carries it.
 - `dark:` utilities are a last resort and confined to `packages/ui`.
 
 ## Branch branding
@@ -55,7 +56,9 @@ Statuses never use `warning`/`danger`; priorities never use `info`/`progress`. *
 
 IBM Plex Sans + IBM Plex Sans Arabic (400/500/600). Named scale only: `caption` 12 · `label` 12/600 · `body-sm` 13 · `body` 14 (default UI) · `body-lg` 16 (reading) · `subhead` 16/600 · `heading` 18/600 · `title` 24/600 (page `h1`) · `display` 30/600 (KPIs, `tabular-nums`).
 
-Arabic: no `uppercase`, no letter-spacing (`:lang(ar)` resets it), slightly taller line-height. The Arabic UI shows **Latin digits** — what `Intl` produces for `ar` in this runtime — and no `numberingSystem` override is added (product redesign PD-8, superseding the earlier Arabic-Indic intent). All dates, times and numbers go through `Intl` with the active locale. Counts, times and KPIs use `tabular-nums`.
+Arabic: no `uppercase`, no letter-spacing (`:lang(ar)` resets it), slightly taller line-height. The Arabic UI shows **Latin digits** (product redesign PD-8, superseding the earlier Arabic-Indic intent). Dates and times go through `Intl` with the active locale (`formatDate`/`formatTime` in `@crm/ui`), which gives Latin digits for `ar` in this runtime; formatted numbers whose `Intl` output could differ — currency, percentages, decimals on Reports — pin it with the `-u-nu-latn` extension. Story 233 verified every route in Arabic carries no Arabic-Indic digit. Durations use translated units. Counts, times and KPIs use `tabular-nums`.
+
+**Mixed direction:** text a person wrote can run in the other direction from the UI. Single-line user text (page titles, ticket subjects, article titles, customer and sender names) is isolated with `<bdi>`, which keeps the surrounding alignment; multi-line user text (messages, article bodies, comments) takes its direction from its own content with `dir="auto"`. `PageHeader` and `MessageBubble` do this themselves.
 
 ## Spacing, shape, elevation, density
 
@@ -71,6 +74,35 @@ lucide only, through `packages/ui/src/lib/icons.ts`. 16px inline, 20px navigatio
 ## Motion
 
 `duration-fast` 120ms (hover/press) · `duration-base` 180ms (menus, toasts) · `duration-slow` 240ms (dialogs, sheets); easing `cubic-bezier(.2,0,0,1)`. Sheets enter from the inline-end edge. All motion respects `prefers-reduced-motion`; motion never carries meaning alone.
+
+## Accessibility contract
+
+- Every page has a document title, "<page> · <product>": a page exports `generateMetadata = pageTitle(namespace, key)` (its nav label) and the locale layout supplies the template.
+- Exactly one `h1` per page and per state (loading, error, not found).
+- An inline error that appears because something failed carries `role="alert"` (`role="status"` for validation shown while typing). Conversations are polite `role="log"` regions; progress such as "Thinking…" is a mounted `role="status"`.
+- Every control is named by a real label, never only by a placeholder; text fields stay enabled while their submit is pending.
+- Guards in `apps/web/src/test/` (`a11y-guards`, `table-mobile-labels`, `style-guard`, `token-contrast`) keep these from regressing.
+
+## Primitives and patterns index
+
+`@crm/ui` (`packages/ui/src/components`), by job:
+
+| Job | Primitives |
+|---|---|
+| Actions | `Button`, `DropdownMenu`, `ConfirmDialog`, `AlertDialog` |
+| Forms | `FormField`, `FormSection`/`FormActions` (`form-layout`), `Input`, `PasswordInput`, `Textarea`, `Select`, `NativeSelect`, `Combobox`, `Checkbox`, `Switch`, `Label`, `FileDropzone`, `SegmentedControl` |
+| Surfaces | `Card`/`SectionCard`, `Dialog`, `Sheet`, `Popover`, `Tooltip`, `Separator`, `Tabs` |
+| Page frame | `PageHeader`, `BackLink`, `AuthLayout`, `BrandScope`, `ThemeScript`/`ThemeSwitcher`, `NavigationOverlay` |
+| Lists and data | `ListToolbar`, `FilterBar`/`FilterSelect`, `Table` (mobile card rows), `Pagination`, `SortIndicator`, `DescriptionList`, `Board`/`BoardColumn`, `StatCard`, charts (`BarChart`, `DonutGauge`, `RatingBar`, `DistributionBar`) |
+| Status | `Badge`, `ActiveBadge`, `Avatar`, `Kbd`, `toneSpine` |
+| States | `QueryStateCard`, `EmptyState`, `ErrorState`, `LoadingStatus`, `Skeleton`, `Spinner`, `FetchingIndicator`, `Alert`, `SuccessToaster` |
+| Conversation | `MessageThread` (`fill` for full-height pages), `MessageBubble`, `Composer` |
+
+CRM patterns (in the apps): the tickets board and its moves (`apps/web/src/components/tickets/board`), the ticket header and inspector, the unified timeline (`ticket-chat-card`), `CreateDialog` for multi-field admin creates, URL-backed filters (`lib/url-filters.ts`), the portal `TicketCard` and `StillNeedHelp`. A pattern moves into `@crm/ui` only as a domain-free shell when both apps need the same rendering.
+
+## Visual regression
+
+A local screenshot baseline of the hero screens (both logins, dashboard, board, ticket, portal home and ticket × en/ar × light/dark × 1280/390) lives in `apps/e2e/visual` (`pnpm --filter @crm/e2e test:visual`; see `playwright.visual.config.ts`). It is not a CI gate (PD-9).
 
 ## Principles
 

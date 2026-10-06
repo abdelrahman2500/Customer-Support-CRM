@@ -246,6 +246,12 @@ function failureKind(query: QueryLike): FailureKind | null {
  * depending on whether a range is set; this surfaces that distinction
  * instead of leaving it implicit. See the `dashboards.*` doc comment
  * above for this story's other half (the "Dashboard" naming collision).
+ *
+ * Story 228 — the notes above describe how the filters came to be; today
+ * they live in the URL (`useUrlFilters`, together with the selected saved
+ * view), sit in one `ListToolbar` whose "Clear all" replaced the date-only
+ * Clear button, and a KPI row and a page-level failure state frame the
+ * cards.
  */
 export function ReportsView() {
   const t = useTranslations("reporting");

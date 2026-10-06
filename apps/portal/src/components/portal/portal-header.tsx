@@ -76,8 +76,9 @@ function buildLocalePath(pathname: string, currentLocale: string, targetLocale: 
  * visible scroll affordance. All four are fixed here, mirroring
  * `WorkspaceNav`'s own equivalent Story 96 treatment.
  *
- * RM-11 — Mobile-Responsive Navigation. Below `sm` the flat `<nav>` below
- * is hidden (`hidden sm:flex`, RM-10's own pure-CSS pattern) and a
+ * RM-11 — Mobile-Responsive Navigation. Below `lg` (Story 229; it was `sm`
+ * until six links stopped fitting at tablet width) the flat `<nav>` below
+ * is hidden (`hidden lg:flex`, RM-10's own pure-CSS pattern) and a
  * hamburger `DropdownMenuTrigger` takes its place, opening the identical
  * links as `DropdownMenuItem` `asChild` `Link`s — mirroring
  * `WorkspaceNav`'s own identical RM-11 change, including its "one shared
