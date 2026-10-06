@@ -590,6 +590,23 @@
     background-color: rgb(var(--surface));
     color: rgb(var(--ink));
   }
+
+  /**
+   * Final UX pass — the scrollbar of a container that scrolls on purpose (a
+   * board column, a sheet, a menu, a table or strip wider than the screen):
+   * thin, in the rule colour, darkening while hovered, instead of the
+   * platform's heavy default inside a card. Nothing is hidden, and the
+   * page's own scrollbar (on <html>) keeps the platform look. Containers
+   * that should not scroll at all are fixed where they are built (see
+   * TabsList).
+   */
+  body * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--rule-strong)) transparent;
+  }
+  body *:hover {
+    scrollbar-color: rgb(var(--ink-subtle) / 0.6) transparent;
+  }
 }
 
 @layer components {

@@ -33,7 +33,16 @@ export const TabsList = React.forwardRef<
     // already, so a list that outgrows its container (more tabs, longer
     // Arabic labels) scrolls horizontally in its own box instead of
     // silently clipping — the page itself never scrolls sideways.
-    className={cn("flex items-center gap-1 overflow-x-auto border-b border-rule", className)}
+    //
+    // Final UX pass — the base line is an inset shadow, not a border the
+    // triggers overlap with `-mb-px`: inside an `overflow-x-auto` box that
+    // overlap was 1px of vertical overflow, so every tab strip (Settings'
+    // first) grew its own vertical scrollbar. Nothing overflows now, and
+    // `overflow-y-hidden` keeps it that way.
+    className={cn(
+      "flex items-center gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_rgb(var(--rule))]",
+      className,
+    )}
     {...props}
   />
 ));
@@ -46,9 +55,9 @@ export const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      // `-mb-px` pulls the active underline onto the list's own border so the
-      // two read as one line rather than two stacked rules.
-      "focus-ring -mb-px whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:text-ink disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-accent data-[state=active]:text-ink",
+      // The active underline sits on the list's inset base line, so the two
+      // read as one line rather than two stacked rules.
+      "focus-ring whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:text-ink disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-accent data-[state=active]:text-ink",
       className,
     )}
     {...props}
