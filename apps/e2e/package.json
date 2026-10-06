@@ -7,7 +7,9 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:visual": "playwright test -c playwright.visual.config.ts",
+    "test:visual:update": "playwright test -c playwright.visual.config.ts --update-snapshots"
   },
   "devDependencies": {
     "@crm/config": "workspace:*",
