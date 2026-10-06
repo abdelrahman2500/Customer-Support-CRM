@@ -506,6 +506,24 @@ async function main(): Promise<void> {
       update: { title: titleAr, body: bodyAr },
       create: { articleId: article.id, locale: KbLocale.AR, title: titleAr, body: bodyAr },
     });
+    // Version 1, as publishing writes it — without it a published article
+    // said "no published versions yet".
+    const versionFields = {
+      title,
+      body,
+      category: DEMO_KB_CATEGORIES[categorySlug as keyof typeof DEMO_KB_CATEGORIES],
+      publishedAt,
+    };
+    await prisma.knowledgeBaseArticleVersion.upsert({
+      where: { id: demoId(`kb-version:${slug}:1`) },
+      update: versionFields,
+      create: {
+        id: demoId(`kb-version:${slug}:1`),
+        articleId: article.id,
+        versionNumber: 1,
+        ...versionFields,
+      },
+    });
   }
 
   console.log(
