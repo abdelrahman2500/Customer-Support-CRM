@@ -136,8 +136,14 @@ export function columnQuery(status: TicketStatus, filters: BoardFilters): ListTi
   };
 }
 
-/** "At risk" on the board: an at-risk or breached governing target (not on hold). */
+/** "At risk" on the board: an at-risk or breached governing target (not on hold).
+ *
+ * Demo hardening — only work that is still open can be at risk: a resolved
+ * or closed ticket's targets have long passed, but there is nothing left to
+ * act on, so the At-risk view used to fill with resolved cards (and count
+ * them). */
 export function isAtRiskTicket(ticket: TicketListItem, now: Date = new Date()): boolean {
+  if (ticket.status !== "OPEN" && ticket.status !== "IN_PROGRESS") return false;
   const status = deriveSlaStatus(ticket.slaTarget, now, { createdAt: ticket.createdAt });
   return status.kind === "breached" || (status.kind === "on-track" && status.atRisk);
 }

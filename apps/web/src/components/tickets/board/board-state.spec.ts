@@ -88,8 +88,13 @@ describe("board state", () => {
 
   it("treats breached and at-risk targets as at risk, but not on-hold or on-track", () => {
     const now = new Date("2026-10-05T12:00:00Z");
-    const ticket = (responseTargetAt: string, onHoldSince: string | null = null) =>
+    const ticket = (
+      responseTargetAt: string,
+      onHoldSince: string | null = null,
+      status: TicketListItem["status"] = "OPEN",
+    ) =>
       ({
+        status,
         createdAt: "2026-10-05T08:00:00Z",
         slaTarget: { responseTargetAt, resolutionTargetAt: "2026-10-09T00:00:00Z", onHoldSince },
       }) as unknown as TicketListItem;
@@ -97,6 +102,11 @@ describe("board state", () => {
     expect(isAtRiskTicket(ticket("2026-10-05T12:30:00Z"), now)).toBe(true);
     expect(isAtRiskTicket(ticket("2026-10-05T20:00:00Z"), now)).toBe(false);
     expect(isAtRiskTicket(ticket("2026-10-05T11:00:00Z", "2026-10-05T10:00:00Z"), now)).toBe(false);
+    // Demo hardening — only open work can be at risk: a resolved or closed
+    // ticket whose targets passed long ago is not in the At-risk view.
+    expect(isAtRiskTicket(ticket("2026-10-05T11:00:00Z", null, "IN_PROGRESS"), now)).toBe(true);
+    expect(isAtRiskTicket(ticket("2026-10-05T11:00:00Z", null, "RESOLVED"), now)).toBe(false);
+    expect(isAtRiskTicket(ticket("2026-10-05T11:00:00Z", null, "CLOSED"), now)).toBe(false);
   });
 
   it("gives every status its own spine, with Closed neutral", () => {
