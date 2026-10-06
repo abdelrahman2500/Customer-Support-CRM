@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import {
   createAgentAsAdmin,
-  createPortalContactAsAdmin,
+  createPortalContactWithTicketAsAdmin,
   getMyFullName,
   loginAsAdmin,
 } from "./support/api-client";
@@ -49,7 +49,11 @@ test("switching between an admin and an agent in one tab shows only the current 
   const adminName = await getMyFullName(adminToken);
   const agentEmail = `playwright-agent-${randomUUID()}@example.com`;
   const agentName = `Playwright Agent ${randomUUID().slice(0, 8)}`;
-  await createAgentAsAdmin(adminToken, { email: agentEmail, password: PASSWORD, fullName: agentName });
+  await createAgentAsAdmin(adminToken, {
+    email: agentEmail,
+    password: PASSWORD,
+    fullName: agentName,
+  });
 
   const forbidden: string[] = [];
   page.on("response", (response) => {
@@ -58,7 +62,12 @@ test("switching between an admin and an agent in one tab shows only the current 
   const insights = () => page.getByRole("navigation").getByRole("button", { name: /^Insights/ });
 
   // Admin → Agent.
-  await signIn(page, WEB, process.env.SEED_ADMIN_EMAIL as string, process.env.SEED_ADMIN_PASSWORD as string);
+  await signIn(
+    page,
+    WEB,
+    process.env.SEED_ADMIN_EMAIL as string,
+    process.env.SEED_ADMIN_PASSWORD as string,
+  );
   await expect(page.getByRole("button", { name: `Account menu for ${adminName}` })).toBeVisible();
   await expect(insights()).toBeVisible();
   await signOut(page);
@@ -69,7 +78,11 @@ test("switching between an admin and an agent in one tab shows only the current 
 
   // Agent → Admin.
   await signOut(page);
-  await signInFromHere(page, process.env.SEED_ADMIN_EMAIL as string, process.env.SEED_ADMIN_PASSWORD as string);
+  await signInFromHere(
+    page,
+    process.env.SEED_ADMIN_EMAIL as string,
+    process.env.SEED_ADMIN_PASSWORD as string,
+  );
   await expect(page.getByRole("button", { name: `Account menu for ${adminName}` })).toBeVisible();
   await expect(page.getByRole("button", { name: `Account menu for ${agentName}` })).toHaveCount(0);
   await expect(insights()).toBeVisible();
@@ -78,23 +91,28 @@ test("switching between an admin and an agent in one tab shows only the current 
   expect(forbidden).toEqual([]);
 });
 
-test("switching between two portal contacts in one tab shows only the current contact", async ({
+test("switching between two portal contacts in one tab shows only the current contact's tickets", async ({
   page,
 }) => {
   const adminToken = await loginAsAdmin();
-  const first = `playwright-switch-a-${randomUUID()}@example.com`;
-  const second = `playwright-switch-b-${randomUUID()}@example.com`;
-  await createPortalContactAsAdmin(adminToken, first, PASSWORD);
-  await createPortalContactAsAdmin(adminToken, second, PASSWORD);
-  const customerOf = (email: string) => `Playwright fixture customer ${email}`;
+  const first = {
+    email: `playwright-switch-a-${randomUUID()}@example.com`,
+    subject: `Switch A ${randomUUID()}`,
+  };
+  const second = {
+    email: `playwright-switch-b-${randomUUID()}@example.com`,
+    subject: `Switch B ${randomUUID()}`,
+  };
+  await createPortalContactWithTicketAsAdmin(adminToken, { ...first, password: PASSWORD });
+  await createPortalContactWithTicketAsAdmin(adminToken, { ...second, password: PASSWORD });
 
-  await signIn(page, PORTAL, first, PASSWORD);
-  await page.goto(`${PORTAL}/en/account`);
-  await expect(page.getByText(first)).toBeVisible();
+  await signIn(page, PORTAL, first.email, PASSWORD);
+  await page.goto(`${PORTAL}/en/tickets`);
+  await expect(page.getByText(first.subject)).toBeVisible();
   await signOut(page);
-  await signInFromHere(page, second, PASSWORD);
-  await page.getByRole("link", { name: /Account/ }).first().click();
-  await expect(page.getByText(second)).toBeVisible();
-  await expect(page.getByText(first)).toHaveCount(0);
-  await expect(page.getByText(customerOf(first))).toHaveCount(0);
+  await signInFromHere(page, second.email, PASSWORD);
+  // A client-side navigation, the path that used to reuse the last session.
+  await page.getByRole("link", { name: "My Tickets" }).first().click();
+  await expect(page.getByText(second.subject)).toBeVisible();
+  await expect(page.getByText(first.subject)).toHaveCount(0);
 });
